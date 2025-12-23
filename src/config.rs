@@ -20,6 +20,7 @@ pub struct Config {
     /// Callback URL for 3-legged OAuth
     pub callback_url: String,
     /// Design Automation nickname (optional)
+    #[allow(dead_code)]
     pub da_nickname: Option<String>,
 }
 

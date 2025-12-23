@@ -131,6 +131,7 @@ impl AuthClient {
     }
 
     /// Load token from persistent storage
+    #[allow(dead_code)]
     fn load_stored_token(&self) -> Result<StoredToken> {
         let path = self.token_path();
         let mut file = fs::File::open(&path)?;
@@ -479,6 +480,7 @@ impl AuthClient {
     }
 
     /// Clear the cached 2-legged token
+    #[allow(dead_code)]
     pub async fn clear_cache(&self) {
         let mut cache = self.cached_2leg_token.write().await;
         *cache = None;
