@@ -61,17 +61,91 @@ Each release includes:
 
 ## Publishing to crates.io
 
-Publishing to crates.io happens automatically when a release is published (via the `publish.yml` workflow).
+Publishing to crates.io happens **automatically** when a GitHub Release is published. The `publish.yml` workflow is triggered by the `release` event and uses **Trusted Publishing** (OIDC) - no API tokens needed!
+
+### Automatic Publishing Flow
+
+1. **Create and push a version tag** (see Option 1 above)
+2. **GitHub Actions builds binaries** and creates a GitHub Release
+3. **Publishing the GitHub Release triggers** the `publish.yml` workflow
+4. **The workflow automatically publishes** to crates.io using Trusted Publishing (OIDC)
+
+### Prerequisites for crates.io Publishing (Trusted Publishing)
+
+**No API tokens needed!** This uses crates.io's Trusted Publishing feature with OIDC.
+
+1. **Publish the first version manually** (one-time setup):
+   ```bash
+   cargo login
+   # Enter your crates.io token when prompted
+   cargo publish
+   ```
+   This establishes the crate on crates.io.
+
+2. **Set up Trusted Publishing**:
+   - Go to your crate page on crates.io: https://crates.io/crates/raps
+   - Click the **"Settings"** tab
+   - Scroll to **"Trusted Publishers"** section
+   - Click **"Add Trusted Publisher"**
+   - Select **"GitHub"**
+   - Enter your repository: `dmytro-yemelianov/raps` (or your org/repo)
+   - Click **"Add Publisher"**
+
+3. **That's it!** The workflow will automatically authenticate using OIDC for all future releases.
+
+### Alternative: Token-Based Publishing (Legacy)
+
+If you prefer the old token-based method:
+
+1. **Get a crates.io API token**:
+   - Go to https://crates.io/settings/tokens
+   - Click "New Token"
+   - Name it (e.g., "GitHub Actions")
+   - Select scope: `publish-new-crate` or `api`
+   - Copy the token (starts with `cargo_`)
+
+2. **Add token to GitHub Secrets**:
+   - Go to your repository → **Settings** → **Secrets and variables** → **Actions**
+   - Click **New repository secret**
+   - Name: `CARGO_REGISTRY_TOKEN`
+   - Value: Paste your crates.io token
+   - Click **Add secret**
+
+3. **Update `publish.yml`** to use the token instead of Trusted Publishing.
 
 ### Manual Publishing (if needed)
 
+If you need to publish manually (e.g., for testing or if automatic publishing fails):
+
 ```bash
-# Verify the package
+# 1. Login to crates.io (first time only)
+cargo login
+# Enter your token when prompted
+
+# 2. Verify the package
 cargo package --allow-dirty
 
-# Publish (requires CARGO_REGISTRY_TOKEN)
+# 3. Check what will be published
+cargo publish --dry-run
+
+# 4. Publish
+cargo publish
+```
+
+Or using an environment variable:
+
+```bash
+# Set token
+export CARGO_REGISTRY_TOKEN="your_token_here"
+
+# Verify
+cargo package --allow-dirty
+
+# Publish
 cargo publish --token $CARGO_REGISTRY_TOKEN
 ```
+
+**Note**: Make sure the version in `Cargo.toml` hasn't been published before. crates.io doesn't allow republishing the same version.
 
 ## Version Numbering
 
@@ -90,9 +164,24 @@ Pre-release versions (e.g., `v0.3.0-beta.1`) are automatically marked as pre-rel
 - Check workflow logs for errors
 
 ### crates.io publish fails
-- Verify `CARGO_REGISTRY_TOKEN` is set correctly
-- Check that the version hasn't been published before
-- Ensure `Cargo.toml` metadata is correct
+- **Trusted Publishing issues** (if using OIDC):
+  - Verify Trusted Publisher is configured on crates.io (Settings → Trusted Publishers)
+  - Check that repository name matches exactly (owner/repo)
+  - Ensure workflow has `id-token: write` permission
+  - Verify the first version was published manually
+- **Token issues** (if using legacy token method):
+  - Verify `CARGO_REGISTRY_TOKEN` is set in GitHub Secrets
+  - Check token hasn't expired (regenerate if needed)
+  - Ensure token has `publish-new-crate` or `api` scope
+- **Version already exists**: Check https://crates.io/crates/raps/versions
+- **Metadata issues**:
+  - Ensure `Cargo.toml` has all required fields (name, version, description, license, authors)
+  - Check that `repository`, `homepage`, `documentation` URLs are valid
+  - Verify `readme` file exists and is included
+- **Package validation**:
+  - Run `cargo package --allow-dirty` locally to check for errors
+  - Check for excluded files that shouldn't be excluded
+  - Verify no large files (>10MB) are included
 
 ### Build fails for specific platform
 - Check the build matrix in `.github/workflows/release.yml`
