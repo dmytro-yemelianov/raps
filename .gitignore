@@ -1,0 +1,45 @@
+# Rust
+/target
+**/*.rs.bk
+*.pdb
+# Note: Cargo.lock should be committed for binaries/applications
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.rlib
+*.lib
+
+# Test coverage
+tarpaulin-report.html
+coverage/
+*.profraw
+
+# Generated files
+generated-files/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Rust-analyzer
+.rust-analyzer/
+rust-project.json
+
