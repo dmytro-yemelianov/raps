@@ -223,6 +223,9 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs", self.config.project_url());
 
+        // Log request in verbose/debug mode
+        crate::logging::log_request("GET", &url);
+
         let response = self
             .http_client
             .get(&url)
@@ -230,6 +233,9 @@ impl DataManagementClient {
             .send()
             .await
             .context("Failed to list hubs")?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();

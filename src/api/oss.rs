@@ -218,6 +218,9 @@ impl OssClient {
             policy_key: policy.to_string(),
         };
 
+        // Log request in verbose/debug mode
+        crate::logging::log_request("POST", &url);
+
         let response = self
             .http_client
             .post(&url)
@@ -228,6 +231,9 @@ impl OssClient {
             .send()
             .await
             .context("Failed to create bucket")?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();
@@ -308,6 +314,9 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}/details", self.config.oss_url(), bucket_key);
 
+        // Log request in verbose/debug mode
+        crate::logging::log_request("GET", &url);
+
         let response = self
             .http_client
             .get(&url)
@@ -315,6 +324,9 @@ impl OssClient {
             .send()
             .await
             .context("Failed to get bucket details")?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();

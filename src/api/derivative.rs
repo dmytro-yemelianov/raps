@@ -247,6 +247,9 @@ impl DerivativeClient {
             },
         };
 
+        // Log request in verbose/debug mode
+        crate::logging::log_request("POST", &url);
+
         let response = self
             .http_client
             .post(&url)
@@ -257,6 +260,9 @@ impl DerivativeClient {
             .send()
             .await
             .context("Failed to start translation")?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();

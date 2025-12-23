@@ -71,16 +71,20 @@
 
 ## Remaining Work
 
-### Commands Still Needing Non-Interactive Updates
+### Commands Updated for Non-Interactive Mode ✅
 
-- `folder create` - needs `--name` flag requirement
-- `webhook create` - needs `--url` and `--event` flag requirements
-- `auth login` - partially done (has `--default`), but could add `--scopes` flag
+- ✅ `translate start` - requires `--urn` and `--format`
+- ✅ `bucket create` - requires `--key`, defaults region/policy
+- ✅ `issue create` - requires `--title`
+- ✅ `reality create` - requires `--name`, defaults scene-type/format
+- ✅ `folder create` - requires `--name`
+- ✅ `webhook create` - requires `--url` and `--event`
 
 ### Integration Work
 
-- **Logging Integration**: API clients should use `logging::log_request()` and `logging::log_response()` for verbose/debug output
-- **Error Context**: Enhance error messages with more context for better exit code detection
+- ✅ **Logging Integration**: Added logging to key API methods (derivative, oss, data_management)
+- ⏭️ **Additional Logging**: Can be extended to other API methods as needed
+- ⏭️ **Error Context**: Enhance error messages with more context for better exit code detection
 
 ## Testing Recommendations
 
