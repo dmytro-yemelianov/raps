@@ -112,6 +112,10 @@ fn extract_hub_type(ext_type: &str) -> String {
     } else if ext_type.contains("fusion") {
         "Fusion".to_string()
     } else {
-        ext_type.split(':').last().unwrap_or("Unknown").to_string()
+        ext_type
+            .split(':')
+            .next_back()
+            .unwrap_or("Unknown")
+            .to_string()
     }
 }

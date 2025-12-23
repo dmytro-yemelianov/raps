@@ -3,7 +3,7 @@ use colored::*;
 use rand::Rng;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Args)]
 pub struct GenerateArgs {
@@ -237,7 +237,7 @@ struct Stats {
 }
 
 fn generate_obj(
-    output: &PathBuf,
+    output: &Path,
     index: u32,
     _settings: &ComplexitySettings,
 ) -> anyhow::Result<(u64, u64)> {
@@ -315,7 +315,7 @@ fn generate_obj(
     Ok((obj_path.metadata()?.len(), mtl_path.metadata()?.len()))
 }
 
-fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
+fn generate_dxf(output: &Path, index: u32) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let width: f64 = rng.gen_range(20.0..40.0);
     let height: f64 = rng.gen_range(15.0..30.0);
@@ -376,7 +376,7 @@ fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
     Ok(path.metadata()?.len())
 }
 
-fn generate_stl(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
+fn generate_stl(output: &Path, index: u32) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let scale: f64 = rng.gen_range(10.0..30.0);
 
@@ -407,7 +407,7 @@ fn generate_stl(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
 }
 
 fn generate_ifc(
-    output: &PathBuf,
+    output: &Path,
     index: u32,
     settings: &ComplexitySettings,
 ) -> anyhow::Result<u64> {
@@ -476,7 +476,7 @@ fn generate_ifc(
     }
 
     // Add elements
-    let elements_per_storey = settings.elements / storey_count;
+    let _elements_per_storey = settings.elements / storey_count;
     for _ in 0..settings.elements {
         let cat = ifc_categories[rng.gen_range(0..ifc_categories.len())];
         content.push_str(&format!(
@@ -499,7 +499,7 @@ fn generate_ifc(
 }
 
 fn generate_json(
-    output: &PathBuf,
+    output: &Path,
     index: u32,
     settings: &ComplexitySettings,
 ) -> anyhow::Result<u64> {
@@ -562,7 +562,7 @@ fn generate_json(
 }
 
 fn generate_xyz(
-    output: &PathBuf,
+    output: &Path,
     index: u32,
     settings: &ComplexitySettings,
 ) -> anyhow::Result<u64> {

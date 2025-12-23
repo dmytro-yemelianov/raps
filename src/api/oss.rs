@@ -2,6 +2,9 @@
 //!
 //! Handles bucket and object operations for storing files in APS.
 
+// API response structs may contain fields we don't use - this is expected for external API contracts
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -54,6 +57,7 @@ impl RetentionPolicy {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Region {
     US,
+    #[allow(clippy::upper_case_acronyms)]
     EMEA,
 }
 

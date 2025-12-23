@@ -2,6 +2,9 @@
 //!
 //! Handles translation of CAD files and retrieval of derivative manifests.
 
+// API response structs may contain fields we don't use - this is expected for external API contracts
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -301,6 +304,7 @@ impl DerivativeClient {
     }
 
     /// Delete manifest (and all derivatives)
+    #[allow(dead_code)]
     pub async fn delete_manifest(&self, urn: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
         let url = format!(
