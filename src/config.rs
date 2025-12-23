@@ -20,6 +20,7 @@ pub struct Config {
     /// Callback URL for 3-legged OAuth
     pub callback_url: String,
     /// Design Automation nickname (optional)
+    #[allow(dead_code)]
     pub da_nickname: Option<String>,
 }
 
@@ -29,8 +30,8 @@ impl Config {
     /// Looks for:
     /// - APS_CLIENT_ID: Your APS application client ID
     /// - APS_CLIENT_SECRET: Your APS application client secret
-    /// - APS_BASE_URL: Optional, defaults to https://developer.api.autodesk.com
-    /// - APS_CALLBACK_URL: Optional, defaults to http://localhost:8080/callback
+    /// - APS_BASE_URL: Optional, defaults to <https://developer.api.autodesk.com>
+    /// - APS_CALLBACK_URL: Optional, defaults to <http://localhost:8080/callback>
     /// - APS_DA_NICKNAME: Optional, Design Automation nickname
     pub fn from_env() -> Result<Self> {
         // Try to load .env file if it exists (silently ignore if not found)

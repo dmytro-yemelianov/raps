@@ -6,15 +6,26 @@ Thank you for your interest in contributing to APS CLI! This document provides g
 
 By participating in this project, you agree to maintain a respectful and inclusive environment for all contributors.
 
+## Branch Protection Policy
+
+**Important**: The `main` branch is protected. All changes must be made through feature branches and Pull Requests (PRs). Direct pushes to `main` are not allowed.
+
+### Workflow Requirements
+
+- ✅ All changes must go through a Pull Request
+- ✅ All CI checks must pass before a PR can be merged
+- ✅ At least one approval may be required (depending on repository settings)
+- ✅ PRs must be up to date with the main branch before merging
+
 ## Getting Started
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
+1. **Fork the repository** on GitHub (if you don't have write access)
+2. **Clone the repository** locally:
    ```bash
    git clone https://github.com/dmytro-yemelianov/raps.git
    cd raps
    ```
-3. **Add the upstream remote** (if contributing back):
+3. **Add the upstream remote** (if you forked):
    ```bash
    git remote add upstream https://github.com/dmytro-yemelianov/raps.git
    ```
@@ -62,22 +73,55 @@ cargo doc --no-deps --all-features
 
 ## Making Changes
 
-1. **Create a branch** for your changes:
+**⚠️ Never commit directly to `main` branch. Always create a feature branch.**
+
+1. **Ensure you're on the main branch and up to date**:
+   ```bash
+   git checkout main
+   git pull origin main
+   ```
+
+2. **Create a branch** for your changes:
    ```bash
    git checkout -b feature/your-feature-name
    # or
    git checkout -b fix/your-bug-fix
+   # or
+   git checkout -b docs/update-readme
    ```
 
-2. **Make your changes** following the coding standards:
+   Branch naming conventions:
+   - `feature/` - New features
+   - `fix/` - Bug fixes
+   - `docs/` - Documentation updates
+   - `refactor/` - Code refactoring
+   - `test/` - Test additions/updates
+   - `chore/` - Maintenance tasks
+
+3. **Make your changes** following the coding standards:
    - Use meaningful variable and function names
    - Add comments for complex logic
    - Follow Rust naming conventions (snake_case for functions/variables, PascalCase for types)
    - Keep functions focused and small
 
-3. **Write or update tests** as needed
+4. **Write or update tests** as needed
 
-4. **Commit your changes**:
+5. **Run quality checks locally** before committing:
+   ```bash
+   # Format code
+   cargo fmt
+   
+   # Check formatting
+   cargo fmt --all -- --check
+   
+   # Run clippy
+   cargo clippy --all-features -- -D warnings
+   
+   # Run tests
+   cargo test --all-features
+   ```
+
+6. **Commit your changes**:
    ```bash
    git add .
    git commit -m "Description of your changes"
@@ -91,12 +135,18 @@ cargo doc --no-deps --all-features
    - `test: Add tests`
    - `chore: Maintenance tasks`
 
-5. **Push to your fork**:
+7. **Push your branch**:
    ```bash
    git push origin feature/your-feature-name
    ```
 
-6. **Create a Pull Request** on GitHub
+8. **Create a Pull Request** on GitHub:
+   - Go to the repository on GitHub
+   - Click "New Pull Request"
+   - Select your branch
+   - Fill out the PR template
+   - Wait for CI checks to pass
+   - Request review if needed
 
 ## Pull Request Guidelines
 
@@ -105,7 +155,19 @@ cargo doc --no-deps --all-features
 - **Reference issues**: Link to related issues using `Fixes #123` or `Closes #123`
 - **Update documentation**: If you add features, update the README.md
 - **Add tests**: Include tests for new functionality
-- **Ensure CI passes**: All GitHub Actions checks must pass
+- **Ensure CI passes**: All GitHub Actions checks must pass before merging
+- **Keep PRs small**: Smaller PRs are easier to review and merge faster
+- **Update your branch**: Rebase or merge main into your branch if it's behind
+- **Respond to feedback**: Address review comments promptly
+
+### PR Checklist
+
+Before requesting review, ensure:
+- [ ] Code follows the project's style guidelines
+- [ ] All tests pass locally
+- [ ] Documentation is updated if needed
+- [ ] Commit messages are clear and descriptive
+- [ ] Branch is up to date with main
 
 ## Testing
 

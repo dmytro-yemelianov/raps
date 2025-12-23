@@ -2,6 +2,9 @@
 //!
 //! Handles access to Hubs, Projects, Folders, and Items in BIM 360/ACC.
 
+// API response structs may contain fields we don't use - this is expected for external API contracts
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 

@@ -340,6 +340,17 @@ This CLI covers the following APS APIs (validated against OpenAPI specs):
 - **Construction Issues API v1** - Issues, issue types
 - **Reality Capture API v1** - Photogrammetry processing
 
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Development setup
+- Code style guidelines
+- Pull request process
+- Branch protection policy
+
+**Important**: The `main` branch is protected. All changes must be made through Pull Requests. See [Branch Protection Setup](docs/BRANCH_PROTECTION.md) for details.
+
 ## License
 
 MIT License

@@ -16,6 +16,8 @@ use crate::config::{Config, DEFAULT_CALLBACK_PORT};
 
 /// User profile information from /userinfo endpoint
 #[derive(Debug, Clone, Deserialize)]
+// API response structs may contain fields we don't use - this is expected for external API contracts
+#[allow(dead_code)]
 pub struct UserInfo {
     /// The unique APS ID of the user
     pub sub: String,
@@ -131,6 +133,7 @@ impl AuthClient {
     }
 
     /// Load token from persistent storage
+    #[allow(dead_code)]
     fn load_stored_token(&self) -> Result<StoredToken> {
         let path = self.token_path();
         let mut file = fs::File::open(&path)?;
@@ -293,6 +296,7 @@ impl AuthClient {
         println!("\nWaiting for authentication callback...");
 
         // Wait for callback - may receive multiple requests (favicon, etc.)
+        #[allow(unused_assignments)]
         let mut auth_code: Option<String> = None;
 
         loop {
@@ -479,6 +483,7 @@ impl AuthClient {
     }
 
     /// Clear the cached 2-legged token
+    #[allow(dead_code)]
     pub async fn clear_cache(&self) {
         let mut cache = self.cached_2leg_token.write().await;
         *cache = None;
