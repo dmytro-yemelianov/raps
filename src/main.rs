@@ -13,6 +13,7 @@
 mod api;
 mod commands;
 mod config;
+mod output;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
@@ -30,6 +31,7 @@ use commands::{
     TranslateCommands, WebhookCommands,
 };
 use config::Config;
+use output::OutputFormat;
 
 /// RAPS - Rust APS CLI - Command-line interface for Autodesk Platform Services
 #[derive(Parser)]
@@ -39,6 +41,10 @@ use config::Config;
 #[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
+    /// Output format: table, json, csv, or plain (default: auto-detect)
+    #[arg(long, value_name = "FORMAT")]
+    output: Option<String>,
+
     #[command(subcommand)]
     command: Commands,
 }
@@ -134,6 +140,14 @@ async fn run() -> Result<()> {
         return Ok(());
     }
 
+    // Determine output format
+    let output_format = if let Some(format_str) = &cli.output {
+        Some(format_str.parse()?)
+    } else {
+        None
+    };
+    let output_format = OutputFormat::determine(output_format);
+
     // Load configuration
     let config = Config::from_env()?;
 
@@ -149,51 +163,51 @@ async fn run() -> Result<()> {
 
     match cli.command {
         Commands::Auth(cmd) => {
-            cmd.execute(&auth_client).await?;
+            cmd.execute(&auth_client, output_format).await?;
         }
 
         Commands::Bucket(cmd) => {
-            cmd.execute(&oss_client).await?;
+            cmd.execute(&oss_client, output_format).await?;
         }
 
         Commands::Object(cmd) => {
-            cmd.execute(&oss_client).await?;
+            cmd.execute(&oss_client, output_format).await?;
         }
 
         Commands::Translate(cmd) => {
-            cmd.execute(&derivative_client).await?;
+            cmd.execute(&derivative_client, output_format).await?;
         }
 
         Commands::Hub(cmd) => {
-            cmd.execute(&dm_client).await?;
+            cmd.execute(&dm_client, output_format).await?;
         }
 
         Commands::Project(cmd) => {
-            cmd.execute(&dm_client).await?;
+            cmd.execute(&dm_client, output_format).await?;
         }
 
         Commands::Folder(cmd) => {
-            cmd.execute(&dm_client).await?;
+            cmd.execute(&dm_client, output_format).await?;
         }
 
         Commands::Item(cmd) => {
-            cmd.execute(&dm_client).await?;
+            cmd.execute(&dm_client, output_format).await?;
         }
 
         Commands::Webhook(cmd) => {
-            cmd.execute(&webhooks_client).await?;
+            cmd.execute(&webhooks_client, output_format).await?;
         }
 
         Commands::Da(cmd) => {
-            cmd.execute(&da_client).await?;
+            cmd.execute(&da_client, output_format).await?;
         }
 
         Commands::Issue(cmd) => {
-            cmd.execute(&issues_client).await?;
+            cmd.execute(&issues_client, output_format).await?;
         }
 
         Commands::Reality(cmd) => {
-            cmd.execute(&rc_client).await?;
+            cmd.execute(&rc_client, output_format).await?;
         }
 
         Commands::Generate(args) => {

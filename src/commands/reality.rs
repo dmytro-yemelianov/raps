@@ -7,11 +7,13 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::api::reality_capture::{OutputFormat, SceneType};
+use crate::api::reality_capture::{OutputFormat as RealityOutputFormat, SceneType};
 use crate::api::RealityCaptureClient;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum RealityCommands {
@@ -77,31 +79,31 @@ pub enum RealityCommands {
 }
 
 impl RealityCommands {
-    pub async fn execute(self, client: &RealityCaptureClient) -> Result<()> {
+    pub async fn execute(self, client: &RealityCaptureClient, output_format: OutputFormat) -> Result<()> {
         match self {
             RealityCommands::Create {
                 name,
                 scene_type,
                 format,
-            } => create_photoscene(client, name, scene_type, format).await,
+            } => create_photoscene(client, name, scene_type, format, output_format).await,
             RealityCommands::Upload {
                 photoscene_id,
                 photos,
-            } => upload_photos(client, &photoscene_id, photos).await,
+            } => upload_photos(client, &photoscene_id, photos, output_format).await,
             RealityCommands::Process { photoscene_id } => {
-                start_processing(client, &photoscene_id).await
+                start_processing(client, &photoscene_id, output_format).await
             }
             RealityCommands::Status {
                 photoscene_id,
                 wait,
-            } => check_status(client, &photoscene_id, wait).await,
+            } => check_status(client, &photoscene_id, wait, output_format).await,
             RealityCommands::Result {
                 photoscene_id,
                 format,
-            } => get_result(client, &photoscene_id, &format).await,
-            RealityCommands::Formats => list_formats(client),
+            } => get_result(client, &photoscene_id, &format, output_format).await,
+            RealityCommands::Formats => list_formats(client, output_format),
             RealityCommands::Delete { photoscene_id } => {
-                delete_photoscene(client, &photoscene_id).await
+                delete_photoscene(client, &photoscene_id, output_format).await
             }
         }
     }
@@ -112,6 +114,7 @@ async fn create_photoscene(
     name: Option<String>,
     scene_type: Option<String>,
     format: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get name
     let scene_name = match name {
@@ -146,7 +149,7 @@ async fn create_photoscene(
     let selected_format = match format {
         Some(f) => parse_format(&f)?,
         None => {
-            let formats = OutputFormat::all();
+            let formats = RealityOutputFormat::all();
             let format_labels: Vec<String> = formats
                 .iter()
                 .map(|f| format!("{} - {}", f, f.description()))
@@ -162,29 +165,51 @@ async fn create_photoscene(
         }
     };
 
-    println!("{}", "Creating photoscene...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Creating photoscene...".dimmed());
+    }
 
     let photoscene = client
         .create_photoscene(&scene_name, selected_scene_type, selected_format)
         .await?;
 
-    println!("{} Photoscene created!", "✓".green().bold());
-    println!("  {} {}", "ID:".bold(), photoscene.photoscene_id.cyan());
-    println!("  {} {}", "Name:".bold(), scene_name);
+    #[derive(Serialize)]
+    struct CreatePhotosceneOutput {
+        success: bool,
+        photoscene_id: String,
+        name: String,
+    }
 
-    println!("\n{}", "Next steps:".yellow());
-    println!(
-        "  1. Upload photos: raps reality upload {} <photo1.jpg> <photo2.jpg> ...",
-        photoscene.photoscene_id
-    );
-    println!(
-        "  2. Start processing: raps reality process {}",
-        photoscene.photoscene_id
-    );
-    println!(
-        "  3. Check status: raps reality status {} --wait",
-        photoscene.photoscene_id
-    );
+    let output = CreatePhotosceneOutput {
+        success: true,
+        photoscene_id: photoscene.photoscene_id.clone(),
+        name: scene_name.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Photoscene created!", "✓".green().bold());
+            println!("  {} {}", "ID:".bold(), output.photoscene_id.cyan());
+            println!("  {} {}", "Name:".bold(), output.name);
+
+            println!("\n{}", "Next steps:".yellow());
+            println!(
+                "  1. Upload photos: raps reality upload {} <photo1.jpg> <photo2.jpg> ...",
+                output.photoscene_id
+            );
+            println!(
+                "  2. Start processing: raps reality process {}",
+                output.photoscene_id
+            );
+            println!(
+                "  3. Check status: raps reality status {} --wait",
+                output.photoscene_id
+            );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
 
     Ok(())
 }
@@ -193,6 +218,7 @@ async fn upload_photos(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     photos: Vec<PathBuf>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Validate files exist
     for photo in &photos {
@@ -224,7 +250,7 @@ async fn upload_photos(
     Ok(())
 }
 
-async fn start_processing(client: &RealityCaptureClient, photoscene_id: &str) -> Result<()> {
+async fn start_processing(client: &RealityCaptureClient, photoscene_id: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Starting processing...".dimmed());
 
     client.start_processing(photoscene_id).await?;
@@ -241,6 +267,7 @@ async fn check_status(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     wait: bool,
+    output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
         let spinner = ProgressBar::new_spinner();
@@ -294,6 +321,7 @@ async fn get_result(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     format: &str,
+    output_format: OutputFormat,
 ) -> Result<()> {
     let output_format = parse_format(format)?;
 
@@ -322,7 +350,7 @@ async fn get_result(
     Ok(())
 }
 
-fn list_formats(client: &RealityCaptureClient) -> Result<()> {
+fn list_formats(client: &RealityCaptureClient, output_format: OutputFormat) -> Result<()> {
     let formats = client.available_formats();
 
     println!("\n{}", "Available Output Formats:".bold());
@@ -341,7 +369,7 @@ fn list_formats(client: &RealityCaptureClient) -> Result<()> {
     Ok(())
 }
 
-async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str) -> Result<()> {
+async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting photoscene...".dimmed());
 
     client.delete_photoscene(photoscene_id).await?;
@@ -354,13 +382,13 @@ async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str) -
     Ok(())
 }
 
-fn parse_format(s: &str) -> Result<OutputFormat> {
+fn parse_format(s: &str) -> Result<RealityOutputFormat> {
     match s.to_lowercase().as_str() {
-        "rcm" => Ok(OutputFormat::Rcm),
-        "rcs" => Ok(OutputFormat::Rcs),
-        "obj" => Ok(OutputFormat::Obj),
-        "fbx" => Ok(OutputFormat::Fbx),
-        "ortho" => Ok(OutputFormat::Ortho),
+        "rcm" => Ok(RealityOutputFormat::Rcm),
+        "rcs" => Ok(RealityOutputFormat::Rcs),
+        "obj" => Ok(RealityOutputFormat::Obj),
+        "fbx" => Ok(RealityOutputFormat::Fbx),
+        "ortho" => Ok(RealityOutputFormat::Ortho),
         _ => anyhow::bail!("Invalid format. Use: rcm, rcs, obj, fbx, ortho"),
     }
 }

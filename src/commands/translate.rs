@@ -7,9 +7,11 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::Serialize;
 use std::time::Duration;
 
-use crate::api::{derivative::OutputFormat, DerivativeClient};
+use crate::api::{derivative::OutputFormat as DerivativeOutputFormat, DerivativeClient};
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum TranslateCommands {
@@ -45,17 +47,25 @@ pub enum TranslateCommands {
 }
 
 impl TranslateCommands {
-    pub async fn execute(self, client: &DerivativeClient) -> Result<()> {
+    pub async fn execute(self, client: &DerivativeClient, output_format: OutputFormat) -> Result<()> {
         match self {
             TranslateCommands::Start {
                 urn,
                 format,
                 root_filename,
-            } => start_translation(client, urn, format, root_filename).await,
-            TranslateCommands::Status { urn, wait } => check_status(client, &urn, wait).await,
-            TranslateCommands::Manifest { urn } => show_manifest(client, &urn).await,
+            } => start_translation(client, urn, format, root_filename, output_format).await,
+            TranslateCommands::Status { urn, wait } => check_status(client, &urn, wait, output_format).await,
+            TranslateCommands::Manifest { urn } => show_manifest(client, &urn, output_format).await,
         }
     }
+}
+
+#[derive(Serialize)]
+struct TranslationStartOutput {
+    success: bool,
+    result: String,
+    urn: String,
+    accepted_formats: Vec<String>,
 }
 
 async fn start_translation(
@@ -63,6 +73,7 @@ async fn start_translation(
     urn: Option<String>,
     format: Option<String>,
     root_filename: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get URN interactively if not provided
     let source_urn = match urn {
@@ -80,22 +91,22 @@ async fn start_translation(
     };
 
     // Select output format interactively if not provided
-    let output_format = match format {
+    let derivative_format = match format {
         Some(f) => match f.to_lowercase().as_str() {
-            "svf2" => OutputFormat::Svf2,
-            "svf" => OutputFormat::Svf,
-            "thumbnail" => OutputFormat::Thumbnail,
-            "obj" => OutputFormat::Obj,
-            "stl" => OutputFormat::Stl,
-            "step" => OutputFormat::Step,
-            "iges" => OutputFormat::Iges,
-            "ifc" => OutputFormat::Ifc,
+            "svf2" => DerivativeOutputFormat::Svf2,
+            "svf" => DerivativeOutputFormat::Svf,
+            "thumbnail" => DerivativeOutputFormat::Thumbnail,
+            "obj" => DerivativeOutputFormat::Obj,
+            "stl" => DerivativeOutputFormat::Stl,
+            "step" => DerivativeOutputFormat::Step,
+            "iges" => DerivativeOutputFormat::Iges,
+            "ifc" => DerivativeOutputFormat::Ifc,
             _ => anyhow::bail!(
                 "Invalid format. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc"
             ),
         },
         None => {
-            let formats = OutputFormat::all();
+            let formats = DerivativeOutputFormat::all();
             let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
 
             let selection = Select::new()
@@ -108,38 +119,64 @@ async fn start_translation(
         }
     };
 
-    println!(
-        "{} {} {} {}",
-        "Starting translation".dimmed(),
-        "→".dimmed(),
-        output_format.to_string().cyan(),
-        "format".dimmed()
-    );
-
-    let response = client
-        .translate(&source_urn, output_format, root_filename.as_deref())
-        .await?;
-
-    println!("{} Translation job started!", "✓".green().bold());
-    println!("  {} {}", "Result:".bold(), response.result);
-    println!("  {} {}", "URN:".bold(), response.urn);
-
-    if let Some(jobs) = response.accepted_jobs {
-        println!("  {} ", "Accepted formats:".bold());
-        for format in jobs.output.formats {
-            println!("    {} {}", "•".dimmed(), format.format_type.cyan());
-        }
+    if output_format.supports_colors() {
+        println!(
+            "{} {} {} {}",
+            "Starting translation".dimmed(),
+            "→".dimmed(),
+            derivative_format.to_string().cyan(),
+            "format".dimmed()
+        );
     }
 
-    println!(
-        "\n{}",
-        "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed()
-    );
+    let response = client
+        .translate(&source_urn, derivative_format, root_filename.as_deref())
+        .await?;
+
+    let accepted_formats: Vec<String> = response.accepted_jobs.as_ref()
+        .map(|jobs| jobs.output.formats.iter().map(|f| f.format_type.clone()).collect())
+        .unwrap_or_default();
+
+    let output = TranslationStartOutput {
+        success: true,
+        result: response.result.clone(),
+        urn: response.urn.clone(),
+        accepted_formats,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Translation job started!", "✓".green().bold());
+            println!("  {} {}", "Result:".bold(), output.result);
+            println!("  {} {}", "URN:".bold(), output.urn);
+
+            if !output.accepted_formats.is_empty() {
+                println!("  {} ", "Accepted formats:".bold());
+                for format in &output.accepted_formats {
+                    println!("    {} {}", "•".dimmed(), format.cyan());
+                }
+            }
+
+            println!(
+                "\n{}",
+                "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed()
+            );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
 
     Ok(())
 }
 
-async fn check_status(client: &DerivativeClient, urn: &str, wait: bool) -> Result<()> {
+#[derive(Serialize)]
+struct StatusOutput {
+    status: String,
+    progress: String,
+}
+
+async fn check_status(client: &DerivativeClient, urn: &str, wait: bool, output_format: OutputFormat) -> Result<()> {
     if wait {
         // Poll until complete
         let spinner = ProgressBar::new_spinner();
@@ -183,77 +220,96 @@ async fn check_status(client: &DerivativeClient, urn: &str, wait: bool) -> Resul
         // Just show current status
         let (status, progress) = client.get_status(urn).await?;
 
-        let status_icon = match status.as_str() {
-            "success" => "✓".green().bold(),
-            "failed" | "timeout" => "✗".red().bold(),
-            "inprogress" | "pending" => "⋯".yellow().bold(),
-            _ => "?".dimmed(),
+        let output = StatusOutput {
+            status: status.clone(),
+            progress: progress.clone(),
         };
 
-        println!("{} {} ({})", status_icon, status, progress);
+        match output_format {
+            OutputFormat::Table => {
+                let status_icon = match status.as_str() {
+                    "success" => "✓".green().bold(),
+                    "failed" | "timeout" => "✗".red().bold(),
+                    "inprogress" | "pending" => "⋯".yellow().bold(),
+                    _ => "?".dimmed(),
+                };
+                println!("{} {} ({})", status_icon, status, progress);
+            }
+            _ => {
+                output_format.write(&output)?;
+            }
+        }
     }
 
     Ok(())
 }
 
-async fn show_manifest(client: &DerivativeClient, urn: &str) -> Result<()> {
+async fn show_manifest(client: &DerivativeClient, urn: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching manifest...".dimmed());
 
     let manifest = client.get_manifest(urn).await?;
 
-    let status_icon = match manifest.status.as_str() {
-        "success" => "✓".green().bold(),
-        "failed" | "timeout" => "✗".red().bold(),
-        "inprogress" | "pending" => "⋯".yellow().bold(),
-        _ => "?".dimmed(),
-    };
-
-    println!("\n{}", "Manifest".bold());
-    println!("{}", "─".repeat(60));
-    println!("  {} {} {}", "Status:".bold(), status_icon, manifest.status);
-    println!("  {} {}", "Progress:".bold(), manifest.progress);
-    println!("  {} {}", "Region:".bold(), manifest.region);
-    println!("  {} {}", "Has Thumbnail:".bold(), manifest.has_thumbnail);
-
-    if let Some(version) = &manifest.version {
-        println!("  {} {}", "Version:".bold(), version);
-    }
-
-    if !manifest.derivatives.is_empty() {
-        println!("\n{}", "Derivatives:".bold());
-        println!("{}", "─".repeat(60));
-
-        for derivative in &manifest.derivatives {
-            let status_icon = match derivative.status.as_str() {
-                "success" => "✓".green(),
-                "failed" | "timeout" => "✗".red(),
-                "inprogress" | "pending" => "⋯".yellow(),
+    match output_format {
+        OutputFormat::Table => {
+            let status_icon = match manifest.status.as_str() {
+                "success" => "✓".green().bold(),
+                "failed" | "timeout" => "✗".red().bold(),
+                "inprogress" | "pending" => "⋯".yellow().bold(),
                 _ => "?".dimmed(),
             };
 
-            println!(
-                "  {} {} {}",
-                status_icon,
-                derivative.output_type.cyan().bold(),
-                derivative.progress.as_deref().unwrap_or("").dimmed()
-            );
+            println!("\n{}", "Manifest".bold());
+            println!("{}", "─".repeat(60));
+            println!("  {} {} {}", "Status:".bold(), status_icon, manifest.status);
+            println!("  {} {}", "Progress:".bold(), manifest.progress);
+            println!("  {} {}", "Region:".bold(), manifest.region);
+            println!("  {} {}", "Has Thumbnail:".bold(), manifest.has_thumbnail);
 
-            if let Some(name) = &derivative.name {
-                println!("      {} {}", "Name:".dimmed(), name);
+            if let Some(version) = &manifest.version {
+                println!("  {} {}", "Version:".bold(), version);
             }
 
-            // Show children (viewables)
-            for child in &derivative.children {
-                println!(
-                    "      {} {} ({})",
-                    "└".dimmed(),
-                    child.name.as_deref().unwrap_or(&child.guid),
-                    child.role.dimmed()
-                );
+            if !manifest.derivatives.is_empty() {
+                println!("\n{}", "Derivatives:".bold());
+                println!("{}", "─".repeat(60));
+
+                for derivative in &manifest.derivatives {
+                    let status_icon = match derivative.status.as_str() {
+                        "success" => "✓".green(),
+                        "failed" | "timeout" => "✗".red(),
+                        "inprogress" | "pending" => "⋯".yellow(),
+                        _ => "?".dimmed(),
+                    };
+
+                    println!(
+                        "  {} {} {}",
+                        status_icon,
+                        derivative.output_type.cyan().bold(),
+                        derivative.progress.as_deref().unwrap_or("").dimmed()
+                    );
+
+                    if let Some(name) = &derivative.name {
+                        println!("      {} {}", "Name:".dimmed(), name);
+                    }
+
+                    // Show children (viewables)
+                    for child in &derivative.children {
+                        println!(
+                            "      {} {} ({})",
+                            "└".dimmed(),
+                            child.name.as_deref().unwrap_or(&child.guid),
+                            child.role.dimmed()
+                        );
+                    }
+                }
             }
+
+            println!("{}", "─".repeat(60));
+        }
+        _ => {
+            // For non-table formats, serialize the manifest directly
+            output_format.write(&manifest)?;
         }
     }
-
-    println!("{}", "─".repeat(60));
     Ok(())
 }
