@@ -616,14 +616,19 @@ mod tests {
     #[test]
     fn test_generate_ifc_guid_format() {
         let guid = generate_ifc_guid();
-        
+
         // IFC GUIDs should be exactly 22 characters
         assert_eq!(guid.len(), 22);
-        
+
         // Should only contain valid IFC GUID characters
-        const VALID_CHARS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
+        const VALID_CHARS: &str =
+            "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
         for ch in guid.chars() {
-            assert!(VALID_CHARS.contains(ch), "Invalid character in IFC GUID: {}", ch);
+            assert!(
+                VALID_CHARS.contains(ch),
+                "Invalid character in IFC GUID: {}",
+                ch
+            );
         }
     }
 
@@ -633,7 +638,7 @@ mod tests {
         let guid1 = generate_ifc_guid();
         let guid2 = generate_ifc_guid();
         let guid3 = generate_ifc_guid();
-        
+
         assert_ne!(guid1, guid2);
         assert_ne!(guid2, guid3);
         assert_ne!(guid1, guid3);

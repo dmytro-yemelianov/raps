@@ -21,7 +21,10 @@ fn test_cli_help() {
     assert!(output.status.success(), "CLI should show help successfully");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("raps"), "Help should contain 'raps'");
-    assert!(stdout.contains("Command-line interface"), "Help should contain description");
+    assert!(
+        stdout.contains("Command-line interface"),
+        "Help should contain description"
+    );
 }
 
 /// Test that the CLI shows version information
@@ -33,10 +36,19 @@ fn test_cli_version() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "CLI should show version successfully");
+    assert!(
+        output.status.success(),
+        "CLI should show version successfully"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("raps"), "Version output should contain 'raps'");
-    assert!(stdout.contains("0.3.0"), "Version output should contain version number");
+    assert!(
+        stdout.contains("raps"),
+        "Version output should contain 'raps'"
+    );
+    assert!(
+        stdout.contains("0.3.0"),
+        "Version output should contain version number"
+    );
 }
 
 /// Test that invalid commands show appropriate error messages
@@ -55,4 +67,3 @@ fn test_cli_invalid_command() {
         "Error output should indicate failure"
     );
 }
-

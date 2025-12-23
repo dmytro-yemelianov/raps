@@ -563,7 +563,7 @@ mod tests {
     #[test]
     fn test_stored_token_validity() {
         let now = chrono::Utc::now().timestamp();
-        
+
         // Valid token (expires in 1 hour)
         let token = StoredToken {
             access_token: "test".to_string(),
@@ -623,7 +623,10 @@ mod tests {
         assert_eq!(deserialized.access_token, "test_token");
         assert_eq!(deserialized.token_type, "Bearer");
         assert_eq!(deserialized.expires_in, 3600);
-        assert_eq!(deserialized.refresh_token, Some("refresh_token".to_string()));
+        assert_eq!(
+            deserialized.refresh_token,
+            Some("refresh_token".to_string())
+        );
     }
 
     #[test]
