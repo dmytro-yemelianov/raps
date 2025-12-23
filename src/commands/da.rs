@@ -7,9 +7,11 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+use serde::Serialize;
 use std::time::Duration;
 
 use crate::api::DesignAutomationClient;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum DaCommands {
@@ -64,46 +66,68 @@ pub enum DaCommands {
 }
 
 impl DaCommands {
-    pub async fn execute(self, client: &DesignAutomationClient) -> Result<()> {
+    pub async fn execute(self, client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            DaCommands::Engines => list_engines(client).await,
-            DaCommands::Appbundles => list_appbundles(client).await,
+            DaCommands::Engines => list_engines(client, output_format).await,
+            DaCommands::Appbundles => list_appbundles(client, output_format).await,
             DaCommands::AppbundleCreate {
                 id,
                 engine,
                 description,
-            } => create_appbundle(client, id, engine, description).await,
-            DaCommands::AppbundleDelete { id } => delete_appbundle(client, &id).await,
-            DaCommands::Activities => list_activities(client).await,
-            DaCommands::ActivityDelete { id } => delete_activity(client, &id).await,
+            } => create_appbundle(client, id, engine, description, output_format).await,
+            DaCommands::AppbundleDelete { id } => delete_appbundle(client, &id, output_format).await,
+            DaCommands::Activities => list_activities(client, output_format).await,
+            DaCommands::ActivityDelete { id } => delete_activity(client, &id, output_format).await,
             DaCommands::Status { workitem_id, wait } => {
-                check_status(client, &workitem_id, wait).await
+                check_status(client, &workitem_id, wait, output_format).await
             }
         }
     }
 }
 
-async fn list_engines(client: &DesignAutomationClient) -> Result<()> {
-    println!("{}", "Fetching engines...".dimmed());
+async fn list_engines(client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching engines...".dimmed());
+    }
 
     let engines = client.list_engines().await?;
 
-    if engines.is_empty() {
-        println!("{}", "No engines found.".yellow());
+    #[derive(Serialize)]
+    struct EngineOutput {
+        id: String,
+        description: Option<String>,
+        product_version: Option<String>,
+    }
+
+    let engine_outputs: Vec<EngineOutput> = engines.iter().map(|e| EngineOutput {
+        id: e.id.clone(),
+        description: e.description.clone(),
+        product_version: e.product_version.clone(),
+    }).collect();
+
+    if engine_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No engines found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<EngineOutput>::new())?;
+            }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Available Engines:".bold());
-    println!("{}", "─".repeat(80));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Available Engines:".bold());
+            println!("{}", "─".repeat(80));
 
-    // Group by product
-    let mut autocad_engines = Vec::new();
-    let mut revit_engines = Vec::new();
-    let mut inventor_engines = Vec::new();
-    let mut max_engines = Vec::new();
-    let mut other_engines = Vec::new();
+            // Group by product
+            let mut autocad_engines = Vec::new();
+            let mut revit_engines = Vec::new();
+            let mut inventor_engines = Vec::new();
+            let mut max_engines = Vec::new();
+            let mut other_engines = Vec::new();
 
-    for engine in engines {
+            for engine in &engines {
         if engine.id.contains("AutoCAD") {
             autocad_engines.push(engine);
         } else if engine.id.contains("Revit") {
@@ -117,46 +141,51 @@ async fn list_engines(client: &DesignAutomationClient) -> Result<()> {
         }
     }
 
-    if !autocad_engines.is_empty() {
-        println!("\n{}", "AutoCAD:".cyan().bold());
-        for engine in autocad_engines {
-            println!("  {} {}", "•".dimmed(), engine.id);
+            if !autocad_engines.is_empty() {
+                println!("\n{}", "AutoCAD:".cyan().bold());
+                for engine in autocad_engines {
+                    println!("  {} {}", "•".dimmed(), engine.id);
+                }
+            }
+
+            if !revit_engines.is_empty() {
+                println!("\n{}", "Revit:".cyan().bold());
+                for engine in revit_engines {
+                    println!("  {} {}", "•".dimmed(), engine.id);
+                }
+            }
+
+            if !inventor_engines.is_empty() {
+                println!("\n{}", "Inventor:".cyan().bold());
+                for engine in inventor_engines {
+                    println!("  {} {}", "•".dimmed(), engine.id);
+                }
+            }
+
+            if !max_engines.is_empty() {
+                println!("\n{}", "3ds Max:".cyan().bold());
+                for engine in max_engines {
+                    println!("  {} {}", "•".dimmed(), engine.id);
+                }
+            }
+
+            if !other_engines.is_empty() {
+                println!("\n{}", "Other:".cyan().bold());
+                for engine in other_engines {
+                    println!("  {} {}", "•".dimmed(), engine.id);
+                }
+            }
+
+            println!("{}", "─".repeat(80));
+        }
+        _ => {
+            output_format.write(&engine_outputs)?;
         }
     }
-
-    if !revit_engines.is_empty() {
-        println!("\n{}", "Revit:".cyan().bold());
-        for engine in revit_engines {
-            println!("  {} {}", "•".dimmed(), engine.id);
-        }
-    }
-
-    if !inventor_engines.is_empty() {
-        println!("\n{}", "Inventor:".cyan().bold());
-        for engine in inventor_engines {
-            println!("  {} {}", "•".dimmed(), engine.id);
-        }
-    }
-
-    if !max_engines.is_empty() {
-        println!("\n{}", "3ds Max:".cyan().bold());
-        for engine in max_engines {
-            println!("  {} {}", "•".dimmed(), engine.id);
-        }
-    }
-
-    if !other_engines.is_empty() {
-        println!("\n{}", "Other:".cyan().bold());
-        for engine in other_engines {
-            println!("  {} {}", "•".dimmed(), engine.id);
-        }
-    }
-
-    println!("{}", "─".repeat(80));
     Ok(())
 }
 
-async fn list_appbundles(client: &DesignAutomationClient) -> Result<()> {
+async fn list_appbundles(client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching app bundles...".dimmed());
 
     let appbundles = client.list_appbundles().await?;
@@ -182,6 +211,7 @@ async fn create_appbundle(
     id: Option<String>,
     engine: Option<String>,
     description: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get engine first to help with ID suggestion
     let selected_engine = match engine {
@@ -228,7 +258,7 @@ async fn create_appbundle(
     Ok(())
 }
 
-async fn delete_appbundle(client: &DesignAutomationClient, id: &str) -> Result<()> {
+async fn delete_appbundle(client: &DesignAutomationClient, id: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting app bundle...".dimmed());
 
     client.delete_appbundle(id).await?;
@@ -237,7 +267,7 @@ async fn delete_appbundle(client: &DesignAutomationClient, id: &str) -> Result<(
     Ok(())
 }
 
-async fn list_activities(client: &DesignAutomationClient) -> Result<()> {
+async fn list_activities(client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching activities...".dimmed());
 
     let activities = client.list_activities().await?;
@@ -258,7 +288,7 @@ async fn list_activities(client: &DesignAutomationClient) -> Result<()> {
     Ok(())
 }
 
-async fn delete_activity(client: &DesignAutomationClient, id: &str) -> Result<()> {
+async fn delete_activity(client: &DesignAutomationClient, id: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting activity...".dimmed());
 
     client.delete_activity(id).await?;
@@ -271,6 +301,7 @@ async fn check_status(
     client: &DesignAutomationClient,
     workitem_id: &str,
     wait: bool,
+    output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
         let spinner = ProgressBar::new_spinner();

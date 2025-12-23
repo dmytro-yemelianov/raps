@@ -159,7 +159,7 @@ pub struct FormatJobInfo {
 }
 
 /// Manifest response (translation status and derivatives)
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
     #[serde(rename = "type")]
@@ -174,7 +174,7 @@ pub struct Manifest {
     pub derivatives: Vec<Derivative>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Derivative {
     pub name: Option<String>,
@@ -186,7 +186,7 @@ pub struct Derivative {
     pub children: Vec<DerivativeChild>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivativeChild {
     pub guid: String,

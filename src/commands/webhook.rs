@@ -6,9 +6,11 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
+use serde::Serialize;
 
 use crate::api::webhooks::WEBHOOK_EVENTS;
 use crate::api::WebhooksClient;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum WebhookCommands {
@@ -43,67 +45,109 @@ pub enum WebhookCommands {
 }
 
 impl WebhookCommands {
-    pub async fn execute(self, client: &WebhooksClient) -> Result<()> {
+    pub async fn execute(self, client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            WebhookCommands::List => list_webhooks(client).await,
-            WebhookCommands::Create { url, event } => create_webhook(client, url, event).await,
+            WebhookCommands::List => list_webhooks(client, output_format).await,
+            WebhookCommands::Create { url, event } => create_webhook(client, url, event, output_format).await,
             WebhookCommands::Delete {
                 hook_id,
                 system,
                 event,
-            } => delete_webhook(client, &system, &event, &hook_id).await,
-            WebhookCommands::Events => list_events(client),
+            } => delete_webhook(client, &system, &event, &hook_id, output_format).await,
+            WebhookCommands::Events => list_events(client, output_format),
         }
     }
 }
 
-async fn list_webhooks(client: &WebhooksClient) -> Result<()> {
-    println!("{}", "Fetching webhooks...".dimmed());
+#[derive(Serialize)]
+struct WebhookListOutput {
+    hook_id: String,
+    event: String,
+    callback_url: String,
+    status: String,
+}
+
+async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching webhooks...".dimmed());
+    }
 
     let webhooks = client.list_all_webhooks().await?;
 
-    if webhooks.is_empty() {
-        println!("{}", "No webhooks found.".yellow());
+    let webhook_outputs: Vec<WebhookListOutput> = webhooks
+        .iter()
+        .map(|w| WebhookListOutput {
+            hook_id: w.hook_id.clone(),
+            event: w.event.clone(),
+            callback_url: w.callback_url.clone(),
+            status: w.status.clone(),
+        })
+        .collect();
+
+    if webhook_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No webhooks found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<WebhookListOutput>::new())?;
+            }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Webhooks:".bold());
-    println!("{}", "─".repeat(90));
-    println!(
-        "{:<15} {:<25} {:<35} {}",
-        "Status".bold(),
-        "Event".bold(),
-        "Callback URL".bold(),
-        "Hook ID".bold()
-    );
-    println!("{}", "─".repeat(90));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Webhooks:".bold());
+            println!("{}", "─".repeat(90));
+            println!(
+                "{:<15} {:<25} {:<35} {}",
+                "Status".bold(),
+                "Event".bold(),
+                "Callback URL".bold(),
+                "Hook ID".bold()
+            );
+            println!("{}", "─".repeat(90));
 
-    for webhook in webhooks {
-        let status_icon = if webhook.status == "active" {
-            "✓ active".green()
-        } else {
-            format!("✗ {}", webhook.status).red()
-        };
+            for webhook in &webhook_outputs {
+                let status_icon = if webhook.status == "active" {
+                    "✓ active".green()
+                } else {
+                    format!("✗ {}", webhook.status).red()
+                };
 
-        let url = truncate_str(&webhook.callback_url, 35);
+                let url = truncate_str(&webhook.callback_url, 35);
 
-        println!(
-            "{:<15} {:<25} {:<35} {}",
-            status_icon,
-            webhook.event.cyan(),
-            url,
-            webhook.hook_id.dimmed()
-        );
+                println!(
+                    "{:<15} {:<25} {:<35} {}",
+                    status_icon,
+                    webhook.event.cyan(),
+                    url,
+                    webhook.hook_id.dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(90));
+        }
+        _ => {
+            output_format.write(&webhook_outputs)?;
+        }
     }
-
-    println!("{}", "─".repeat(90));
     Ok(())
+}
+
+#[derive(Serialize)]
+struct CreateWebhookOutput {
+    success: bool,
+    hook_id: String,
+    event: String,
+    status: String,
+    callback_url: String,
 }
 
 async fn create_webhook(
     client: &WebhooksClient,
     callback_url: Option<String>,
     event: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get callback URL
     let url = match callback_url {
@@ -147,19 +191,43 @@ async fn create_webhook(
         "data"
     };
 
-    println!("{}", "Creating webhook...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Creating webhook...".dimmed());
+    }
 
     let webhook = client
         .create_webhook(system, &event_type, &url, None)
         .await?;
 
-    println!("{} Webhook created successfully!", "✓".green().bold());
-    println!("  {} {}", "Hook ID:".bold(), webhook.hook_id);
-    println!("  {} {}", "Event:".bold(), webhook.event.cyan());
-    println!("  {} {}", "Status:".bold(), webhook.status.green());
-    println!("  {} {}", "Callback:".bold(), webhook.callback_url);
+    let output = CreateWebhookOutput {
+        success: true,
+        hook_id: webhook.hook_id.clone(),
+        event: webhook.event.clone(),
+        status: webhook.status.clone(),
+        callback_url: webhook.callback_url.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Webhook created successfully!", "✓".green().bold());
+            println!("  {} {}", "Hook ID:".bold(), output.hook_id);
+            println!("  {} {}", "Event:".bold(), output.event.cyan());
+            println!("  {} {}", "Status:".bold(), output.status.green());
+            println!("  {} {}", "Callback:".bold(), output.callback_url);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
 
     Ok(())
+}
+
+#[derive(Serialize)]
+struct DeleteWebhookOutput {
+    success: bool,
+    hook_id: String,
+    message: String,
 }
 
 async fn delete_webhook(
@@ -167,28 +235,65 @@ async fn delete_webhook(
     system: &str,
     event: &str,
     hook_id: &str,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    println!("{}", "Deleting webhook...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Deleting webhook...".dimmed());
+    }
 
     client.delete_webhook(system, event, hook_id).await?;
 
-    println!("{} Webhook deleted successfully!", "✓".green().bold());
+    let output = DeleteWebhookOutput {
+        success: true,
+        hook_id: hook_id.to_string(),
+        message: "Webhook deleted successfully!".to_string(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
     Ok(())
 }
 
-fn list_events(_client: &WebhooksClient) -> Result<()> {
-    println!("\n{}", "Available Webhook Events:".bold());
-    println!("{}", "─".repeat(60));
+#[derive(Serialize)]
+struct EventOutput {
+    event: String,
+    description: String,
+}
 
-    for (event, description) in WEBHOOK_EVENTS {
-        println!(
-            "  {} {}",
-            event.cyan(),
-            format!("- {}", description).dimmed()
-        );
+fn list_events(_client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
+    let events: Vec<EventOutput> = WEBHOOK_EVENTS
+        .iter()
+        .map(|(event, description)| EventOutput {
+            event: event.to_string(),
+            description: description.to_string(),
+        })
+        .collect();
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Available Webhook Events:".bold());
+            println!("{}", "─".repeat(60));
+
+            for event in &events {
+                println!(
+                    "  {} {}",
+                    event.event.cyan(),
+                    format!("- {}", event.description).dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(60));
+        }
+        _ => {
+            output_format.write(&events)?;
+        }
     }
-
-    println!("{}", "─".repeat(60));
     Ok(())
 }
 
@@ -256,3 +361,4 @@ mod tests {
         assert_eq!(truncate_str("", 10), "");
     }
 }
+

@@ -7,9 +7,12 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
+use serde::Serialize;
 
 use crate::api::issues::CreateIssueRequest;
 use crate::api::IssuesClient;
+use crate::interactive;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum IssueCommands {
@@ -61,23 +64,23 @@ pub enum IssueCommands {
 }
 
 impl IssueCommands {
-    pub async fn execute(self, client: &IssuesClient) -> Result<()> {
+    pub async fn execute(self, client: &IssuesClient, output_format: OutputFormat) -> Result<()> {
         match self {
             IssueCommands::List { project_id, status } => {
-                list_issues(client, &project_id, status).await
+                list_issues(client, &project_id, status, output_format).await
             }
             IssueCommands::Create {
                 project_id,
                 title,
                 description,
-            } => create_issue(client, &project_id, title, description).await,
+            } => create_issue(client, &project_id, title, description, output_format).await,
             IssueCommands::Update {
                 project_id,
                 issue_id,
                 status,
                 title,
-            } => update_issue(client, &project_id, &issue_id, status, title).await,
-            IssueCommands::Types { project_id } => list_issue_types(client, &project_id).await,
+            } => update_issue(client, &project_id, &issue_id, status, title, output_format).await,
+            IssueCommands::Types { project_id } => list_issue_types(client, &project_id, output_format).await,
         }
     }
 }
@@ -86,6 +89,7 @@ async fn list_issues(
     client: &IssuesClient,
     project_id: &str,
     status: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     println!("{}", "Fetching issues...".dimmed());
 
@@ -141,27 +145,39 @@ async fn create_issue(
     project_id: &str,
     title: Option<String>,
     description: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get title
     let issue_title = match title {
         Some(t) => t,
-        None => Input::new()
-            .with_prompt("Enter issue title")
-            .interact_text()?,
+        None => {
+            // In non-interactive mode, require the title
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Issue title is required in non-interactive mode. Use --title flag.");
+            }
+            Input::new()
+                .with_prompt("Enter issue title")
+                .interact_text()?
+        }
     };
 
     // Get description (optional)
     let issue_desc = match description {
         Some(d) => Some(d),
         None => {
-            let desc: String = Input::new()
-                .with_prompt("Enter description (optional)")
-                .allow_empty(true)
-                .interact_text()?;
-            if desc.is_empty() {
+            // In non-interactive mode, description is optional (None)
+            if interactive::is_non_interactive() {
                 None
             } else {
-                Some(desc)
+                let desc: String = Input::new()
+                    .with_prompt("Enter description (optional)")
+                    .allow_empty(true)
+                    .interact_text()?;
+                if desc.is_empty() {
+                    None
+                } else {
+                    Some(desc)
+                }
             }
         }
     };
@@ -195,6 +211,7 @@ async fn update_issue(
     issue_id: &str,
     status: Option<String>,
     title: Option<String>,
+    output_format: OutputFormat,
 ) -> Result<()> {
     // Get current issue
     let current = client.get_issue(project_id, issue_id).await?;
@@ -239,7 +256,7 @@ async fn update_issue(
     Ok(())
 }
 
-async fn list_issue_types(client: &IssuesClient, project_id: &str) -> Result<()> {
+async fn list_issue_types(client: &IssuesClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching issue types...".dimmed());
 
     let types = client.list_issue_types(project_id).await?;

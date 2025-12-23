@@ -6,8 +6,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::Select;
+use serde::Serialize;
 
 use crate::api::DataManagementClient;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum ProjectCommands {
@@ -27,17 +29,25 @@ pub enum ProjectCommands {
 }
 
 impl ProjectCommands {
-    pub async fn execute(self, client: &DataManagementClient) -> Result<()> {
+    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            ProjectCommands::List { hub_id } => list_projects(client, hub_id).await,
+            ProjectCommands::List { hub_id } => list_projects(client, hub_id, output_format).await,
             ProjectCommands::Info { hub_id, project_id } => {
-                project_info(client, &hub_id, &project_id).await
+                project_info(client, &hub_id, &project_id, output_format).await
             }
         }
     }
 }
 
-async fn list_projects(client: &DataManagementClient, hub_id: Option<String>) -> Result<()> {
+#[derive(Serialize)]
+struct ProjectListOutput {
+    id: String,
+    name: String,
+    project_type: String,
+    scopes: Option<Vec<String>>,
+}
+
+async fn list_projects(client: &DataManagementClient, hub_id: Option<String>, output_format: OutputFormat) -> Result<()> {
     // Get hub ID interactively if not provided
     let hub = match hub_id {
         Some(h) => h,
@@ -63,66 +73,127 @@ async fn list_projects(client: &DataManagementClient, hub_id: Option<String>) ->
         }
     };
 
-    println!("{}", "Fetching projects...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching projects...".dimmed());
+    }
 
     let projects = client.list_projects(&hub).await?;
 
-    if projects.is_empty() {
-        println!("{}", "No projects found in this hub.".yellow());
+    let project_outputs: Vec<ProjectListOutput> = projects
+        .iter()
+        .map(|p| ProjectListOutput {
+            id: p.id.clone(),
+            name: p.attributes.name.clone(),
+            project_type: p.project_type.clone(),
+            scopes: p.attributes.scopes.clone(),
+        })
+        .collect();
+
+    if project_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No projects found in this hub.".yellow()),
+            _ => {
+                output_format.write(&Vec::<ProjectListOutput>::new())?;
+            }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Projects:".bold());
-    println!("{}", "─".repeat(80));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Projects:".bold());
+            println!("{}", "─".repeat(80));
 
-    for project in projects {
-        println!("  {} {}", "•".cyan(), project.attributes.name.bold());
-        println!("    {} {}", "ID:".dimmed(), project.id);
-        if let Some(ref scopes) = project.attributes.scopes {
-            println!("    {} {:?}", "Scopes:".dimmed(), scopes);
+            for project in &project_outputs {
+                println!("  {} {}", "•".cyan(), project.name.bold());
+                println!("    {} {}", "ID:".dimmed(), project.id);
+                if let Some(ref scopes) = project.scopes {
+                    println!("    {} {:?}", "Scopes:".dimmed(), scopes);
+                }
+            }
+
+            println!("{}", "─".repeat(80));
+            println!(
+                "\n{}",
+                "Use 'raps folder list <hub-id> <project-id>' to see folders".dimmed()
+            );
+        }
+        _ => {
+            output_format.write(&project_outputs)?;
         }
     }
-
-    println!("{}", "─".repeat(80));
-    println!(
-        "\n{}",
-        "Use 'raps folder list <hub-id> <project-id>' to see folders".dimmed()
-    );
     Ok(())
 }
 
-async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &str) -> Result<()> {
-    println!("{}", "Fetching project details...".dimmed());
+#[derive(Serialize)]
+struct ProjectInfoOutput {
+    id: String,
+    name: String,
+    project_type: String,
+    scopes: Option<Vec<String>>,
+    top_folders: Vec<FolderOutput>,
+}
+
+#[derive(Serialize)]
+struct FolderOutput {
+    id: String,
+    name: String,
+    display_name: Option<String>,
+}
+
+async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &str, output_format: OutputFormat) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching project details...".dimmed());
+    }
 
     let project = client.get_project(hub_id, project_id).await?;
-
-    println!("\n{}", "Project Details".bold());
-    println!("{}", "─".repeat(60));
-    println!("  {} {}", "Name:".bold(), project.attributes.name.cyan());
-    println!("  {} {}", "ID:".bold(), project.id);
-    println!("  {} {}", "Type:".bold(), project.project_type);
-
-    if let Some(ref scopes) = project.attributes.scopes {
-        println!("  {} {:?}", "Scopes:".bold(), scopes);
-    }
-
-    // Get top folders
-    println!("\n{}", "Top Folders:".bold());
     let folders = client.get_top_folders(hub_id, project_id).await?;
 
-    for folder in folders {
-        println!(
-            "  {} {} ({})",
-            "📁".dimmed(),
-            folder
-                .attributes
-                .display_name
-                .as_ref()
-                .unwrap_or(&folder.attributes.name),
-            folder.id.dimmed()
-        );
-    }
+    let folder_outputs: Vec<FolderOutput> = folders
+        .iter()
+        .map(|f| FolderOutput {
+            id: f.id.clone(),
+            name: f.attributes.name.clone(),
+            display_name: f.attributes.display_name.clone(),
+        })
+        .collect();
 
-    println!("{}", "─".repeat(60));
+    let output = ProjectInfoOutput {
+        id: project.id.clone(),
+        name: project.attributes.name.clone(),
+        project_type: project.project_type.clone(),
+        scopes: project.attributes.scopes.clone(),
+        top_folders: folder_outputs,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Project Details".bold());
+            println!("{}", "─".repeat(60));
+            println!("  {} {}", "Name:".bold(), output.name.cyan());
+            println!("  {} {}", "ID:".bold(), output.id);
+            println!("  {} {}", "Type:".bold(), output.project_type);
+
+            if let Some(ref scopes) = output.scopes {
+                println!("  {} {:?}", "Scopes:".bold(), scopes);
+            }
+
+            println!("\n{}", "Top Folders:".bold());
+            for folder in &output.top_folders {
+                println!(
+                    "  {} {} ({})",
+                    "📁".dimmed(),
+                    folder.display_name.as_ref().unwrap_or(&folder.name),
+                    folder.id.dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(60));
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
     Ok(())
 }
+

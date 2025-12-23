@@ -1,0 +1,111 @@
+[
+  {
+    "title": "Add global `--output` with `json|yaml|table`",
+    "body": "## Description\n\nIntroduce a global output selector for consistent machine-readable output. This enables CI/CD pipelines and automation scripts to reliably parse command output.\n\n## Acceptance Criteria\n\n- `raps ... --output json` prints valid JSON to stdout\n- `--output table` matches current human-readable behavior\n- `--output yaml` supported (optional if too heavy, can be v0.5)\n- Documented in README + each relevant command page\n- Tests cover JSON schema stability for at least 5 representative commands\n\n## Notes\n\nThis is a foundational feature for CI/CD adoption. The JSON output must be stable and well-documented to enable reliable automation.",
+    "labels": ["epic:ci", "type:feature", "prio:high"],
+    "milestone": "v0.4 — CI/CD & Automation Ready"
+  },
+  {
+    "title": "Standardize exit codes across commands",
+    "body": "## Description\n\nEnsure deterministic exit codes for scripting. This allows CI/CD pipelines and shell scripts to reliably detect success, failure types, and handle errors appropriately.\n\n## Acceptance Criteria\n\n- `0` success\n- `2` invalid arguments / validation failure\n- `3` auth failure\n- `4` not found\n- `5` remote/API error\n- `6` internal error\n- Documented in `docs/cli/exit-codes.md`\n\n## Notes\n\nExit codes should be consistent across all commands to enable reliable error handling in automation scripts.",
+    "labels": ["epic:ci", "type:feature", "prio:high"],
+    "milestone": "v0.4 — CI/CD & Automation Ready"
+  },
+  {
+    "title": "Add global `--no-color`, `--quiet`, `--verbose`, `--debug`",
+    "body": "## Description\n\nMake logs predictable in CI and allow proper troubleshooting. These flags control output verbosity and formatting to suit different environments (CI, local development, debugging).\n\n## Acceptance Criteria\n\n- `--no-color` disables ANSI everywhere\n- `--quiet` prints only the result payload (especially useful with JSON)\n- `--verbose` shows request summaries\n- `--debug` includes full trace (but redacts secrets)\n- Works consistently across subcommands\n\n## Notes\n\nThese flags are essential for CI/CD environments where colored output and interactive prompts are not desired. Debug mode must never expose secrets in logs.",
+    "labels": ["epic:ci", "type:feature", "prio:high"],
+    "milestone": "v0.4 — CI/CD & Automation Ready"
+  },
+  {
+    "title": "Add `--yes` / `--non-interactive` and remove mandatory prompts",
+    "body": "## Description\n\nCommands like create/delete must be fully parameterizable. This enables automation scripts and CI/CD pipelines to run without human interaction.\n\n## Current Status\n\n⚠️ **Partially Implemented**: `--non-interactive` flag exists for `demo` commands only. Many commands still use interactive prompts.\n\n## Acceptance Criteria\n\n- Global `--non-interactive` flag that disables all prompts\n- Any prompt can be bypassed via flags\n- In `--non-interactive`, missing required info results in clear error + exit code 2\n- `--yes` auto-confirms destructive actions\n\n## Notes\n\nThis is critical for CI/CD adoption. All commands must be fully scriptable without requiring user input.",
+    "labels": ["epic:ci", "type:feature", "prio:high"],
+    "milestone": "v0.4 — CI/CD & Automation Ready"
+  },
+  {
+    "title": "Add YAML output format support",
+    "body": "## Description\n\nAdd YAML output format as an alternative to JSON for better human readability while maintaining machine-parsable output.\n\n## Current Status\n\n❌ **Not Implemented**: YAML format is not supported. Only `json`, `csv`, `table`, and `plain` are available.\n\n## Acceptance Criteria\n\n- `raps ... --output yaml` prints valid YAML to stdout\n- YAML output is consistent with JSON structure\n- Add `serde_yaml` dependency\n- Document YAML output format in README\n\n## Notes\n\nYAML can be deferred to v0.5 if implementation complexity is high, but it's a natural extension of the output format system.",
+    "labels": ["epic:ci", "type:feature", "prio:med"],
+    "milestone": "v0.4 — CI/CD & Automation Ready"
+  },
+  {
+    "title": "Introduce `raps config profile` (create/list/use/delete)",
+    "body": "## Description\n\nAdd profile management (`dev`, `prod`, `clientA`, etc.) to enable easy switching between environments and multiple APS apps.\n\n## Acceptance Criteria\n\n- `raps config profile create <name>`\n- `raps config profile use <name>`\n- `raps config get/set` are profile-aware\n- `.env` remains supported, but profile config takes priority when active\n- Docs include a \"CI example\" and \"local dev example\"\n\n## Notes\n\nProfiles enable developers to manage multiple APS applications and environments (dev, staging, prod) without manual credential switching.",
+    "labels": ["type:feature", "prio:high"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Config precedence spec (env vs config vs flags)",
+    "body": "## Description\n\nDocument deterministic precedence rules for configuration sources. This ensures users understand how settings are resolved and can reliably configure the CLI for different scenarios.\n\n## Acceptance Criteria\n\n- Single doc page: flags > env vars > active profile > default profile\n- Includes examples for CI/CD and local shell usage\n\n## Notes\n\nClear precedence rules prevent confusion and enable predictable behavior in different environments.",
+    "labels": ["type:docs", "prio:high"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Optional OS keychain integration (credential storage)",
+    "body": "## Description\n\nAllow storing tokens in OS credential manager (where feasible). This provides enhanced security for credential storage on supported platforms.\n\n## Acceptance Criteria\n\n- Feature flag or config toggle (keep default simple)\n- Falls back to existing storage if unsupported\n- Secrets never printed in debug logs\n\n## Notes\n\nThis is an optional enhancement. The default behavior should remain simple and work across all platforms, with keychain integration as an opt-in feature.",
+    "labels": ["type:feature", "prio:med"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Add device-code flow or \"paste token\" auth mode",
+    "body": "## Description\n\nSupport a browserless login UX. This enables authentication on servers, SSH sessions, and CI/CD environments where browser-based OAuth is not feasible.\n\n## Acceptance Criteria\n\n- `raps auth login --device` (or equivalent) works without launching a browser\n- `raps auth login --token <...>` supported for CI scenarios (document security caveats)\n- `raps auth status` shows active profile + token expiry (redacted)\n\n## Notes\n\nThis is essential for headless/server environments. The token-based login should include clear security warnings in documentation.",
+    "labels": ["type:feature", "prio:high"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Implement retry/backoff strategy for 429/5xx",
+    "body": "## Description\n\nAdd standardized retry policy with jitter. This makes the CLI robust under APS throttling and unstable networks.\n\n## Acceptance Criteria\n\n- Default retry for 429, 500–599\n- Configurable max retries + max wait\n- Clear logging in verbose/debug\n- Unit tests for retry logic\n\n## Notes\n\nRetry logic should use exponential backoff with jitter to avoid thundering herd problems. Configuration should allow tuning for different use cases.",
+    "labels": ["type:feature", "prio:high"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Add configurable request timeouts + concurrency limits",
+    "body": "## Description\n\nAvoid hanging jobs and control parallelism in bulk operations. This prevents indefinite hangs and allows users to control resource usage.\n\n## Acceptance Criteria\n\n- `--timeout <sec>` or config\n- `--concurrency <n>` for bulk commands\n- Safe defaults documented\n\n## Notes\n\nTimeouts prevent indefinite hangs. Concurrency limits help avoid overwhelming the API or local resources during bulk operations.",
+    "labels": ["type:feature", "prio:med"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Proxy support documentation (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`)",
+    "body": "## Description\n\nMake corporate network usage straightforward. Document how to configure proxy settings for environments behind corporate firewalls.\n\n## Acceptance Criteria\n\n- One doc page with examples\n- Troubleshooting section for TLS interception, cert issues (as guidance)\n\n## Notes\n\nMany enterprise environments require proxy configuration. Clear documentation reduces support burden and improves adoption.",
+    "labels": ["type:docs", "prio:med"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Add configurable HTTP client timeouts",
+    "body": "## Description\n\nConfigure HTTP client timeouts to prevent indefinite hangs and allow users to control request timeouts.\n\n## Current Status\n\n❌ **Not Implemented**: All HTTP clients use `reqwest::Client::new()` without timeout configuration.\n\n## Acceptance Criteria\n\n- Configurable timeout via `--timeout <sec>` flag or config file\n- Separate timeouts for connect, read, and total request duration\n- Safe defaults (e.g., 30s connect, 60s read, 120s total)\n- Timeout errors are clearly reported with appropriate exit code\n\n## Notes\n\nThis complements the retry/backoff strategy and helps prevent hanging operations in CI/CD environments.",
+    "labels": ["type:feature", "prio:med"],
+    "milestone": "v0.5 — Profiles, Auth, Reliability"
+  },
+  {
+    "title": "Publish SHA256 checksums for release artifacts",
+    "body": "## Description\n\nMake binaries trustworthy for enterprise adoption. Providing checksums allows users to verify download integrity and detect tampering.\n\n## Acceptance Criteria\n\n- Each GitHub release includes `checksums.txt`\n- Docs show how to verify checksums on Windows/macOS/Linux\n\n## Notes\n\nChecksums are essential for security-conscious organizations. This is a low-effort, high-value addition to the release process.",
+    "labels": ["type:feature", "prio:high"],
+    "milestone": "v0.6 — Supply-chain, UX polish, Open-source hygiene"
+  },
+  {
+    "title": "(Optional) SBOM + build provenance",
+    "body": "## Description\n\nGenerate Software Bill of Materials (SBOM) and build provenance for enhanced supply chain security. This helps organizations meet compliance requirements and understand dependencies.\n\n## Acceptance Criteria\n\n- Generate SBOM (CycloneDX or SPDX)\n- Attach to releases or publish in artifacts\n- Document consumption\n\n## Notes\n\nSBOM generation is becoming a standard requirement for enterprise software. This can be implemented incrementally, starting with basic dependency listing.",
+    "labels": ["type:feature", "prio:med"],
+    "milestone": "v0.6 — Supply-chain, UX polish, Open-source hygiene"
+  },
+  {
+    "title": "Add `CHANGELOG.md` with Keep a Changelog format",
+    "body": "## Description\n\nMaintain a structured changelog following the [Keep a Changelog](https://keepachangelog.com/) format. This helps users understand what changed between versions and improves transparency.\n\n## Acceptance Criteria\n\n- Changelog entries for v0.4+ changes\n- Linked to GitHub releases\n\n## Notes\n\nA well-maintained changelog is a sign of a mature project and helps users track changes. The Keep a Changelog format is widely recognized and tool-friendly.",
+    "labels": ["type:docs", "prio:med"],
+    "milestone": "v0.6 — Supply-chain, UX polish, Open-source hygiene"
+  },
+  {
+    "title": "Add Issue/PR templates + CODE_OF_CONDUCT",
+    "body": "## Description\n\nReduce friction for contributors and maintain consistent issue/PR quality. Templates guide contributors to provide necessary information upfront.\n\n## Acceptance Criteria\n\n- Bug report template includes `raps --version`, OS, repro steps\n- Feature request template includes expected output format + CI requirements\n\n## Notes\n\nTemplates improve the quality of issues and PRs by ensuring contributors provide necessary context. CODE_OF_CONDUCT establishes community expectations.",
+    "labels": ["type:chore", "prio:low"],
+    "milestone": "v0.6 — Supply-chain, UX polish, Open-source hygiene"
+  },
+  {
+    "title": "Remove accidental artifacts from repo + extend `.gitignore`",
+    "body": "## Description\n\nKeep the repository clean by ensuring development artifacts and build outputs are not tracked. This reduces repository size and prevents accidental commits of generated files.\n\n## Acceptance Criteria\n\n- Dev logs/build artifacts are not tracked\n- `.gitignore` updated\n- CI remains green\n\n## Notes\n\nA clean repository is easier to navigate and reduces merge conflicts. This should be done carefully to ensure CI continues to work correctly.",
+    "labels": ["type:chore", "prio:med"],
+    "milestone": "v0.6 — Supply-chain, UX polish, Open-source hygiene"
+  }
+]
+

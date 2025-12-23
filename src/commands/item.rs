@@ -5,8 +5,10 @@
 use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
+use serde::Serialize;
 
 use crate::api::DataManagementClient;
+use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum ItemCommands {
@@ -28,118 +30,173 @@ pub enum ItemCommands {
 }
 
 impl ItemCommands {
-    pub async fn execute(self, client: &DataManagementClient) -> Result<()> {
+    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
         match self {
             ItemCommands::Info {
                 project_id,
                 item_id,
-            } => item_info(client, &project_id, &item_id).await,
+            } => item_info(client, &project_id, &item_id, output_format).await,
             ItemCommands::Versions {
                 project_id,
                 item_id,
-            } => list_versions(client, &project_id, &item_id).await,
+            } => list_versions(client, &project_id, &item_id, output_format).await,
         }
     }
 }
 
-async fn item_info(client: &DataManagementClient, project_id: &str, item_id: &str) -> Result<()> {
-    println!("{}", "Fetching item details...".dimmed());
+#[derive(Serialize)]
+struct ItemInfoOutput {
+    id: String,
+    name: String,
+    item_type: String,
+    create_time: Option<String>,
+    modified_time: Option<String>,
+    extension_type: Option<String>,
+    extension_version: Option<String>,
+}
+
+async fn item_info(client: &DataManagementClient, project_id: &str, item_id: &str, output_format: OutputFormat) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching item details...".dimmed());
+    }
 
     let item = client.get_item(project_id, item_id).await?;
 
-    println!("\n{}", "Item Details".bold());
-    println!("{}", "─".repeat(60));
-    println!(
-        "  {} {}",
-        "Name:".bold(),
-        item.attributes.display_name.cyan()
-    );
-    println!("  {} {}", "ID:".bold(), item.id);
-    println!("  {} {}", "Type:".bold(), item.item_type);
+    let extension_type = item.attributes.extension.as_ref()
+        .and_then(|e| e.extension_type.clone());
+    let extension_version = item.attributes.extension.as_ref()
+        .and_then(|e| e.version.clone());
 
-    if let Some(ref create_time) = item.attributes.create_time {
-        println!("  {} {}", "Created:".bold(), create_time);
-    }
+    let output = ItemInfoOutput {
+        id: item.id.clone(),
+        name: item.attributes.display_name.clone(),
+        item_type: item.item_type.clone(),
+        create_time: item.attributes.create_time.clone(),
+        modified_time: item.attributes.last_modified_time.clone(),
+        extension_type,
+        extension_version,
+    };
 
-    if let Some(ref modified_time) = item.attributes.last_modified_time {
-        println!("  {} {}", "Modified:".bold(), modified_time);
-    }
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Item Details".bold());
+            println!("{}", "─".repeat(60));
+            println!("  {} {}", "Name:".bold(), output.name.cyan());
+            println!("  {} {}", "ID:".bold(), output.id);
+            println!("  {} {}", "Type:".bold(), output.item_type);
 
-    if let Some(ref ext) = item.attributes.extension {
-        if let Some(ref ext_type) = ext.extension_type {
-            println!("  {} {}", "Extension:".bold(), ext_type);
+            if let Some(ref create_time) = output.create_time {
+                println!("  {} {}", "Created:".bold(), create_time);
+            }
+
+            if let Some(ref modified_time) = output.modified_time {
+                println!("  {} {}", "Modified:".bold(), modified_time);
+            }
+
+            if let Some(ref ext_type) = output.extension_type {
+                println!("  {} {}", "Extension:".bold(), ext_type);
+            }
+            if let Some(version) = output.extension_version {
+                println!("  {} {}", "Ext Version:".bold(), version);
+            }
+
+            println!("{}", "─".repeat(60));
+            println!(
+                "\n{}",
+                "Use 'raps item versions' to see version history".dimmed()
+            );
         }
-        if let Some(ref version) = ext.version {
-            println!("  {} {}", "Ext Version:".bold(), version);
+        _ => {
+            output_format.write(&output)?;
         }
     }
-
-    println!("{}", "─".repeat(60));
-    println!(
-        "\n{}",
-        "Use 'raps item versions' to see version history".dimmed()
-    );
     Ok(())
+}
+
+#[derive(Serialize)]
+struct VersionOutput {
+    version_number: Option<i32>,
+    name: String,
+    size: Option<u64>,
+    size_human: Option<String>,
+    create_time: Option<String>,
 }
 
 async fn list_versions(
     client: &DataManagementClient,
     project_id: &str,
     item_id: &str,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    println!("{}", "Fetching item versions...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching item versions...".dimmed());
+    }
 
     let versions = client.get_item_versions(project_id, item_id).await?;
 
-    if versions.is_empty() {
-        println!("{}", "No versions found.".yellow());
+    let version_outputs: Vec<VersionOutput> = versions
+        .iter()
+        .map(|v| {
+            let name = v.attributes.display_name.as_ref()
+                .or(Some(&v.attributes.name))
+                .map(|s| s.clone())
+                .unwrap_or_default();
+            VersionOutput {
+                version_number: v.attributes.version_number,
+                name,
+                size: v.attributes.storage_size.map(|s| s as u64),
+                size_human: v.attributes.storage_size.map(|s| format_size(s as u64)),
+                create_time: v.attributes.create_time.clone(),
+            }
+        })
+        .collect();
+
+    if version_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No versions found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<VersionOutput>::new())?;
+            }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Item Versions:".bold());
-    println!("{}", "─".repeat(80));
-    println!(
-        "{:<6} {:<40} {:>12} {}",
-        "Ver".bold(),
-        "Name".bold(),
-        "Size".bold(),
-        "Created".bold()
-    );
-    println!("{}", "─".repeat(80));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Item Versions:".bold());
+            println!("{}", "─".repeat(80));
+            println!(
+                "{:<6} {:<40} {:>12} {}",
+                "Ver".bold(),
+                "Name".bold(),
+                "Size".bold(),
+                "Created".bold()
+            );
+            println!("{}", "─".repeat(80));
 
-    for version in versions {
-        let ver_num = version
-            .attributes
-            .version_number
-            .map(|n| n.to_string())
-            .unwrap_or_else(|| "-".to_string());
+            for version in &version_outputs {
+                let ver_num = version.version_number
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| "-".to_string());
+                let name = truncate_str(&version.name, 40);
+                let size = version.size_human.as_deref().unwrap_or("-");
+                let created = version.create_time.as_deref().unwrap_or("-");
 
-        let name = version
-            .attributes
-            .display_name
-            .as_ref()
-            .or(Some(&version.attributes.name))
-            .map(|s| truncate_str(s, 40))
-            .unwrap_or_default();
+                println!(
+                    "{:<6} {:<40} {:>12} {}",
+                    ver_num.cyan(),
+                    name,
+                    size,
+                    created.dimmed()
+                );
+            }
 
-        let size = version
-            .attributes
-            .storage_size
-            .map(|s| format_size(s as u64))
-            .unwrap_or_else(|| "-".to_string());
-
-        let created = version.attributes.create_time.as_deref().unwrap_or("-");
-
-        println!(
-            "{:<6} {:<40} {:>12} {}",
-            ver_num.cyan(),
-            name,
-            size,
-            created.dimmed()
-        );
+            println!("{}", "─".repeat(80));
+        }
+        _ => {
+            output_format.write(&version_outputs)?;
+        }
     }
-
-    println!("{}", "─".repeat(80));
     Ok(())
 }
 
@@ -168,3 +225,4 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
+

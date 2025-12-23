@@ -6,8 +6,10 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::MultiSelect;
+use serde::Serialize;
 
 use crate::api::AuthClient;
+use crate::output::OutputFormat;
 
 /// Available OAuth scopes for 3-legged authentication
 const AVAILABLE_SCOPES: &[(&str, &str)] = &[
@@ -55,37 +57,65 @@ pub enum AuthCommands {
 }
 
 impl AuthCommands {
-    pub async fn execute(self, auth_client: &AuthClient) -> Result<()> {
+    pub async fn execute(self, auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            AuthCommands::Test => test_auth(auth_client).await,
-            AuthCommands::Login { default } => login(auth_client, default).await,
-            AuthCommands::Logout => logout(auth_client).await,
-            AuthCommands::Status => status(auth_client).await,
-            AuthCommands::Whoami => whoami(auth_client).await,
+            AuthCommands::Test => test_auth(auth_client, output_format).await,
+            AuthCommands::Login { default } => login(auth_client, default, output_format).await,
+            AuthCommands::Logout => logout(auth_client, output_format).await,
+            AuthCommands::Status => status(auth_client, output_format).await,
+            AuthCommands::Whoami => whoami(auth_client, output_format).await,
         }
     }
 }
 
-async fn test_auth(auth_client: &AuthClient) -> Result<()> {
-    println!("{}", "Testing 2-legged authentication...".dimmed());
+#[derive(Serialize)]
+struct TestAuthOutput {
+    success: bool,
+    client_id: String,
+    base_url: String,
+}
+
+async fn test_auth(auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Testing 2-legged authentication...".dimmed());
+    }
     auth_client.test_auth().await?;
-    println!("{} 2-legged authentication successful!", "✓".green().bold());
-    println!(
-        "  {} {}",
-        "Client ID:".bold(),
-        mask_string(&auth_client.config().client_id)
-    );
-    println!("  {} {}", "Base URL:".bold(), auth_client.config().base_url);
+    
+    let output = TestAuthOutput {
+        success: true,
+        client_id: mask_string(&auth_client.config().client_id),
+        base_url: auth_client.config().base_url.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} 2-legged authentication successful!", "✓".green().bold());
+            println!("  {} {}", "Client ID:".bold(), output.client_id);
+            println!("  {} {}", "Base URL:".bold(), output.base_url);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
     Ok(())
 }
 
-async fn login(auth_client: &AuthClient, use_defaults: bool) -> Result<()> {
+#[derive(Serialize)]
+struct LoginOutput {
+    success: bool,
+    access_token: String,
+    refresh_token_stored: bool,
+    scopes: Vec<String>,
+}
+
+async fn login(auth_client: &AuthClient, use_defaults: bool, output_format: OutputFormat) -> Result<()> {
     // Check if already logged in
     if auth_client.is_logged_in().await {
-        println!(
-            "{}",
-            "Already logged in. Use 'raps auth logout' to logout first.".yellow()
-        );
+        let msg = "Already logged in. Use 'raps auth logout' to logout first.";
+        match output_format {
+            OutputFormat::Table => println!("{}", msg.yellow()),
+            _ => output_format.write_message(msg)?,
+        }
         return Ok(());
     }
 
@@ -117,107 +147,214 @@ async fn login(auth_client: &AuthClient, use_defaults: bool) -> Result<()> {
         selections.iter().map(|&i| AVAILABLE_SCOPES[i].0).collect()
     };
 
-    println!("{}", "Starting 3-legged OAuth login...".dimmed());
-    println!("  {} {:?}", "Scopes:".bold(), scopes);
+    if output_format.supports_colors() {
+        println!("{}", "Starting 3-legged OAuth login...".dimmed());
+        println!("  {} {:?}", "Scopes:".bold(), scopes);
+    }
 
     let token = auth_client.login(&scopes).await?;
 
-    println!("\n{} Login successful!", "✓".green().bold());
-    println!(
-        "  {} {}",
-        "Access Token:".bold(),
-        mask_string(&token.access_token)
-    );
-    if token.refresh_token.is_some() {
-        println!("  {} {}", "Refresh Token:".bold(), "stored".green());
+    let output = LoginOutput {
+        success: true,
+        access_token: mask_string(&token.access_token),
+        refresh_token_stored: token.refresh_token.is_some(),
+        scopes: token.scopes.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Login successful!", "✓".green().bold());
+            println!("  {} {}", "Access Token:".bold(), output.access_token);
+            if output.refresh_token_stored {
+                println!("  {} {}", "Refresh Token:".bold(), "stored".green());
+            }
+            println!("  {} {:?}", "Scopes:".bold(), output.scopes);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
     }
-    println!("  {} {:?}", "Scopes:".bold(), token.scopes);
 
     Ok(())
 }
 
-async fn logout(auth_client: &AuthClient) -> Result<()> {
+#[derive(Serialize)]
+struct LogoutOutput {
+    success: bool,
+    message: String,
+}
+
+async fn logout(auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
     if !auth_client.is_logged_in().await {
-        println!("{}", "Not currently logged in.".yellow());
+        let msg = "Not currently logged in.";
+        match output_format {
+            OutputFormat::Table => println!("{}", msg.yellow()),
+            _ => {
+                let output = LogoutOutput {
+                    success: false,
+                    message: msg.to_string(),
+                };
+                output_format.write(&output)?;
+            }
+        }
         return Ok(());
     }
 
     auth_client.logout().await?;
-    println!(
-        "{} Logged out successfully. Stored tokens cleared.",
-        "✓".green().bold()
-    );
-    Ok(())
-}
+    
+    let output = LogoutOutput {
+        success: true,
+        message: "Logged out successfully. Stored tokens cleared.".to_string(),
+    };
 
-async fn status(auth_client: &AuthClient) -> Result<()> {
-    println!("{}", "Authentication Status".bold());
-    println!("{}", "─".repeat(40));
-
-    // 2-legged status
-    print!("  {} ", "2-legged (Client Credentials):".bold());
-    match auth_client.test_auth().await {
-        Ok(_) => println!("{}", "✓ Available".green()),
-        Err(_) => println!("{}", "✗ Not configured".red()),
-    }
-
-    // 3-legged status
-    print!("  {} ", "3-legged (User Login):".bold());
-    if auth_client.is_logged_in().await {
-        println!("{}", "✓ Logged in".green());
-        // Try to get token info
-        if let Ok(token) = auth_client.get_3leg_token().await {
-            println!("    {} {}", "Token:".dimmed(), mask_string(&token));
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
         }
-    } else {
-        println!("{}", "✗ Not logged in".yellow());
-        println!("    {}", "Run 'raps auth login' to authenticate".dimmed());
+        _ => {
+            output_format.write(&output)?;
+        }
     }
-
-    println!("{}", "─".repeat(40));
     Ok(())
 }
 
-async fn whoami(auth_client: &AuthClient) -> Result<()> {
+#[derive(Serialize)]
+struct StatusOutput {
+    two_legged: TwoLeggedStatus,
+    three_legged: ThreeLeggedStatus,
+}
+
+#[derive(Serialize)]
+struct TwoLeggedStatus {
+    available: bool,
+}
+
+#[derive(Serialize)]
+struct ThreeLeggedStatus {
+    logged_in: bool,
+    token: Option<String>,
+}
+
+async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
+    let two_legged_available = auth_client.test_auth().await.is_ok();
+    let three_legged_logged_in = auth_client.is_logged_in().await;
+    let token = if three_legged_logged_in {
+        auth_client.get_3leg_token().await.ok().map(|t| mask_string(&t))
+    } else {
+        None
+    };
+
+    let output = StatusOutput {
+        two_legged: TwoLeggedStatus {
+            available: two_legged_available,
+        },
+        three_legged: ThreeLeggedStatus {
+            logged_in: three_legged_logged_in,
+            token,
+        },
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{}", "Authentication Status".bold());
+            println!("{}", "─".repeat(40));
+
+            print!("  {} ", "2-legged (Client Credentials):".bold());
+            if output.two_legged.available {
+                println!("{}", "✓ Available".green());
+            } else {
+                println!("{}", "✗ Not configured".red());
+            }
+
+            print!("  {} ", "3-legged (User Login):".bold());
+            if output.three_legged.logged_in {
+                println!("{}", "✓ Logged in".green());
+                if let Some(ref token) = output.three_legged.token {
+                    println!("    {} {}", "Token:".dimmed(), token);
+                }
+            } else {
+                println!("{}", "✗ Not logged in".yellow());
+                println!("    {}", "Run 'raps auth login' to authenticate".dimmed());
+            }
+
+            println!("{}", "─".repeat(40));
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct WhoamiOutput {
+    name: Option<String>,
+    email: Option<String>,
+    email_verified: Option<bool>,
+    username: Option<String>,
+    aps_id: String,
+    profile_url: Option<String>,
+}
+
+async fn whoami(auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
     if !auth_client.is_logged_in().await {
-        println!(
-            "{}",
-            "Not logged in. Please run 'raps auth login' first.".yellow()
-        );
+        let msg = "Not logged in. Please run 'raps auth login' first.";
+        match output_format {
+            OutputFormat::Table => println!("{}", msg.yellow()),
+            _ => output_format.write_message(msg)?,
+        }
         return Ok(());
     }
 
-    println!("{}", "Fetching user profile...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching user profile...".dimmed());
+    }
 
     let user = auth_client.get_user_info().await?;
 
-    println!("\n{}", "User Profile".bold());
-    println!("{}", "─".repeat(50));
+    let output = WhoamiOutput {
+        name: user.name.clone(),
+        email: user.email.clone(),
+        email_verified: user.email_verified,
+        username: user.preferred_username.clone(),
+        aps_id: user.sub.clone(),
+        profile_url: user.profile.clone(),
+    };
 
-    if let Some(name) = &user.name {
-        println!("  {} {}", "Name:".bold(), name.cyan());
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "User Profile".bold());
+            println!("{}", "─".repeat(50));
+
+            if let Some(ref name) = output.name {
+                println!("  {} {}", "Name:".bold(), name.cyan());
+            }
+
+            if let Some(ref email) = output.email {
+                let verified = if output.email_verified.unwrap_or(false) {
+                    " ✓".green().to_string()
+                } else {
+                    "".to_string()
+                };
+                println!("  {} {}{}", "Email:".bold(), email, verified);
+            }
+
+            if let Some(ref username) = output.username {
+                println!("  {} {}", "Username:".bold(), username);
+            }
+
+            println!("  {} {}", "APS ID:".bold(), output.aps_id.dimmed());
+
+            if let Some(ref profile) = output.profile_url {
+                println!("  {} {}", "Profile URL:".bold(), profile.dimmed());
+            }
+
+            println!("{}", "─".repeat(50));
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
     }
-
-    if let Some(email) = &user.email {
-        let verified = if user.email_verified.unwrap_or(false) {
-            " ✓".green().to_string()
-        } else {
-            "".to_string()
-        };
-        println!("  {} {}{}", "Email:".bold(), email, verified);
-    }
-
-    if let Some(username) = &user.preferred_username {
-        println!("  {} {}", "Username:".bold(), username);
-    }
-
-    println!("  {} {}", "APS ID:".bold(), user.sub.dimmed());
-
-    if let Some(profile) = &user.profile {
-        println!("  {} {}", "Profile URL:".bold(), profile.dimmed());
-    }
-
-    println!("{}", "─".repeat(50));
     Ok(())
 }
 
