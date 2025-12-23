@@ -241,8 +241,6 @@ fn generate_obj(
     index: u32,
     _settings: &ComplexitySettings,
 ) -> anyhow::Result<(u64, u64)> {
-    let mut rng = rand::thread_rng();
-
     let obj_path = output.join(format!("building-model-{}.obj", index));
     let mtl_path = output.join(format!("building-model-{}.mtl", index));
 
