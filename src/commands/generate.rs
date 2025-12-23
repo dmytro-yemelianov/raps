@@ -608,3 +608,43 @@ fn generate_ifc_guid() -> String {
 
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_ifc_guid_format() {
+        let guid = generate_ifc_guid();
+        
+        // IFC GUIDs should be exactly 22 characters
+        assert_eq!(guid.len(), 22);
+        
+        // Should only contain valid IFC GUID characters
+        const VALID_CHARS: &str = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
+        for ch in guid.chars() {
+            assert!(VALID_CHARS.contains(ch), "Invalid character in IFC GUID: {}", ch);
+        }
+    }
+
+    #[test]
+    fn test_generate_ifc_guid_uniqueness() {
+        // Generate multiple GUIDs and verify they're different
+        let guid1 = generate_ifc_guid();
+        let guid2 = generate_ifc_guid();
+        let guid3 = generate_ifc_guid();
+        
+        assert_ne!(guid1, guid2);
+        assert_ne!(guid2, guid3);
+        assert_ne!(guid1, guid3);
+    }
+
+    #[test]
+    fn test_generate_ifc_guid_multiple_calls() {
+        // Generate 100 GUIDs to ensure they're all valid
+        for _ in 0..100 {
+            let guid = generate_ifc_guid();
+            assert_eq!(guid.len(), 22);
+        }
+    }
+}

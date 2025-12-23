@@ -17,7 +17,7 @@ use super::AuthClient;
 use crate::config::Config;
 
 /// Bucket retention policy
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RetentionPolicy {
     /// Files are automatically deleted after 24 hours
@@ -54,7 +54,7 @@ impl RetentionPolicy {
 }
 
 /// Region for bucket storage
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Region {
     US,
     #[allow(clippy::upper_case_acronyms)]
@@ -730,5 +730,91 @@ impl OssClient {
         })?;
 
         Ok(object_info)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::Config;
+    use crate::api::AuthClient;
+
+    fn create_test_oss_client() -> OssClient {
+        let config = Config {
+            client_id: "test".to_string(),
+            client_secret: "secret".to_string(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+        };
+        let auth = AuthClient::new(config.clone());
+        OssClient::new(config, auth)
+    }
+
+    #[test]
+    fn test_get_urn() {
+        let client = create_test_oss_client();
+        let urn = client.get_urn("my-bucket", "my-object.dwg");
+        
+        // URN should be base64 encoded
+        assert!(!urn.contains("urn:adsk.objects:os.object:"));
+        assert!(!urn.contains("my-bucket"));
+        assert!(!urn.contains("my-object.dwg"));
+        
+        // Should be valid base64 URL-safe encoding
+        assert!(!urn.contains("+"));
+        assert!(!urn.contains("/"));
+        assert!(!urn.contains("="));
+    }
+
+    #[test]
+    fn test_get_urn_with_special_characters() {
+        let client = create_test_oss_client();
+        let urn = client.get_urn("bucket-with-dashes", "folder/file name with spaces.txt");
+        
+        // Should handle special characters in object key
+        assert!(!urn.is_empty());
+    }
+
+    #[test]
+    fn test_retention_policy_display() {
+        assert_eq!(RetentionPolicy::Transient.to_string(), "transient");
+        assert_eq!(RetentionPolicy::Temporary.to_string(), "temporary");
+        assert_eq!(RetentionPolicy::Persistent.to_string(), "persistent");
+    }
+
+    #[test]
+    fn test_retention_policy_from_str() {
+        assert_eq!(RetentionPolicy::from_str("transient"), Some(RetentionPolicy::Transient));
+        assert_eq!(RetentionPolicy::from_str("TRANSIENT"), Some(RetentionPolicy::Transient));
+        assert_eq!(RetentionPolicy::from_str("temporary"), Some(RetentionPolicy::Temporary));
+        assert_eq!(RetentionPolicy::from_str("TEMPORARY"), Some(RetentionPolicy::Temporary));
+        assert_eq!(RetentionPolicy::from_str("persistent"), Some(RetentionPolicy::Persistent));
+        assert_eq!(RetentionPolicy::from_str("PERSISTENT"), Some(RetentionPolicy::Persistent));
+        assert_eq!(RetentionPolicy::from_str("invalid"), None);
+        assert_eq!(RetentionPolicy::from_str(""), None);
+    }
+
+    #[test]
+    fn test_retention_policy_all() {
+        let all = RetentionPolicy::all();
+        assert_eq!(all.len(), 3);
+        assert!(all.contains(&RetentionPolicy::Transient));
+        assert!(all.contains(&RetentionPolicy::Temporary));
+        assert!(all.contains(&RetentionPolicy::Persistent));
+    }
+
+    #[test]
+    fn test_region_display() {
+        assert_eq!(Region::US.to_string(), "US");
+        assert_eq!(Region::EMEA.to_string(), "EMEA");
+    }
+
+    #[test]
+    fn test_region_all() {
+        let all = Region::all();
+        assert_eq!(all.len(), 2);
+        assert!(all.contains(&Region::US));
+        assert!(all.contains(&Region::EMEA));
     }
 }

@@ -119,3 +119,47 @@ fn extract_hub_type(ext_type: &str) -> String {
             .to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_hub_type_bim360() {
+        assert_eq!(extract_hub_type("autodesk.bim360:Account"), "BIM 360");
+        assert_eq!(extract_hub_type("something.bim360.else"), "BIM 360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_acc() {
+        assert_eq!(extract_hub_type("autodesk.accproject:Project"), "ACC");
+        assert_eq!(extract_hub_type("prefix.accproject.suffix"), "ACC");
+    }
+
+    #[test]
+    fn test_extract_hub_type_a360() {
+        assert_eq!(extract_hub_type("autodesk.a360:Account"), "A360");
+        assert_eq!(extract_hub_type("something.a360.else"), "A360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_fusion() {
+        assert_eq!(extract_hub_type("autodesk.fusion:Account"), "Fusion");
+        assert_eq!(extract_hub_type("something.fusion.else"), "Fusion");
+    }
+
+    #[test]
+    fn test_extract_hub_type_with_colon() {
+        assert_eq!(extract_hub_type("autodesk:something:Project"), "Project");
+        assert_eq!(extract_hub_type("namespace:type:subtype"), "subtype");
+    }
+
+    #[test]
+    fn test_extract_hub_type_unknown() {
+        assert_eq!(extract_hub_type("unknown"), "unknown");
+        // Empty string splits to [""], next_back() returns Some(""), so result is ""
+        assert_eq!(extract_hub_type(""), "");
+        // But if there's no colon, it returns the whole string
+        assert_eq!(extract_hub_type("simple"), "simple");
+    }
+}

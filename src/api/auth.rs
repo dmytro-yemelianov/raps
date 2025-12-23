@@ -542,4 +542,104 @@ mod tests {
         };
         assert!(!expired_token.is_valid());
     }
+
+    #[test]
+    fn test_cached_token_near_expiry() {
+        // Token expiring in less than 60 seconds should be invalid
+        let token = CachedToken {
+            access_token: "test".to_string(),
+            expires_at: Instant::now() + Duration::from_secs(30),
+        };
+        assert!(!token.is_valid());
+
+        // Token expiring in more than 60 seconds should be valid
+        let token = CachedToken {
+            access_token: "test".to_string(),
+            expires_at: Instant::now() + Duration::from_secs(120),
+        };
+        assert!(token.is_valid());
+    }
+
+    #[test]
+    fn test_stored_token_validity() {
+        let now = chrono::Utc::now().timestamp();
+        
+        // Valid token (expires in 1 hour)
+        let token = StoredToken {
+            access_token: "test".to_string(),
+            refresh_token: Some("refresh".to_string()),
+            expires_at: now + 3600,
+            scopes: vec!["data:read".to_string()],
+        };
+        assert!(token.is_valid());
+
+        // Expired token
+        let expired_token = StoredToken {
+            access_token: "test".to_string(),
+            refresh_token: Some("refresh".to_string()),
+            expires_at: now - 100,
+            scopes: vec!["data:read".to_string()],
+        };
+        assert!(!expired_token.is_valid());
+
+        // Token expiring soon (within 60 seconds) should be invalid
+        let soon_expiring = StoredToken {
+            access_token: "test".to_string(),
+            refresh_token: Some("refresh".to_string()),
+            expires_at: now + 30,
+            scopes: vec!["data:read".to_string()],
+        };
+        assert!(!soon_expiring.is_valid());
+    }
+
+    #[test]
+    fn test_stored_token_without_refresh() {
+        let now = chrono::Utc::now().timestamp();
+        let token = StoredToken {
+            access_token: "test".to_string(),
+            refresh_token: None,
+            expires_at: now + 3600,
+            scopes: vec!["data:read".to_string()],
+        };
+        // Should still be valid if not expired
+        assert!(token.is_valid());
+    }
+
+    #[test]
+    fn test_token_response_serialization() {
+        let token = TokenResponse {
+            access_token: "test_token".to_string(),
+            token_type: "Bearer".to_string(),
+            expires_in: 3600,
+            refresh_token: Some("refresh_token".to_string()),
+        };
+
+        let json = serde_json::to_string(&token).unwrap();
+        assert!(json.contains("test_token"));
+        assert!(json.contains("Bearer"));
+        assert!(json.contains("refresh_token"));
+
+        let deserialized: TokenResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.access_token, "test_token");
+        assert_eq!(deserialized.token_type, "Bearer");
+        assert_eq!(deserialized.expires_in, 3600);
+        assert_eq!(deserialized.refresh_token, Some("refresh_token".to_string()));
+    }
+
+    #[test]
+    fn test_token_response_without_refresh() {
+        let token = TokenResponse {
+            access_token: "test_token".to_string(),
+            token_type: "Bearer".to_string(),
+            expires_in: 3600,
+            refresh_token: None,
+        };
+
+        let json = serde_json::to_string(&token).unwrap();
+        // refresh_token should be omitted when None
+        assert!(!json.contains("refresh_token"));
+
+        let deserialized: TokenResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.refresh_token, None);
+    }
 }
