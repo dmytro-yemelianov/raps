@@ -404,11 +404,7 @@ fn generate_stl(output: &Path, index: u32) -> anyhow::Result<u64> {
     Ok(path.metadata()?.len())
 }
 
-fn generate_ifc(
-    output: &Path,
-    index: u32,
-    settings: &ComplexitySettings,
-) -> anyhow::Result<u64> {
+fn generate_ifc(output: &Path, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("building-{}.ifc", index));
 
@@ -496,11 +492,7 @@ fn generate_ifc(
     Ok(path.metadata()?.len())
 }
 
-fn generate_json(
-    output: &Path,
-    index: u32,
-    settings: &ComplexitySettings,
-) -> anyhow::Result<u64> {
+fn generate_json(output: &Path, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("project-{}-metadata.json", index));
 
@@ -559,11 +551,7 @@ fn generate_json(
     Ok(path.metadata()?.len())
 }
 
-fn generate_xyz(
-    output: &Path,
-    index: u32,
-    settings: &ComplexitySettings,
-) -> anyhow::Result<u64> {
+fn generate_xyz(output: &Path, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("scan-{}.xyz", index));
 
