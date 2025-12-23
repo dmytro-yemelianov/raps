@@ -1,5 +1,5 @@
 //! Webhooks API module
-//! 
+//!
 //! Handles webhook subscriptions for automated event notifications.
 
 use anyhow::{Context, Result};
@@ -20,7 +20,10 @@ pub const WEBHOOK_EVENTS: &[(&str, &str)] = &[
     ("dm.folder.deleted", "Folder deleted"),
     ("dm.folder.moved", "Folder moved"),
     ("dm.folder.copied", "Folder copied"),
-    ("extraction.finished", "Model derivative extraction finished"),
+    (
+        "extraction.finished",
+        "Model derivative extraction finished",
+    ),
     ("extraction.updated", "Model derivative extraction updated"),
 ];
 
@@ -110,9 +113,15 @@ impl WebhooksClient {
     /// List all webhooks for a system and event
     pub async fn list_webhooks(&self, system: &str, event: &str) -> Result<Vec<Webhook>> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/systems/{}/events/{}/hooks", self.config.webhooks_url(), system, event);
+        let url = format!(
+            "{}/systems/{}/events/{}/hooks",
+            self.config.webhooks_url(),
+            system,
+            event
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -125,7 +134,9 @@ impl WebhooksClient {
             anyhow::bail!("Failed to list webhooks ({}): {}", status, error_text);
         }
 
-        let webhooks_response: WebhooksResponse = response.json().await
+        let webhooks_response: WebhooksResponse = response
+            .json()
+            .await
             .context("Failed to parse webhooks response")?;
 
         Ok(webhooks_response.data)
@@ -136,7 +147,8 @@ impl WebhooksClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/hooks", self.config.webhooks_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -149,7 +161,9 @@ impl WebhooksClient {
             anyhow::bail!("Failed to list webhooks ({}): {}", status, error_text);
         }
 
-        let webhooks_response: WebhooksResponse = response.json().await
+        let webhooks_response: WebhooksResponse = response
+            .json()
+            .await
             .context("Failed to parse webhooks response")?;
 
         Ok(webhooks_response.data)
@@ -164,7 +178,12 @@ impl WebhooksClient {
         folder_urn: Option<&str>,
     ) -> Result<Webhook> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/systems/{}/events/{}/hooks", self.config.webhooks_url(), system, event);
+        let url = format!(
+            "{}/systems/{}/events/{}/hooks",
+            self.config.webhooks_url(),
+            system,
+            event
+        );
 
         let request = CreateWebhookRequest {
             callback_url: callback_url.to_string(),
@@ -179,7 +198,8 @@ impl WebhooksClient {
             auto_reactivate_hook: Some(true),
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -194,7 +214,9 @@ impl WebhooksClient {
             anyhow::bail!("Failed to create webhook ({}): {}", status, error_text);
         }
 
-        let webhook: Webhook = response.json().await
+        let webhook: Webhook = response
+            .json()
+            .await
             .context("Failed to parse webhook response")?;
 
         Ok(webhook)
@@ -203,10 +225,16 @@ impl WebhooksClient {
     /// Delete a webhook
     pub async fn delete_webhook(&self, system: &str, event: &str, hook_id: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/systems/{}/events/{}/hooks/{}", 
-            self.config.webhooks_url(), system, event, hook_id);
+        let url = format!(
+            "{}/systems/{}/events/{}/hooks/{}",
+            self.config.webhooks_url(),
+            system,
+            event,
+            hook_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -227,4 +255,3 @@ impl WebhooksClient {
         WEBHOOK_EVENTS
     }
 }
-

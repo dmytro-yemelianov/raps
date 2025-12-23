@@ -1,5 +1,5 @@
 //! Folder management commands
-//! 
+//!
 //! Commands for listing, creating, and managing folders (requires 3-legged auth).
 
 use anyhow::Result;
@@ -18,7 +18,7 @@ pub enum FolderCommands {
         /// Folder ID
         folder_id: String,
     },
-    
+
     /// Create a new folder
     Create {
         /// Project ID
@@ -34,17 +34,24 @@ pub enum FolderCommands {
 impl FolderCommands {
     pub async fn execute(self, client: &DataManagementClient) -> Result<()> {
         match self {
-            FolderCommands::List { project_id, folder_id } => {
-                list_folder_contents(client, &project_id, &folder_id).await
-            }
-            FolderCommands::Create { project_id, parent_folder_id, name } => {
-                create_folder(client, &project_id, &parent_folder_id, name).await
-            }
+            FolderCommands::List {
+                project_id,
+                folder_id,
+            } => list_folder_contents(client, &project_id, &folder_id).await,
+            FolderCommands::Create {
+                project_id,
+                parent_folder_id,
+                name,
+            } => create_folder(client, &project_id, &parent_folder_id, name).await,
         }
     }
 }
 
-async fn list_folder_contents(client: &DataManagementClient, project_id: &str, folder_id: &str) -> Result<()> {
+async fn list_folder_contents(
+    client: &DataManagementClient,
+    project_id: &str,
+    folder_id: &str,
+) -> Result<()> {
     println!("{}", "Fetching folder contents...".dimmed());
 
     let contents = client.list_folder_contents(project_id, folder_id).await?;
@@ -58,16 +65,28 @@ async fn list_folder_contents(client: &DataManagementClient, project_id: &str, f
     println!("{}", "─".repeat(80));
 
     for item in contents {
-        let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
+        let item_type = item
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("unknown");
         let id = item.get("id").and_then(|i| i.as_str()).unwrap_or("unknown");
-        
-        let name = item.get("attributes")
+
+        let name = item
+            .get("attributes")
             .and_then(|a| a.get("displayName").or(a.get("name")))
             .and_then(|n| n.as_str())
             .unwrap_or("Unnamed");
 
-        let icon = if item_type == "folders" { "📁" } else { "📄" };
-        let type_label = if item_type == "folders" { "folder" } else { "item" };
+        let icon = if item_type == "folders" {
+            "📁"
+        } else {
+            "📄"
+        };
+        let type_label = if item_type == "folders" {
+            "folder"
+        } else {
+            "item"
+        };
 
         println!("  {} {} [{}]", icon, name.cyan(), type_label.dimmed());
         println!("    {} {}", "ID:".dimmed(), id);
@@ -85,16 +104,16 @@ async fn create_folder(
 ) -> Result<()> {
     let folder_name = match name {
         Some(n) => n,
-        None => {
-            Input::new()
-                .with_prompt("Enter folder name")
-                .interact_text()?
-        }
+        None => Input::new()
+            .with_prompt("Enter folder name")
+            .interact_text()?,
     };
 
     println!("{}", "Creating folder...".dimmed());
 
-    let folder = client.create_folder(project_id, parent_folder_id, &folder_name).await?;
+    let folder = client
+        .create_folder(project_id, parent_folder_id, &folder_name)
+        .await?;
 
     println!("{} Folder created successfully!", "✓".green().bold());
     println!("  {} {}", "Name:".bold(), folder.attributes.name.cyan());
@@ -102,4 +121,3 @@ async fn create_folder(
 
     Ok(())
 }
-

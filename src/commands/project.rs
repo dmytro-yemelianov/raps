@@ -1,5 +1,5 @@
 //! Project management commands
-//! 
+//!
 //! Commands for listing and viewing projects (requires 3-legged auth).
 
 use anyhow::Result;
@@ -16,7 +16,7 @@ pub enum ProjectCommands {
         /// Hub ID (interactive if not provided)
         hub_id: Option<String>,
     },
-    
+
     /// Get project details
     Info {
         /// Hub ID
@@ -44,12 +44,13 @@ async fn list_projects(client: &DataManagementClient, hub_id: Option<String>) ->
         None => {
             println!("{}", "Fetching hubs...".dimmed());
             let hubs = client.list_hubs().await?;
-            
+
             if hubs.is_empty() {
                 anyhow::bail!("No hubs found. Make sure you're logged in with 3-legged auth.");
             }
 
-            let hub_names: Vec<String> = hubs.iter()
+            let hub_names: Vec<String> = hubs
+                .iter()
                 .map(|h| format!("{} ({})", h.attributes.name, h.id))
                 .collect();
 
@@ -83,7 +84,10 @@ async fn list_projects(client: &DataManagementClient, hub_id: Option<String>) ->
     }
 
     println!("{}", "─".repeat(80));
-    println!("\n{}", "Use 'raps folder list <hub-id> <project-id>' to see folders".dimmed());
+    println!(
+        "\n{}",
+        "Use 'raps folder list <hub-id> <project-id>' to see folders".dimmed()
+    );
     Ok(())
 }
 
@@ -97,7 +101,7 @@ async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &
     println!("  {} {}", "Name:".bold(), project.attributes.name.cyan());
     println!("  {} {}", "ID:".bold(), project.id);
     println!("  {} {}", "Type:".bold(), project.project_type);
-    
+
     if let Some(ref scopes) = project.attributes.scopes {
         println!("  {} {:?}", "Scopes:".bold(), scopes);
     }
@@ -105,11 +109,15 @@ async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &
     // Get top folders
     println!("\n{}", "Top Folders:".bold());
     let folders = client.get_top_folders(hub_id, project_id).await?;
-    
+
     for folder in folders {
-        println!("  {} {} ({})", 
-            "📁".dimmed(), 
-            folder.attributes.display_name.as_ref()
+        println!(
+            "  {} {} ({})",
+            "📁".dimmed(),
+            folder
+                .attributes
+                .display_name
+                .as_ref()
                 .unwrap_or(&folder.attributes.name),
             folder.id.dimmed()
         );
@@ -118,4 +126,3 @@ async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &
     println!("{}", "─".repeat(60));
     Ok(())
 }
-

@@ -1,5 +1,5 @@
 //! Data Management API module
-//! 
+//!
 //! Handles access to Hubs, Projects, Folders, and Items in BIM 360/ACC.
 
 use anyhow::{Context, Result};
@@ -220,7 +220,8 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs", self.config.project_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -233,7 +234,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to list hubs ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Vec<Hub>> = response.json().await
+        let api_response: JsonApiResponse<Vec<Hub>> = response
+            .json()
+            .await
             .context("Failed to parse hubs response")?;
 
         Ok(api_response.data)
@@ -244,7 +247,8 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs/{}", self.config.project_url(), hub_id);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -257,7 +261,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to get hub ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Hub> = response.json().await
+        let api_response: JsonApiResponse<Hub> = response
+            .json()
+            .await
             .context("Failed to parse hub response")?;
 
         Ok(api_response.data)
@@ -268,7 +274,8 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs/{}/projects", self.config.project_url(), hub_id);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -281,7 +288,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to list projects ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Vec<Project>> = response.json().await
+        let api_response: JsonApiResponse<Vec<Project>> = response
+            .json()
+            .await
             .context("Failed to parse projects response")?;
 
         Ok(api_response.data)
@@ -290,9 +299,15 @@ impl DataManagementClient {
     /// Get project details
     pub async fn get_project(&self, hub_id: &str, project_id: &str) -> Result<Project> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}/projects/{}", self.config.project_url(), hub_id, project_id);
+        let url = format!(
+            "{}/hubs/{}/projects/{}",
+            self.config.project_url(),
+            hub_id,
+            project_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -305,7 +320,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to get project ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Project> = response.json().await
+        let api_response: JsonApiResponse<Project> = response
+            .json()
+            .await
             .context("Failed to parse project response")?;
 
         Ok(api_response.data)
@@ -314,9 +331,15 @@ impl DataManagementClient {
     /// Get top folders for a project
     pub async fn get_top_folders(&self, hub_id: &str, project_id: &str) -> Result<Vec<Folder>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}/projects/{}/topFolders", self.config.project_url(), hub_id, project_id);
+        let url = format!(
+            "{}/hubs/{}/projects/{}/topFolders",
+            self.config.project_url(),
+            hub_id,
+            project_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -329,18 +352,30 @@ impl DataManagementClient {
             anyhow::bail!("Failed to get top folders ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Vec<Folder>> = response.json().await
+        let api_response: JsonApiResponse<Vec<Folder>> = response
+            .json()
+            .await
             .context("Failed to parse folders response")?;
 
         Ok(api_response.data)
     }
 
     /// List folder contents
-    pub async fn list_folder_contents(&self, project_id: &str, folder_id: &str) -> Result<Vec<serde_json::Value>> {
+    pub async fn list_folder_contents(
+        &self,
+        project_id: &str,
+        folder_id: &str,
+    ) -> Result<Vec<serde_json::Value>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/folders/{}/contents", self.config.data_url(), project_id, folder_id);
+        let url = format!(
+            "{}/projects/{}/folders/{}/contents",
+            self.config.data_url(),
+            project_id,
+            folder_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -350,22 +385,35 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list folder contents ({}): {}", status, error_text);
+            anyhow::bail!(
+                "Failed to list folder contents ({}): {}",
+                status,
+                error_text
+            );
         }
 
-        let api_response: JsonApiResponse<Vec<serde_json::Value>> = response.json().await
+        let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
+            .json()
+            .await
             .context("Failed to parse folder contents")?;
 
         Ok(api_response.data)
     }
 
     /// Create a new folder
-    pub async fn create_folder(&self, project_id: &str, parent_folder_id: &str, name: &str) -> Result<Folder> {
+    pub async fn create_folder(
+        &self,
+        project_id: &str,
+        parent_folder_id: &str,
+        name: &str,
+    ) -> Result<Folder> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/projects/{}/folders", self.config.data_url(), project_id);
 
         let request = CreateFolderRequest {
-            jsonapi: JsonApiVersion { version: "1.0".to_string() },
+            jsonapi: JsonApiVersion {
+                version: "1.0".to_string(),
+            },
             data: CreateFolderData {
                 data_type: "folders".to_string(),
                 attributes: CreateFolderAttributes {
@@ -386,7 +434,8 @@ impl DataManagementClient {
             },
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/vnd.api+json")
@@ -401,7 +450,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to create folder ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Folder> = response.json().await
+        let api_response: JsonApiResponse<Folder> = response
+            .json()
+            .await
             .context("Failed to parse folder response")?;
 
         Ok(api_response.data)
@@ -410,9 +461,15 @@ impl DataManagementClient {
     /// Get item details
     pub async fn get_item(&self, project_id: &str, item_id: &str) -> Result<Item> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/items/{}", self.config.data_url(), project_id, item_id);
+        let url = format!(
+            "{}/projects/{}/items/{}",
+            self.config.data_url(),
+            project_id,
+            item_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -425,7 +482,9 @@ impl DataManagementClient {
             anyhow::bail!("Failed to get item ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Item> = response.json().await
+        let api_response: JsonApiResponse<Item> = response
+            .json()
+            .await
             .context("Failed to parse item response")?;
 
         Ok(api_response.data)
@@ -434,9 +493,15 @@ impl DataManagementClient {
     /// Get item versions
     pub async fn get_item_versions(&self, project_id: &str, item_id: &str) -> Result<Vec<Version>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/items/{}/versions", self.config.data_url(), project_id, item_id);
+        let url = format!(
+            "{}/projects/{}/items/{}/versions",
+            self.config.data_url(),
+            project_id,
+            item_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -449,10 +514,11 @@ impl DataManagementClient {
             anyhow::bail!("Failed to get item versions ({}): {}", status, error_text);
         }
 
-        let api_response: JsonApiResponse<Vec<Version>> = response.json().await
+        let api_response: JsonApiResponse<Vec<Version>> = response
+            .json()
+            .await
             .context("Failed to parse versions response")?;
 
         Ok(api_response.data)
     }
 }
-

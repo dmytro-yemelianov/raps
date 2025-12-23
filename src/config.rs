@@ -1,5 +1,5 @@
 //! Configuration module for APS CLI
-//! 
+//!
 //! Handles loading and managing APS credentials from environment variables or .env file.
 
 use anyhow::{Context, Result};
@@ -25,7 +25,7 @@ pub struct Config {
 
 impl Config {
     /// Load configuration from environment variables
-    /// 
+    ///
     /// Looks for:
     /// - APS_CLIENT_ID: Your APS application client ID
     /// - APS_CLIENT_SECRET: Your APS application client secret
@@ -36,12 +36,14 @@ impl Config {
         // Try to load .env file if it exists (silently ignore if not found)
         let _ = dotenvy::dotenv();
 
-        let client_id = env::var("APS_CLIENT_ID")
-            .context("APS_CLIENT_ID environment variable not set. Please set it or create a .env file.")?;
-        
-        let client_secret = env::var("APS_CLIENT_SECRET")
-            .context("APS_CLIENT_SECRET environment variable not set. Please set it or create a .env file.")?;
-        
+        let client_id = env::var("APS_CLIENT_ID").context(
+            "APS_CLIENT_ID environment variable not set. Please set it or create a .env file.",
+        )?;
+
+        let client_secret = env::var("APS_CLIENT_SECRET").context(
+            "APS_CLIENT_SECRET environment variable not set. Please set it or create a .env file.",
+        )?;
+
         let base_url = env::var("APS_BASE_URL")
             .unwrap_or_else(|_| "https://developer.api.autodesk.com".to_string());
 

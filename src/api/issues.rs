@@ -1,5 +1,5 @@
 //! ACC Issues API module
-//! 
+//!
 //! Handles issues and RFIs in ACC (Autodesk Construction Cloud) projects.
 //! Uses the Construction Issues API v1: /construction/issues/v1
 
@@ -125,17 +125,22 @@ impl IssuesClient {
     }
 
     /// List issues in a project
-    /// 
+    ///
     /// Note: project_id should NOT include the "b." prefix used by Data Management API
     pub async fn list_issues(&self, project_id: &str, filter: Option<&str>) -> Result<Vec<Issue>> {
         let token = self.auth.get_3leg_token().await?;
-        let mut url = format!("{}/projects/{}/issues", self.config.issues_url(), project_id);
-        
+        let mut url = format!(
+            "{}/projects/{}/issues",
+            self.config.issues_url(),
+            project_id
+        );
+
         if let Some(f) = filter {
             url = format!("{}?filter[{}]", url, f);
         }
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -148,7 +153,9 @@ impl IssuesClient {
             anyhow::bail!("Failed to list issues ({}): {}", status, error_text);
         }
 
-        let issues_response: IssuesResponse = response.json().await
+        let issues_response: IssuesResponse = response
+            .json()
+            .await
             .context("Failed to parse issues response")?;
 
         Ok(issues_response.results)
@@ -157,10 +164,15 @@ impl IssuesClient {
     /// Get issue details
     pub async fn get_issue(&self, project_id: &str, issue_id: &str) -> Result<Issue> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/issues/{}", 
-            self.config.issues_url(), project_id, issue_id);
+        let url = format!(
+            "{}/projects/{}/issues/{}",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -173,18 +185,29 @@ impl IssuesClient {
             anyhow::bail!("Failed to get issue ({}): {}", status, error_text);
         }
 
-        let issue: Issue = response.json().await
+        let issue: Issue = response
+            .json()
+            .await
             .context("Failed to parse issue response")?;
 
         Ok(issue)
     }
 
     /// Create a new issue
-    pub async fn create_issue(&self, project_id: &str, request: CreateIssueRequest) -> Result<Issue> {
+    pub async fn create_issue(
+        &self,
+        project_id: &str,
+        request: CreateIssueRequest,
+    ) -> Result<Issue> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/issues", self.config.issues_url(), project_id);
+        let url = format!(
+            "{}/projects/{}/issues",
+            self.config.issues_url(),
+            project_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -199,19 +222,31 @@ impl IssuesClient {
             anyhow::bail!("Failed to create issue ({}): {}", status, error_text);
         }
 
-        let issue: Issue = response.json().await
+        let issue: Issue = response
+            .json()
+            .await
             .context("Failed to parse issue response")?;
 
         Ok(issue)
     }
 
     /// Update an issue
-    pub async fn update_issue(&self, project_id: &str, issue_id: &str, request: UpdateIssueRequest) -> Result<Issue> {
+    pub async fn update_issue(
+        &self,
+        project_id: &str,
+        issue_id: &str,
+        request: UpdateIssueRequest,
+    ) -> Result<Issue> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/issues/{}", 
-            self.config.issues_url(), project_id, issue_id);
+        let url = format!(
+            "{}/projects/{}/issues/{}",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .patch(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -226,7 +261,9 @@ impl IssuesClient {
             anyhow::bail!("Failed to update issue ({}): {}", status, error_text);
         }
 
-        let issue: Issue = response.json().await
+        let issue: Issue = response
+            .json()
+            .await
             .context("Failed to parse issue response")?;
 
         Ok(issue)
@@ -235,10 +272,14 @@ impl IssuesClient {
     /// List issue types (categories) for a project
     pub async fn list_issue_types(&self, project_id: &str) -> Result<Vec<IssueType>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/issue-types?include=subtypes", 
-            self.config.issues_url(), project_id);
+        let url = format!(
+            "{}/projects/{}/issue-types?include=subtypes",
+            self.config.issues_url(),
+            project_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -251,7 +292,9 @@ impl IssuesClient {
             anyhow::bail!("Failed to list issue types ({}): {}", status, error_text);
         }
 
-        let types_response: IssueTypesResponse = response.json().await
+        let types_response: IssueTypesResponse = response
+            .json()
+            .await
             .context("Failed to parse issue types response")?;
 
         Ok(types_response.results)

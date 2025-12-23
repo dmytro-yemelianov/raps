@@ -1,5 +1,5 @@
 //! Hub management commands
-//! 
+//!
 //! Commands for listing and viewing hubs (requires 3-legged auth).
 
 use anyhow::Result;
@@ -12,7 +12,7 @@ use crate::api::DataManagementClient;
 pub enum HubCommands {
     /// List all accessible hubs
     List,
-    
+
     /// Get hub details
     Info {
         /// Hub ID
@@ -50,13 +50,15 @@ async fn list_hubs(client: &DataManagementClient) -> Result<()> {
     println!("{}", "─".repeat(80));
 
     for hub in hubs {
-        let hub_type = hub.attributes.extension
+        let hub_type = hub
+            .attributes
+            .extension
             .and_then(|e| e.extension_type)
             .map(|t| extract_hub_type(&t))
             .unwrap_or_else(|| "Unknown".to_string());
-        
+
         let region = hub.attributes.region.as_deref().unwrap_or("US");
-        
+
         println!(
             "{:<45} {:<15} {}",
             hub.attributes.name.cyan(),
@@ -80,11 +82,11 @@ async fn hub_info(client: &DataManagementClient, hub_id: &str) -> Result<()> {
     println!("  {} {}", "Name:".bold(), hub.attributes.name.cyan());
     println!("  {} {}", "ID:".bold(), hub.id);
     println!("  {} {}", "Type:".bold(), hub.hub_type);
-    
+
     if let Some(ref region) = hub.attributes.region {
         println!("  {} {}", "Region:".bold(), region);
     }
-    
+
     if let Some(ref ext) = hub.attributes.extension {
         if let Some(ref ext_type) = ext.extension_type {
             println!("  {} {}", "Extension:".bold(), extract_hub_type(ext_type));
@@ -92,7 +94,10 @@ async fn hub_info(client: &DataManagementClient, hub_id: &str) -> Result<()> {
     }
 
     println!("{}", "─".repeat(60));
-    println!("\n{}", "Use 'raps project list <hub-id>' to see projects".dimmed());
+    println!(
+        "\n{}",
+        "Use 'raps project list <hub-id>' to see projects".dimmed()
+    );
     Ok(())
 }
 
@@ -110,4 +115,3 @@ fn extract_hub_type(ext_type: &str) -> String {
         ext_type.split(':').last().unwrap_or("Unknown").to_string()
     }
 }
-

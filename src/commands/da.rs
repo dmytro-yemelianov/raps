@@ -1,5 +1,5 @@
 //! Design Automation commands
-//! 
+//!
 //! Commands for managing engines, app bundles, activities, and work items.
 
 use anyhow::Result;
@@ -15,48 +15,48 @@ use crate::api::DesignAutomationClient;
 pub enum DaCommands {
     /// List available engines
     Engines,
-    
+
     /// List app bundles
     Appbundles,
-    
+
     /// Create an app bundle
     #[command(name = "appbundle-create")]
     AppbundleCreate {
         /// App bundle ID
         #[arg(short, long)]
         id: Option<String>,
-        
+
         /// Engine ID (e.g., Autodesk.AutoCAD+24)
         #[arg(short, long)]
         engine: Option<String>,
-        
+
         /// Description
         #[arg(short, long)]
         description: Option<String>,
     },
-    
+
     /// Delete an app bundle
     #[command(name = "appbundle-delete")]
     AppbundleDelete {
         /// App bundle ID to delete
         id: String,
     },
-    
+
     /// List activities
     Activities,
-    
+
     /// Delete an activity
     #[command(name = "activity-delete")]
     ActivityDelete {
         /// Activity ID to delete
         id: String,
     },
-    
+
     /// Check work item status
     Status {
         /// Work item ID
         workitem_id: String,
-        
+
         /// Wait for completion
         #[arg(short, long)]
         wait: bool,
@@ -68,9 +68,11 @@ impl DaCommands {
         match self {
             DaCommands::Engines => list_engines(client).await,
             DaCommands::Appbundles => list_appbundles(client).await,
-            DaCommands::AppbundleCreate { id, engine, description } => {
-                create_appbundle(client, id, engine, description).await
-            }
+            DaCommands::AppbundleCreate {
+                id,
+                engine,
+                description,
+            } => create_appbundle(client, id, engine, description).await,
             DaCommands::AppbundleDelete { id } => delete_appbundle(client, &id).await,
             DaCommands::Activities => list_activities(client).await,
             DaCommands::ActivityDelete { id } => delete_activity(client, &id).await,
@@ -187,9 +189,9 @@ async fn create_appbundle(
         None => {
             println!("{}", "Fetching engines...".dimmed());
             let engines = client.list_engines().await?;
-            
+
             let engine_ids: Vec<&str> = engines.iter().map(|e| e.id.as_str()).collect();
-            
+
             let selection = Select::new()
                 .with_prompt("Select engine")
                 .items(&engine_ids)
@@ -202,16 +204,16 @@ async fn create_appbundle(
     // Get bundle ID
     let bundle_id = match id {
         Some(i) => i,
-        None => {
-            Input::new()
-                .with_prompt("Enter app bundle ID")
-                .interact_text()?
-        }
+        None => Input::new()
+            .with_prompt("Enter app bundle ID")
+            .interact_text()?,
     };
 
     println!("{}", "Creating app bundle...".dimmed());
 
-    let bundle = client.create_appbundle(&bundle_id, &selected_engine, description.as_deref()).await?;
+    let bundle = client
+        .create_appbundle(&bundle_id, &selected_engine, description.as_deref())
+        .await?;
 
     println!("{} App bundle created!", "✓".green().bold());
     println!("  {} {}", "ID:".bold(), bundle.id);
@@ -228,7 +230,7 @@ async fn create_appbundle(
 
 async fn delete_appbundle(client: &DesignAutomationClient, id: &str) -> Result<()> {
     println!("{}", "Deleting app bundle...".dimmed());
-    
+
     client.delete_appbundle(id).await?;
 
     println!("{} App bundle '{}' deleted!", "✓".green().bold(), id);
@@ -258,20 +260,24 @@ async fn list_activities(client: &DesignAutomationClient) -> Result<()> {
 
 async fn delete_activity(client: &DesignAutomationClient, id: &str) -> Result<()> {
     println!("{}", "Deleting activity...".dimmed());
-    
+
     client.delete_activity(id).await?;
 
     println!("{} Activity '{}' deleted!", "✓".green().bold(), id);
     Ok(())
 }
 
-async fn check_status(client: &DesignAutomationClient, workitem_id: &str, wait: bool) -> Result<()> {
+async fn check_status(
+    client: &DesignAutomationClient,
+    workitem_id: &str,
+    wait: bool,
+) -> Result<()> {
     if wait {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
-                .unwrap()
+                .unwrap(),
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
 
@@ -318,11 +324,11 @@ async fn check_status(client: &DesignAutomationClient, workitem_id: &str, wait: 
         };
 
         println!("{} {}", status_icon, workitem.status);
-        
+
         if let Some(progress) = workitem.progress {
             println!("  {} {}", "Progress:".bold(), progress);
         }
-        
+
         if let Some(url) = workitem.report_url {
             println!("  {} {}", "Report:".bold(), url);
         }
@@ -330,4 +336,3 @@ async fn check_status(client: &DesignAutomationClient, workitem_id: &str, wait: 
 
     Ok(())
 }
-

@@ -1,5 +1,5 @@
 //! Issue management commands
-//! 
+//!
 //! Commands for managing ACC (Autodesk Construction Cloud) issues.
 //! Uses the Construction Issues API: /construction/issues/v1
 
@@ -8,8 +8,8 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 
-use crate::api::IssuesClient;
 use crate::api::issues::CreateIssueRequest;
+use crate::api::IssuesClient;
 
 #[derive(Debug, Subcommand)]
 pub enum IssueCommands {
@@ -17,42 +17,42 @@ pub enum IssueCommands {
     List {
         /// Project ID (without "b." prefix used by Data Management API)
         project_id: String,
-        
+
         /// Filter by status (open, closed, etc.)
         #[arg(short, long)]
         status: Option<String>,
     },
-    
+
     /// Create a new issue
     Create {
         /// Project ID (without "b." prefix)
         project_id: String,
-        
+
         /// Issue title
         #[arg(short, long)]
         title: Option<String>,
-        
+
         /// Issue description
         #[arg(short, long)]
         description: Option<String>,
     },
-    
+
     /// Update an issue
     Update {
         /// Project ID (without "b." prefix)
         project_id: String,
         /// Issue ID
         issue_id: String,
-        
+
         /// New status
         #[arg(short, long)]
         status: Option<String>,
-        
+
         /// New title
         #[arg(short, long)]
         title: Option<String>,
     },
-    
+
     /// List issue types (categories) for a project
     Types {
         /// Project ID (without "b." prefix)
@@ -66,20 +66,27 @@ impl IssueCommands {
             IssueCommands::List { project_id, status } => {
                 list_issues(client, &project_id, status).await
             }
-            IssueCommands::Create { project_id, title, description } => {
-                create_issue(client, &project_id, title, description).await
-            }
-            IssueCommands::Update { project_id, issue_id, status, title } => {
-                update_issue(client, &project_id, &issue_id, status, title).await
-            }
-            IssueCommands::Types { project_id } => {
-                list_issue_types(client, &project_id).await
-            }
+            IssueCommands::Create {
+                project_id,
+                title,
+                description,
+            } => create_issue(client, &project_id, title, description).await,
+            IssueCommands::Update {
+                project_id,
+                issue_id,
+                status,
+                title,
+            } => update_issue(client, &project_id, &issue_id, status, title).await,
+            IssueCommands::Types { project_id } => list_issue_types(client, &project_id).await,
         }
     }
 }
 
-async fn list_issues(client: &IssuesClient, project_id: &str, status: Option<String>) -> Result<()> {
+async fn list_issues(
+    client: &IssuesClient,
+    project_id: &str,
+    status: Option<String>,
+) -> Result<()> {
     println!("{}", "Fetching issues...".dimmed());
 
     let filter = status.as_ref().map(|s| format!("status={}", s));
@@ -102,19 +109,20 @@ async fn list_issues(client: &IssuesClient, project_id: &str, status: Option<Str
     println!("{}", "─".repeat(90));
 
     for issue in issues {
-        let display_id = issue.display_id
+        let display_id = issue
+            .display_id
             .map(|n| format!("#{}", n))
             .unwrap_or_else(|| "-".to_string());
-        
+
         let status_colored = match issue.status.as_str() {
             "open" => issue.status.yellow(),
             "closed" => issue.status.green(),
             "answered" => issue.status.cyan(),
             _ => issue.status.normal(),
         };
-        
+
         let assigned = issue.assigned_to.as_deref().unwrap_or("-");
-        
+
         println!(
             "{:<8} {:<12} {:<40} {}",
             display_id.cyan(),
@@ -137,11 +145,9 @@ async fn create_issue(
     // Get title
     let issue_title = match title {
         Some(t) => t,
-        None => {
-            Input::new()
-                .with_prompt("Enter issue title")
-                .interact_text()?
-        }
+        None => Input::new()
+            .with_prompt("Enter issue title")
+            .interact_text()?,
     };
 
     // Get description (optional)
@@ -152,7 +158,11 @@ async fn create_issue(
                 .with_prompt("Enter description (optional)")
                 .allow_empty(true)
                 .interact_text()?;
-            if desc.is_empty() { None } else { Some(desc) }
+            if desc.is_empty() {
+                None
+            } else {
+                Some(desc)
+            }
         }
     };
 
@@ -188,7 +198,7 @@ async fn update_issue(
 ) -> Result<()> {
     // Get current issue
     let current = client.get_issue(project_id, issue_id).await?;
-    
+
     // Determine new status
     let new_status = match status {
         Some(s) => Some(s),
@@ -219,7 +229,12 @@ async fn update_issue(
 
     println!("{} Issue updated!", "✓".green().bold());
     println!("  {} {}", "Title:".bold(), issue.title);
-    println!("  {} {} → {}", "Status:".bold(), current.status.dimmed(), issue.status.cyan());
+    println!(
+        "  {} {} → {}",
+        "Status:".bold(),
+        current.status.dimmed(),
+        issue.status.cyan()
+    );
 
     Ok(())
 }
@@ -243,10 +258,10 @@ async fn list_issue_types(client: &IssuesClient, project_id: &str) -> Result<()>
         } else {
             " (inactive)".dimmed().to_string()
         };
-        
+
         println!("  {} {}{}", "•".cyan(), issue_type.title.bold(), active);
         println!("    {} {}", "ID:".dimmed(), issue_type.id);
-        
+
         if let Some(ref subtypes) = issue_type.subtypes {
             for subtype in subtypes {
                 let sub_active = if subtype.is_active.unwrap_or(true) {

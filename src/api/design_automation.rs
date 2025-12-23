@@ -1,5 +1,5 @@
 //! Design Automation API module
-//! 
+//!
 //! Handles automation of CAD processing with engines like AutoCAD, Revit, Inventor, 3ds Max.
 
 use anyhow::{Context, Result};
@@ -167,7 +167,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/engines", self.config.da_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -180,7 +181,9 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to list engines ({}): {}", status, error_text);
         }
 
-        let paginated: PaginatedResponse<Engine> = response.json().await
+        let paginated: PaginatedResponse<Engine> = response
+            .json()
+            .await
             .context("Failed to parse engines response")?;
 
         Ok(paginated.data)
@@ -191,7 +194,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles", self.config.da_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -204,14 +208,21 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to list appbundles ({}): {}", status, error_text);
         }
 
-        let paginated: PaginatedResponse<String> = response.json().await
+        let paginated: PaginatedResponse<String> = response
+            .json()
+            .await
             .context("Failed to parse appbundles response")?;
 
         Ok(paginated.data)
     }
 
     /// Create a new app bundle
-    pub async fn create_appbundle(&self, id: &str, engine: &str, description: Option<&str>) -> Result<AppBundleDetails> {
+    pub async fn create_appbundle(
+        &self,
+        id: &str,
+        engine: &str,
+        description: Option<&str>,
+    ) -> Result<AppBundleDetails> {
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles", self.config.da_url());
 
@@ -221,7 +232,8 @@ impl DesignAutomationClient {
             description: description.map(|s| s.to_string()),
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -236,7 +248,9 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to create appbundle ({}): {}", status, error_text);
         }
 
-        let appbundle: AppBundleDetails = response.json().await
+        let appbundle: AppBundleDetails = response
+            .json()
+            .await
             .context("Failed to parse appbundle response")?;
 
         Ok(appbundle)
@@ -247,7 +261,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles/{}", self.config.da_url(), id);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -268,7 +283,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -281,7 +297,9 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to list activities ({}): {}", status, error_text);
         }
 
-        let paginated: PaginatedResponse<String> = response.json().await
+        let paginated: PaginatedResponse<String> = response
+            .json()
+            .await
             .context("Failed to parse activities response")?;
 
         Ok(paginated.data)
@@ -292,7 +310,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -307,7 +326,9 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to create activity ({}): {}", status, error_text);
         }
 
-        let activity: Activity = response.json().await
+        let activity: Activity = response
+            .json()
+            .await
             .context("Failed to parse activity response")?;
 
         Ok(activity)
@@ -318,7 +339,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities/{}", self.config.da_url(), id);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -335,7 +357,11 @@ impl DesignAutomationClient {
     }
 
     /// Create a work item (run an activity)
-    pub async fn create_workitem(&self, activity_id: &str, arguments: std::collections::HashMap<String, WorkItemArgument>) -> Result<WorkItem> {
+    pub async fn create_workitem(
+        &self,
+        activity_id: &str,
+        arguments: std::collections::HashMap<String, WorkItemArgument>,
+    ) -> Result<WorkItem> {
         let token = self.auth.get_token().await?;
         let url = format!("{}/workitems", self.config.da_url());
 
@@ -344,7 +370,8 @@ impl DesignAutomationClient {
             arguments,
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -359,7 +386,9 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to create workitem ({}): {}", status, error_text);
         }
 
-        let workitem: WorkItem = response.json().await
+        let workitem: WorkItem = response
+            .json()
+            .await
             .context("Failed to parse workitem response")?;
 
         Ok(workitem)
@@ -370,7 +399,8 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/workitems/{}", self.config.da_url(), id);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -383,10 +413,11 @@ impl DesignAutomationClient {
             anyhow::bail!("Failed to get workitem status ({}): {}", status, error_text);
         }
 
-        let workitem: WorkItem = response.json().await
+        let workitem: WorkItem = response
+            .json()
+            .await
             .context("Failed to parse workitem response")?;
 
         Ok(workitem)
     }
 }
-

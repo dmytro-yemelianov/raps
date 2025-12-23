@@ -1,5 +1,5 @@
 //! API modules for interacting with Autodesk Platform Services
-//! 
+//!
 //! This module contains clients for:
 //! - Authentication (OAuth 2.0, both 2-legged and 3-legged)
 //! - Object Storage Service (OSS)
@@ -11,19 +11,19 @@
 //! - Reality Capture
 
 pub mod auth;
-pub mod oss;
-pub mod derivative;
 pub mod data_management;
-pub mod webhooks;
+pub mod derivative;
 pub mod design_automation;
 pub mod issues;
+pub mod oss;
 pub mod reality_capture;
+pub mod webhooks;
 
 pub use auth::AuthClient;
-pub use oss::OssClient;
-pub use derivative::DerivativeClient;
 pub use data_management::DataManagementClient;
-pub use webhooks::WebhooksClient;
+pub use derivative::DerivativeClient;
 pub use design_automation::DesignAutomationClient;
 pub use issues::IssuesClient;
+pub use oss::OssClient;
 pub use reality_capture::RealityCaptureClient;
+pub use webhooks::WebhooksClient;

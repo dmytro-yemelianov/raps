@@ -1,5 +1,5 @@
 //! Object Storage Service (OSS) API module
-//! 
+//!
 //! Handles bucket and object operations for storing files in APS.
 
 use anyhow::{Context, Result};
@@ -214,7 +214,8 @@ impl OssClient {
             policy_key: policy.to_string(),
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("x-ads-region", region.to_string())
@@ -230,7 +231,9 @@ impl OssClient {
             anyhow::bail!("Failed to create bucket ({}): {}", status, error_text);
         }
 
-        let bucket: Bucket = response.json().await
+        let bucket: Bucket = response
+            .json()
+            .await
             .context("Failed to parse bucket response")?;
 
         Ok(bucket)
@@ -265,7 +268,8 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = self.http_client
+            let response = self
+                .http_client
                 .get(&url)
                 .bearer_auth(&token)
                 .header("x-ads-region", region.to_string())
@@ -279,7 +283,9 @@ impl OssClient {
                 anyhow::bail!("Failed to list buckets ({}): {}", status, error_text);
             }
 
-            let buckets_response: BucketsResponse = response.json().await
+            let buckets_response: BucketsResponse = response
+                .json()
+                .await
                 .context("Failed to parse buckets response")?;
 
             buckets.extend(buckets_response.items);
@@ -298,7 +304,8 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}/details", self.config.oss_url(), bucket_key);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -311,7 +318,9 @@ impl OssClient {
             anyhow::bail!("Failed to get bucket details ({}): {}", status, error_text);
         }
 
-        let bucket: Bucket = response.json().await
+        let bucket: Bucket = response
+            .json()
+            .await
             .context("Failed to parse bucket details")?;
 
         Ok(bucket)
@@ -322,7 +331,8 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}", self.config.oss_url(), bucket_key);
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -346,10 +356,13 @@ impl OssClient {
         file_path: &Path,
     ) -> Result<ObjectInfo> {
         // Read file
-        let mut file = File::open(file_path).await
+        let mut file = File::open(file_path)
+            .await
             .context("Failed to open file for upload")?;
-        
-        let metadata = file.metadata().await
+
+        let metadata = file
+            .metadata()
+            .await
             .context("Failed to get file metadata")?;
         let file_size = metadata.len();
 
@@ -365,12 +378,15 @@ impl OssClient {
 
         // Read file contents
         let mut buffer = Vec::with_capacity(file_size as usize);
-        file.read_to_end(&mut buffer).await
+        file.read_to_end(&mut buffer)
+            .await
             .context("Failed to read file")?;
 
         // Step 1: Get signed S3 upload URL
         pb.set_message(format!("Getting upload URL for {}", object_key));
-        let signed = self.get_signed_upload_url(bucket_key, object_key, None, None).await?;
+        let signed = self
+            .get_signed_upload_url(bucket_key, object_key, None, None)
+            .await?;
 
         if signed.urls.is_empty() {
             anyhow::bail!("No upload URLs returned from signed upload request");
@@ -379,8 +395,9 @@ impl OssClient {
         // Step 2: Upload directly to S3
         pb.set_message(format!("Uploading {} to S3", object_key));
         let s3_url = &signed.urls[0];
-        
-        let response = self.http_client
+
+        let response = self
+            .http_client
             .put(s3_url)
             .header("Content-Type", "application/octet-stream")
             .header("Content-Length", file_size.to_string())
@@ -399,7 +416,9 @@ impl OssClient {
 
         // Step 3: Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
-        let object_info = self.complete_signed_upload(bucket_key, object_key, &signed.upload_key).await?;
+        let object_info = self
+            .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
+            .await?;
 
         pb.finish_with_message(format!("Uploaded {}", object_key));
 
@@ -414,13 +433,17 @@ impl OssClient {
         output_path: &Path,
     ) -> Result<()> {
         // Step 1: Get signed S3 download URL
-        let signed = self.get_signed_download_url(bucket_key, object_key, None).await?;
-        
-        let download_url = signed.url
+        let signed = self
+            .get_signed_download_url(bucket_key, object_key, None)
+            .await?;
+
+        let download_url = signed
+            .url
             .ok_or_else(|| anyhow::anyhow!("No download URL returned"))?;
 
         // Step 2: Download from S3
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&download_url)
             .send()
             .await
@@ -432,7 +455,9 @@ impl OssClient {
             anyhow::bail!("Failed to download from S3 ({}): {}", status, error_text);
         }
 
-        let total_size = signed.size.unwrap_or(response.content_length().unwrap_or(0));
+        let total_size = signed
+            .size
+            .unwrap_or(response.content_length().unwrap_or(0));
 
         // Create progress bar
         let pb = ProgressBar::new(total_size);
@@ -445,7 +470,8 @@ impl OssClient {
         pb.set_message(format!("Downloading {}", object_key));
 
         // Stream download
-        let mut file = File::create(output_path).await
+        let mut file = File::create(output_path)
+            .await
             .context("Failed to create output file")?;
 
         let mut stream = response.bytes_stream();
@@ -453,7 +479,8 @@ impl OssClient {
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.context("Error while downloading")?;
-            file.write_all(&chunk).await
+            file.write_all(&chunk)
+                .await
                 .context("Failed to write to file")?;
             downloaded += chunk.len() as u64;
             pb.set_position(downloaded);
@@ -475,7 +502,8 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = self.http_client
+            let response = self
+                .http_client
                 .get(&url)
                 .bearer_auth(&token)
                 .send()
@@ -488,9 +516,11 @@ impl OssClient {
                 anyhow::bail!("Failed to list objects ({}): {}", status, error_text);
             }
 
-            let response_text = response.text().await
+            let response_text = response
+                .text()
+                .await
                 .context("Failed to read objects response")?;
-            
+
             let objects_response: ObjectsResponse = serde_json::from_str(&response_text)
                 .with_context(|| format!("Failed to parse objects response: {}", response_text))?;
 
@@ -515,7 +545,8 @@ impl OssClient {
             object_key
         );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -539,7 +570,7 @@ impl OssClient {
     }
 
     /// Get a signed S3 URL for direct download (bypasses OSS servers)
-    /// 
+    ///
     /// The signed URL expires in 2 minutes by default.
     pub async fn get_signed_download_url(
         &self,
@@ -559,7 +590,8 @@ impl OssClient {
             url = format!("{}?minutesExpiration={}", url, mins);
         }
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -569,17 +601,23 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get signed download URL ({}): {}", status, error_text);
+            anyhow::bail!(
+                "Failed to get signed download URL ({}): {}",
+                status,
+                error_text
+            );
         }
 
-        let signed: SignedS3DownloadResponse = response.json().await
+        let signed: SignedS3DownloadResponse = response
+            .json()
+            .await
             .context("Failed to parse signed URL response")?;
 
         Ok(signed)
     }
 
     /// Get a signed S3 URL for direct upload (bypasses OSS servers)
-    /// 
+    ///
     /// The signed URL expires in 2 minutes by default.
     /// Returns an upload key that must be used to complete the upload.
     pub async fn get_signed_upload_url(
@@ -608,7 +646,8 @@ impl OssClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -618,10 +657,16 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get signed upload URL ({}): {}", status, error_text);
+            anyhow::bail!(
+                "Failed to get signed upload URL ({}): {}",
+                status,
+                error_text
+            );
         }
 
-        let signed: SignedS3UploadResponse = response.json().await
+        let signed: SignedS3UploadResponse = response
+            .json()
+            .await
             .context("Failed to parse signed URL response")?;
 
         Ok(signed)
@@ -646,7 +691,8 @@ impl OssClient {
             "uploadKey": upload_key
         });
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -658,18 +704,27 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to complete signed upload ({}): {}", status, error_text);
+            anyhow::bail!(
+                "Failed to complete signed upload ({}): {}",
+                status,
+                error_text
+            );
         }
 
         // Get response text for debugging
-        let response_text = response.text().await
+        let response_text = response
+            .text()
+            .await
             .context("Failed to read upload completion response")?;
 
         // Try to parse as ObjectInfo
-        let object_info: ObjectInfo = serde_json::from_str(&response_text)
-            .with_context(|| format!("Failed to parse upload completion response: {}", response_text))?;
+        let object_info: ObjectInfo = serde_json::from_str(&response_text).with_context(|| {
+            format!(
+                "Failed to parse upload completion response: {}",
+                response_text
+            )
+        })?;
 
         Ok(object_info)
     }
 }
-

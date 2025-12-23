@@ -1,5 +1,5 @@
 //! Item (file) management commands
-//! 
+//!
 //! Commands for listing, viewing, and downloading items (requires 3-legged auth).
 
 use anyhow::Result;
@@ -17,7 +17,7 @@ pub enum ItemCommands {
         /// Item ID
         item_id: String,
     },
-    
+
     /// List item versions
     Versions {
         /// Project ID
@@ -30,12 +30,14 @@ pub enum ItemCommands {
 impl ItemCommands {
     pub async fn execute(self, client: &DataManagementClient) -> Result<()> {
         match self {
-            ItemCommands::Info { project_id, item_id } => {
-                item_info(client, &project_id, &item_id).await
-            }
-            ItemCommands::Versions { project_id, item_id } => {
-                list_versions(client, &project_id, &item_id).await
-            }
+            ItemCommands::Info {
+                project_id,
+                item_id,
+            } => item_info(client, &project_id, &item_id).await,
+            ItemCommands::Versions {
+                project_id,
+                item_id,
+            } => list_versions(client, &project_id, &item_id).await,
         }
     }
 }
@@ -47,14 +49,18 @@ async fn item_info(client: &DataManagementClient, project_id: &str, item_id: &st
 
     println!("\n{}", "Item Details".bold());
     println!("{}", "─".repeat(60));
-    println!("  {} {}", "Name:".bold(), item.attributes.display_name.cyan());
+    println!(
+        "  {} {}",
+        "Name:".bold(),
+        item.attributes.display_name.cyan()
+    );
     println!("  {} {}", "ID:".bold(), item.id);
     println!("  {} {}", "Type:".bold(), item.item_type);
-    
+
     if let Some(ref create_time) = item.attributes.create_time {
         println!("  {} {}", "Created:".bold(), create_time);
     }
-    
+
     if let Some(ref modified_time) = item.attributes.last_modified_time {
         println!("  {} {}", "Modified:".bold(), modified_time);
     }
@@ -69,11 +75,18 @@ async fn item_info(client: &DataManagementClient, project_id: &str, item_id: &st
     }
 
     println!("{}", "─".repeat(60));
-    println!("\n{}", "Use 'raps item versions' to see version history".dimmed());
+    println!(
+        "\n{}",
+        "Use 'raps item versions' to see version history".dimmed()
+    );
     Ok(())
 }
 
-async fn list_versions(client: &DataManagementClient, project_id: &str, item_id: &str) -> Result<()> {
+async fn list_versions(
+    client: &DataManagementClient,
+    project_id: &str,
+    item_id: &str,
+) -> Result<()> {
     println!("{}", "Fetching item versions...".dimmed());
 
     let versions = client.get_item_versions(project_id, item_id).await?;
@@ -95,23 +108,27 @@ async fn list_versions(client: &DataManagementClient, project_id: &str, item_id:
     println!("{}", "─".repeat(80));
 
     for version in versions {
-        let ver_num = version.attributes.version_number
+        let ver_num = version
+            .attributes
+            .version_number
             .map(|n| n.to_string())
             .unwrap_or_else(|| "-".to_string());
-        
-        let name = version.attributes.display_name
+
+        let name = version
+            .attributes
+            .display_name
             .as_ref()
             .or(Some(&version.attributes.name))
             .map(|s| truncate_str(s, 40))
             .unwrap_or_default();
-        
-        let size = version.attributes.storage_size
+
+        let size = version
+            .attributes
+            .storage_size
             .map(|s| format_size(s as u64))
             .unwrap_or_else(|| "-".to_string());
-        
-        let created = version.attributes.create_time
-            .as_deref()
-            .unwrap_or("-");
+
+        let created = version.attributes.create_time.as_deref().unwrap_or("-");
 
         println!(
             "{:<6} {:<40} {:>12} {}",
@@ -151,4 +168,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

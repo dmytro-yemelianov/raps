@@ -31,25 +31,51 @@ pub enum GenerateCommands {
 
 pub async fn execute(args: GenerateArgs) -> anyhow::Result<()> {
     match args.command {
-        GenerateCommands::Files { count, output, complexity } => {
-            generate_files(count, output, &complexity).await
-        }
+        GenerateCommands::Files {
+            count,
+            output,
+            complexity,
+        } => generate_files(count, output, &complexity).await,
     }
 }
 
 async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow::Result<()> {
     let settings = match complexity {
-        "simple" => ComplexitySettings { vertices: 8, elements: 50, points: 1000 },
-        "complex" => ComplexitySettings { vertices: 200, elements: 1000, points: 100000 },
-        _ => ComplexitySettings { vertices: 50, elements: 200, points: 10000 }, // medium
+        "simple" => ComplexitySettings {
+            vertices: 8,
+            elements: 50,
+            points: 1000,
+        },
+        "complex" => ComplexitySettings {
+            vertices: 200,
+            elements: 1000,
+            points: 100000,
+        },
+        _ => ComplexitySettings {
+            vertices: 50,
+            elements: 200,
+            points: 10000,
+        }, // medium
     };
 
-    println!("\n{}", "╔══════════════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║         Engineering Files Generator (Rust)                   ║".cyan());
-    println!("{}", "╚══════════════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "\n{}",
+        "╔══════════════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║         Engineering Files Generator (Rust)                   ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════════════════════════╝".cyan()
+    );
     println!("\nOutput:     {}", output.display());
     println!("Count:      {} of each type", count);
-    println!("Complexity: {} (vertices: {}, elements: {})", complexity, settings.vertices, settings.elements);
+    println!(
+        "Complexity: {} (vertices: {}, elements: {})",
+        complexity, settings.vertices, settings.elements
+    );
 
     // Create output directory
     fs::create_dir_all(&output)?;
@@ -58,39 +84,71 @@ async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow
     let mut total_bytes: u64 = 0;
 
     // Generate OBJ files
-    println!("\n{}", "[1/6] Generating OBJ files (3D mesh geometry)...".yellow());
+    println!(
+        "\n{}",
+        "[1/6] Generating OBJ files (3D mesh geometry)...".yellow()
+    );
     for i in 1..=count {
         let (size, mtl_size) = generate_obj(&output, i, &settings)?;
         total_bytes += size + mtl_size;
         stats.obj += 1;
-        println!("  {} building-model-{}.obj ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} building-model-{}.obj ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Generate DXF files
-    println!("\n{}", "[2/6] Generating DXF files (AutoCAD drawings)...".yellow());
+    println!(
+        "\n{}",
+        "[2/6] Generating DXF files (AutoCAD drawings)...".yellow()
+    );
     for i in 1..=count {
         let size = generate_dxf(&output, i)?;
         total_bytes += size;
         stats.dxf += 1;
-        println!("  {} floorplan-{}.dxf ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} floorplan-{}.dxf ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Generate STL files
-    println!("\n{}", "[3/6] Generating STL files (3D printing meshes)...".yellow());
+    println!(
+        "\n{}",
+        "[3/6] Generating STL files (3D printing meshes)...".yellow()
+    );
     for i in 1..=count {
         let size = generate_stl(&output, i)?;
         total_bytes += size;
         stats.stl += 1;
-        println!("  {} part-{}.stl ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} part-{}.stl ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Generate IFC files
-    println!("\n{}", "[4/6] Generating IFC files (BIM models)...".yellow());
+    println!(
+        "\n{}",
+        "[4/6] Generating IFC files (BIM models)...".yellow()
+    );
     for i in 1..=count {
         let size = generate_ifc(&output, i, &settings)?;
         total_bytes += size;
         stats.ifc += 1;
-        println!("  {} building-{}.ifc ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} building-{}.ifc ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Generate JSON metadata
@@ -99,7 +157,12 @@ async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow
         let size = generate_json(&output, i, &settings)?;
         total_bytes += size;
         stats.json += 1;
-        println!("  {} project-{}-metadata.json ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} project-{}-metadata.json ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Generate point cloud files
@@ -108,13 +171,27 @@ async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow
         let size = generate_xyz(&output, i, &settings)?;
         total_bytes += size;
         stats.xyz += 1;
-        println!("  {} scan-{}.xyz ({:.1} KB)", "✓".green(), i, size as f64 / 1024.0);
+        println!(
+            "  {} scan-{}.xyz ({:.1} KB)",
+            "✓".green(),
+            i,
+            size as f64 / 1024.0
+        );
     }
 
     // Summary
-    println!("\n{}", "╔══════════════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║                    Generation Complete                        ║".cyan());
-    println!("{}", "╚══════════════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "\n{}",
+        "╔══════════════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║                    Generation Complete                        ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚══════════════════════════════════════════════════════════════╝".cyan()
+    );
 
     println!("\n  Output: {}", fs::canonicalize(&output)?.display());
     println!("\n  Files Generated:");
@@ -126,7 +203,11 @@ async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow
     println!("    XYZ (point cloud): {} files", stats.xyz);
     println!("    ────────────────────────────");
     let total = stats.obj + stats.dxf + stats.stl + stats.ifc + stats.json + stats.xyz;
-    println!("    Total:             {} files ({:.1} KB)", total, total_bytes as f64 / 1024.0);
+    println!(
+        "    Total:             {} files ({:.1} KB)",
+        total,
+        total_bytes as f64 / 1024.0
+    );
 
     println!("\n  {}", "Compatible with APS Translation:".green());
     println!("    ✓ OBJ → SVF/SVF2 viewer format");
@@ -155,19 +236,23 @@ struct Stats {
     xyz: u32,
 }
 
-fn generate_obj(output: &PathBuf, index: u32, _settings: &ComplexitySettings) -> anyhow::Result<(u64, u64)> {
+fn generate_obj(
+    output: &PathBuf,
+    index: u32,
+    _settings: &ComplexitySettings,
+) -> anyhow::Result<(u64, u64)> {
     let mut rng = rand::thread_rng();
-    
+
     let obj_path = output.join(format!("building-model-{}.obj", index));
     let mtl_path = output.join(format!("building-model-{}.mtl", index));
-    
+
     let mut obj_content = format!(
         "# APS Demo - Building Model {}\n# Generated by raps\n\nmtllib building-model-{}.mtl\n\n",
         index, index
     );
-    
+
     let mut vertex_offset = 0u32;
-    
+
     // Building components
     let components = vec![
         ("Foundation", 20.0, 1.0, 15.0, 0.0, -0.5, 0.0),
@@ -175,39 +260,45 @@ fn generate_obj(output: &PathBuf, index: u32, _settings: &ComplexitySettings) ->
         ("Floor2", 18.0, 3.0, 13.0, 0.0, 5.5, 0.0),
         ("Roof", 20.0, 0.5, 15.0, 0.0, 7.5, 0.0),
     ];
-    
+
     for (name, w, h, d, cx, cy, cz) in components {
         obj_content.push_str(&format!("\no {}\nusemtl {}_material\n", name, name));
-        
+
         // Box vertices
-        let hw = w / 2.0; let hh = h / 2.0; let hd = d / 2.0;
+        let hw = w / 2.0;
+        let hh = h / 2.0;
+        let hd = d / 2.0;
         let verts = vec![
-            (cx - hw, cy - hh, cz + hd), (cx + hw, cy - hh, cz + hd),
-            (cx + hw, cy + hh, cz + hd), (cx - hw, cy + hh, cz + hd),
-            (cx - hw, cy - hh, cz - hd), (cx + hw, cy - hh, cz - hd),
-            (cx + hw, cy + hh, cz - hd), (cx - hw, cy + hh, cz - hd),
+            (cx - hw, cy - hh, cz + hd),
+            (cx + hw, cy - hh, cz + hd),
+            (cx + hw, cy + hh, cz + hd),
+            (cx - hw, cy + hh, cz + hd),
+            (cx - hw, cy - hh, cz - hd),
+            (cx + hw, cy - hh, cz - hd),
+            (cx + hw, cy + hh, cz - hd),
+            (cx - hw, cy + hh, cz - hd),
         ];
-        
+
         for (x, y, z) in &verts {
             obj_content.push_str(&format!("v {:.6} {:.6} {:.6}\n", x, y, z));
         }
-        
+
         // Faces (1-indexed, offset by vertex_offset)
         let o = vertex_offset + 1;
-        obj_content.push_str(&format!("f {} {} {} {}\n", o, o+1, o+2, o+3));
-        obj_content.push_str(&format!("f {} {} {} {}\n", o+7, o+6, o+5, o+4));
-        obj_content.push_str(&format!("f {} {} {} {}\n", o+3, o+2, o+6, o+7));
-        obj_content.push_str(&format!("f {} {} {} {}\n", o+4, o+5, o+1, o));
-        obj_content.push_str(&format!("f {} {} {} {}\n", o+1, o+5, o+6, o+2));
-        obj_content.push_str(&format!("f {} {} {} {}\n", o+4, o, o+3, o+7));
-        
+        obj_content.push_str(&format!("f {} {} {} {}\n", o, o + 1, o + 2, o + 3));
+        obj_content.push_str(&format!("f {} {} {} {}\n", o + 7, o + 6, o + 5, o + 4));
+        obj_content.push_str(&format!("f {} {} {} {}\n", o + 3, o + 2, o + 6, o + 7));
+        obj_content.push_str(&format!("f {} {} {} {}\n", o + 4, o + 5, o + 1, o));
+        obj_content.push_str(&format!("f {} {} {} {}\n", o + 1, o + 5, o + 6, o + 2));
+        obj_content.push_str(&format!("f {} {} {} {}\n", o + 4, o, o + 3, o + 7));
+
         vertex_offset += 8;
     }
-    
+
     // Write OBJ file
     let mut obj_file = File::create(&obj_path)?;
     obj_file.write_all(obj_content.as_bytes())?;
-    
+
     // Generate MTL file
     let mtl_content = format!(
         "# Material Library for building-model-{}.obj\n\n\
@@ -217,10 +308,10 @@ fn generate_obj(output: &PathBuf, index: u32, _settings: &ComplexitySettings) ->
         newmtl Roof_material\nKd 0.3 0.3 0.4\nKa 0.1 0.1 0.1\n",
         index
     );
-    
+
     let mut mtl_file = File::create(&mtl_path)?;
     mtl_file.write_all(mtl_content.as_bytes())?;
-    
+
     Ok((obj_path.metadata()?.len(), mtl_path.metadata()?.len()))
 }
 
@@ -229,13 +320,13 @@ fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
     let width: f64 = rng.gen_range(20.0..40.0);
     let height: f64 = rng.gen_range(15.0..30.0);
     let rooms: u32 = rng.gen_range(3..8);
-    
+
     let path = output.join(format!("floorplan-{}.dxf", index));
-    
+
     let mut content = String::from(
         "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
     );
-    
+
     // Outer walls
     let walls = vec![
         (0.0, 0.0, width, 0.0),
@@ -243,14 +334,14 @@ fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
         (width, height, 0.0, height),
         (0.0, height, 0.0, 0.0),
     ];
-    
+
     for (x1, y1, x2, y2) in walls {
         content.push_str(&format!(
             "0\nLINE\n8\nWalls\n10\n{:.1}\n20\n{:.1}\n30\n0.0\n11\n{:.1}\n21\n{:.1}\n31\n0.0\n",
             x1, y1, x2, y2
         ));
     }
-    
+
     // Room divisions
     for r in 1..rooms {
         let div_x = width * r as f64 / rooms as f64;
@@ -259,7 +350,7 @@ fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
             div_x, div_x, height
         ));
     }
-    
+
     // Doors
     for d in 0..rooms {
         let door_x = width * (d as f64 + 0.5) / rooms as f64;
@@ -268,27 +359,29 @@ fn generate_dxf(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
             door_x
         ));
     }
-    
+
     // Dimension text
     content.push_str(&format!(
         "0\nTEXT\n8\nDimensions\n10\n{:.1}\n20\n-2.0\n30\n0.0\n40\n1.0\n1\n{:.0}m x {:.0}m\n",
-        width / 2.0, width, height
+        width / 2.0,
+        width,
+        height
     ));
-    
+
     content.push_str("0\nENDSEC\n0\nEOF\n");
-    
+
     let mut file = File::create(&path)?;
     file.write_all(content.as_bytes())?;
-    
+
     Ok(path.metadata()?.len())
 }
 
 fn generate_stl(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let scale: f64 = rng.gen_range(10.0..30.0);
-    
+
     let path = output.join(format!("part-{}.stl", index));
-    
+
     let content = format!(
         "solid Part_{}\n\
           facet normal 0 0 1\n    outer loop\n      vertex 0 0 {s}\n      vertex {s} 0 {s}\n      vertex {s} {s} {s}\n    endloop\n  endfacet\n\
@@ -306,22 +399,26 @@ fn generate_stl(output: &PathBuf, index: u32) -> anyhow::Result<u64> {
         endsolid Part_{}\n",
         index, index, s = scale
     );
-    
+
     let mut file = File::create(&path)?;
     file.write_all(content.as_bytes())?;
-    
+
     Ok(path.metadata()?.len())
 }
 
-fn generate_ifc(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
+fn generate_ifc(
+    output: &PathBuf,
+    index: u32,
+    settings: &ComplexitySettings,
+) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("building-{}.ifc", index));
-    
+
     let timestamp = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
     let project_guid = generate_ifc_guid();
     let site_guid = generate_ifc_guid();
     let building_guid = generate_ifc_guid();
-    
+
     let mut content = format!(
         "ISO-10303-21;\n\
         HEADER;\n\
@@ -354,13 +451,20 @@ fn generate_ifc(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> 
         index, timestamp, project_guid, index, site_guid, building_guid, index,
         generate_ifc_guid(), generate_ifc_guid()
     );
-    
+
     // Add storeys and elements
     let storey_count = rng.gen_range(2..5);
     let mut entity_id = 100u32;
-    
-    let ifc_categories = ["IfcWall", "IfcDoor", "IfcWindow", "IfcSlab", "IfcColumn", "IfcBeam"];
-    
+
+    let ifc_categories = [
+        "IfcWall",
+        "IfcDoor",
+        "IfcWindow",
+        "IfcSlab",
+        "IfcColumn",
+        "IfcBeam",
+    ];
+
     for s in 0..storey_count {
         let elevation = s * 3000;
         content.push_str(&format!(
@@ -370,44 +474,54 @@ fn generate_ifc(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> 
         ));
         entity_id += 2;
     }
-    
+
     // Add elements
     let elements_per_storey = settings.elements / storey_count;
     for _ in 0..settings.elements {
         let cat = ifc_categories[rng.gen_range(0..ifc_categories.len())];
         content.push_str(&format!(
             "#{}={}('{}',#2,'{}_{}',' ',`$,`$,`$,`$);\n",
-            entity_id, cat, generate_ifc_guid(), cat, entity_id
+            entity_id,
+            cat,
+            generate_ifc_guid(),
+            cat,
+            entity_id
         ));
         entity_id += 1;
     }
-    
+
     content.push_str("ENDSEC;\nEND-ISO-10303-21;\n");
-    
+
     let mut file = File::create(&path)?;
     file.write_all(content.as_bytes())?;
-    
+
     Ok(path.metadata()?.len())
 }
 
-fn generate_json(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
+fn generate_json(
+    output: &PathBuf,
+    index: u32,
+    settings: &ComplexitySettings,
+) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("project-{}-metadata.json", index));
-    
-    let categories = ["Walls", "Doors", "Windows", "Floors", "Ceilings", "Columns", "Beams"];
+
+    let categories = [
+        "Walls", "Doors", "Windows", "Floors", "Ceilings", "Columns", "Beams",
+    ];
     let levels = ["Basement", "Level 1", "Level 2", "Level 3", "Roof"];
     let materials = ["Concrete", "Steel", "Wood", "Glass", "Aluminum", "Brick"];
-    
+
     let mut elements = Vec::new();
     let mut total_area = 0.0f64;
     let mut total_volume = 0.0f64;
-    
+
     for i in 1..=settings.elements {
         let area: f64 = rng.gen_range(1.0..500.0);
         let volume: f64 = rng.gen_range(1.0..200.0);
         total_area += area;
         total_volume += volume;
-        
+
         elements.push(serde_json::json!({
             "dbId": i,
             "externalId": uuid::Uuid::new_v4().to_string(),
@@ -422,7 +536,7 @@ fn generate_json(output: &PathBuf, index: u32, settings: &ComplexitySettings) ->
             "visible": rng.gen_bool(0.9),
         }));
     }
-    
+
     let metadata = serde_json::json!({
         "projectInfo": {
             "id": uuid::Uuid::new_v4().to_string(),
@@ -440,22 +554,26 @@ fn generate_json(output: &PathBuf, index: u32, settings: &ComplexitySettings) ->
         },
         "elements": elements,
     });
-    
+
     let mut file = File::create(&path)?;
     file.write_all(serde_json::to_string_pretty(&metadata)?.as_bytes())?;
-    
+
     Ok(path.metadata()?.len())
 }
 
-fn generate_xyz(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> anyhow::Result<u64> {
+fn generate_xyz(
+    output: &PathBuf,
+    index: u32,
+    settings: &ComplexitySettings,
+) -> anyhow::Result<u64> {
     let mut rng = rand::thread_rng();
     let path = output.join(format!("scan-{}.xyz", index));
-    
+
     let mut content = format!(
         "# XYZ Point Cloud - Scan {}\n# Points: {}\n# Format: X Y Z R G B Intensity\n",
         index, settings.points
     );
-    
+
     for _ in 0..settings.points {
         // Generate points on building surfaces
         let surface = rng.gen_range(0..6);
@@ -467,26 +585,26 @@ fn generate_xyz(output: &PathBuf, index: u32, settings: &ComplexitySettings) -> 
             4 => (rng.gen_range(-20.0..20.0), rng.gen_range(-10.0..10.0), 0.0),
             _ => (rng.gen_range(-20.0..20.0), rng.gen_range(-10.0..10.0), 10.0),
         };
-        
+
         // Add noise
         let x = x + rng.gen_range(-0.5..0.5);
         let y = y + rng.gen_range(-0.5..0.5);
         let z = z + rng.gen_range(-0.5..0.5);
-        
+
         let r: u8 = rng.gen_range(100..200);
         let g: u8 = rng.gen_range(100..200);
         let b: u8 = rng.gen_range(100..200);
         let intensity: f64 = rng.gen_range(0.5..1.0);
-        
+
         content.push_str(&format!(
             "{:.3} {:.3} {:.3} {} {} {} {:.2}\n",
             x, y, z, r, g, b, intensity
         ));
     }
-    
+
     let mut file = File::create(&path)?;
     file.write_all(content.as_bytes())?;
-    
+
     Ok(path.metadata()?.len())
 }
 
@@ -494,14 +612,13 @@ fn generate_ifc_guid() -> String {
     let uuid = uuid::Uuid::new_v4();
     let bytes = uuid.as_bytes();
     let mut result = String::with_capacity(22);
-    
+
     const CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$";
-    
+
     for i in 0..22 {
         let idx = (bytes[i % 16] as usize + i) % 64;
         result.push(CHARS[idx] as char);
     }
-    
+
     result
 }
-

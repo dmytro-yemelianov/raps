@@ -1,5 +1,5 @@
 //! Reality Capture API module
-//! 
+//!
 //! Handles photogrammetry processing to create 3D models from photos.
 
 use anyhow::{Context, Result};
@@ -100,10 +100,10 @@ pub struct PhotosceneResult {
 /// Supported output formats
 #[derive(Debug, Clone, Copy)]
 pub enum OutputFormat {
-    Rcm,  // Autodesk ReCap format
-    Rcs,  // ReCap scan
-    Obj,  // Wavefront OBJ
-    Fbx,  // Autodesk FBX
+    Rcm,   // Autodesk ReCap format
+    Rcs,   // ReCap scan
+    Obj,   // Wavefront OBJ
+    Fbx,   // Autodesk FBX
     Ortho, // Orthophoto
 }
 
@@ -185,7 +185,8 @@ impl RealityCaptureClient {
             ("format", &format.to_string()),
         ];
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .form(&params)
@@ -199,14 +200,20 @@ impl RealityCaptureClient {
             anyhow::bail!("Failed to create photoscene ({}): {}", status, error_text);
         }
 
-        let create_response: CreatePhotosceneResponse = response.json().await
+        let create_response: CreatePhotosceneResponse = response
+            .json()
+            .await
             .context("Failed to parse photoscene response")?;
 
         Ok(create_response.photoscene)
     }
 
     /// Upload photos to a photoscene
-    pub async fn upload_photos(&self, photoscene_id: &str, photo_paths: &[&Path]) -> Result<Vec<UploadedFile>> {
+    pub async fn upload_photos(
+        &self,
+        photoscene_id: &str,
+        photo_paths: &[&Path],
+    ) -> Result<Vec<UploadedFile>> {
         let token = self.auth.get_token().await?;
         let url = format!("{}/file", self.config.reality_capture_url());
 
@@ -215,26 +222,30 @@ impl RealityCaptureClient {
             .text("type", "image");
 
         for (i, path) in photo_paths.iter().enumerate() {
-            let mut file = File::open(path).await
+            let mut file = File::open(path)
+                .await
                 .context(format!("Failed to open file: {}", path.display()))?;
-            
+
             let mut buffer = Vec::new();
-            file.read_to_end(&mut buffer).await
+            file.read_to_end(&mut buffer)
+                .await
                 .context("Failed to read file")?;
-            
-            let filename = path.file_name()
+
+            let filename = path
+                .file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("photo.jpg")
                 .to_string();
-            
+
             let part = reqwest::multipart::Part::bytes(buffer)
                 .file_name(filename.clone())
                 .mime_str("image/jpeg")?;
-            
+
             form = form.part(format!("file[{}]", i), part);
         }
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .multipart(form)
@@ -248,10 +259,13 @@ impl RealityCaptureClient {
             anyhow::bail!("Failed to upload photos ({}): {}", status, error_text);
         }
 
-        let upload_response: UploadResponse = response.json().await
+        let upload_response: UploadResponse = response
+            .json()
+            .await
             .context("Failed to parse upload response")?;
 
-        let files = upload_response.files
+        let files = upload_response
+            .files
             .and_then(|f| f.file)
             .unwrap_or_default();
 
@@ -261,9 +275,14 @@ impl RealityCaptureClient {
     /// Start processing a photoscene
     pub async fn start_processing(&self, photoscene_id: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/photoscene/{}", self.config.reality_capture_url(), photoscene_id);
+        let url = format!(
+            "{}/photoscene/{}",
+            self.config.reality_capture_url(),
+            photoscene_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .send()
@@ -282,9 +301,14 @@ impl RealityCaptureClient {
     /// Get photoscene progress
     pub async fn get_progress(&self, photoscene_id: &str) -> Result<PhotosceneProgress> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/photoscene/{}/progress", self.config.reality_capture_url(), photoscene_id);
+        let url = format!(
+            "{}/photoscene/{}/progress",
+            self.config.reality_capture_url(),
+            photoscene_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -297,19 +321,30 @@ impl RealityCaptureClient {
             anyhow::bail!("Failed to get progress ({}): {}", status, error_text);
         }
 
-        let progress_response: ProgressResponse = response.json().await
+        let progress_response: ProgressResponse = response
+            .json()
+            .await
             .context("Failed to parse progress response")?;
 
         Ok(progress_response.photoscene)
     }
 
     /// Get photoscene result (download link)
-    pub async fn get_result(&self, photoscene_id: &str, format: OutputFormat) -> Result<PhotosceneResult> {
+    pub async fn get_result(
+        &self,
+        photoscene_id: &str,
+        format: OutputFormat,
+    ) -> Result<PhotosceneResult> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/photoscene/{}?format={}", 
-            self.config.reality_capture_url(), photoscene_id, format);
+        let url = format!(
+            "{}/photoscene/{}?format={}",
+            self.config.reality_capture_url(),
+            photoscene_id,
+            format
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -322,7 +357,9 @@ impl RealityCaptureClient {
             anyhow::bail!("Failed to get result ({}): {}", status, error_text);
         }
 
-        let result_response: ResultResponse = response.json().await
+        let result_response: ResultResponse = response
+            .json()
+            .await
             .context("Failed to parse result response")?;
 
         Ok(result_response.photoscene)
@@ -331,9 +368,14 @@ impl RealityCaptureClient {
     /// Delete a photoscene
     pub async fn delete_photoscene(&self, photoscene_id: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/photoscene/{}", self.config.reality_capture_url(), photoscene_id);
+        let url = format!(
+            "{}/photoscene/{}",
+            self.config.reality_capture_url(),
+            photoscene_id
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -354,4 +396,3 @@ impl RealityCaptureClient {
         OutputFormat::all()
     }
 }
-

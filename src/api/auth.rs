@@ -1,5 +1,5 @@
 //! Authentication module for APS OAuth 2.0
-//! 
+//!
 //! Implements both 2-legged (client credentials) and 3-legged (authorization code) OAuth flows.
 
 use anyhow::{Context, Result};
@@ -9,8 +9,8 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tiny_http::{Response, Server};
 use tokio::sync::RwLock;
-use tiny_http::{Server, Response};
 
 use crate::config::{Config, DEFAULT_CALLBACK_PORT};
 
@@ -78,7 +78,7 @@ impl CachedToken {
 }
 
 /// Authentication client for APS
-/// 
+///
 /// Handles OAuth 2.0 token acquisition for both 2-legged and 3-legged flows.
 #[derive(Clone)]
 pub struct AuthClient {
@@ -93,7 +93,7 @@ impl AuthClient {
     pub fn new(config: Config) -> Self {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
-        
+
         Self {
             config,
             http_client: reqwest::Client::new(),
@@ -101,7 +101,7 @@ impl AuthClient {
             cached_3leg_token: Arc::new(RwLock::new(stored_token)),
         }
     }
-    
+
     /// Load token from persistent storage (static version for initialization)
     fn load_stored_token_static(_config: &Config) -> Option<StoredToken> {
         let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")?;
@@ -163,7 +163,7 @@ impl AuthClient {
 
         // Fetch new token
         let new_token = self.fetch_2leg_token().await?;
-        
+
         // Cache the new token
         {
             let mut cache = self.cached_2leg_token.write().await;
@@ -219,13 +219,17 @@ impl AuthClient {
     /// Fetch a new 2-legged token
     async fn fetch_2leg_token(&self) -> Result<TokenResponse> {
         let url = self.config.auth_url();
-        
+
         let params = [
             ("grant_type", "client_credentials"),
-            ("scope", "data:read data:write data:create bucket:read bucket:create bucket:delete code:all"),
+            (
+                "scope",
+                "data:read data:write data:create bucket:read bucket:create bucket:delete code:all",
+            ),
         ];
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .basic_auth(&self.config.client_id, Some(&self.config.client_secret))
             .form(&params)
@@ -236,7 +240,11 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Authentication failed with status {}: {}", status, error_text);
+            anyhow::bail!(
+                "Authentication failed with status {}: {}",
+                status,
+                error_text
+            );
         }
 
         let token_response: TokenResponse = response
@@ -251,7 +259,7 @@ impl AuthClient {
     pub async fn login(&self, scopes: &[&str]) -> Result<StoredToken> {
         let state = uuid::Uuid::new_v4().to_string();
         let scope = scopes.join(" ");
-        
+
         // Build authorization URL
         let auth_url = format!(
             "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}",
@@ -267,8 +275,13 @@ impl AuthClient {
         println!("{}", auth_url);
 
         // Start local server BEFORE opening browser to ensure it's ready
-        let server = Server::http(format!("0.0.0.0:{}", DEFAULT_CALLBACK_PORT))
-            .map_err(|e| anyhow::anyhow!("Failed to start callback server on port {}: {}", DEFAULT_CALLBACK_PORT, e))?;
+        let server = Server::http(format!("0.0.0.0:{}", DEFAULT_CALLBACK_PORT)).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to start callback server on port {}: {}",
+                DEFAULT_CALLBACK_PORT,
+                e
+            )
+        })?;
 
         println!("Callback server started on port {}", DEFAULT_CALLBACK_PORT);
 
@@ -281,44 +294,49 @@ impl AuthClient {
 
         // Wait for callback - may receive multiple requests (favicon, etc.)
         let mut auth_code: Option<String> = None;
-        
+
         loop {
-            let request = server.recv()
+            let request = server
+                .recv()
                 .map_err(|e| anyhow::anyhow!("Failed to receive callback: {}", e))?;
 
             let url = request.url().to_string();
             println!("Received request: {}", url);
-            
+
             // Skip non-callback requests (like favicon)
             if !url.starts_with("/callback") && !url.contains("code=") {
-                let response = Response::from_string("Not found")
-                    .with_status_code(404);
+                let response = Response::from_string("Not found").with_status_code(404);
                 request.respond(response).ok();
                 continue;
             }
-            
+
             // Parse the callback URL for code and state
             let parsed = url::Url::parse(&format!("http://localhost{}", url))?;
             let params: std::collections::HashMap<_, _> = parsed.query_pairs().collect();
 
             // Check for error
             if let Some(error) = params.get("error") {
-                let desc = params.get("error_description").map(|s| s.to_string()).unwrap_or_default();
-                let response = Response::from_string(
-                    format!("<html><body><h1>Login Failed</h1><p>{}: {}</p></body></html>", error, desc)
-                ).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap()
+                let desc = params
+                    .get("error_description")
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let response = Response::from_string(format!(
+                    "<html><body><h1>Login Failed</h1><p>{}: {}</p></body></html>",
+                    error, desc
+                ))
+                .with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
                 );
                 request.respond(response).ok();
                 anyhow::bail!("Authorization error: {} - {}", error, desc);
             }
 
             // Check state
-            let returned_state = params.get("state")
+            let returned_state = params
+                .get("state")
                 .ok_or_else(|| anyhow::anyhow!("Missing state parameter"))?;
             if returned_state != &state {
-                let response = Response::from_string("State mismatch")
-                    .with_status_code(400);
+                let response = Response::from_string("State mismatch").with_status_code(400);
                 request.respond(response).ok();
                 anyhow::bail!("State mismatch - possible CSRF attack");
             }
@@ -326,7 +344,7 @@ impl AuthClient {
             // Get authorization code
             if let Some(code) = params.get("code") {
                 auth_code = Some(code.to_string());
-                
+
                 // Send success response to browser IMMEDIATELY
                 let response = Response::from_string(
                     "<html><body><h1>Login Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>"
@@ -339,7 +357,7 @@ impl AuthClient {
         }
 
         let code = auth_code.ok_or_else(|| anyhow::anyhow!("No authorization code received"))?;
-        
+
         println!("Authorization code received, exchanging for token...");
 
         // Exchange code for tokens
@@ -374,7 +392,8 @@ impl AuthClient {
             ("redirect_uri", &self.config.callback_url),
         ];
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .basic_auth(&self.config.client_id, Some(&self.config.client_secret))
             .form(&params)
@@ -388,7 +407,9 @@ impl AuthClient {
             anyhow::bail!("Token exchange failed ({}): {}", status, error_text);
         }
 
-        let token: TokenResponse = response.json().await
+        let token: TokenResponse = response
+            .json()
+            .await
             .context("Failed to parse token response")?;
 
         Ok(token)
@@ -403,7 +424,8 @@ impl AuthClient {
             ("refresh_token", &refresh_token),
         ];
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .basic_auth(&self.config.client_id, Some(&self.config.client_secret))
             .form(&params)
@@ -419,7 +441,9 @@ impl AuthClient {
             anyhow::bail!("Token refresh failed. Please login again with 'raps auth login'");
         }
 
-        let token: TokenResponse = response.json().await
+        let token: TokenResponse = response
+            .json()
+            .await
             .context("Failed to parse refresh response")?;
 
         // Update stored token
@@ -468,11 +492,12 @@ impl AuthClient {
     /// Get user profile information (requires 3-legged auth with user:read or user-profile:read scope)
     pub async fn get_user_info(&self) -> Result<UserInfo> {
         let token = self.get_3leg_token().await?;
-        
+
         // The userinfo endpoint is on a different host
         let url = "https://api.userprofile.autodesk.com/userinfo";
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(url)
             .bearer_auth(&token)
             .send()
@@ -485,7 +510,9 @@ impl AuthClient {
             anyhow::bail!("Failed to get user info ({}): {}", status, error_text);
         }
 
-        let user_info: UserInfo = response.json().await
+        let user_info: UserInfo = response
+            .json()
+            .await
             .context("Failed to parse user info response")?;
 
         Ok(user_info)

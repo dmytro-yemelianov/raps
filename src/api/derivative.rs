@@ -1,5 +1,5 @@
 //! Model Derivative API module
-//! 
+//!
 //! Handles translation of CAD files and retrieval of derivative manifests.
 
 use anyhow::{Context, Result};
@@ -244,7 +244,8 @@ impl DerivativeClient {
             },
         };
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .post(&url)
             .bearer_auth(&token)
             .header("Content-Type", "application/json")
@@ -260,7 +261,9 @@ impl DerivativeClient {
             anyhow::bail!("Failed to start translation ({}): {}", status, error_text);
         }
 
-        let translation_response: TranslationResponse = response.json().await
+        let translation_response: TranslationResponse = response
+            .json()
+            .await
             .context("Failed to parse translation response")?;
 
         Ok(translation_response)
@@ -269,9 +272,14 @@ impl DerivativeClient {
     /// Get the manifest (translation status and available derivatives)
     pub async fn get_manifest(&self, urn: &str) -> Result<Manifest> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/designdata/{}/manifest", self.config.derivative_url(), urn);
+        let url = format!(
+            "{}/designdata/{}/manifest",
+            self.config.derivative_url(),
+            urn
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -284,7 +292,9 @@ impl DerivativeClient {
             anyhow::bail!("Failed to get manifest ({}): {}", status, error_text);
         }
 
-        let manifest: Manifest = response.json().await
+        let manifest: Manifest = response
+            .json()
+            .await
             .context("Failed to parse manifest response")?;
 
         Ok(manifest)
@@ -293,9 +303,14 @@ impl DerivativeClient {
     /// Delete manifest (and all derivatives)
     pub async fn delete_manifest(&self, urn: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/designdata/{}/manifest", self.config.derivative_url(), urn);
+        let url = format!(
+            "{}/designdata/{}/manifest",
+            self.config.derivative_url(),
+            urn
+        );
 
-        let response = self.http_client
+        let response = self
+            .http_client
             .delete(&url)
             .bearer_auth(&token)
             .send()
@@ -317,4 +332,3 @@ impl DerivativeClient {
         Ok((manifest.status, manifest.progress))
     }
 }
-

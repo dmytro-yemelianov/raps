@@ -1,5 +1,5 @@
 //! APS CLI - Command-line interface for Autodesk Platform Services
-//! 
+//!
 //! This CLI tool provides comprehensive access to:
 //! - Authentication (2-legged and 3-legged OAuth)
 //! - Object Storage Service (OSS): Bucket and object management
@@ -10,19 +10,26 @@
 //! - ACC/BIM 360: Issues and RFIs
 //! - Reality Capture: Photogrammetry processing
 
-mod config;
 mod api;
 mod commands;
+mod config;
 
-use std::io;
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
 use colored::Colorize;
+use std::io;
 
+use api::{
+    AuthClient, DataManagementClient, DerivativeClient, DesignAutomationClient, IssuesClient,
+    OssClient, RealityCaptureClient, WebhooksClient,
+};
+use commands::{
+    AuthCommands, BucketCommands, DaCommands, DemoCommands, FolderCommands, GenerateArgs,
+    HubCommands, IssueCommands, ItemCommands, ObjectCommands, ProjectCommands, RealityCommands,
+    TranslateCommands, WebhookCommands,
+};
 use config::Config;
-use api::{AuthClient, OssClient, DerivativeClient, DataManagementClient, WebhooksClient, DesignAutomationClient, IssuesClient, RealityCaptureClient};
-use commands::{AuthCommands, BucketCommands, ObjectCommands, TranslateCommands, HubCommands, ProjectCommands, FolderCommands, ItemCommands, WebhookCommands, DaCommands, IssueCommands, RealityCommands, GenerateArgs, DemoCommands};
 
 /// RAPS - Rust APS CLI - Command-line interface for Autodesk Platform Services
 #[derive(Parser)]
@@ -41,15 +48,15 @@ enum Commands {
     /// Authentication management (login, logout, test)
     #[command(subcommand)]
     Auth(AuthCommands),
-    
+
     /// Manage OSS buckets
     #[command(subcommand)]
     Bucket(BucketCommands),
-    
+
     /// Manage objects in OSS buckets
     #[command(subcommand)]
     Object(ObjectCommands),
-    
+
     /// Translate files using Model Derivative API
     #[command(subcommand)]
     Translate(TranslateCommands),
@@ -105,31 +112,31 @@ enum Commands {
 async fn main() {
     if let Err(err) = run().await {
         eprintln!("{} {}", "Error:".red().bold(), err);
-        
+
         // Print chain of errors
         let mut source = err.source();
         while let Some(cause) = source {
             eprintln!("  {} {}", "Caused by:".dimmed(), cause);
             source = cause.source();
         }
-        
+
         std::process::exit(1);
     }
 }
 
 async fn run() -> Result<()> {
     let cli = Cli::parse();
-    
+
     // Handle completions command first (doesn't need config/auth)
     if let Commands::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
         generate(*shell, &mut cmd, "raps", &mut io::stdout());
         return Ok(());
     }
-    
+
     // Load configuration
     let config = Config::from_env()?;
-    
+
     // Create API clients
     let auth_client = AuthClient::new(config.clone());
     let oss_client = OssClient::new(config.clone(), auth_client.clone());
@@ -139,20 +146,20 @@ async fn run() -> Result<()> {
     let da_client = DesignAutomationClient::new(config.clone(), auth_client.clone());
     let issues_client = IssuesClient::new(config.clone(), auth_client.clone());
     let rc_client = RealityCaptureClient::new(config.clone(), auth_client.clone());
-    
+
     match cli.command {
         Commands::Auth(cmd) => {
             cmd.execute(&auth_client).await?;
         }
-        
+
         Commands::Bucket(cmd) => {
             cmd.execute(&oss_client).await?;
         }
-        
+
         Commands::Object(cmd) => {
             cmd.execute(&oss_client).await?;
         }
-        
+
         Commands::Translate(cmd) => {
             cmd.execute(&derivative_client).await?;
         }
@@ -202,6 +209,6 @@ async fn run() -> Result<()> {
             unreachable!()
         }
     }
-    
+
     Ok(())
 }

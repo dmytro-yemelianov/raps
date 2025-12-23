@@ -1,5 +1,5 @@
 //! Webhook management commands
-//! 
+//!
 //! Commands for creating, listing, and deleting webhook subscriptions.
 
 use anyhow::Result;
@@ -7,25 +7,25 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 
-use crate::api::WebhooksClient;
 use crate::api::webhooks::WEBHOOK_EVENTS;
+use crate::api::WebhooksClient;
 
 #[derive(Debug, Subcommand)]
 pub enum WebhookCommands {
     /// List all webhooks
     List,
-    
+
     /// Create a new webhook subscription
     Create {
         /// Callback URL for webhook notifications
         #[arg(short, long)]
         url: Option<String>,
-        
+
         /// Event type (e.g., dm.version.added)
         #[arg(short, long)]
         event: Option<String>,
     },
-    
+
     /// Delete a webhook
     Delete {
         /// Hook ID to delete
@@ -37,7 +37,7 @@ pub enum WebhookCommands {
         #[arg(short, long)]
         event: String,
     },
-    
+
     /// List available webhook events
     Events,
 }
@@ -47,9 +47,11 @@ impl WebhookCommands {
         match self {
             WebhookCommands::List => list_webhooks(client).await,
             WebhookCommands::Create { url, event } => create_webhook(client, url, event).await,
-            WebhookCommands::Delete { hook_id, system, event } => {
-                delete_webhook(client, &system, &event, &hook_id).await
-            }
+            WebhookCommands::Delete {
+                hook_id,
+                system,
+                event,
+            } => delete_webhook(client, &system, &event, &hook_id).await,
             WebhookCommands::Events => list_events(client),
         }
     }
@@ -106,18 +108,16 @@ async fn create_webhook(
     // Get callback URL
     let url = match callback_url {
         Some(u) => u,
-        None => {
-            Input::new()
-                .with_prompt("Enter callback URL")
-                .validate_with(|input: &String| -> Result<(), &str> {
-                    if input.starts_with("http://") || input.starts_with("https://") {
-                        Ok(())
-                    } else {
-                        Err("URL must start with http:// or https://")
-                    }
-                })
-                .interact_text()?
-        }
+        None => Input::new()
+            .with_prompt("Enter callback URL")
+            .validate_with(|input: &String| -> Result<(), &str> {
+                if input.starts_with("http://") || input.starts_with("https://") {
+                    Ok(())
+                } else {
+                    Err("URL must start with http:// or https://")
+                }
+            })
+            .interact_text()?,
     };
 
     // Get event type
@@ -149,7 +149,9 @@ async fn create_webhook(
 
     println!("{}", "Creating webhook...".dimmed());
 
-    let webhook = client.create_webhook(system, &event_type, &url, None).await?;
+    let webhook = client
+        .create_webhook(system, &event_type, &url, None)
+        .await?;
 
     println!("{} Webhook created successfully!", "✓".green().bold());
     println!("  {} {}", "Hook ID:".bold(), webhook.hook_id);
@@ -160,7 +162,12 @@ async fn create_webhook(
     Ok(())
 }
 
-async fn delete_webhook(client: &WebhooksClient, system: &str, event: &str, hook_id: &str) -> Result<()> {
+async fn delete_webhook(
+    client: &WebhooksClient,
+    system: &str,
+    event: &str,
+    hook_id: &str,
+) -> Result<()> {
     println!("{}", "Deleting webhook...".dimmed());
 
     client.delete_webhook(system, event, hook_id).await?;
@@ -174,7 +181,11 @@ fn list_events(_client: &WebhooksClient) -> Result<()> {
     println!("{}", "─".repeat(60));
 
     for (event, description) in WEBHOOK_EVENTS {
-        println!("  {} {}", event.cyan(), format!("- {}", description).dimmed());
+        println!(
+            "  {} {}",
+            event.cyan(),
+            format!("- {}", description).dimmed()
+        );
     }
 
     println!("{}", "─".repeat(60));
@@ -189,4 +200,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

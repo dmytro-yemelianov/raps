@@ -1,5 +1,5 @@
 //! Authentication commands
-//! 
+//!
 //! Commands for testing authentication, logging in with 3-legged OAuth, and logging out.
 
 use anyhow::Result;
@@ -36,20 +36,20 @@ const DEFAULT_SCOPES: &[&str] = &[
 pub enum AuthCommands {
     /// Test 2-legged (client credentials) authentication
     Test,
-    
+
     /// Login with 3-legged OAuth (opens browser)
     Login {
         /// Use default scopes without prompting
         #[arg(short, long)]
         default: bool,
     },
-    
+
     /// Logout and clear stored tokens
     Logout,
-    
+
     /// Show current authentication status
     Status,
-    
+
     /// Show logged-in user profile (requires 3-legged auth)
     Whoami,
 }
@@ -70,7 +70,11 @@ async fn test_auth(auth_client: &AuthClient) -> Result<()> {
     println!("{}", "Testing 2-legged authentication...".dimmed());
     auth_client.test_auth().await?;
     println!("{} 2-legged authentication successful!", "✓".green().bold());
-    println!("  {} {}", "Client ID:".bold(), mask_string(&auth_client.config().client_id));
+    println!(
+        "  {} {}",
+        "Client ID:".bold(),
+        mask_string(&auth_client.config().client_id)
+    );
     println!("  {} {}", "Base URL:".bold(), auth_client.config().base_url);
     Ok(())
 }
@@ -78,7 +82,10 @@ async fn test_auth(auth_client: &AuthClient) -> Result<()> {
 async fn login(auth_client: &AuthClient, use_defaults: bool) -> Result<()> {
     // Check if already logged in
     if auth_client.is_logged_in().await {
-        println!("{}", "Already logged in. Use 'raps auth logout' to logout first.".yellow());
+        println!(
+            "{}",
+            "Already logged in. Use 'raps auth logout' to logout first.".yellow()
+        );
         return Ok(());
     }
 
@@ -116,7 +123,11 @@ async fn login(auth_client: &AuthClient, use_defaults: bool) -> Result<()> {
     let token = auth_client.login(&scopes).await?;
 
     println!("\n{} Login successful!", "✓".green().bold());
-    println!("  {} {}", "Access Token:".bold(), mask_string(&token.access_token));
+    println!(
+        "  {} {}",
+        "Access Token:".bold(),
+        mask_string(&token.access_token)
+    );
     if token.refresh_token.is_some() {
         println!("  {} {}", "Refresh Token:".bold(), "stored".green());
     }
@@ -132,7 +143,10 @@ async fn logout(auth_client: &AuthClient) -> Result<()> {
     }
 
     auth_client.logout().await?;
-    println!("{} Logged out successfully. Stored tokens cleared.", "✓".green().bold());
+    println!(
+        "{} Logged out successfully. Stored tokens cleared.",
+        "✓".green().bold()
+    );
     Ok(())
 }
 
@@ -166,21 +180,24 @@ async fn status(auth_client: &AuthClient) -> Result<()> {
 
 async fn whoami(auth_client: &AuthClient) -> Result<()> {
     if !auth_client.is_logged_in().await {
-        println!("{}", "Not logged in. Please run 'raps auth login' first.".yellow());
+        println!(
+            "{}",
+            "Not logged in. Please run 'raps auth login' first.".yellow()
+        );
         return Ok(());
     }
 
     println!("{}", "Fetching user profile...".dimmed());
-    
+
     let user = auth_client.get_user_info().await?;
 
     println!("\n{}", "User Profile".bold());
     println!("{}", "─".repeat(50));
-    
+
     if let Some(name) = &user.name {
         println!("  {} {}", "Name:".bold(), name.cyan());
     }
-    
+
     if let Some(email) = &user.email {
         let verified = if user.email_verified.unwrap_or(false) {
             " ✓".green().to_string()
@@ -189,13 +206,13 @@ async fn whoami(auth_client: &AuthClient) -> Result<()> {
         };
         println!("  {} {}{}", "Email:".bold(), email, verified);
     }
-    
+
     if let Some(username) = &user.preferred_username {
         println!("  {} {}", "Username:".bold(), username);
     }
-    
+
     println!("  {} {}", "APS ID:".bold(), user.sub.dimmed());
-    
+
     if let Some(profile) = &user.profile {
         println!("  {} {}", "Profile URL:".bold(), profile.dimmed());
     }
@@ -209,7 +226,6 @@ fn mask_string(s: &str) -> String {
     if s.len() <= 8 {
         "*".repeat(s.len())
     } else {
-        format!("{}...{}", &s[..4], &s[s.len()-4..])
+        format!("{}...{}", &s[..4], &s[s.len() - 4..])
     }
 }
-

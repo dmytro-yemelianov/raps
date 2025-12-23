@@ -1,5 +1,5 @@
 //! Translation commands for Model Derivative API
-//! 
+//!
 //! Commands for starting translations, checking status, and viewing manifests.
 
 use anyhow::Result;
@@ -9,7 +9,7 @@ use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
-use crate::api::{DerivativeClient, derivative::OutputFormat};
+use crate::api::{derivative::OutputFormat, DerivativeClient};
 
 #[derive(Debug, Subcommand)]
 pub enum TranslateCommands {
@@ -17,26 +17,26 @@ pub enum TranslateCommands {
     Start {
         /// Base64-encoded URN of the source file
         urn: Option<String>,
-        
+
         /// Output format (svf2, svf, obj, stl, step, iges, ifc)
         #[arg(short, long)]
         format: Option<String>,
-        
+
         /// Root filename (for ZIP files with multiple design files)
         #[arg(short, long)]
         root_filename: Option<String>,
     },
-    
+
     /// Check translation status
     Status {
         /// Base64-encoded URN of the source file
         urn: String,
-        
+
         /// Wait for translation to complete
         #[arg(short, long)]
         wait: bool,
     },
-    
+
     /// Get translation manifest (available derivatives)
     Manifest {
         /// Base64-encoded URN of the source file
@@ -47,15 +47,13 @@ pub enum TranslateCommands {
 impl TranslateCommands {
     pub async fn execute(self, client: &DerivativeClient) -> Result<()> {
         match self {
-            TranslateCommands::Start { urn, format, root_filename } => {
-                start_translation(client, urn, format, root_filename).await
-            }
-            TranslateCommands::Status { urn, wait } => {
-                check_status(client, &urn, wait).await
-            }
-            TranslateCommands::Manifest { urn } => {
-                show_manifest(client, &urn).await
-            }
+            TranslateCommands::Start {
+                urn,
+                format,
+                root_filename,
+            } => start_translation(client, urn, format, root_filename).await,
+            TranslateCommands::Status { urn, wait } => check_status(client, &urn, wait).await,
+            TranslateCommands::Manifest { urn } => show_manifest(client, &urn).await,
         }
     }
 }
@@ -69,40 +67,36 @@ async fn start_translation(
     // Get URN interactively if not provided
     let source_urn = match urn {
         Some(u) => u,
-        None => {
-            Input::new()
-                .with_prompt("Enter the base64-encoded URN")
-                .validate_with(|input: &String| -> Result<(), &str> {
-                    if input.is_empty() {
-                        Err("URN cannot be empty")
-                    } else {
-                        Ok(())
-                    }
-                })
-                .interact_text()?
-        }
+        None => Input::new()
+            .with_prompt("Enter the base64-encoded URN")
+            .validate_with(|input: &String| -> Result<(), &str> {
+                if input.is_empty() {
+                    Err("URN cannot be empty")
+                } else {
+                    Ok(())
+                }
+            })
+            .interact_text()?,
     };
 
     // Select output format interactively if not provided
     let output_format = match format {
-        Some(f) => {
-            match f.to_lowercase().as_str() {
-                "svf2" => OutputFormat::Svf2,
-                "svf" => OutputFormat::Svf,
-                "thumbnail" => OutputFormat::Thumbnail,
-                "obj" => OutputFormat::Obj,
-                "stl" => OutputFormat::Stl,
-                "step" => OutputFormat::Step,
-                "iges" => OutputFormat::Iges,
-                "ifc" => OutputFormat::Ifc,
-                _ => anyhow::bail!("Invalid format. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc"),
-            }
-        }
+        Some(f) => match f.to_lowercase().as_str() {
+            "svf2" => OutputFormat::Svf2,
+            "svf" => OutputFormat::Svf,
+            "thumbnail" => OutputFormat::Thumbnail,
+            "obj" => OutputFormat::Obj,
+            "stl" => OutputFormat::Stl,
+            "step" => OutputFormat::Step,
+            "iges" => OutputFormat::Iges,
+            "ifc" => OutputFormat::Ifc,
+            _ => anyhow::bail!(
+                "Invalid format. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc"
+            ),
+        },
         None => {
             let formats = OutputFormat::all();
-            let format_labels: Vec<String> = formats.iter()
-                .map(|f| f.to_string())
-                .collect();
+            let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
 
             let selection = Select::new()
                 .with_prompt("Select output format")
@@ -122,11 +116,9 @@ async fn start_translation(
         "format".dimmed()
     );
 
-    let response = client.translate(
-        &source_urn,
-        output_format,
-        root_filename.as_deref(),
-    ).await?;
+    let response = client
+        .translate(&source_urn, output_format, root_filename.as_deref())
+        .await?;
 
     println!("{} Translation job started!", "✓".green().bold());
     println!("  {} {}", "Result:".bold(), response.result);
@@ -139,7 +131,10 @@ async fn start_translation(
         }
     }
 
-    println!("\n{}", "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed());
+    println!(
+        "\n{}",
+        "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed()
+    );
 
     Ok(())
 }
@@ -151,7 +146,7 @@ async fn check_status(client: &DerivativeClient, urn: &str, wait: bool) -> Resul
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
-                .unwrap()
+                .unwrap(),
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
 
@@ -168,10 +163,8 @@ async fn check_status(client: &DerivativeClient, urn: &str, wait: bool) -> Resul
                     break;
                 }
                 "failed" => {
-                    spinner.finish_with_message(format!(
-                        "{} Translation failed!",
-                        "✗".red().bold()
-                    ));
+                    spinner
+                        .finish_with_message(format!("{} Translation failed!", "✗".red().bold()));
                     anyhow::bail!("Translation failed");
                 }
                 "timeout" => {
@@ -189,7 +182,7 @@ async fn check_status(client: &DerivativeClient, urn: &str, wait: bool) -> Resul
     } else {
         // Just show current status
         let (status, progress) = client.get_status(urn).await?;
-        
+
         let status_icon = match status.as_str() {
             "success" => "✓".green().bold(),
             "failed" | "timeout" => "✗".red().bold(),
@@ -221,7 +214,7 @@ async fn show_manifest(client: &DerivativeClient, urn: &str) -> Result<()> {
     println!("  {} {}", "Progress:".bold(), manifest.progress);
     println!("  {} {}", "Region:".bold(), manifest.region);
     println!("  {} {}", "Has Thumbnail:".bold(), manifest.has_thumbnail);
-    
+
     if let Some(version) = &manifest.version {
         println!("  {} {}", "Version:".bold(), version);
     }
@@ -264,4 +257,3 @@ async fn show_manifest(client: &DerivativeClient, urn: &str) -> Result<()> {
     println!("{}", "─".repeat(60));
     Ok(())
 }
-
