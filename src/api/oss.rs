@@ -736,8 +736,8 @@ impl OssClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
     use crate::api::AuthClient;
+    use crate::config::Config;
 
     fn create_test_oss_client() -> OssClient {
         let config = Config {
@@ -755,12 +755,12 @@ mod tests {
     fn test_get_urn() {
         let client = create_test_oss_client();
         let urn = client.get_urn("my-bucket", "my-object.dwg");
-        
+
         // URN should be base64 encoded
         assert!(!urn.contains("urn:adsk.objects:os.object:"));
         assert!(!urn.contains("my-bucket"));
         assert!(!urn.contains("my-object.dwg"));
-        
+
         // Should be valid base64 URL-safe encoding
         assert!(!urn.contains("+"));
         assert!(!urn.contains("/"));
@@ -771,7 +771,7 @@ mod tests {
     fn test_get_urn_with_special_characters() {
         let client = create_test_oss_client();
         let urn = client.get_urn("bucket-with-dashes", "folder/file name with spaces.txt");
-        
+
         // Should handle special characters in object key
         assert!(!urn.is_empty());
     }
@@ -785,12 +785,30 @@ mod tests {
 
     #[test]
     fn test_retention_policy_from_str() {
-        assert_eq!(RetentionPolicy::from_str("transient"), Some(RetentionPolicy::Transient));
-        assert_eq!(RetentionPolicy::from_str("TRANSIENT"), Some(RetentionPolicy::Transient));
-        assert_eq!(RetentionPolicy::from_str("temporary"), Some(RetentionPolicy::Temporary));
-        assert_eq!(RetentionPolicy::from_str("TEMPORARY"), Some(RetentionPolicy::Temporary));
-        assert_eq!(RetentionPolicy::from_str("persistent"), Some(RetentionPolicy::Persistent));
-        assert_eq!(RetentionPolicy::from_str("PERSISTENT"), Some(RetentionPolicy::Persistent));
+        assert_eq!(
+            RetentionPolicy::from_str("transient"),
+            Some(RetentionPolicy::Transient)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("TRANSIENT"),
+            Some(RetentionPolicy::Transient)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("temporary"),
+            Some(RetentionPolicy::Temporary)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("TEMPORARY"),
+            Some(RetentionPolicy::Temporary)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("persistent"),
+            Some(RetentionPolicy::Persistent)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("PERSISTENT"),
+            Some(RetentionPolicy::Persistent)
+        );
         assert_eq!(RetentionPolicy::from_str("invalid"), None);
         assert_eq!(RetentionPolicy::from_str(""), None);
     }

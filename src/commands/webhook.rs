@@ -232,7 +232,7 @@ mod tests {
         // String is 6 chars, max_len is 6, so it should not be truncated
         let result = truncate_str(str, 6);
         assert_eq!(result, "onetwo");
-        
+
         // String is 6 chars, max_len is 5, so it should be truncated to 2 chars + "..."
         let result = truncate_str(str, 5);
         assert_eq!(result, "on...");
@@ -245,7 +245,7 @@ mod tests {
         // But the function will still add "...", resulting in "..."
         let result = truncate_str(str, 3);
         assert_eq!(result, "...");
-        
+
         // For max_len 4, we get 1 char + "..."
         let result = truncate_str(str, 4);
         assert_eq!(result, "h...");

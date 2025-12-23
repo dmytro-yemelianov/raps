@@ -131,14 +131,20 @@ mod tests {
     fn test_auth_url() {
         let config = create_test_config();
         let url = config.auth_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/authentication/v2/token");
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/authentication/v2/token"
+        );
     }
 
     #[test]
     fn test_authorize_url() {
         let config = create_test_config();
         let url = config.authorize_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/authentication/v2/authorize");
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/authentication/v2/authorize"
+        );
     }
 
     #[test]
@@ -187,7 +193,10 @@ mod tests {
     fn test_issues_url() {
         let config = create_test_config();
         let url = config.issues_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/construction/issues/v1");
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/construction/issues/v1"
+        );
     }
 
     #[test]
@@ -206,8 +215,12 @@ mod tests {
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: None,
         };
-        assert!(config.auth_url().starts_with("https://custom.api.example.com"));
-        assert!(config.oss_url().starts_with("https://custom.api.example.com"));
+        assert!(config
+            .auth_url()
+            .starts_with("https://custom.api.example.com"));
+        assert!(config
+            .oss_url()
+            .starts_with("https://custom.api.example.com"));
     }
 
     #[test]
@@ -226,7 +239,7 @@ mod tests {
     fn test_all_urls_contain_base_url() {
         let config = create_test_config();
         let base = &config.base_url;
-        
+
         assert!(config.auth_url().starts_with(base));
         assert!(config.authorize_url().starts_with(base));
         assert!(config.oss_url().starts_with(base));
