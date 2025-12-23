@@ -1,5 +1,9 @@
 # RAPS
 
+<div align="center">
+  <img src="logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
+</div>
+
 **R**ust **APS** CLI - A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
 
 ## Features
