@@ -4,7 +4,7 @@ title: RAPS CLI Documentation
 ---
 
 <div align="center">
-  <img src="/logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
+  <img src="{{ '/logo/output/raps-logo.png' | relative_url }}" alt="RAPS Logo" width="200"/>
   <h1>RAPS CLI Documentation</h1>
   <p><strong>R</strong>ust <strong>APS</strong> CLI - A comprehensive command-line interface for Autodesk Platform Services</p>
 </div>

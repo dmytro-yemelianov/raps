@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test/add-comprehensive-testing
     paths:
       - 'docs/**'
       - '.github/workflows/docs.yml'

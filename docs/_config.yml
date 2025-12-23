@@ -1,7 +1,9 @@
 title: RAPS CLI Documentation
 description: Comprehensive command-line interface for Autodesk Platform Services
 theme: jekyll-theme-minimal
-logo: /logo/output/raps-logo.png
+baseurl: "/raps"
+url: "https://dmytro-yemelianov.github.io"
+logo: /raps/logo/output/raps-logo.png
 
 # GitHub Pages settings
 plugins:
