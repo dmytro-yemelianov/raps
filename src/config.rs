@@ -117,20 +117,125 @@ impl Config {
 mod tests {
     use super::*;
 
+    fn create_test_config() -> Config {
+        Config {
+            client_id: "test_client_id".to_string(),
+            client_secret: "test_secret".to_string(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+        }
+    }
+
     #[test]
-    fn test_urls() {
+    fn test_auth_url() {
+        let config = create_test_config();
+        let url = config.auth_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/authentication/v2/token");
+    }
+
+    #[test]
+    fn test_authorize_url() {
+        let config = create_test_config();
+        let url = config.authorize_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/authentication/v2/authorize");
+    }
+
+    #[test]
+    fn test_oss_url() {
+        let config = create_test_config();
+        let url = config.oss_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/oss/v2");
+    }
+
+    #[test]
+    fn test_derivative_url() {
+        let config = create_test_config();
+        let url = config.derivative_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/modelderivative/v2");
+    }
+
+    #[test]
+    fn test_project_url() {
+        let config = create_test_config();
+        let url = config.project_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/project/v1");
+    }
+
+    #[test]
+    fn test_data_url() {
+        let config = create_test_config();
+        let url = config.data_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/data/v1");
+    }
+
+    #[test]
+    fn test_webhooks_url() {
+        let config = create_test_config();
+        let url = config.webhooks_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/webhooks/v1");
+    }
+
+    #[test]
+    fn test_da_url() {
+        let config = create_test_config();
+        let url = config.da_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/da/us-east/v3");
+    }
+
+    #[test]
+    fn test_issues_url() {
+        let config = create_test_config();
+        let url = config.issues_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/construction/issues/v1");
+    }
+
+    #[test]
+    fn test_reality_capture_url() {
+        let config = create_test_config();
+        let url = config.reality_capture_url();
+        assert_eq!(url, "https://developer.api.autodesk.com/photo-to-3d/v1");
+    }
+
+    #[test]
+    fn test_custom_base_url() {
+        let config = Config {
+            client_id: "test".to_string(),
+            client_secret: "secret".to_string(),
+            base_url: "https://custom.api.example.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+        };
+        assert!(config.auth_url().starts_with("https://custom.api.example.com"));
+        assert!(config.oss_url().starts_with("https://custom.api.example.com"));
+    }
+
+    #[test]
+    fn test_config_with_da_nickname() {
         let config = Config {
             client_id: "test".to_string(),
             client_secret: "secret".to_string(),
             base_url: "https://developer.api.autodesk.com".to_string(),
             callback_url: "http://localhost:8080/callback".to_string(),
-            da_nickname: None,
+            da_nickname: Some("my-nickname".to_string()),
         };
+        assert_eq!(config.da_nickname, Some("my-nickname".to_string()));
+    }
 
-        assert!(config.auth_url().contains("/authentication/v2/token"));
-        assert!(config.oss_url().contains("/oss/v2"));
-        assert!(config.derivative_url().contains("/modelderivative/v2"));
-        assert!(config.project_url().contains("/project/v1"));
-        assert!(config.da_url().contains("/da/us-east/v3"));
+    #[test]
+    fn test_all_urls_contain_base_url() {
+        let config = create_test_config();
+        let base = &config.base_url;
+        
+        assert!(config.auth_url().starts_with(base));
+        assert!(config.authorize_url().starts_with(base));
+        assert!(config.oss_url().starts_with(base));
+        assert!(config.derivative_url().starts_with(base));
+        assert!(config.project_url().starts_with(base));
+        assert!(config.data_url().starts_with(base));
+        assert!(config.webhooks_url().starts_with(base));
+        assert!(config.da_url().starts_with(base));
+        assert!(config.issues_url().starts_with(base));
+        assert!(config.reality_capture_url().starts_with(base));
     }
 }

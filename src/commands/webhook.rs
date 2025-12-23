@@ -200,3 +200,59 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_str_short() {
+        assert_eq!(truncate_str("short", 10), "short");
+        assert_eq!(truncate_str("exact", 5), "exact");
+    }
+
+    #[test]
+    fn test_truncate_str_long() {
+        let long_str = "this is a very long string that needs to be truncated";
+        let result = truncate_str(long_str, 20);
+        assert_eq!(result.len(), 20);
+        assert!(result.ends_with("..."));
+        assert_eq!(result, "this is a very lo...");
+    }
+
+    #[test]
+    fn test_truncate_str_exact_length() {
+        let str = "exactly";
+        assert_eq!(truncate_str(str, 7), "exactly");
+    }
+
+    #[test]
+    fn test_truncate_str_one_over() {
+        let str = "onetwo";
+        // String is 6 chars, max_len is 6, so it should not be truncated
+        let result = truncate_str(str, 6);
+        assert_eq!(result, "onetwo");
+        
+        // String is 6 chars, max_len is 5, so it should be truncated to 2 chars + "..."
+        let result = truncate_str(str, 5);
+        assert_eq!(result, "on...");
+    }
+
+    #[test]
+    fn test_truncate_str_very_short_max() {
+        let str = "hello";
+        // If max_len is 3, we can't add "...", so it will try to slice [..0] which is ""
+        // But the function will still add "...", resulting in "..."
+        let result = truncate_str(str, 3);
+        assert_eq!(result, "...");
+        
+        // For max_len 4, we get 1 char + "..."
+        let result = truncate_str(str, 4);
+        assert_eq!(result, "h...");
+    }
+
+    #[test]
+    fn test_truncate_str_empty() {
+        assert_eq!(truncate_str("", 10), "");
+    }
+}
