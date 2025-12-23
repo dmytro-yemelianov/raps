@@ -15,6 +15,8 @@ pub enum OutputFormat {
     Table,
     /// JSON format (default when piped)
     Json,
+    /// YAML format (human-readable, machine-parsable)
+    Yaml,
     /// CSV format (for tabular data)
     Csv,
     /// Plain text (no colors, simple formatting)
@@ -28,9 +30,10 @@ impl FromStr for OutputFormat {
         match s.to_lowercase().as_str() {
             "table" => Ok(OutputFormat::Table),
             "json" => Ok(OutputFormat::Json),
+            "yaml" | "yml" => Ok(OutputFormat::Yaml),
             "csv" => Ok(OutputFormat::Csv),
             "plain" => Ok(OutputFormat::Plain),
-            _ => anyhow::bail!("Invalid output format: {}. Use: table, json, csv, plain", s),
+            _ => anyhow::bail!("Invalid output format: {}. Use: table, json, yaml, csv, plain", s),
         }
     }
 }
@@ -64,6 +67,7 @@ impl OutputFormat {
         match self {
             OutputFormat::Table => write_table(data),
             OutputFormat::Json => write_json(data),
+            OutputFormat::Yaml => write_yaml(data),
             OutputFormat::Csv => write_csv(data),
             OutputFormat::Plain => write_plain(data),
         }
@@ -85,6 +89,15 @@ impl OutputFormat {
                     message: message.to_string(),
                 })
             }
+            OutputFormat::Yaml => {
+                #[derive(Serialize)]
+                struct Message {
+                    message: String,
+                }
+                write_yaml(&Message {
+                    message: message.to_string(),
+                })
+            }
             OutputFormat::Csv => {
                 // CSV doesn't make sense for simple messages, use plain
                 println!("{}", message);
@@ -103,6 +116,13 @@ impl OutputFormat {
 fn write_json<T: Serialize>(data: &T) -> Result<()> {
     let json = serde_json::to_string_pretty(data)?;
     println!("{}", json);
+    Ok(())
+}
+
+/// Write data as YAML
+fn write_yaml<T: Serialize>(data: &T) -> Result<()> {
+    let yaml = serde_yaml::to_string(data)?;
+    print!("{}", yaml);
     Ok(())
 }
 

@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use crate::api::reality_capture::{OutputFormat as RealityOutputFormat, SceneType};
 use crate::api::RealityCaptureClient;
+use crate::interactive;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -119,9 +120,15 @@ async fn create_photoscene(
     // Get name
     let scene_name = match name {
         Some(n) => n,
-        None => Input::new()
-            .with_prompt("Enter photoscene name")
-            .interact_text()?,
+        None => {
+            // In non-interactive mode, require the name
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Photoscene name is required in non-interactive mode. Use --name flag.");
+            }
+            Input::new()
+                .with_prompt("Enter photoscene name")
+                .interact_text()?
+        }
     };
 
     // Get scene type
@@ -132,15 +139,20 @@ async fn create_photoscene(
             _ => anyhow::bail!("Invalid scene type. Use 'aerial' or 'object'"),
         },
         None => {
-            let types = vec!["aerial (drone/outdoor)", "object (turntable/indoor)"];
-            let selection = Select::new()
-                .with_prompt("Select scene type")
-                .items(&types)
-                .interact()?;
-            if selection == 0 {
-                SceneType::Aerial
-            } else {
+            // In non-interactive mode, default to object
+            if interactive::is_non_interactive() {
                 SceneType::Object
+            } else {
+                let types = vec!["aerial (drone/outdoor)", "object (turntable/indoor)"];
+                let selection = Select::new()
+                    .with_prompt("Select scene type")
+                    .items(&types)
+                    .interact()?;
+                if selection == 0 {
+                    SceneType::Aerial
+                } else {
+                    SceneType::Object
+                }
             }
         }
     };
@@ -149,19 +161,24 @@ async fn create_photoscene(
     let selected_format = match format {
         Some(f) => parse_format(&f)?,
         None => {
-            let formats = RealityOutputFormat::all();
-            let format_labels: Vec<String> = formats
-                .iter()
-                .map(|f| format!("{} - {}", f, f.description()))
-                .collect();
+            // In non-interactive mode, default to OBJ
+            if interactive::is_non_interactive() {
+                RealityOutputFormat::Obj
+            } else {
+                let formats = RealityOutputFormat::all();
+                let format_labels: Vec<String> = formats
+                    .iter()
+                    .map(|f| format!("{} - {}", f, f.description()))
+                    .collect();
 
-            let selection = Select::new()
-                .with_prompt("Select output format")
-                .items(&format_labels)
-                .default(2) // OBJ is usually a good default
-                .interact()?;
+                let selection = Select::new()
+                    .with_prompt("Select output format")
+                    .items(&format_labels)
+                    .default(2) // OBJ is usually a good default
+                    .interact()?;
 
-            formats[selection]
+                formats[selection]
+            }
         }
     };
 

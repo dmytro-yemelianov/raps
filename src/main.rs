@@ -13,6 +13,9 @@
 mod api;
 mod commands;
 mod config;
+mod error;
+mod interactive;
+mod logging;
 mod output;
 
 use anyhow::Result;
@@ -31,6 +34,7 @@ use commands::{
     TranslateCommands, WebhookCommands,
 };
 use config::Config;
+use error::ExitCode;
 use output::OutputFormat;
 
 /// RAPS - Rust APS CLI - Command-line interface for Autodesk Platform Services
@@ -41,9 +45,33 @@ use output::OutputFormat;
 #[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
-    /// Output format: table, json, csv, or plain (default: auto-detect)
+    /// Output format: table, json, yaml, csv, or plain (default: auto-detect)
     #[arg(long, value_name = "FORMAT")]
     output: Option<String>,
+
+    /// Disable colored output
+    #[arg(long)]
+    no_color: bool,
+
+    /// Print only the result payload (useful with JSON output)
+    #[arg(short, long)]
+    quiet: bool,
+
+    /// Show verbose output (request summaries)
+    #[arg(short, long)]
+    verbose: bool,
+
+    /// Show debug output (full trace, secrets redacted)
+    #[arg(long)]
+    debug: bool,
+
+    /// Non-interactive mode: fail if prompts would be required
+    #[arg(long)]
+    non_interactive: bool,
+
+    /// Auto-confirm destructive actions
+    #[arg(long)]
+    yes: bool,
 
     #[command(subcommand)]
     command: Commands,
@@ -116,22 +144,41 @@ enum Commands {
 
 #[tokio::main]
 async fn main() {
-    if let Err(err) = run().await {
-        eprintln!("{} {}", "Error:".red().bold(), err);
+    // Handle clap errors (invalid arguments) - clap already exits with code 2
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(e) => {
+            e.print().unwrap();
+            std::process::exit(2); // Invalid arguments
+        }
+    };
 
-        // Print chain of errors
-        let mut source = err.source();
-        while let Some(cause) = source {
-            eprintln!("  {} {}", "Caused by:".dimmed(), cause);
-            source = cause.source();
+    // Initialize logging flags
+    logging::init(cli.no_color, cli.quiet, cli.verbose, cli.debug);
+    
+    // Initialize interactive mode flags
+    interactive::init(cli.non_interactive, cli.yes);
+
+    if let Err(err) = run(cli).await {
+        let exit_code = ExitCode::from_error(&err);
+        
+        // Only print errors if not in quiet mode
+        if !logging::quiet() {
+            eprintln!("{} {}", "Error:".red().bold(), err);
+
+            // Print chain of errors
+            let mut source = err.source();
+            while let Some(cause) = source {
+                eprintln!("  {} {}", "Caused by:".dimmed(), cause);
+                source = cause.source();
+            }
         }
 
-        std::process::exit(1);
+        exit_code.exit();
     }
 }
 
-async fn run() -> Result<()> {
-    let cli = Cli::parse();
+async fn run(cli: Cli) -> Result<()> {
 
     // Handle completions command first (doesn't need config/auth)
     if let Commands::Completions { shell } = &cli.command {
@@ -147,6 +194,11 @@ async fn run() -> Result<()> {
         None
     };
     let output_format = OutputFormat::determine(output_format);
+
+    // Log startup info in verbose/debug mode
+    if logging::verbose() || logging::debug() {
+        logging::log_verbose("RAPS CLI starting...");
+    }
 
     // Load configuration
     let config = Config::from_env()?;

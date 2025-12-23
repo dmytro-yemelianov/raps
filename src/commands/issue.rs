@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::api::issues::CreateIssueRequest;
 use crate::api::IssuesClient;
+use crate::interactive;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -149,23 +150,34 @@ async fn create_issue(
     // Get title
     let issue_title = match title {
         Some(t) => t,
-        None => Input::new()
-            .with_prompt("Enter issue title")
-            .interact_text()?,
+        None => {
+            // In non-interactive mode, require the title
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Issue title is required in non-interactive mode. Use --title flag.");
+            }
+            Input::new()
+                .with_prompt("Enter issue title")
+                .interact_text()?
+        }
     };
 
     // Get description (optional)
     let issue_desc = match description {
         Some(d) => Some(d),
         None => {
-            let desc: String = Input::new()
-                .with_prompt("Enter description (optional)")
-                .allow_empty(true)
-                .interact_text()?;
-            if desc.is_empty() {
+            // In non-interactive mode, description is optional (None)
+            if interactive::is_non_interactive() {
                 None
             } else {
-                Some(desc)
+                let desc: String = Input::new()
+                    .with_prompt("Enter description (optional)")
+                    .allow_empty(true)
+                    .interact_text()?;
+                if desc.is_empty() {
+                    None
+                } else {
+                    Some(desc)
+                }
             }
         }
     };

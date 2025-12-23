@@ -12,6 +12,7 @@ use crate::api::{
     oss::{Region, RetentionPolicy},
     OssClient,
 };
+use crate::interactive;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -114,6 +115,11 @@ async fn create_bucket(
     let bucket_key = match key {
         Some(k) => k,
         None => {
+            // In non-interactive mode, require the key
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Bucket key is required in non-interactive mode. Use --key flag.");
+            }
+            
             println!(
                 "{}",
                 "Note: Bucket keys must be globally unique across all APS applications.".yellow()
@@ -153,13 +159,18 @@ async fn create_bucket(
             _ => anyhow::bail!("Invalid region. Use US or EMEA."),
         },
         None => {
-            let regions = Region::all();
-            let selection = Select::new()
-                .with_prompt("Select region")
-                .items(&regions)
-                .default(0)
-                .interact()?;
-            regions[selection]
+            // In non-interactive mode, default to US
+            if interactive::is_non_interactive() {
+                Region::US
+            } else {
+                let regions = Region::all();
+                let selection = Select::new()
+                    .with_prompt("Select region")
+                    .items(&regions)
+                    .default(0)
+                    .interact()?;
+                regions[selection]
+            }
         }
     };
 
@@ -169,22 +180,27 @@ async fn create_bucket(
             anyhow::anyhow!("Invalid policy. Use transient, temporary, or persistent.")
         })?,
         None => {
-            let policies = RetentionPolicy::all();
-            let policy_labels: Vec<String> = policies
-                .iter()
-                .map(|p| match p {
-                    RetentionPolicy::Transient => "transient (deleted after 24 hours)".to_string(),
-                    RetentionPolicy::Temporary => "temporary (deleted after 30 days)".to_string(),
-                    RetentionPolicy::Persistent => "persistent (kept until deleted)".to_string(),
-                })
-                .collect();
+            // In non-interactive mode, default to transient
+            if interactive::is_non_interactive() {
+                RetentionPolicy::Transient
+            } else {
+                let policies = RetentionPolicy::all();
+                let policy_labels: Vec<String> = policies
+                    .iter()
+                    .map(|p| match p {
+                        RetentionPolicy::Transient => "transient (deleted after 24 hours)".to_string(),
+                        RetentionPolicy::Temporary => "temporary (deleted after 30 days)".to_string(),
+                        RetentionPolicy::Persistent => "persistent (kept until deleted)".to_string(),
+                    })
+                    .collect();
 
-            let selection = Select::new()
-                .with_prompt("Select retention policy")
-                .items(&policy_labels)
-                .default(0)
-                .interact()?;
-            policies[selection]
+                let selection = Select::new()
+                    .with_prompt("Select retention policy")
+                    .items(&policy_labels)
+                    .default(0)
+                    .interact()?;
+                policies[selection]
+            }
         }
     };
 
