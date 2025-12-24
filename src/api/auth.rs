@@ -810,6 +810,7 @@ mod tests {
             token_type: "Bearer".to_string(),
             expires_in: 3600,
             refresh_token: Some("refresh_token".to_string()),
+            scope: None,
         };
 
         let json = serde_json::to_string(&token).unwrap();
@@ -834,6 +835,7 @@ mod tests {
             token_type: "Bearer".to_string(),
             expires_in: 3600,
             refresh_token: None,
+            scope: None,
         };
 
         let json = serde_json::to_string(&token).unwrap();

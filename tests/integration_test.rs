@@ -14,7 +14,7 @@ use std::process::Command;
 #[ignore] // Requires binary to be built
 fn test_cli_help() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--help"])
+        .args(["run", "--", "--help"])
         .output()
         .expect("Failed to execute command");
 
@@ -32,7 +32,7 @@ fn test_cli_help() {
 #[ignore] // Requires binary to be built
 fn test_cli_version() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "--version"])
+        .args(["run", "--", "--version"])
         .output()
         .expect("Failed to execute command");
 
@@ -56,7 +56,7 @@ fn test_cli_version() {
 #[ignore] // Requires binary to be built
 fn test_cli_invalid_command() {
     let output = Command::new("cargo")
-        .args(&["run", "--", "invalid-command"])
+        .args(["run", "--", "invalid-command"])
         .output()
         .expect("Failed to execute command");
 
