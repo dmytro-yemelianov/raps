@@ -1,8 +1,8 @@
 ---
 name: Feature Request
-about: Suggest an idea for this project
+about: Suggest an idea for RAPS CLI
 title: '[FEATURE] '
-labels: enhancement
+labels: 'type:feature'
 assignees: ''
 ---
 
@@ -10,31 +10,25 @@ assignees: ''
 A clear and concise description of the feature you'd like to see.
 
 ## Use Case
-Describe the problem or use case this feature would solve. For example:
-- "I want to be able to..."
-- "It would be helpful if..."
-- "Currently, I have to work around this by..."
+Describe the problem this feature would solve or the workflow it would improve.
 
 ## Proposed Solution
-Describe how you envision this feature working:
+How do you envision this feature working?
 
-```bash
-# Example command
-raps new-command --option value
-```
+## Expected Output Format
+If this feature involves command output, what format should it use?
+- [ ] Table (human-readable)
+- [ ] JSON (machine-readable)
+- [ ] YAML
+- [ ] CSV
+- [ ] Plain text
 
-## Alternatives Considered
-Describe any alternative solutions or features you've considered.
-
-## API Requirements
-If this feature requires new APS API endpoints:
-- Which APS API? (e.g., Data Management, Model Derivative, etc.)
-- What endpoints would be needed?
-- Is this API already available in APS?
+## CI/CD Requirements
+If this feature is intended for CI/CD use:
+- [ ] Must work in non-interactive mode (`--non-interactive`)
+- [ ] Must support JSON output (`--output json`)
+- [ ] Must have standardized exit codes
+- [ ] Other requirements: ...
 
 ## Additional Context
-Add any other context, screenshots, or examples about the feature request here.
-
-## Implementation Notes
-If you're planning to implement this yourself, please mention it here.
-
+Add any other context, examples, or mockups about the feature request here.

@@ -23,7 +23,11 @@ pub enum HubCommands {
 }
 
 impl HubCommands {
-    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             HubCommands::List => list_hubs(client, output_format).await,
             HubCommands::Info { hub_id } => hub_info(client, &hub_id, output_format).await,
@@ -50,7 +54,10 @@ async fn list_hubs(client: &DataManagementClient, output_format: OutputFormat) -
     let hub_outputs: Vec<HubListOutput> = hubs
         .iter()
         .map(|h| {
-            let extension_type = h.attributes.extension.as_ref()
+            let extension_type = h
+                .attributes
+                .extension
+                .as_ref()
                 .and_then(|e| e.extension_type.as_ref())
                 .map(|t| extract_hub_type(t));
             HubListOutput {
@@ -116,14 +123,21 @@ struct HubInfoOutput {
     extension_type: Option<String>,
 }
 
-async fn hub_info(client: &DataManagementClient, hub_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn hub_info(
+    client: &DataManagementClient,
+    hub_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching hub details...".dimmed());
     }
 
     let hub = client.get_hub(hub_id).await?;
 
-    let extension_type = hub.attributes.extension.as_ref()
+    let extension_type = hub
+        .attributes
+        .extension
+        .as_ref()
         .and_then(|e| e.extension_type.as_ref())
         .map(|t| extract_hub_type(t));
 

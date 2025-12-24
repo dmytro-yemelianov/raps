@@ -7,7 +7,6 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
-use serde::Serialize;
 
 use crate::api::issues::CreateIssueRequest;
 use crate::api::IssuesClient;
@@ -80,7 +79,9 @@ impl IssueCommands {
                 status,
                 title,
             } => update_issue(client, &project_id, &issue_id, status, title, output_format).await,
-            IssueCommands::Types { project_id } => list_issue_types(client, &project_id, output_format).await,
+            IssueCommands::Types { project_id } => {
+                list_issue_types(client, &project_id, output_format).await
+            }
         }
     }
 }
@@ -89,7 +90,7 @@ async fn list_issues(
     client: &IssuesClient,
     project_id: &str,
     status: Option<String>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     println!("{}", "Fetching issues...".dimmed());
 
@@ -145,7 +146,7 @@ async fn create_issue(
     project_id: &str,
     title: Option<String>,
     description: Option<String>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     // Get title
     let issue_title = match title {
@@ -211,7 +212,7 @@ async fn update_issue(
     issue_id: &str,
     status: Option<String>,
     title: Option<String>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     // Get current issue
     let current = client.get_issue(project_id, issue_id).await?;
@@ -256,7 +257,11 @@ async fn update_issue(
     Ok(())
 }
 
-async fn list_issue_types(client: &IssuesClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn list_issue_types(
+    client: &IssuesClient,
+    project_id: &str,
+    _output_format: OutputFormat,
+) -> Result<()> {
     println!("{}", "Fetching issue types...".dimmed());
 
     let types = client.list_issue_types(project_id).await?;

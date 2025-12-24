@@ -3,6 +3,7 @@
 //! Implements both 2-legged (client credentials) and 3-legged (authorization code) OAuth flows.
 
 use anyhow::{Context, Result};
+use colored::Colorize;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{Read, Write};
@@ -47,6 +48,19 @@ pub struct TokenResponse {
     pub expires_in: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+}
+
+/// Device code response from APS Device Authorization endpoint
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeviceCodeResponse {
+    pub device_code: String,
+    pub user_code: String,
+    pub verification_uri: String,
+    pub verification_uri_complete: Option<String>,
+    pub expires_in: u64,
+    pub interval: Option<u64>, // Polling interval in seconds
 }
 
 /// Stored token with metadata for persistence
@@ -96,9 +110,15 @@ impl AuthClient {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
 
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config
+            .create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
-            http_client: reqwest::Client::new(),
+            http_client,
             cached_2leg_token: Arc::new(RwLock::new(None)),
             cached_3leg_token: Arc::new(RwLock::new(stored_token)),
         }
@@ -256,6 +276,201 @@ impl AuthClient {
             .context("Failed to parse token response")?;
 
         Ok(token_response)
+    }
+
+    /// Login with 3-legged OAuth using device code flow (headless-friendly)
+    pub async fn login_device(&self, scopes: &[&str]) -> Result<StoredToken> {
+        let url = format!("{}/authentication/v2/device", self.config.base_url);
+
+        // Request device code
+        let params = [("client_id", &self.config.client_id)];
+        let response = self
+            .http_client
+            .post(&url)
+            .form(&params)
+            .send()
+            .await
+            .context("Failed to request device code")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Device code request failed ({}): {}", status, error_text);
+        }
+
+        let device_response: DeviceCodeResponse = response
+            .json()
+            .await
+            .context("Failed to parse device code response")?;
+
+        // Display instructions to user
+        println!("\n{}", "Device Code Authentication".bold().cyan());
+        println!("{}", "─".repeat(50));
+        println!(
+            "  {} {}",
+            "User Code:".bold(),
+            device_response.user_code.bold().yellow()
+        );
+        println!(
+            "  {} {}",
+            "Verification URL:".bold(),
+            device_response.verification_uri.cyan()
+        );
+        if let Some(ref complete_url) = device_response.verification_uri_complete {
+            println!("  {} {}", "Complete URL:".bold(), complete_url.cyan());
+        }
+        println!(
+            "\n{}",
+            "Please visit the URL above and enter the user code to authorize.".dimmed()
+        );
+        println!(
+            "{}",
+            format!(
+                "Waiting for authorization (expires in {} seconds)...",
+                device_response.expires_in
+            )
+            .dimmed()
+        );
+        println!("{}", "─".repeat(50));
+
+        // Poll for token
+        let poll_interval = Duration::from_secs(device_response.interval.unwrap_or(5));
+        let expires_at = Instant::now() + Duration::from_secs(device_response.expires_in);
+        let mut last_poll = Instant::now();
+
+        loop {
+            // Check if expired
+            if Instant::now() >= expires_at {
+                anyhow::bail!("Device code expired. Please try again.");
+            }
+
+            // Wait for polling interval
+            let elapsed = last_poll.elapsed();
+            if elapsed < poll_interval {
+                tokio::time::sleep(poll_interval - elapsed).await;
+            }
+            last_poll = Instant::now();
+
+            // Poll for token
+            let token_url = self.config.auth_url();
+            let poll_params = [
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                ("device_code", &device_response.device_code),
+                ("client_id", &self.config.client_id),
+                ("client_secret", &self.config.client_secret),
+            ];
+
+            let poll_response = self
+                .http_client
+                .post(&token_url)
+                .form(&poll_params)
+                .send()
+                .await
+                .context("Failed to poll for token")?;
+
+            if poll_response.status().is_success() {
+                let token: TokenResponse = poll_response
+                    .json()
+                    .await
+                    .context("Failed to parse token response")?;
+
+                println!("\n{} Authorization successful!", "✓".green().bold());
+
+                // Store the token
+                let stored = StoredToken {
+                    access_token: token.access_token.clone(),
+                    refresh_token: token.refresh_token.clone(),
+                    expires_at: chrono::Utc::now().timestamp() + token.expires_in as i64,
+                    scopes: scopes.iter().map(|s| s.to_string()).collect(),
+                };
+
+                self.save_token(&stored)?;
+
+                // Update cache
+                {
+                    let mut cache = self.cached_3leg_token.write().await;
+                    *cache = Some(stored.clone());
+                }
+
+                return Ok(stored);
+            } else {
+                // Check error response
+                let error_text = poll_response.text().await.unwrap_or_default();
+                if error_text.contains("authorization_pending") {
+                    // Still waiting, continue polling
+                    print!(".");
+                    use std::io::Write;
+                    std::io::stdout().flush().ok();
+                    continue;
+                } else if error_text.contains("slow_down") {
+                    // Slow down polling
+                    tokio::time::sleep(poll_interval * 2).await;
+                    continue;
+                } else if error_text.contains("expired_token") {
+                    anyhow::bail!("Device code expired. Please try again.");
+                } else {
+                    anyhow::bail!("Token polling failed: {}", error_text);
+                }
+            }
+        }
+    }
+
+    /// Login with a provided access token (for CI/CD scenarios)
+    pub async fn login_with_token(
+        &self,
+        access_token: String,
+        refresh_token: Option<String>,
+        expires_in: u64,
+        scopes: Vec<String>,
+    ) -> Result<StoredToken> {
+        // Validate token by fetching user info
+        let user_info = self.get_user_info_with_token(&access_token).await?;
+
+        println!(
+            "{} Token validated for user: {}",
+            "✓".green().bold(),
+            user_info.email.as_deref().unwrap_or("unknown")
+        );
+
+        // Store the token
+        let stored = StoredToken {
+            access_token: access_token.clone(),
+            refresh_token,
+            expires_at: chrono::Utc::now().timestamp() + expires_in as i64,
+            scopes,
+        };
+
+        self.save_token(&stored)?;
+
+        // Update cache
+        {
+            let mut cache = self.cached_3leg_token.write().await;
+            *cache = Some(stored.clone());
+        }
+
+        Ok(stored)
+    }
+
+    /// Get user info with a provided token (for validation)
+    async fn get_user_info_with_token(&self, token: &str) -> Result<UserInfo> {
+        let url = "https://api.userprofile.autodesk.com/userinfo";
+        let response = self
+            .http_client
+            .get(url)
+            .bearer_auth(token)
+            .send()
+            .await
+            .context("Failed to fetch user info")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to validate token ({}): {}", status, error_text);
+        }
+
+        let user: UserInfo = response.json().await.context("Failed to parse user info")?;
+
+        Ok(user)
     }
 
     /// Start 3-legged OAuth login flow
@@ -497,30 +712,13 @@ impl AuthClient {
     /// Get user profile information (requires 3-legged auth with user:read or user-profile:read scope)
     pub async fn get_user_info(&self) -> Result<UserInfo> {
         let token = self.get_3leg_token().await?;
+        self.get_user_info_with_token(&token).await
+    }
 
-        // The userinfo endpoint is on a different host
-        let url = "https://api.userprofile.autodesk.com/userinfo";
-
-        let response = self
-            .http_client
-            .get(url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get user info")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get user info ({}): {}", status, error_text);
-        }
-
-        let user_info: UserInfo = response
-            .json()
-            .await
-            .context("Failed to parse user info response")?;
-
-        Ok(user_info)
+    /// Get token expiry timestamp
+    pub async fn get_token_expiry(&self) -> Option<i64> {
+        let cache = self.cached_3leg_token.read().await;
+        cache.as_ref().map(|t| t.expires_at)
     }
 }
 
@@ -612,6 +810,7 @@ mod tests {
             token_type: "Bearer".to_string(),
             expires_in: 3600,
             refresh_token: Some("refresh_token".to_string()),
+            scope: None,
         };
 
         let json = serde_json::to_string(&token).unwrap();
@@ -636,6 +835,7 @@ mod tests {
             token_type: "Bearer".to_string(),
             expires_in: 3600,
             refresh_token: None,
+            scope: None,
         };
 
         let json = serde_json::to_string(&token).unwrap();

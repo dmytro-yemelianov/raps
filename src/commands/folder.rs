@@ -9,6 +9,7 @@ use dialoguer::Input;
 use serde::Serialize;
 
 use crate::api::DataManagementClient;
+use crate::interactive;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -34,7 +35,11 @@ pub enum FolderCommands {
 }
 
 impl FolderCommands {
-    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             FolderCommands::List {
                 project_id,
@@ -146,9 +151,15 @@ async fn create_folder(
 ) -> Result<()> {
     let folder_name = match name {
         Some(n) => n,
-        None => Input::new()
-            .with_prompt("Enter folder name")
-            .interact_text()?,
+        None => {
+            // In non-interactive mode, require the name
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Folder name is required in non-interactive mode. Use --name flag.");
+            }
+            Input::new()
+                .with_prompt("Enter folder name")
+                .interact_text()?
+        }
     };
 
     if output_format.supports_colors() {

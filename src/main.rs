@@ -14,6 +14,7 @@ mod api;
 mod commands;
 mod config;
 mod error;
+mod http;
 mod interactive;
 mod logging;
 mod output;
@@ -29,9 +30,9 @@ use api::{
     OssClient, RealityCaptureClient, WebhooksClient,
 };
 use commands::{
-    AuthCommands, BucketCommands, DaCommands, DemoCommands, FolderCommands, GenerateArgs,
-    HubCommands, IssueCommands, ItemCommands, ObjectCommands, ProjectCommands, RealityCommands,
-    TranslateCommands, WebhookCommands,
+    AuthCommands, BucketCommands, ConfigCommands, DaCommands, DemoCommands, FolderCommands,
+    GenerateArgs, HubCommands, IssueCommands, ItemCommands, ObjectCommands, ProjectCommands,
+    RealityCommands, TranslateCommands, WebhookCommands,
 };
 use config::Config;
 use error::ExitCode;
@@ -134,6 +135,10 @@ enum Commands {
     #[command(subcommand)]
     Demo(DemoCommands),
 
+    /// Configuration management (profiles, settings)
+    #[command(subcommand)]
+    Config(ConfigCommands),
+
     /// Generate shell completions for bash, zsh, fish, PowerShell, or elvish
     Completions {
         /// Shell to generate completions for
@@ -155,13 +160,13 @@ async fn main() {
 
     // Initialize logging flags
     logging::init(cli.no_color, cli.quiet, cli.verbose, cli.debug);
-    
+
     // Initialize interactive mode flags
     interactive::init(cli.non_interactive, cli.yes);
 
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
-        
+
         // Only print errors if not in quiet mode
         if !logging::quiet() {
             eprintln!("{} {}", "Error:".red().bold(), err);
@@ -178,13 +183,27 @@ async fn main() {
     }
 }
 
-async fn run(cli: Cli) -> Result<()> {
-
+async fn run(mut cli: Cli) -> Result<()> {
     // Handle completions command first (doesn't need config/auth)
     if let Commands::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
         generate(*shell, &mut cmd, "raps", &mut io::stdout());
         return Ok(());
+    }
+
+    // Handle config commands (they don't need authentication)
+    if let Commands::Config(cmd) = std::mem::replace(
+        &mut cli.command,
+        Commands::Completions { shell: Shell::Bash },
+    ) {
+        // Determine output format for config commands
+        let output_format = if let Some(format_str) = &cli.output {
+            Some(format_str.parse()?)
+        } else {
+            None
+        };
+        let output_format = OutputFormat::determine(output_format);
+        return cmd.execute(output_format).await;
     }
 
     // Determine output format
@@ -268,6 +287,11 @@ async fn run(cli: Cli) -> Result<()> {
 
         Commands::Demo(cmd) => {
             cmd.execute().await?;
+        }
+
+        Commands::Config(_) => {
+            // Already handled above
+            unreachable!()
         }
 
         Commands::Completions { .. } => {

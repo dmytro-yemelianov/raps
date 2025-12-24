@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::api::webhooks::WEBHOOK_EVENTS;
 use crate::api::WebhooksClient;
+use crate::interactive;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -48,7 +49,9 @@ impl WebhookCommands {
     pub async fn execute(self, client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
         match self {
             WebhookCommands::List => list_webhooks(client, output_format).await,
-            WebhookCommands::Create { url, event } => create_webhook(client, url, event, output_format).await,
+            WebhookCommands::Create { url, event } => {
+                create_webhook(client, url, event, output_format).await
+            }
             WebhookCommands::Delete {
                 hook_id,
                 system,
@@ -152,22 +155,32 @@ async fn create_webhook(
     // Get callback URL
     let url = match callback_url {
         Some(u) => u,
-        None => Input::new()
-            .with_prompt("Enter callback URL")
-            .validate_with(|input: &String| -> Result<(), &str> {
-                if input.starts_with("http://") || input.starts_with("https://") {
-                    Ok(())
-                } else {
-                    Err("URL must start with http:// or https://")
-                }
-            })
-            .interact_text()?,
+        None => {
+            // In non-interactive mode, require the URL
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Callback URL is required in non-interactive mode. Use --url flag.");
+            }
+            Input::new()
+                .with_prompt("Enter callback URL")
+                .validate_with(|input: &String| -> Result<(), &str> {
+                    if input.starts_with("http://") || input.starts_with("https://") {
+                        Ok(())
+                    } else {
+                        Err("URL must start with http:// or https://")
+                    }
+                })
+                .interact_text()?
+        }
     };
 
     // Get event type
     let event_type = match event {
         Some(e) => e,
         None => {
+            // In non-interactive mode, require the event
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Event type is required in non-interactive mode. Use --event flag.");
+            }
             let event_labels: Vec<String> = WEBHOOK_EVENTS
                 .iter()
                 .map(|(e, d)| format!("{} - {}", e, d))
@@ -361,4 +374,3 @@ mod tests {
         assert_eq!(truncate_str("", 10), "");
     }
 }
-

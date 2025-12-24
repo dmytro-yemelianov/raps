@@ -33,7 +33,10 @@ impl FromStr for OutputFormat {
             "yaml" | "yml" => Ok(OutputFormat::Yaml),
             "csv" => Ok(OutputFormat::Csv),
             "plain" => Ok(OutputFormat::Plain),
-            _ => anyhow::bail!("Invalid output format: {}. Use: table, json, yaml, csv, plain", s),
+            _ => anyhow::bail!(
+                "Invalid output format: {}. Use: table, json, yaml, csv, plain",
+                s
+            ),
         }
     }
 }
@@ -137,7 +140,7 @@ fn write_csv<T: Serialize>(data: &T) -> Result<()> {
             if let Some(first) = items.first() {
                 if let serde_json::Value::Object(map) = first {
                     let mut wtr = csv::Writer::from_writer(std::io::stdout());
-                    
+
                     // Write headers
                     let headers: Vec<String> = map.keys().cloned().collect();
                     wtr.write_record(&headers)?;
@@ -211,4 +214,3 @@ pub trait TableFormat {
     /// Write this data as a formatted table
     fn write_table(&self) -> Result<()>;
 }
-

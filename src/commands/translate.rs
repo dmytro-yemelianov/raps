@@ -48,14 +48,20 @@ pub enum TranslateCommands {
 }
 
 impl TranslateCommands {
-    pub async fn execute(self, client: &DerivativeClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DerivativeClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             TranslateCommands::Start {
                 urn,
                 format,
                 root_filename,
             } => start_translation(client, urn, format, root_filename, output_format).await,
-            TranslateCommands::Status { urn, wait } => check_status(client, &urn, wait, output_format).await,
+            TranslateCommands::Status { urn, wait } => {
+                check_status(client, &urn, wait, output_format).await
+            }
             TranslateCommands::Manifest { urn } => show_manifest(client, &urn, output_format).await,
         }
     }
@@ -84,7 +90,7 @@ async fn start_translation(
             if interactive::is_non_interactive() {
                 anyhow::bail!("URN is required in non-interactive mode. Use --urn flag or provide as argument.");
             }
-            
+
             // Interactive mode: prompt for URN
             Input::new()
                 .with_prompt("Enter the base64-encoded URN")
@@ -119,7 +125,7 @@ async fn start_translation(
             if interactive::is_non_interactive() {
                 anyhow::bail!("--format is required in non-interactive mode. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc");
             }
-            
+
             // Interactive mode: prompt for format
             let formats = DerivativeOutputFormat::all();
             let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
@@ -148,8 +154,16 @@ async fn start_translation(
         .translate(&source_urn, derivative_format, root_filename.as_deref())
         .await?;
 
-    let accepted_formats: Vec<String> = response.accepted_jobs.as_ref()
-        .map(|jobs| jobs.output.formats.iter().map(|f| f.format_type.clone()).collect())
+    let accepted_formats: Vec<String> = response
+        .accepted_jobs
+        .as_ref()
+        .map(|jobs| {
+            jobs.output
+                .formats
+                .iter()
+                .map(|f| f.format_type.clone())
+                .collect()
+        })
         .unwrap_or_default();
 
     let output = TranslationStartOutput {
@@ -191,7 +205,12 @@ struct StatusOutput {
     progress: String,
 }
 
-async fn check_status(client: &DerivativeClient, urn: &str, wait: bool, output_format: OutputFormat) -> Result<()> {
+async fn check_status(
+    client: &DerivativeClient,
+    urn: &str,
+    wait: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
     if wait {
         // Poll until complete
         let spinner = ProgressBar::new_spinner();
@@ -259,7 +278,11 @@ async fn check_status(client: &DerivativeClient, urn: &str, wait: bool, output_f
     Ok(())
 }
 
-async fn show_manifest(client: &DerivativeClient, urn: &str, output_format: OutputFormat) -> Result<()> {
+async fn show_manifest(
+    client: &DerivativeClient,
+    urn: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     println!("{}", "Fetching manifest...".dimmed());
 
     let manifest = client.get_manifest(urn).await?;

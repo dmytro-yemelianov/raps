@@ -30,7 +30,11 @@ pub enum ItemCommands {
 }
 
 impl ItemCommands {
-    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             ItemCommands::Info {
                 project_id,
@@ -55,16 +59,27 @@ struct ItemInfoOutput {
     extension_version: Option<String>,
 }
 
-async fn item_info(client: &DataManagementClient, project_id: &str, item_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn item_info(
+    client: &DataManagementClient,
+    project_id: &str,
+    item_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching item details...".dimmed());
     }
 
     let item = client.get_item(project_id, item_id).await?;
 
-    let extension_type = item.attributes.extension.as_ref()
+    let extension_type = item
+        .attributes
+        .extension
+        .as_ref()
         .and_then(|e| e.extension_type.clone());
-    let extension_version = item.attributes.extension.as_ref()
+    let extension_version = item
+        .attributes
+        .extension
+        .as_ref()
         .and_then(|e| e.version.clone());
 
     let output = ItemInfoOutput {
@@ -137,7 +152,10 @@ async fn list_versions(
     let version_outputs: Vec<VersionOutput> = versions
         .iter()
         .map(|v| {
-            let name = v.attributes.display_name.as_ref()
+            let name = v
+                .attributes
+                .display_name
+                .as_ref()
                 .or(Some(&v.attributes.name))
                 .map(|s| s.clone())
                 .unwrap_or_default();
@@ -175,7 +193,8 @@ async fn list_versions(
             println!("{}", "─".repeat(80));
 
             for version in &version_outputs {
-                let ver_num = version.version_number
+                let ver_num = version
+                    .version_number
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "-".to_string());
                 let name = truncate_str(&version.name, 40);
@@ -225,4 +244,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

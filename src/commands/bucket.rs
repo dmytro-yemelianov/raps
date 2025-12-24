@@ -61,7 +61,9 @@ impl BucketCommands {
                 region,
             } => create_bucket(client, key, policy, region, output_format).await,
             BucketCommands::List => list_buckets(client, output_format).await,
-            BucketCommands::Info { bucket_key } => bucket_info(client, &bucket_key, output_format).await,
+            BucketCommands::Info { bucket_key } => {
+                bucket_info(client, &bucket_key, output_format).await
+            }
             BucketCommands::Delete { bucket_key, yes } => {
                 delete_bucket(client, bucket_key, yes, output_format).await
             }
@@ -119,7 +121,7 @@ async fn create_bucket(
             if interactive::is_non_interactive() {
                 anyhow::bail!("Bucket key is required in non-interactive mode. Use --key flag.");
             }
-            
+
             println!(
                 "{}",
                 "Note: Bucket keys must be globally unique across all APS applications.".yellow()
@@ -188,9 +190,15 @@ async fn create_bucket(
                 let policy_labels: Vec<String> = policies
                     .iter()
                     .map(|p| match p {
-                        RetentionPolicy::Transient => "transient (deleted after 24 hours)".to_string(),
-                        RetentionPolicy::Temporary => "temporary (deleted after 30 days)".to_string(),
-                        RetentionPolicy::Persistent => "persistent (kept until deleted)".to_string(),
+                        RetentionPolicy::Transient => {
+                            "transient (deleted after 24 hours)".to_string()
+                        }
+                        RetentionPolicy::Temporary => {
+                            "temporary (deleted after 30 days)".to_string()
+                        }
+                        RetentionPolicy::Persistent => {
+                            "persistent (kept until deleted)".to_string()
+                        }
                     })
                     .collect();
 
@@ -218,10 +226,14 @@ async fn create_bucket(
         policy_key: bucket.policy_key.clone(),
         created_date: bucket.created_date,
         created_date_human: chrono_humanize(bucket.created_date),
-        permissions: bucket.permissions.iter().map(|p| PermissionOutput {
-            auth_id: p.auth_id.clone(),
-            access: p.access.clone(),
-        }).collect(),
+        permissions: bucket
+            .permissions
+            .iter()
+            .map(|p| PermissionOutput {
+                auth_id: p.auth_id.clone(),
+                access: p.access.clone(),
+            })
+            .collect(),
     };
 
     match output_format {
@@ -301,7 +313,11 @@ async fn list_buckets(client: &OssClient, output_format: OutputFormat) -> Result
     Ok(())
 }
 
-async fn bucket_info(client: &OssClient, bucket_key: &str, output_format: OutputFormat) -> Result<()> {
+async fn bucket_info(
+    client: &OssClient,
+    bucket_key: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching bucket details...".dimmed());
     }
@@ -314,10 +330,14 @@ async fn bucket_info(client: &OssClient, bucket_key: &str, output_format: Output
         policy_key: bucket.policy_key.clone(),
         created_date: bucket.created_date,
         created_date_human: chrono_humanize(bucket.created_date),
-        permissions: bucket.permissions.iter().map(|p| PermissionOutput {
-            auth_id: p.auth_id.clone(),
-            access: p.access.clone(),
-        }).collect(),
+        permissions: bucket
+            .permissions
+            .iter()
+            .map(|p| PermissionOutput {
+                auth_id: p.auth_id.clone(),
+                access: p.access.clone(),
+            })
+            .collect(),
     };
 
     match output_format {

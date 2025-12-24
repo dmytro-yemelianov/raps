@@ -120,10 +120,16 @@ pub struct IssuesClient {
 impl IssuesClient {
     /// Create a new Issues client
     pub fn new(config: Config, auth: AuthClient) -> Self {
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config
+            .create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
             auth,
-            http_client: reqwest::Client::new(),
+            http_client,
         }
     }
 

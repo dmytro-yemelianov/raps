@@ -196,10 +196,16 @@ pub struct OssClient {
 impl OssClient {
     /// Create a new OSS client
     pub fn new(config: Config, auth: AuthClient) -> Self {
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config
+            .create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
             auth,
-            http_client: reqwest::Client::new(),
+            http_client,
         }
     }
 
@@ -218,16 +224,33 @@ impl OssClient {
             policy_key: policy.to_string(),
         };
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("x-ads-region", region.to_string())
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create bucket")?;
+        // Log request in verbose/debug mode
+        crate::logging::log_request("POST", &url);
+
+        // Use retry logic for bucket creation
+        let http_config = crate::http::HttpClientConfig::default();
+        let response = crate::http::execute_with_retry(&http_config, || {
+            let client = self.http_client.clone();
+            let url = url.clone();
+            let token = token.clone();
+            let region_str = region.to_string();
+            let request_json = serde_json::to_value(&request).ok();
+            Box::pin(async move {
+                let mut req = client
+                    .post(&url)
+                    .bearer_auth(&token)
+                    .header("x-ads-region", region_str)
+                    .header("Content-Type", "application/json");
+                if let Some(json) = request_json {
+                    req = req.json(&json);
+                }
+                req.send().await.context("Failed to create bucket")
+            })
+        })
+        .await?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();
@@ -308,6 +331,9 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}/details", self.config.oss_url(), bucket_key);
 
+        // Log request in verbose/debug mode
+        crate::logging::log_request("GET", &url);
+
         let response = self
             .http_client
             .get(&url)
@@ -315,6 +341,9 @@ impl OssClient {
             .send()
             .await
             .context("Failed to get bucket details")?;
+
+        // Log response in verbose/debug mode
+        crate::logging::log_response(response.status().as_u16(), &url);
 
         if !response.status().is_success() {
             let status = response.status();
