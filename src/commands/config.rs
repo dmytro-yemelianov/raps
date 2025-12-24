@@ -116,8 +116,8 @@ pub(crate) fn load_profiles() -> Result<ProfilesData> {
     }
 
     let content = std::fs::read_to_string(&path)?;
-    let data: ProfilesData = serde_json::from_str(&content)
-        .context("Failed to parse profiles.json")?;
+    let data: ProfilesData =
+        serde_json::from_str(&content).context("Failed to parse profiles.json")?;
     Ok(data)
 }
 
@@ -148,13 +148,16 @@ async fn create_profile(name: &str, output_format: OutputFormat) -> Result<()> {
         return Ok(());
     }
 
-    data.profiles.insert(name.to_string(), ProfileConfig {
-        client_id: None,
-        client_secret: None,
-        base_url: None,
-        callback_url: None,
-        da_nickname: None,
-    });
+    data.profiles.insert(
+        name.to_string(),
+        ProfileConfig {
+            client_id: None,
+            client_secret: None,
+            base_url: None,
+            callback_url: None,
+            da_nickname: None,
+        },
+    );
 
     save_profiles(&data)?;
 
@@ -197,16 +200,17 @@ async fn list_profiles(output_format: OutputFormat) -> Result<()> {
         .keys()
         .map(|name| ProfileInfo {
             name: name.clone(),
-            active: data.active_profile.as_ref().map_or(false, |active| active == name),
+            active: data
+                .active_profile
+                .as_ref()
+                .map_or(false, |active| active == name),
         })
         .collect();
 
-    profiles.sort_by(|a, b| {
-        match (a.active, b.active) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
-        }
+    profiles.sort_by(|a, b| match (a.active, b.active) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
     });
 
     match output_format {
@@ -238,7 +242,11 @@ async fn use_profile(name: &str, output_format: OutputFormat) -> Result<()> {
     let mut data = load_profiles()?;
 
     if !data.profiles.contains_key(name) {
-        anyhow::bail!("Profile '{}' does not exist. Create it first with 'raps config profile create {}'", name, name);
+        anyhow::bail!(
+            "Profile '{}' does not exist. Create it first with 'raps config profile create {}'",
+            name,
+            name
+        );
     }
 
     data.active_profile = Some(name.to_string());
@@ -277,7 +285,11 @@ async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
     }
 
     // If deleting active profile, clear it
-    if data.active_profile.as_ref().map_or(false, |active| active == name) {
+    if data
+        .active_profile
+        .as_ref()
+        .map_or(false, |active| active == name)
+    {
         data.active_profile = None;
     }
 
@@ -340,7 +352,7 @@ async fn show_current_profile(output_format: OutputFormat) -> Result<()> {
 
 async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
     let data = load_profiles()?;
-    
+
     let value = if let Some(profile_name) = &data.active_profile {
         if let Some(profile) = data.profiles.get(profile_name) {
             match key {
@@ -403,7 +415,9 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
     let profile_name = data.active_profile.clone()
         .ok_or_else(|| anyhow::anyhow!("No active profile. Create and activate one first with 'raps config profile create <name>' and 'raps config profile use <name>'"))?;
 
-    let profile = data.profiles.get_mut(&profile_name)
+    let profile = data
+        .profiles
+        .get_mut(&profile_name)
         .ok_or_else(|| anyhow::anyhow!("Active profile '{}' not found", profile_name))?;
 
     match key {
@@ -436,7 +450,13 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Set {} = {} in profile '{}'", "✓".green().bold(), key.bold(), value, profile_name);
+            println!(
+                "{} Set {} = {} in profile '{}'",
+                "✓".green().bold(),
+                key.bold(),
+                value,
+                profile_name
+            );
         }
         _ => {
             output_format.write(&output)?;
@@ -445,4 +465,3 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
 
     Ok(())
 }
-

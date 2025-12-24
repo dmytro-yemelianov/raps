@@ -51,12 +51,11 @@ pub fn should_proceed_destructive(_action: &str) -> bool {
     if is_yes() {
         return true;
     }
-    
+
     if is_non_interactive() {
         return false; // Fail in non-interactive mode without --yes
     }
-    
+
     // In interactive mode, return false to trigger confirmation prompt
     false
 }
-

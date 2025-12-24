@@ -69,11 +69,30 @@ pub enum AuthCommands {
 }
 
 impl AuthCommands {
-    pub async fn execute(self, auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        auth_client: &AuthClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             AuthCommands::Test => test_auth(auth_client, output_format).await,
-            AuthCommands::Login { default, device, token, refresh_token, expires_in } => {
-                login(auth_client, default, device, token, refresh_token, expires_in, output_format).await
+            AuthCommands::Login {
+                default,
+                device,
+                token,
+                refresh_token,
+                expires_in,
+            } => {
+                login(
+                    auth_client,
+                    default,
+                    device,
+                    token,
+                    refresh_token,
+                    expires_in,
+                    output_format,
+                )
+                .await
             }
             AuthCommands::Logout => logout(auth_client, output_format).await,
             AuthCommands::Status => status(auth_client, output_format).await,
@@ -94,7 +113,7 @@ async fn test_auth(auth_client: &AuthClient, output_format: OutputFormat) -> Res
         println!("{}", "Testing 2-legged authentication...".dimmed());
     }
     auth_client.test_auth().await?;
-    
+
     let output = TestAuthOutput {
         success: true,
         client_id: mask_string(&auth_client.config().client_id),
@@ -143,16 +162,27 @@ async fn login(
 
     // Handle token-based login (CI/CD scenario)
     if let Some(access_token) = token {
-        eprintln!("{}", "⚠️  WARNING: Using token-based login. Tokens should be kept secure!".yellow().bold());
-        eprintln!("{}", "   This is intended for CI/CD environments. Never commit tokens to version control.".dimmed());
-        
+        eprintln!(
+            "{}",
+            "⚠️  WARNING: Using token-based login. Tokens should be kept secure!"
+                .yellow()
+                .bold()
+        );
+        eprintln!(
+            "{}",
+            "   This is intended for CI/CD environments. Never commit tokens to version control."
+                .dimmed()
+        );
+
         let scopes = if use_defaults {
             DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect()
         } else {
             DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect() // Default scopes for token login
         };
 
-        let stored = auth_client.login_with_token(access_token, refresh_token, expires_in, scopes).await?;
+        let stored = auth_client
+            .login_with_token(access_token, refresh_token, expires_in, scopes)
+            .await?;
 
         let output = LoginOutput {
             success: true,
@@ -265,7 +295,7 @@ async fn logout(auth_client: &AuthClient, output_format: OutputFormat) -> Result
     }
 
     auth_client.logout().await?;
-    
+
     let output = LogoutOutput {
         success: true,
         message: "Logged out successfully. Stored tokens cleared.".to_string(),
@@ -305,11 +335,15 @@ async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result
     let two_legged_available = auth_client.test_auth().await.is_ok();
     let three_legged_logged_in = auth_client.is_logged_in().await;
     let token = if three_legged_logged_in {
-        auth_client.get_3leg_token().await.ok().map(|t| mask_string(&t))
+        auth_client
+            .get_3leg_token()
+            .await
+            .ok()
+            .map(|t| mask_string(&t))
     } else {
         None
     };
-    
+
     let expires_at = auth_client.get_token_expiry().await;
     let expires_in_seconds = expires_at.map(|exp| {
         let now = chrono::Utc::now().timestamp();

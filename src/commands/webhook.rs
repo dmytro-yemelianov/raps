@@ -49,7 +49,9 @@ impl WebhookCommands {
     pub async fn execute(self, client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
         match self {
             WebhookCommands::List => list_webhooks(client, output_format).await,
-            WebhookCommands::Create { url, event } => create_webhook(client, url, event, output_format).await,
+            WebhookCommands::Create { url, event } => {
+                create_webhook(client, url, event, output_format).await
+            }
             WebhookCommands::Delete {
                 hook_id,
                 system,
@@ -372,4 +374,3 @@ mod tests {
         assert_eq!(truncate_str("", 10), "");
     }
 }
-

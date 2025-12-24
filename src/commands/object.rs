@@ -189,7 +189,11 @@ async fn upload_object(
             if let Some(ref sha1) = output.sha1 {
                 println!("  {} {}", "SHA1:".bold(), sha1.dimmed());
             }
-            println!("\n  {} {}", "URN (for translation):".bold().yellow(), output.urn);
+            println!(
+                "\n  {} {}",
+                "URN (for translation):".bold().yellow(),
+                output.urn
+            );
         }
         _ => {
             output_format.write(&output)?;
@@ -302,7 +306,11 @@ struct ObjectListOutput {
     sha1: Option<String>,
 }
 
-async fn list_objects(client: &OssClient, bucket: Option<String>, output_format: OutputFormat) -> Result<()> {
+async fn list_objects(
+    client: &OssClient,
+    bucket: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
     // Select bucket
     let bucket_key = select_bucket(client, bucket).await?;
 
@@ -436,16 +444,15 @@ async fn delete_object(
         success: true,
         bucket_key: bucket_key.clone(),
         object_key: object_key.clone(),
-        message: format!("Object '{}/{}' deleted successfully!", bucket_key, object_key),
+        message: format!(
+            "Object '{}/{}' deleted successfully!",
+            bucket_key, object_key
+        ),
     };
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "{} {}",
-                "✓".green().bold(),
-                output.message
-            );
+            println!("{} {}", "✓".green().bold(), output.message);
         }
         _ => {
             output_format.write(&output)?;

@@ -160,13 +160,13 @@ async fn main() {
 
     // Initialize logging flags
     logging::init(cli.no_color, cli.quiet, cli.verbose, cli.debug);
-    
+
     // Initialize interactive mode flags
     interactive::init(cli.non_interactive, cli.yes);
 
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
-        
+
         // Only print errors if not in quiet mode
         if !logging::quiet() {
             eprintln!("{} {}", "Error:".red().bold(), err);
@@ -192,7 +192,10 @@ async fn run(mut cli: Cli) -> Result<()> {
     }
 
     // Handle config commands (they don't need authentication)
-    if let Commands::Config(cmd) = std::mem::replace(&mut cli.command, Commands::Completions { shell: Shell::Bash }) {
+    if let Commands::Config(cmd) = std::mem::replace(
+        &mut cli.command,
+        Commands::Completions { shell: Shell::Bash },
+    ) {
         // Determine output format for config commands
         let output_format = if let Some(format_str) = &cli.output {
             Some(format_str.parse()?)

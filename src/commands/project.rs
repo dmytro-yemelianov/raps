@@ -29,7 +29,11 @@ pub enum ProjectCommands {
 }
 
 impl ProjectCommands {
-    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             ProjectCommands::List { hub_id } => list_projects(client, hub_id, output_format).await,
             ProjectCommands::Info { hub_id, project_id } => {
@@ -47,7 +51,11 @@ struct ProjectListOutput {
     scopes: Option<Vec<String>>,
 }
 
-async fn list_projects(client: &DataManagementClient, hub_id: Option<String>, output_format: OutputFormat) -> Result<()> {
+async fn list_projects(
+    client: &DataManagementClient,
+    hub_id: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
     // Get hub ID interactively if not provided
     let hub = match hub_id {
         Some(h) => h,
@@ -141,7 +149,12 @@ struct FolderOutput {
     display_name: Option<String>,
 }
 
-async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn project_info(
+    client: &DataManagementClient,
+    hub_id: &str,
+    project_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching project details...".dimmed());
     }
@@ -196,4 +209,3 @@ async fn project_info(client: &DataManagementClient, hub_id: &str, project_id: &
     }
     Ok(())
 }
-

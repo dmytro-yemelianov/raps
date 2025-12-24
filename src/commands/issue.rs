@@ -79,7 +79,9 @@ impl IssueCommands {
                 status,
                 title,
             } => update_issue(client, &project_id, &issue_id, status, title, output_format).await,
-            IssueCommands::Types { project_id } => list_issue_types(client, &project_id, output_format).await,
+            IssueCommands::Types { project_id } => {
+                list_issue_types(client, &project_id, output_format).await
+            }
         }
     }
 }
@@ -255,7 +257,11 @@ async fn update_issue(
     Ok(())
 }
 
-async fn list_issue_types(client: &IssuesClient, project_id: &str, _output_format: OutputFormat) -> Result<()> {
+async fn list_issue_types(
+    client: &IssuesClient,
+    project_id: &str,
+    _output_format: OutputFormat,
+) -> Result<()> {
     println!("{}", "Fetching issue types...".dimmed());
 
     let types = client.list_issue_types(project_id).await?;

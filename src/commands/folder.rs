@@ -35,7 +35,11 @@ pub enum FolderCommands {
 }
 
 impl FolderCommands {
-    pub async fn execute(self, client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             FolderCommands::List {
                 project_id,

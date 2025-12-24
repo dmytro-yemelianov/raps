@@ -79,17 +79,23 @@ pub fn log_response(status: u16, url: &str) {
 pub fn redact_secrets(text: &str) -> String {
     // Redact common secret patterns
     let mut redacted = text.to_string();
-    
+
     // Redact client secrets - match patterns like "client_secret: value" or "api-key=value"
-    let secret_pattern = regex::Regex::new(r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+")
-        .unwrap();
-    redacted = secret_pattern.replace_all(&redacted, "$1: [REDACTED]").to_string();
-    
+    let secret_pattern =
+        regex::Regex::new(r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+")
+            .unwrap();
+    redacted = secret_pattern
+        .replace_all(&redacted, "$1: [REDACTED]")
+        .to_string();
+
     // Redact tokens (JWT-like strings) - match patterns like "token: abc123..." or "bearer=xyz..."
-    let token_pattern = regex::Regex::new(r"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*[:=]\s*([A-Za-z0-9_-]{20,})")
-        .unwrap();
-    redacted = token_pattern.replace_all(&redacted, "$1: [REDACTED]").to_string();
-    
+    let token_pattern = regex::Regex::new(
+        r"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*[:=]\s*([A-Za-z0-9_-]{20,})",
+    )
+    .unwrap();
+    redacted = token_pattern
+        .replace_all(&redacted, "$1: [REDACTED]")
+        .to_string();
+
     redacted
 }
-

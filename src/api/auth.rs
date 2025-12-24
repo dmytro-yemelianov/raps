@@ -112,7 +112,8 @@ impl AuthClient {
 
         // Create HTTP client with configured timeouts
         let http_config = crate::http::HttpClientConfig::default();
-        let http_client = http_config.create_client()
+        let http_client = http_config
+            .create_client()
             .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
 
         Self {
@@ -305,13 +306,31 @@ impl AuthClient {
         // Display instructions to user
         println!("\n{}", "Device Code Authentication".bold().cyan());
         println!("{}", "─".repeat(50));
-        println!("  {} {}", "User Code:".bold(), device_response.user_code.bold().yellow());
-        println!("  {} {}", "Verification URL:".bold(), device_response.verification_uri.cyan());
+        println!(
+            "  {} {}",
+            "User Code:".bold(),
+            device_response.user_code.bold().yellow()
+        );
+        println!(
+            "  {} {}",
+            "Verification URL:".bold(),
+            device_response.verification_uri.cyan()
+        );
         if let Some(ref complete_url) = device_response.verification_uri_complete {
             println!("  {} {}", "Complete URL:".bold(), complete_url.cyan());
         }
-        println!("\n{}", "Please visit the URL above and enter the user code to authorize.".dimmed());
-        println!("{}", format!("Waiting for authorization (expires in {} seconds)...", device_response.expires_in).dimmed());
+        println!(
+            "\n{}",
+            "Please visit the URL above and enter the user code to authorize.".dimmed()
+        );
+        println!(
+            "{}",
+            format!(
+                "Waiting for authorization (expires in {} seconds)...",
+                device_response.expires_in
+            )
+            .dimmed()
+        );
         println!("{}", "─".repeat(50));
 
         // Poll for token
@@ -397,11 +416,21 @@ impl AuthClient {
     }
 
     /// Login with a provided access token (for CI/CD scenarios)
-    pub async fn login_with_token(&self, access_token: String, refresh_token: Option<String>, expires_in: u64, scopes: Vec<String>) -> Result<StoredToken> {
+    pub async fn login_with_token(
+        &self,
+        access_token: String,
+        refresh_token: Option<String>,
+        expires_in: u64,
+        scopes: Vec<String>,
+    ) -> Result<StoredToken> {
         // Validate token by fetching user info
         let user_info = self.get_user_info_with_token(&access_token).await?;
-        
-        println!("{} Token validated for user: {}", "✓".green().bold(), user_info.email.as_deref().unwrap_or("unknown"));
+
+        println!(
+            "{} Token validated for user: {}",
+            "✓".green().bold(),
+            user_info.email.as_deref().unwrap_or("unknown")
+        );
 
         // Store the token
         let stored = StoredToken {
@@ -439,10 +468,7 @@ impl AuthClient {
             anyhow::bail!("Failed to validate token ({}): {}", status, error_text);
         }
 
-        let user: UserInfo = response
-            .json()
-            .await
-            .context("Failed to parse user info")?;
+        let user: UserInfo = response.json().await.context("Failed to parse user info")?;
 
         Ok(user)
     }

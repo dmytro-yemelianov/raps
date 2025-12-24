@@ -46,10 +46,7 @@ impl HttpClientConfig {
 }
 
 /// Execute HTTP request with retry logic
-pub async fn execute_with_retry<F, T>(
-    config: &HttpClientConfig,
-    mut request_fn: F,
-) -> Result<T>
+pub async fn execute_with_retry<F, T>(config: &HttpClientConfig, mut request_fn: F) -> Result<T>
 where
     F: FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send>>,
 {
@@ -61,16 +58,16 @@ where
             Err(err) => {
                 // Check if we should retry
                 let should_retry = should_retry_error(&err, attempt, config.max_retries);
-                
+
                 if !should_retry {
                     return Err(err);
                 }
 
                 attempt += 1;
-                
+
                 // Calculate delay with exponential backoff and jitter
                 let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
-                
+
                 // Log retry attempt
                 crate::logging::log_verbose(&format!(
                     "Request failed (attempt {}/{}), retrying in {}s...",
@@ -99,19 +96,19 @@ fn should_retry_error(err: &anyhow::Error, attempt: u32, max_retries: u32) -> bo
                 if status.as_u16() == 429 {
                     return true;
                 }
-                
+
                 // Retry on server errors (5xx)
                 if status.is_server_error() {
                     return true;
                 }
-                
+
                 // Don't retry on client errors (4xx except 429)
                 if status.is_client_error() {
                     return false;
                 }
             }
         }
-        
+
         // Retry on network/timeout errors
         if reqwest_err.is_timeout() || reqwest_err.is_connect() || reqwest_err.is_request() {
             return true;
@@ -120,7 +117,7 @@ fn should_retry_error(err: &anyhow::Error, attempt: u32, max_retries: u32) -> bo
 
     // Check error string for common patterns
     let error_str = err.to_string().to_lowercase();
-    
+
     // Retry on rate limiting (429)
     if error_str.contains("429") || error_str.contains("too many requests") {
         return true;
@@ -151,17 +148,16 @@ fn should_retry_error(err: &anyhow::Error, attempt: u32, max_retries: u32) -> bo
 /// Calculate delay with exponential backoff and jitter
 fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
     use rand::Rng;
-    
+
     // Exponential backoff: base_delay * 2^attempt
     let exponential_delay = base_delay * 2_u64.pow(attempt);
-    
+
     // Cap at max_wait
     let capped_delay = exponential_delay.min(max_wait);
-    
+
     // Add jitter (random 0-25% of delay)
     let mut rng = rand::thread_rng();
     let jitter = rng.gen_range(0..=(capped_delay / 4));
-    
+
     Duration::from_secs(capped_delay + jitter)
 }
-

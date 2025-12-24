@@ -34,10 +34,7 @@ impl ExitCode {
     /// Analyzes the error chain to determine the appropriate exit code
     pub fn from_error(err: &Error) -> Self {
         let error_string = err.to_string().to_lowercase();
-        let error_chain: Vec<String> = err
-            .chain()
-            .map(|e| e.to_string().to_lowercase())
-            .collect();
+        let error_chain: Vec<String> = err.chain().map(|e| e.to_string().to_lowercase()).collect();
 
         // Check for authentication errors
         if error_string.contains("authentication failed")
@@ -47,9 +44,9 @@ impl ExitCode {
             || error_string.contains("invalid credentials")
             || error_string.contains("token expired")
             || error_string.contains("token invalid")
-            || error_chain.iter().any(|e| {
-                e.contains("401") || e.contains("403") || e.contains("authentication")
-            })
+            || error_chain
+                .iter()
+                .any(|e| e.contains("401") || e.contains("403") || e.contains("authentication"))
         {
             return ExitCode::AuthFailure;
         }
@@ -119,17 +116,16 @@ impl<T> ResultExt<T> for Result<T, Error> {
             Err(err) => {
                 let exit_code = ExitCode::from_error(&err);
                 eprintln!("Error: {}", err);
-                
+
                 // Print chain of errors
                 let mut source = err.source();
                 while let Some(cause) = source {
                     eprintln!("  Caused by: {}", cause);
                     source = cause.source();
                 }
-                
+
                 exit_code.exit();
             }
         }
     }
 }
-

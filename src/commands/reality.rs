@@ -80,7 +80,11 @@ pub enum RealityCommands {
 }
 
 impl RealityCommands {
-    pub async fn execute(self, client: &RealityCaptureClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &RealityCaptureClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             RealityCommands::Create {
                 name,
@@ -123,7 +127,9 @@ async fn create_photoscene(
         None => {
             // In non-interactive mode, require the name
             if interactive::is_non_interactive() {
-                anyhow::bail!("Photoscene name is required in non-interactive mode. Use --name flag.");
+                anyhow::bail!(
+                    "Photoscene name is required in non-interactive mode. Use --name flag."
+                );
             }
             Input::new()
                 .with_prompt("Enter photoscene name")
@@ -267,7 +273,11 @@ async fn upload_photos(
     Ok(())
 }
 
-async fn start_processing(client: &RealityCaptureClient, photoscene_id: &str, _output_format: OutputFormat) -> Result<()> {
+async fn start_processing(
+    client: &RealityCaptureClient,
+    photoscene_id: &str,
+    _output_format: OutputFormat,
+) -> Result<()> {
     println!("{}", "Starting processing...".dimmed());
 
     client.start_processing(photoscene_id).await?;
@@ -386,7 +396,11 @@ fn list_formats(client: &RealityCaptureClient, _output_format: OutputFormat) -> 
     Ok(())
 }
 
-async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str, _output_format: OutputFormat) -> Result<()> {
+async fn delete_photoscene(
+    client: &RealityCaptureClient,
+    photoscene_id: &str,
+    _output_format: OutputFormat,
+) -> Result<()> {
     println!("{}", "Deleting photoscene...".dimmed());
 
     client.delete_photoscene(photoscene_id).await?;

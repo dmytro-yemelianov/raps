@@ -79,13 +79,11 @@ impl Config {
             })
             .unwrap_or_else(|_| format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT));
 
-        let da_nickname = env::var("APS_DA_NICKNAME")
-            .ok()
-            .or_else(|| {
-                profile_data
-                    .as_ref()
-                    .and_then(|(_, profile)| profile.da_nickname.clone())
-            });
+        let da_nickname = env::var("APS_DA_NICKNAME").ok().or_else(|| {
+            profile_data
+                .as_ref()
+                .and_then(|(_, profile)| profile.da_nickname.clone())
+        });
 
         Ok(Self {
             client_id,
@@ -99,16 +97,18 @@ impl Config {
     /// Load profile data from disk
     fn load_profile_data() -> Result<(String, crate::commands::config::ProfileConfig)> {
         use crate::commands::config::load_profiles;
-        
+
         let data = load_profiles()?;
-        let profile_name = data.active_profile
+        let profile_name = data
+            .active_profile
             .ok_or_else(|| anyhow::anyhow!("No active profile"))?;
-        
-        let profile = data.profiles
+
+        let profile = data
+            .profiles
             .get(&profile_name)
             .ok_or_else(|| anyhow::anyhow!("Active profile '{}' not found", profile_name))?
             .clone();
-        
+
         Ok((profile_name, profile))
     }
 
