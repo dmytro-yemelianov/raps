@@ -159,7 +159,6 @@ fn write_csv<T: Serialize>(data: &T) -> Result<()> {
                 return Ok(());
             }
         }
-        }
         _ => {
             // For non-array data, fall back to JSON
             return write_json(data);
