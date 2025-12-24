@@ -104,7 +104,7 @@
 |---|---|---|
 | Implement retry/backoff strategy for 429/5xx | ✅ **Implemented** | Retry logic implemented in `src/http.rs` and integrated into all API clients. HTTP client configurable timeouts added. |
 | Add configurable request timeouts + concurrency limits | ✅ **Implemented** | HTTP client timeouts configurable via `HttpClientConfig`. Default: 120s timeout, 30s connect timeout. All API clients use configured timeouts. |
-| Proxy support documentation (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) | ❌ **Not Implemented** | Proxy support may work via reqwest env vars but not documented. |
+| Proxy support documentation (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) | ✅ **Implemented** | Comprehensive proxy support documentation added. Includes examples, troubleshooting, and CI/CD integration. |
 | Add configurable HTTP client timeouts | ✅ **Implemented** | `HttpClientConfig` struct with configurable timeouts. Default timeouts applied to AuthClient. |
 
 ## Testing Recommendations
@@ -132,14 +132,20 @@
 
 | Issue | Status | Notes |
 |---|---|---|
-| Add `CHANGELOG.md` with Keep a Changelog format | ✅ **Implemented** | CHANGELOG.md created following Keep a Changelog format. Includes v0.3.0 and Unreleased sections. |
+| Add `CHANGELOG.md` with Keep a Changelog format | ✅ **Implemented** | CHANGELOG.md created following Keep a Changelog format. Includes v0.3.0 and v0.4.0 sections. |
 | Add Issue/PR templates + CODE_OF_CONDUCT | ✅ **Implemented** | Bug report and feature request templates added. PR template updated with checklist. |
+| Remove accidental artifacts from repo + extend `.gitignore` | ✅ **Implemented** | Enhanced .gitignore with additional patterns for logs, temp files, caches, and build artifacts. |
+
+### EPIC: Release integrity & provenance
+
+| Issue | Status | Notes |
+|---|---|---|
+| (Optional) SBOM + build provenance | ✅ **Implemented** | SBOM generation scripts added (PowerShell and bash). Comprehensive SBOM documentation added. Supports CycloneDX format. |
 
 ## Next Steps
 
-1. Document proxy support (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`)
-2. Add OS keychain integration for secure token storage
-3. Add tests for retry/backoff logic
-4. Update documentation with profile examples
-5. Generate and publish checksums for next release
+1. Add OS keychain integration for secure token storage (optional enhancement)
+2. Add tests for retry/backoff logic
+3. Generate and publish SBOM for releases
+4. Integrate SBOM generation into CI/CD workflow
 

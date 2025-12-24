@@ -66,6 +66,8 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - **[Getting Started]({{ '/getting-started' | relative_url }})** - Overview and prerequisites
 - **[Installation]({{ '/installation' | relative_url }})** - Installation methods
 - **[Configuration]({{ '/configuration' | relative_url }})** - Setting up credentials
+- **[Proxy Support]({{ '/proxy-support' | relative_url }})** - Configure proxy for corporate networks
+- **[SBOM & Build Provenance]({{ '/sbom' | relative_url }})** - Software Bill of Materials
 - **[Commands]({{ '/commands/buckets' | relative_url }})** - Complete command reference
 - **[Examples]({{ '/examples' | relative_url }})** - Common use cases and workflows
 - **[Troubleshooting]({{ '/troubleshooting' | relative_url }})** - Common issues and solutions
