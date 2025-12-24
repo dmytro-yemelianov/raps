@@ -44,6 +44,18 @@ pub enum AuthCommands {
         /// Use default scopes without prompting
         #[arg(short, long)]
         default: bool,
+        /// Use device code flow instead of browser (headless-friendly)
+        #[arg(long)]
+        device: bool,
+        /// Provide access token directly (for CI/CD - use with caution)
+        #[arg(long)]
+        token: Option<String>,
+        /// Refresh token (optional, used with --token)
+        #[arg(long)]
+        refresh_token: Option<String>,
+        /// Token expiry in seconds (default: 3600, used with --token)
+        #[arg(long, default_value = "3600")]
+        expires_in: u64,
     },
 
     /// Logout and clear stored tokens
@@ -60,7 +72,9 @@ impl AuthCommands {
     pub async fn execute(self, auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
         match self {
             AuthCommands::Test => test_auth(auth_client, output_format).await,
-            AuthCommands::Login { default } => login(auth_client, default, output_format).await,
+            AuthCommands::Login { default, device, token, refresh_token, expires_in } => {
+                login(auth_client, default, device, token, refresh_token, expires_in, output_format).await
+            }
             AuthCommands::Logout => logout(auth_client, output_format).await,
             AuthCommands::Status => status(auth_client, output_format).await,
             AuthCommands::Whoami => whoami(auth_client, output_format).await,
@@ -108,7 +122,15 @@ struct LoginOutput {
     scopes: Vec<String>,
 }
 
-async fn login(auth_client: &AuthClient, use_defaults: bool, output_format: OutputFormat) -> Result<()> {
+async fn login(
+    auth_client: &AuthClient,
+    use_defaults: bool,
+    device: bool,
+    token: Option<String>,
+    refresh_token: Option<String>,
+    expires_in: u64,
+    output_format: OutputFormat,
+) -> Result<()> {
     // Check if already logged in
     if auth_client.is_logged_in().await {
         let msg = "Already logged in. Use 'raps auth logout' to logout first.";
@@ -116,6 +138,43 @@ async fn login(auth_client: &AuthClient, use_defaults: bool, output_format: Outp
             OutputFormat::Table => println!("{}", msg.yellow()),
             _ => output_format.write_message(msg)?,
         }
+        return Ok(());
+    }
+
+    // Handle token-based login (CI/CD scenario)
+    if let Some(access_token) = token {
+        eprintln!("{}", "⚠️  WARNING: Using token-based login. Tokens should be kept secure!".yellow().bold());
+        eprintln!("{}", "   This is intended for CI/CD environments. Never commit tokens to version control.".dimmed());
+        
+        let scopes = if use_defaults {
+            DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect()
+        } else {
+            DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect() // Default scopes for token login
+        };
+
+        let stored = auth_client.login_with_token(access_token, refresh_token, expires_in, scopes).await?;
+
+        let output = LoginOutput {
+            success: true,
+            access_token: mask_string(&stored.access_token),
+            refresh_token_stored: stored.refresh_token.is_some(),
+            scopes: stored.scopes.clone(),
+        };
+
+        match output_format {
+            OutputFormat::Table => {
+                println!("\n{} Login successful!", "✓".green().bold());
+                println!("  {} {}", "Access Token:".bold(), output.access_token);
+                if output.refresh_token_stored {
+                    println!("  {} {}", "Refresh Token:".bold(), "stored".green());
+                }
+                println!("  {} {:?}", "Scopes:".bold(), output.scopes);
+            }
+            _ => {
+                output_format.write(&output)?;
+            }
+        }
+
         return Ok(());
     }
 
@@ -152,7 +211,12 @@ async fn login(auth_client: &AuthClient, use_defaults: bool, output_format: Outp
         println!("  {} {:?}", "Scopes:".bold(), scopes);
     }
 
-    let token = auth_client.login(&scopes).await?;
+    // Use device code flow if requested
+    let token = if device {
+        auth_client.login_device(&scopes).await?
+    } else {
+        auth_client.login(&scopes).await?
+    };
 
     let output = LoginOutput {
         success: true,
@@ -233,6 +297,8 @@ struct TwoLeggedStatus {
 struct ThreeLeggedStatus {
     logged_in: bool,
     token: Option<String>,
+    expires_at: Option<i64>,
+    expires_in_seconds: Option<i64>,
 }
 
 async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result<()> {
@@ -243,6 +309,12 @@ async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result
     } else {
         None
     };
+    
+    let expires_at = auth_client.get_token_expiry().await;
+    let expires_in_seconds = expires_at.map(|exp| {
+        let now = chrono::Utc::now().timestamp();
+        (exp - now).max(0)
+    });
 
     let output = StatusOutput {
         two_legged: TwoLeggedStatus {
@@ -251,6 +323,8 @@ async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result
         three_legged: ThreeLeggedStatus {
             logged_in: three_legged_logged_in,
             token,
+            expires_at,
+            expires_in_seconds,
         },
     };
 
@@ -271,6 +345,15 @@ async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result
                 println!("{}", "✓ Logged in".green());
                 if let Some(ref token) = output.three_legged.token {
                     println!("    {} {}", "Token:".dimmed(), token);
+                }
+                if let Some(expires_in) = output.three_legged.expires_in_seconds {
+                    if expires_in > 0 {
+                        let hours = expires_in / 3600;
+                        let minutes = (expires_in % 3600) / 60;
+                        println!("    {} {}h {}m", "Expires in:".dimmed(), hours, minutes);
+                    } else {
+                        println!("    {} {}", "Status:".dimmed(), "Expired".red());
+                    }
                 }
             } else {
                 println!("{}", "✗ Not logged in".yellow());
