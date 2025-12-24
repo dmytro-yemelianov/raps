@@ -118,12 +118,28 @@
 7. Test retry logic with simulated 429/5xx errors
 8. Test config precedence (env vars vs profile)
 
+---
+
+## Milestone v0.6 — Supply-chain, UX polish, Open-source hygiene
+
+### EPIC: Release integrity & provenance
+
+| Issue | Status | Notes |
+|---|---|---|
+| Publish SHA256 checksums for release artifacts | ✅ **Implemented** | Scripts added for generating checksums (PowerShell and bash). Documentation added for verification. |
+
+### EPIC: Repo quality & contributor workflow
+
+| Issue | Status | Notes |
+|---|---|---|
+| Add `CHANGELOG.md` with Keep a Changelog format | ✅ **Implemented** | CHANGELOG.md created following Keep a Changelog format. Includes v0.3.0 and Unreleased sections. |
+| Add Issue/PR templates + CODE_OF_CONDUCT | ✅ **Implemented** | Bug report and feature request templates added. PR template updated with checklist. |
+
 ## Next Steps
 
-1. Integrate retry logic into remaining API clients
-2. Add device-code authentication flow
-3. Document proxy support
-4. Add OS keychain integration for secure token storage
-5. Add tests for retry/backoff logic
-6. Update documentation with profile examples
+1. Document proxy support (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`)
+2. Add OS keychain integration for secure token storage
+3. Add tests for retry/backoff logic
+4. Update documentation with profile examples
+5. Generate and publish checksums for next release
 
