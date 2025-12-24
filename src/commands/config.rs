@@ -350,23 +350,40 @@ async fn show_current_profile(output_format: OutputFormat) -> Result<()> {
 async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
     let data = load_profiles()?;
 
-    let value = if let Some(profile_name) = &data.active_profile {
-        if let Some(profile) = data.profiles.get(profile_name) {
-            match key {
-                "client_id" => profile.client_id.as_ref(),
-                "client_secret" => profile.client_secret.as_ref(),
-                "base_url" => profile.base_url.as_ref(),
-                "callback_url" => profile.callback_url.as_ref(),
-                "da_nickname" => profile.da_nickname.as_ref(),
-                _ => {
-                    anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname", key);
+    // Handle use_keychain separately since it's an environment variable, not a profile setting
+    let (value, source) = if key == "use_keychain" {
+        let env_value = std::env::var("RAPS_USE_KEYCHAIN")
+            .ok()
+            .filter(|v| v.to_lowercase() == "true" || v == "1" || v.to_lowercase() == "yes");
+        (
+            env_value.as_ref().map(|_| "true"),
+            "environment".to_string(),
+        )
+    } else {
+        let value = if let Some(profile_name) = &data.active_profile {
+            if let Some(profile) = data.profiles.get(profile_name) {
+                match key {
+                    "client_id" => profile.client_id.as_ref().map(|s| s.as_str()),
+                    "client_secret" => profile.client_secret.as_ref().map(|s| s.as_str()),
+                    "base_url" => profile.base_url.as_ref().map(|s| s.as_str()),
+                    "callback_url" => profile.callback_url.as_ref().map(|s| s.as_str()),
+                    "da_nickname" => profile.da_nickname.as_ref().map(|s| s.as_str()),
+                    _ => {
+                        anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
+                    }
                 }
+            } else {
+                None
             }
         } else {
             None
-        }
-    } else {
-        None
+        };
+        let source = if data.active_profile.is_some() {
+            format!("profile:{}", data.active_profile.as_ref().unwrap())
+        } else {
+            "environment".to_string()
+        };
+        (value, source)
     };
 
     #[derive(Serialize)]
@@ -376,15 +393,9 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
         source: String,
     }
 
-    let source = if data.active_profile.is_some() {
-        format!("profile:{}", data.active_profile.as_ref().unwrap())
-    } else {
-        "environment".to_string()
-    };
-
     let output = GetConfigOutput {
         key: key.to_string(),
-        value: value.cloned(),
+        value: value.map(|s| s.to_string()),
         source: source.clone(),
     };
 
@@ -423,8 +434,16 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
         "base_url" => profile.base_url = Some(value.to_string()),
         "callback_url" => profile.callback_url = Some(value.to_string()),
         "da_nickname" => profile.da_nickname = Some(value.to_string()),
+        "use_keychain" => {
+            // Set environment variable for keychain usage
+            if value.to_lowercase() == "true" || value == "1" || value.to_lowercase() == "yes" {
+                std::env::set_var("RAPS_USE_KEYCHAIN", "true");
+            } else {
+                std::env::remove_var("RAPS_USE_KEYCHAIN");
+            }
+        }
         _ => {
-            anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname", key);
+            anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
         }
     }
 

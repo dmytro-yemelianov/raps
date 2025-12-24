@@ -18,6 +18,7 @@ mod http;
 mod interactive;
 mod logging;
 mod output;
+mod storage;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};

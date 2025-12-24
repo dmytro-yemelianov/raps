@@ -5,15 +5,13 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::io::{Read, Write};
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tiny_http::{Response, Server};
 use tokio::sync::RwLock;
 
 use crate::config::{Config, DEFAULT_CALLBACK_PORT};
+use crate::storage::{StorageBackend, TokenStorage};
 
 /// User profile information from /userinfo endpoint
 #[derive(Debug, Clone, Deserialize)]
@@ -124,14 +122,17 @@ impl AuthClient {
         }
     }
 
+    /// Get token storage instance
+    fn token_storage(&self) -> TokenStorage {
+        let backend = StorageBackend::from_env();
+        TokenStorage::new(backend)
+    }
+
     /// Load token from persistent storage (static version for initialization)
     fn load_stored_token_static(_config: &Config) -> Option<StoredToken> {
-        let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")?;
-        let path = proj_dirs.config_dir().join("tokens.json");
-        let mut file = std::fs::File::open(&path).ok()?;
-        let mut contents = String::new();
-        std::io::Read::read_to_string(&mut file, &mut contents).ok()?;
-        serde_json::from_str(&contents).ok()
+        let backend = StorageBackend::from_env();
+        let storage = TokenStorage::new(backend);
+        storage.load().ok().flatten()
     }
 
     /// Get token storage path
