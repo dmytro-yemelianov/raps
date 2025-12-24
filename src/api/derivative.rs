@@ -209,10 +209,15 @@ pub struct DerivativeClient {
 impl DerivativeClient {
     /// Create a new Model Derivative client
     pub fn new(config: Config, auth: AuthClient) -> Self {
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config.create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
             auth,
-            http_client: reqwest::Client::new(),
+            http_client,
         }
     }
 
@@ -250,16 +255,28 @@ impl DerivativeClient {
         // Log request in verbose/debug mode
         crate::logging::log_request("POST", &url);
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .header("x-ads-force", "true")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to start translation")?;
+        // Use retry logic for translation requests
+        let http_config = crate::http::HttpClientConfig::default();
+        let response = crate::http::execute_with_retry(&http_config, || {
+            let client = self.http_client.clone();
+            let url = url.clone();
+            let token = token.clone();
+            let request_json = serde_json::to_value(&request).ok();
+            Box::pin(async move {
+                let mut req = client
+                    .post(&url)
+                    .bearer_auth(&token)
+                    .header("Content-Type", "application/json")
+                    .header("x-ads-force", "true");
+                if let Some(json) = request_json {
+                    req = req.json(&json);
+                }
+                req.send()
+                    .await
+                    .context("Failed to start translation")
+            })
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         crate::logging::log_response(response.status().as_u16(), &url);

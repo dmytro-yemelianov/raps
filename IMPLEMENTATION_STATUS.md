@@ -102,8 +102,8 @@
 
 | Issue | Status | Notes |
 |---|---|---|
-| Implement retry/backoff strategy for 429/5xx | ✅ **Partially Implemented** | Retry logic implemented in `src/http.rs`. HTTP client configurable timeouts added. Not yet integrated into all API clients. |
-| Add configurable request timeouts + concurrency limits | ✅ **Partially Implemented** | HTTP client timeouts configurable via `HttpClientConfig`. Default: 120s timeout, 30s connect timeout. |
+| Implement retry/backoff strategy for 429/5xx | ✅ **Implemented** | Retry logic implemented in `src/http.rs` and integrated into all API clients. HTTP client configurable timeouts added. |
+| Add configurable request timeouts + concurrency limits | ✅ **Implemented** | HTTP client timeouts configurable via `HttpClientConfig`. Default: 120s timeout, 30s connect timeout. All API clients use configured timeouts. |
 | Proxy support documentation (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) | ❌ **Not Implemented** | Proxy support may work via reqwest env vars but not documented. |
 | Add configurable HTTP client timeouts | ✅ **Implemented** | `HttpClientConfig` struct with configurable timeouts. Default timeouts applied to AuthClient. |
 

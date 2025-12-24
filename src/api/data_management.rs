@@ -211,10 +211,15 @@ pub struct DataManagementClient {
 impl DataManagementClient {
     /// Create a new Data Management client
     pub fn new(config: Config, auth: AuthClient) -> Self {
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config.create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
             auth,
-            http_client: reqwest::Client::new(),
+            http_client,
         }
     }
 
@@ -226,13 +231,22 @@ impl DataManagementClient {
         // Log request in verbose/debug mode
         crate::logging::log_request("GET", &url);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list hubs")?;
+        // Use retry logic for API requests
+        let http_config = crate::http::HttpClientConfig::default();
+        let response = crate::http::execute_with_retry(&http_config, || {
+            let client = self.http_client.clone();
+            let url = url.clone();
+            let token = token.clone();
+            Box::pin(async move {
+                client
+                    .get(&url)
+                    .bearer_auth(&token)
+                    .send()
+                    .await
+                    .context("Failed to list hubs")
+            })
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         crate::logging::log_response(response.status().as_u16(), &url);
