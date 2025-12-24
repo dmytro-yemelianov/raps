@@ -235,7 +235,7 @@ async fn upload_photos(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     photos: Vec<PathBuf>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     // Validate files exist
     for photo in &photos {
@@ -267,7 +267,7 @@ async fn upload_photos(
     Ok(())
 }
 
-async fn start_processing(client: &RealityCaptureClient, photoscene_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn start_processing(client: &RealityCaptureClient, photoscene_id: &str, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Starting processing...".dimmed());
 
     client.start_processing(photoscene_id).await?;
@@ -284,7 +284,7 @@ async fn check_status(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     wait: bool,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
         let spinner = ProgressBar::new_spinner();
@@ -338,7 +338,7 @@ async fn get_result(
     client: &RealityCaptureClient,
     photoscene_id: &str,
     format: &str,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     let output_format = parse_format(format)?;
 
@@ -367,7 +367,7 @@ async fn get_result(
     Ok(())
 }
 
-fn list_formats(client: &RealityCaptureClient, output_format: OutputFormat) -> Result<()> {
+fn list_formats(client: &RealityCaptureClient, _output_format: OutputFormat) -> Result<()> {
     let formats = client.available_formats();
 
     println!("\n{}", "Available Output Formats:".bold());
@@ -386,7 +386,7 @@ fn list_formats(client: &RealityCaptureClient, output_format: OutputFormat) -> R
     Ok(())
 }
 
-async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn delete_photoscene(client: &RealityCaptureClient, photoscene_id: &str, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting photoscene...".dimmed());
 
     client.delete_photoscene(photoscene_id).await?;

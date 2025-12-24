@@ -4,6 +4,7 @@
 
 pub mod auth;
 pub mod bucket;
+pub mod config;
 pub mod da;
 pub mod demo;
 pub mod folder;
@@ -19,6 +20,7 @@ pub mod webhook;
 
 pub use auth::AuthCommands;
 pub use bucket::BucketCommands;
+pub use config::ConfigCommands;
 pub use da::DaCommands;
 pub use demo::DemoCommands;
 pub use folder::FolderCommands;

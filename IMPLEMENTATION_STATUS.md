@@ -86,6 +86,27 @@
 - ⏭️ **Additional Logging**: Can be extended to other API methods as needed
 - ⏭️ **Error Context**: Enhance error messages with more context for better exit code detection
 
+---
+
+## Milestone v0.5 — Profiles, Auth, Reliability
+
+### EPIC: Profiles (contexts) & secrets handling
+
+| Issue | Status | Notes |
+|---|---|---|
+| Introduce `raps config profile` (create/list/use/delete) | ✅ **Implemented** | Profile management commands implemented. Config loading supports profile precedence. |
+| Config precedence spec (env vs config vs flags) | ✅ **Implemented** | Precedence: env vars > profile > defaults. Documented in code. |
+| Optional OS keychain integration (credential storage) | ❌ **Not Implemented** | Tokens still stored in plain JSON file. |
+
+### EPIC: Reliability: retries, backoff, timeouts, rate limits
+
+| Issue | Status | Notes |
+|---|---|---|
+| Implement retry/backoff strategy for 429/5xx | ✅ **Partially Implemented** | Retry logic implemented in `src/http.rs`. HTTP client configurable timeouts added. Not yet integrated into all API clients. |
+| Add configurable request timeouts + concurrency limits | ✅ **Partially Implemented** | HTTP client timeouts configurable via `HttpClientConfig`. Default: 120s timeout, 30s connect timeout. |
+| Proxy support documentation (`HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`) | ❌ **Not Implemented** | Proxy support may work via reqwest env vars but not documented. |
+| Add configurable HTTP client timeouts | ✅ **Implemented** | `HttpClientConfig` struct with configurable timeouts. Default timeouts applied to AuthClient. |
+
 ## Testing Recommendations
 
 1. Test exit codes with various error scenarios
@@ -93,11 +114,16 @@
 3. Test non-interactive mode with all updated commands
 4. Test YAML output format with various data structures
 5. Verify secret redaction in debug mode
+6. Test profile management (create, switch, delete)
+7. Test retry logic with simulated 429/5xx errors
+8. Test config precedence (env vars vs profile)
 
 ## Next Steps
 
-1. Update remaining commands for non-interactive mode
-2. Integrate logging into API clients
-3. Add tests for exit codes
-4. Update documentation with examples
+1. Integrate retry logic into remaining API clients
+2. Add device-code authentication flow
+3. Document proxy support
+4. Add OS keychain integration for secure token storage
+5. Add tests for retry/backoff logic
+6. Update documentation with profile examples
 

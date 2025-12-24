@@ -96,9 +96,14 @@ impl AuthClient {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
 
+        // Create HTTP client with configured timeouts
+        let http_config = crate::http::HttpClientConfig::default();
+        let http_client = http_config.create_client()
+            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+
         Self {
             config,
-            http_client: reqwest::Client::new(),
+            http_client,
             cached_2leg_token: Arc::new(RwLock::new(None)),
             cached_3leg_token: Arc::new(RwLock::new(stored_token)),
         }

@@ -47,7 +47,7 @@ pub fn require_value<T>(value: Option<T>, name: &str) -> Result<T, anyhow::Error
 /// Check if a destructive action should proceed
 ///
 /// Returns true if --yes is set or if interactive mode allows confirmation
-pub fn should_proceed_destructive(action: &str) -> bool {
+pub fn should_proceed_destructive(_action: &str) -> bool {
     if is_yes() {
         return true;
     }

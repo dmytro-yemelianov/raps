@@ -25,33 +25,67 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration from environment variables
+    /// Load configuration with precedence: flags > env vars > active profile > defaults
     ///
     /// Looks for:
-    /// - APS_CLIENT_ID: Your APS application client ID
-    /// - APS_CLIENT_SECRET: Your APS application client secret
-    /// - APS_BASE_URL: Optional, defaults to <https://developer.api.autodesk.com>
-    /// - APS_CALLBACK_URL: Optional, defaults to <http://localhost:8080/callback>
-    /// - APS_DA_NICKNAME: Optional, Design Automation nickname
+    /// 1. Environment variables (APS_CLIENT_ID, APS_CLIENT_SECRET, etc.)
+    /// 2. Active profile configuration (if set)
+    /// 3. Defaults
     pub fn from_env() -> Result<Self> {
         // Try to load .env file if it exists (silently ignore if not found)
         let _ = dotenvy::dotenv();
 
-        let client_id = env::var("APS_CLIENT_ID").context(
-            "APS_CLIENT_ID environment variable not set. Please set it or create a .env file.",
-        )?;
+        // Load profile data
+        let profile_data = Self::load_profile_data().ok();
 
-        let client_secret = env::var("APS_CLIENT_SECRET").context(
-            "APS_CLIENT_SECRET environment variable not set. Please set it or create a .env file.",
-        )?;
+        // Determine values with precedence: env vars > profile > defaults
+        let client_id = env::var("APS_CLIENT_ID")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.client_id.clone())
+                    .ok_or_else(|| env::VarError::NotPresent)
+            })
+            .context(
+                "APS_CLIENT_ID not set. Set it via:\n  - Environment variable: APS_CLIENT_ID\n  - Profile: raps config profile create <name> && raps config set client_id <value>",
+            )?;
+
+        let client_secret = env::var("APS_CLIENT_SECRET")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.client_secret.clone())
+                    .ok_or_else(|| env::VarError::NotPresent)
+            })
+            .context(
+                "APS_CLIENT_SECRET not set. Set it via:\n  - Environment variable: APS_CLIENT_SECRET\n  - Profile: raps config profile create <name> && raps config set client_secret <value>",
+            )?;
 
         let base_url = env::var("APS_BASE_URL")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.base_url.clone())
+                    .ok_or_else(|| env::VarError::NotPresent)
+            })
             .unwrap_or_else(|_| "https://developer.api.autodesk.com".to_string());
 
         let callback_url = env::var("APS_CALLBACK_URL")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.callback_url.clone())
+                    .ok_or_else(|| env::VarError::NotPresent)
+            })
             .unwrap_or_else(|_| format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT));
 
-        let da_nickname = env::var("APS_DA_NICKNAME").ok();
+        let da_nickname = env::var("APS_DA_NICKNAME")
+            .ok()
+            .or_else(|| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.da_nickname.clone())
+            });
 
         Ok(Self {
             client_id,
@@ -60,6 +94,22 @@ impl Config {
             callback_url,
             da_nickname,
         })
+    }
+
+    /// Load profile data from disk
+    fn load_profile_data() -> Result<(String, crate::commands::config::ProfileConfig)> {
+        use crate::commands::config::load_profiles;
+        
+        let data = load_profiles()?;
+        let profile_name = data.active_profile
+            .ok_or_else(|| anyhow::anyhow!("No active profile"))?;
+        
+        let profile = data.profiles
+            .get(&profile_name)
+            .ok_or_else(|| anyhow::anyhow!("Active profile '{}' not found", profile_name))?
+            .clone();
+        
+        Ok((profile_name, profile))
     }
 
     /// Get the authentication endpoint URL

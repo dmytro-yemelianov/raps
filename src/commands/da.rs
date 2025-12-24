@@ -185,7 +185,7 @@ async fn list_engines(client: &DesignAutomationClient, output_format: OutputForm
     Ok(())
 }
 
-async fn list_appbundles(client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
+async fn list_appbundles(client: &DesignAutomationClient, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching app bundles...".dimmed());
 
     let appbundles = client.list_appbundles().await?;
@@ -211,7 +211,7 @@ async fn create_appbundle(
     id: Option<String>,
     engine: Option<String>,
     description: Option<String>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     // Get engine first to help with ID suggestion
     let selected_engine = match engine {
@@ -258,7 +258,7 @@ async fn create_appbundle(
     Ok(())
 }
 
-async fn delete_appbundle(client: &DesignAutomationClient, id: &str, output_format: OutputFormat) -> Result<()> {
+async fn delete_appbundle(client: &DesignAutomationClient, id: &str, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting app bundle...".dimmed());
 
     client.delete_appbundle(id).await?;
@@ -267,7 +267,7 @@ async fn delete_appbundle(client: &DesignAutomationClient, id: &str, output_form
     Ok(())
 }
 
-async fn list_activities(client: &DesignAutomationClient, output_format: OutputFormat) -> Result<()> {
+async fn list_activities(client: &DesignAutomationClient, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Fetching activities...".dimmed());
 
     let activities = client.list_activities().await?;
@@ -288,7 +288,7 @@ async fn list_activities(client: &DesignAutomationClient, output_format: OutputF
     Ok(())
 }
 
-async fn delete_activity(client: &DesignAutomationClient, id: &str, output_format: OutputFormat) -> Result<()> {
+async fn delete_activity(client: &DesignAutomationClient, id: &str, _output_format: OutputFormat) -> Result<()> {
     println!("{}", "Deleting activity...".dimmed());
 
     client.delete_activity(id).await?;
@@ -301,7 +301,7 @@ async fn check_status(
     client: &DesignAutomationClient,
     workitem_id: &str,
     wait: bool,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
         let spinner = ProgressBar::new_spinner();
