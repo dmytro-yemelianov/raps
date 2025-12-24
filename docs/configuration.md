@@ -5,7 +5,7 @@ title: Configuration
 
 # Configuration
 
-RAPS CLI uses environment variables for configuration. You can set them in your shell session or use a `.env` file.
+RAPS CLI supports multiple configuration methods: environment variables, profiles, and `.env` files. Configuration precedence is: **environment variables > active profile > defaults**.
 
 ## Required Environment Variables
 
@@ -65,6 +65,71 @@ $env:APS_DA_NICKNAME = "your_nickname"
 ```bash
 # macOS/Linux
 export APS_DA_NICKNAME="your_nickname"
+```
+
+## Profile Management (v0.4.0+)
+
+Profiles allow you to manage multiple configurations for different environments (development, staging, production).
+
+### Creating and Using Profiles
+
+```bash
+# Create a new profile
+raps config profile create production
+
+# Set configuration values for the active profile
+raps config set client_id "your_production_client_id"
+raps config set client_secret "your_production_client_secret"
+raps config set base_url "https://developer.api.autodesk.com"
+
+# Switch to a different profile
+raps config profile use development
+
+# List all profiles
+raps config profile list
+
+# Show current active profile
+raps config profile current
+
+# Delete a profile
+raps config profile delete old-profile
+```
+
+### Profile Storage
+
+Profiles are stored in:
+- **Windows**: `%APPDATA%\raps\profiles.json`
+- **macOS**: `~/Library/Application Support/raps/profiles.json`
+- **Linux**: `~/.config/raps/profiles.json`
+
+### Configuration Precedence
+
+When RAPS loads configuration, it uses this order:
+
+1. **Environment variables** (highest priority)
+2. **Active profile** (if set)
+3. **Defaults** (lowest priority)
+
+This means environment variables always override profile settings, making it easy to override for specific commands.
+
+### Example: Multi-Environment Setup
+
+```bash
+# Development profile
+raps config profile create dev
+raps config profile use dev
+raps config set client_id "dev_client_id"
+raps config set client_secret "dev_secret"
+
+# Production profile
+raps config profile create prod
+raps config profile use prod
+raps config set client_id "prod_client_id"
+raps config set client_secret "prod_secret"
+
+# Switch between environments
+raps config profile use dev   # Use development credentials
+raps config profile use prod # Use production credentials
 ```
 
 ## Using .env File

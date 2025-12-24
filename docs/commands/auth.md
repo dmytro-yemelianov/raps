@@ -31,17 +31,23 @@ $ raps auth test
 
 ### `raps auth login`
 
-Login with 3-legged OAuth. Opens your browser for authentication.
+Login with 3-legged OAuth. Supports multiple authentication methods.
 
 **Usage:**
 ```bash
-raps auth login [--default]
+raps auth login [--default] [--device] [--token <token>] [--refresh-token <token>] [--expires-in <seconds>]
 ```
 
 **Options:**
 - `--default`: Use default scopes without prompting
+- `--device`: Use device code flow (for headless/server environments)
+- `--token <token>`: Provide access token directly (for CI/CD)
+- `--refresh-token <token>`: Optional refresh token (used with --token)
+- `--expires-in <seconds>`: Token expiry in seconds (default: 3600, used with --token)
 
-**Example:**
+**Examples:**
+
+Browser-based login (default):
 ```bash
 $ raps auth login
 Opening browser for authentication...
@@ -59,6 +65,29 @@ Select scopes:
 ✓ Login successful!
   User: john.doe@example.com
   Token expires in: 3599 seconds
+```
+
+Device code flow (headless/server):
+```bash
+$ raps auth login --device
+Device Code Authentication
+──────────────────────────────────────────────────
+  User Code: ABC-123-DEF
+  Verification URL: https://developer.api.autodesk.com/authentication/v2/device
+  Complete URL: https://developer.api.autodesk.com/authentication/v2/device?user_code=ABC-123-DEF
+
+Please visit the URL above and enter the user code to authorize.
+Waiting for authorization (expires in 600 seconds)...
+.
+✓ Authorization successful!
+```
+
+Token-based login (CI/CD):
+```bash
+$ raps auth login --token "eyJhbGc..." --refresh-token "refresh_token_here" --expires-in 3600
+⚠️  WARNING: Using token-based login. Tokens should be kept secure!
+   This is intended for CI/CD environments. Never commit tokens to version control.
+✓ Token validated for user: user@example.com
 ```
 
 **Available Scopes:**
@@ -113,12 +142,19 @@ raps auth status
 **Example:**
 ```bash
 $ raps auth status
-Authentication Status:
-  Type: 3-legged OAuth
-  User: john.doe@example.com
-  Token expires in: 1800 seconds
-  Scopes: data:read, data:write, data:create, account:read, user:read, viewables:read
+Authentication Status
+────────────────────────────────────────
+  2-legged (Client Credentials): ✓ Available
+  3-legged (User Login): ✓ Logged in
+    Token: abcd...wxyz
+    Expires in: 1h 30m
 ```
+
+**Output includes:**
+- 2-legged authentication availability
+- 3-legged login status
+- Token preview (first 4 and last 4 characters)
+- Token expiry time (hours and minutes remaining)
 
 ### `raps auth whoami`
 

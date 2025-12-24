@@ -11,8 +11,11 @@
 ### Authentication
 - **2-legged OAuth** (Client Credentials) for server-to-server operations
 - **3-legged OAuth** (Authorization Code) with browser login for user data access
+- **Device-code authentication** (`--device`) for headless/server environments
+- **Token-based login** (`--token`) for CI/CD scenarios
 - Secure token storage with automatic refresh
 - User profile information with `auth whoami`
+- Token expiry information in `auth status`
 
 ### Object Storage Service (OSS)
 - Create, list, and delete buckets (with multi-region support: US & EMEA)
@@ -156,6 +159,30 @@ eval (raps completions elvish | slurp)
 
 ## Configuration
 
+### Profile Management (v0.4.0+)
+
+Manage multiple configurations for different environments:
+
+```bash
+# Create a profile
+raps config profile create production
+
+# Set profile values
+raps config set client_id "your_client_id"
+raps config set client_secret "your_client_secret"
+
+# Switch between profiles
+raps config profile use production
+
+# List all profiles
+raps config profile list
+
+# Show current profile
+raps config profile current
+```
+
+**Config Precedence:** Environment variables > Active profile > Defaults
+
 ### Environment Variables
 
 ```powershell
@@ -189,7 +216,13 @@ raps auth test
 # Login with 3-legged OAuth (opens browser)
 raps auth login
 
-# Check authentication status
+# Login with device code (headless/server environments)
+raps auth login --device
+
+# Login with token (CI/CD scenarios)
+raps auth login --token <access_token> --refresh-token <refresh_token>
+
+# Check authentication status (shows token expiry)
 raps auth status
 
 # Show logged-in user profile
@@ -233,6 +266,62 @@ raps translate status <urn> --wait
 # View manifest
 raps translate manifest <urn>
 ```
+
+### Output Formats
+
+RAPS supports multiple output formats for CI/CD integration:
+
+```bash
+# JSON output (machine-readable)
+raps bucket list --output json
+
+# YAML output
+raps bucket list --output yaml
+
+# CSV output
+raps bucket list --output csv
+
+# Table output (default, human-readable)
+raps bucket list --output table
+
+# Plain text
+raps bucket list --output plain
+```
+
+### Global Flags
+
+```bash
+# Disable colors
+raps bucket list --no-color
+
+# Quiet mode (only output data)
+raps bucket list --quiet
+
+# Verbose mode (show request summaries)
+raps bucket list --verbose
+
+# Debug mode (full trace with secret redaction)
+raps bucket list --debug
+
+# Non-interactive mode (fail on prompts)
+raps bucket create --non-interactive --key my-bucket
+
+# Auto-confirm prompts
+raps bucket delete my-bucket --yes
+```
+
+### Exit Codes
+
+RAPS uses standardized exit codes for scripting:
+
+- `0` - Success
+- `2` - Invalid arguments
+- `3` - Authentication failure
+- `4` - Not found
+- `5` - Remote/API error
+- `6` - Internal error
+
+See [Exit Codes Documentation](docs/cli/exit-codes.md) for details.
 
 ### Data Management (requires login)
 
@@ -329,6 +418,7 @@ raps reality result <photoscene-id>
 | `da` | Design Automation |
 | `issue` | ACC/BIM 360 issues |
 | `reality` | Reality Capture photogrammetry |
+| `config` | Configuration and profile management |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
 
 ## API Coverage
@@ -343,6 +433,10 @@ This CLI covers the following APS APIs (validated against OpenAPI specs):
 - **Design Automation API v3** - Engines, activities, work items
 - **Construction Issues API v1** - Issues, issue types
 - **Reality Capture API v1** - Photogrammetry processing
+
+## Release Verification
+
+All releases include SHA256 checksums for verification. See [Checksums Documentation](docs/cli/checksums.md) for instructions on verifying downloads.
 
 ## Contributing
 
