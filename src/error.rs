@@ -104,6 +104,7 @@ impl ExitCode {
 }
 
 /// Extension trait for Result to easily exit with appropriate code
+#[allow(dead_code)] // Trait may be used in future
 pub trait ResultExt<T> {
     /// Unwrap or exit with appropriate exit code
     fn unwrap_or_exit(self) -> T;

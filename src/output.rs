@@ -137,28 +137,26 @@ fn write_csv<T: Serialize>(data: &T) -> Result<()> {
     match json_value {
         serde_json::Value::Array(items) if !items.is_empty() => {
             // Get headers from first item
-            if let Some(first) = items.first() {
-                if let serde_json::Value::Object(map) = first {
-                    let mut wtr = csv::Writer::from_writer(std::io::stdout());
+            if let Some(serde_json::Value::Object(map)) = items.first() {
+                let mut wtr = csv::Writer::from_writer(std::io::stdout());
 
-                    // Write headers
-                    let headers: Vec<String> = map.keys().cloned().collect();
-                    wtr.write_record(&headers)?;
+                // Write headers
+                let headers: Vec<String> = map.keys().cloned().collect();
+                wtr.write_record(&headers)?;
 
-                    // Write each row
-                    for item in items {
-                        if let serde_json::Value::Object(map) = item {
-                            let mut row = Vec::new();
-                            for header in &headers {
-                                let value = map.get(header).unwrap_or(&serde_json::Value::Null);
-                                row.push(format_value_for_csv(value));
-                            }
-                            wtr.write_record(&row)?;
+                // Write each row
+                for item in items {
+                    if let serde_json::Value::Object(map) = item {
+                        let mut row = Vec::new();
+                        for header in &headers {
+                            let value = map.get(header).unwrap_or(&serde_json::Value::Null);
+                            row.push(format_value_for_csv(value));
                         }
+                        wtr.write_record(&row)?;
                     }
-                    wtr.flush()?;
-                    return Ok(());
                 }
+                wtr.flush()?;
+                return Ok(());
             }
         }
         _ => {
