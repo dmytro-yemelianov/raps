@@ -20,6 +20,7 @@ pub fn is_non_interactive() -> bool {
 }
 
 /// Check if --yes flag is set (auto-confirm)
+#[allow(dead_code)] // May be used in future
 pub fn is_yes() -> bool {
     YES.load(Ordering::Relaxed)
 }
@@ -27,6 +28,7 @@ pub fn is_yes() -> bool {
 /// Require a value in non-interactive mode
 ///
 /// Returns an error if non-interactive mode is enabled and the value is None
+#[allow(dead_code)] // May be used in future
 pub fn require_value<T>(value: Option<T>, name: &str) -> Result<T, anyhow::Error> {
     match value {
         Some(v) => Ok(v),
@@ -47,6 +49,7 @@ pub fn require_value<T>(value: Option<T>, name: &str) -> Result<T, anyhow::Error
 /// Check if a destructive action should proceed
 ///
 /// Returns true if --yes is set or if interactive mode allows confirmation
+#[allow(dead_code)] // May be used in future
 pub fn should_proceed_destructive(_action: &str) -> bool {
     if is_yes() {
         return true;

@@ -157,7 +157,7 @@ async fn list_versions(
                 .display_name
                 .as_ref()
                 .or(Some(&v.attributes.name))
-                .map(|s| s.clone())
+                .cloned()
                 .unwrap_or_default();
             VersionOutput {
                 version_number: v.attributes.version_number,

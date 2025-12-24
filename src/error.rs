@@ -13,6 +13,7 @@ use std::process;
 
 /// Exit codes following standard conventions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Success is used implicitly when no error occurs
 pub enum ExitCode {
     /// Success
     Success = 0,
@@ -104,6 +105,7 @@ impl ExitCode {
 }
 
 /// Extension trait for Result to easily exit with appropriate code
+#[allow(dead_code)] // Trait may be used in future
 pub trait ResultExt<T> {
     /// Unwrap or exit with appropriate exit code
     fn unwrap_or_exit(self) -> T;

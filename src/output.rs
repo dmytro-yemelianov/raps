@@ -137,8 +137,7 @@ fn write_csv<T: Serialize>(data: &T) -> Result<()> {
     match json_value {
         serde_json::Value::Array(items) if !items.is_empty() => {
             // Get headers from first item
-            if let Some(first) = items.first() {
-                if let serde_json::Value::Object(map) = first {
+            if let Some(serde_json::Value::Object(map)) = items.first() {
                     let mut wtr = csv::Writer::from_writer(std::io::stdout());
 
                     // Write headers
@@ -210,6 +209,7 @@ fn write_table<T: Serialize>(data: &T) -> Result<()> {
 }
 
 /// Helper trait for types that can be formatted as tables
+#[allow(dead_code)] // May be used in future
 pub trait TableFormat {
     /// Write this data as a formatted table
     fn write_table(&self) -> Result<()>;

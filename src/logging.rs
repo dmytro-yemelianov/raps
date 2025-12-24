@@ -28,6 +28,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
 }
 
 /// Check if colors should be disabled
+#[allow(dead_code)] // May be used in future
 pub fn no_color() -> bool {
     NO_COLOR.load(Ordering::Relaxed)
 }
@@ -55,6 +56,7 @@ pub fn log_verbose(message: &str) {
 }
 
 /// Log a debug message (only shown if --debug)
+#[allow(dead_code)] // May be used in future
 pub fn log_debug(message: &str) {
     if debug() {
         eprintln!("[DEBUG] {}", message);
@@ -76,6 +78,7 @@ pub fn log_response(status: u16, url: &str) {
 }
 
 /// Redact secrets from debug output
+#[allow(dead_code)] // May be used in future
 pub fn redact_secrets(text: &str) -> String {
     // Redact common secret patterns
     let mut redacted = text.to_string();

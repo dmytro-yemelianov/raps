@@ -44,7 +44,7 @@ impl Config {
                 profile_data
                     .as_ref()
                     .and_then(|(_, profile)| profile.client_id.clone())
-                    .ok_or_else(|| env::VarError::NotPresent)
+                    .ok_or(env::VarError::NotPresent)
             })
             .context(
                 "APS_CLIENT_ID not set. Set it via:\n  - Environment variable: APS_CLIENT_ID\n  - Profile: raps config profile create <name> && raps config set client_id <value>",
@@ -55,7 +55,7 @@ impl Config {
                 profile_data
                     .as_ref()
                     .and_then(|(_, profile)| profile.client_secret.clone())
-                    .ok_or_else(|| env::VarError::NotPresent)
+                    .ok_or(env::VarError::NotPresent)
             })
             .context(
                 "APS_CLIENT_SECRET not set. Set it via:\n  - Environment variable: APS_CLIENT_SECRET\n  - Profile: raps config profile create <name> && raps config set client_secret <value>",
@@ -66,7 +66,7 @@ impl Config {
                 profile_data
                     .as_ref()
                     .and_then(|(_, profile)| profile.base_url.clone())
-                    .ok_or_else(|| env::VarError::NotPresent)
+                    .ok_or(env::VarError::NotPresent)
             })
             .unwrap_or_else(|_| "https://developer.api.autodesk.com".to_string());
 
@@ -75,7 +75,7 @@ impl Config {
                 profile_data
                     .as_ref()
                     .and_then(|(_, profile)| profile.callback_url.clone())
-                    .ok_or_else(|| env::VarError::NotPresent)
+                    .ok_or(env::VarError::NotPresent)
             })
             .unwrap_or_else(|_| format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT));
 

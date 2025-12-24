@@ -200,10 +200,7 @@ async fn list_profiles(output_format: OutputFormat) -> Result<()> {
         .keys()
         .map(|name| ProfileInfo {
             name: name.clone(),
-            active: data
-                .active_profile
-                .as_ref()
-                .map_or(false, |active| active == name),
+            active: data.active_profile.as_ref() == Some(name),
         })
         .collect();
 
@@ -285,11 +282,7 @@ async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
     }
 
     // If deleting active profile, clear it
-    if data
-        .active_profile
-        .as_ref()
-        .map_or(false, |active| active == name)
-    {
+    if data.active_profile.as_ref().is_some_and(|active| active == name) {
         data.active_profile = None;
     }
 
