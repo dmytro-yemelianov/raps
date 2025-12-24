@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-24
+
 ### Added
 - Profile management system (`raps config profile create/list/use/delete/current`)
 - Config get/set commands with profile support
@@ -20,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Global non-interactive mode (`--non-interactive` and `--yes` flags)
 - Standardized exit codes (0=success, 2=invalid args, 3=auth failure, 4=not found, 5=remote error, 6=internal error)
 - Token expiry information in `raps auth status`
+- CHANGELOG.md following Keep a Changelog format
+- GitHub issue templates (bug report, feature request)
+- Checksum generation scripts for release verification
 
 ### Changed
 - Config loading now supports profile precedence: environment variables > active profile > defaults
@@ -28,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Commands now properly respect non-interactive mode and fail with clear errors when required parameters are missing
+- All clippy warnings resolved
 
 ## [0.3.0] - 2024-XX-XX
 
@@ -45,6 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.3.0
 
