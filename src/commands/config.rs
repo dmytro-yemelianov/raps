@@ -282,7 +282,11 @@ async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
     }
 
     // If deleting active profile, clear it
-    if data.active_profile.as_ref().is_some_and(|active| active == name) {
+    if data
+        .active_profile
+        .as_ref()
+        .is_some_and(|active| active == name)
+    {
         data.active_profile = None;
     }
 
