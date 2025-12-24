@@ -43,3 +43,46 @@ desktop.ini
 .rust-analyzer/
 rust-project.json
 
+# Logs
+*.log
+*.log.*
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+
+# CI/CD artifacts (if any are generated locally)
+.ci/
+ci-artifacts/
+
+# Release artifacts (should be generated, not committed)
+*.zip
+*.tar.gz
+*.tar.bz2
+checksums.txt
+
+# Editor backups
+*~
+*.bak
+*.backup
+*_backup
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+$RECYCLE.BIN/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
