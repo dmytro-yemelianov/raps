@@ -132,16 +132,17 @@ Batch translation of multiple model files.
 
 **Usage:**
 ```bash
-raps demo batch-processing [--files FILE1] [FILE2] [FILE3] ... [--format FORMAT]
+raps demo batch-processing [--input FOLDER] [--format FORMAT] [--max-parallel N]
 ```
 
 **Options:**
-- `--files`: Model files to process
+- `--input, -i`: Folder containing model files (optional, generates synthetic if not provided)
 - `--format`: Output format (default: `svf2`)
+- `--max-parallel`: Maximum concurrent translations (default: 3)
 
 **Example:**
 ```bash
-$ raps demo batch-processing model1.dwg model2.dwg model3.dwg
+$ raps demo batch-processing --input ./models
 Processing 3 files...
 
 [1/3] Processing model1.dwg...

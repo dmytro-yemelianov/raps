@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use tiny_http::{Response, Server};
 use tokio::sync::RwLock;
 
-use crate::config::{Config, DEFAULT_CALLBACK_PORT};
+use crate::config::Config;
 use crate::storage::{StorageBackend, TokenStorage};
 
 /// User profile information from /userinfo endpoint
@@ -483,16 +483,18 @@ impl AuthClient {
         println!("If the browser doesn't open, visit this URL:");
         println!("{}", auth_url);
 
-        // Start local server BEFORE opening browser to ensure it's ready
-        let server = Server::http(format!("0.0.0.0:{}", DEFAULT_CALLBACK_PORT)).map_err(|e| {
-            anyhow::anyhow!(
-                "Failed to start callback server on port {}: {}",
-                DEFAULT_CALLBACK_PORT,
-                e
-            )
+        // Start local server to listen for callback
+        // Parse port from callback URL or default to DEFAULT_CALLBACK_PORT
+        let port = match url::Url::parse(&self.config.callback_url) {
+            Ok(u) => u.port().unwrap_or(crate::config::DEFAULT_CALLBACK_PORT),
+            Err(_) => crate::config::DEFAULT_CALLBACK_PORT,
+        };
+
+        let server = Server::http(format!("0.0.0.0:{}", port)).map_err(|e| {
+            anyhow::anyhow!("Failed to start callback server on port {}: {}", port, e)
         })?;
 
-        println!("Callback server started on port {}", DEFAULT_CALLBACK_PORT);
+        println!("Callback server started on port {}", port);
 
         // Open browser
         if webbrowser::open(&auth_url).is_err() {

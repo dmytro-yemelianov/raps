@@ -26,28 +26,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          ruby-version: '3.1'
-          bundler-cache: true
+          python-version: '3.10'
+          cache: 'pip'
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Build with Jekyll
+      - name: Install dependencies
         run: |
-          cd docs
-          gem install bundler
-          bundle install
-          bundle exec jekyll build
-        env:
-          JEKYLL_ENV: production
+          pip install -r docs/requirements.txt
+
+      - name: Build with MkDocs
+        run: |
+          mkdocs build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/_site
+          path: site
 
   deploy:
     environment:

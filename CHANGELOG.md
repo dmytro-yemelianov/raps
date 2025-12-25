@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-12-25
+
+### Added
+- **APS Feature Coverage**: New dedicated documentation page comparing RAPS CLI capabilities against full APS API spectrum.
+- **Enhanced Documentation**: Created comprehensive guides for ACC Modules, RFIs, Plugin Management, and Synthetic Data Generation.
+- **Architecture Visualization**: New Mermaid diagrams for command architecture and authentication flows.
+- **Practical Examples**: Expanded use cases for ACC Assets, RFIs, and developer tools.
+
+### Changed
+- **Repository Reorganization**: Significant cleanup and restructuring of the repository for better maintainability (moved scripts, consolidated assets, archived historical logs).
+- **Workflow Migration**: Documentation deployment migrated from Jekyll to MkDocs in GitHub Actions.
+- **Reference Overhaul**: Updated `README.md` and `index.md` with complete command reference and feature discovery paths.
+
+### Fixed
+- Outdated usage examples in `demo` command documentation.
+- Broken environment variable examples in installation guides.
+
+---
+
 ## [1.0.0] - 2025-12-25
 
 ### Added

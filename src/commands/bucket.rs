@@ -155,11 +155,22 @@ async fn create_bucket(
 
     // Get region interactively if not provided
     let selected_region = match region {
-        Some(r) => match r.to_uppercase().as_str() {
-            "US" => Region::US,
-            "EMEA" => Region::EMEA,
-            _ => anyhow::bail!("Invalid region. Use US or EMEA."),
-        },
+        Some(r) => {
+            // Try to find matching region from the enum list
+            let regions = Region::all();
+            regions
+                .iter()
+                .find(|reg| reg.to_string().to_uppercase() == r.to_uppercase())
+                .cloned()
+                .ok_or_else(|| {
+                    let available = regions
+                        .iter()
+                        .map(|reg| reg.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    anyhow::anyhow!("Invalid region. Available regions: {}", available)
+                })?
+        }
         None => {
             // In non-interactive mode, default to US
             if interactive::is_non_interactive() {

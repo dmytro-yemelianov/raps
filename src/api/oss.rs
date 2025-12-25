@@ -636,8 +636,15 @@ impl OssClient {
         let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
         let total_parts = ((file_size + chunk_size - 1) / chunk_size) as u32;
 
-        // Check for existing upload state
-        let mut state = if resume {
+        // Container for signed URLs (either loaded from fresh request or empty if resuming)
+        // We really only need them if we are starting fresh OR if we need to refresh them.
+        // For simplicity/robustness:
+        // 1. If resuming, state exists. We might need new URLs if old ones expired (which we don't track well here, so maybe safer to fetch).
+        // 2. If new, we fetch URLs.
+
+        // To optimize: If we JUST created the state, we have valid URLs. We should pass them through.
+
+        let (mut state, initial_urls) = if resume {
             if let Some(existing_state) = MultipartUploadState::load(bucket_key, object_key)? {
                 if existing_state.can_resume(file_path) {
                     crate::logging::log_verbose(&format!(
@@ -645,53 +652,72 @@ impl OssClient {
                         existing_state.completed_parts.len(),
                         existing_state.total_parts
                     ));
-                    Some(existing_state)
+                    (existing_state, None)
                 } else {
                     crate::logging::log_verbose("File changed since last upload, starting fresh");
                     MultipartUploadState::delete(bucket_key, object_key)?;
-                    None
+                    let signed = self
+                        .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+                        .await?;
+
+                    if signed.urls.len() != total_parts as usize {
+                        anyhow::bail!(
+                            "Expected {} URLs but got {}",
+                            total_parts,
+                            signed.urls.len()
+                        );
+                    }
+
+                    let new_state = MultipartUploadState {
+                        bucket_key: bucket_key.to_string(),
+                        object_key: object_key.to_string(),
+                        file_path: file_path.to_string_lossy().to_string(),
+                        file_size,
+                        chunk_size,
+                        total_parts,
+                        completed_parts: Vec::new(),
+                        part_etags: std::collections::HashMap::new(),
+                        upload_key: signed.upload_key,
+                        started_at: chrono::Utc::now().timestamp(),
+                        file_mtime,
+                    };
+                    new_state.save()?;
+                    (new_state, Some(signed.urls))
                 }
             } else {
-                None
+                // No state, start fresh
+                let signed = self
+                    .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+                    .await?;
+
+                if signed.urls.len() != total_parts as usize {
+                    anyhow::bail!(
+                        "Expected {} URLs but got {}",
+                        total_parts,
+                        signed.urls.len()
+                    );
+                }
+
+                let new_state = MultipartUploadState {
+                    bucket_key: bucket_key.to_string(),
+                    object_key: object_key.to_string(),
+                    file_path: file_path.to_string_lossy().to_string(),
+                    file_size,
+                    chunk_size,
+                    total_parts,
+                    completed_parts: Vec::new(),
+                    part_etags: std::collections::HashMap::new(),
+                    upload_key: signed.upload_key,
+                    started_at: chrono::Utc::now().timestamp(),
+                    file_mtime,
+                };
+                new_state.save()?;
+                (new_state, Some(signed.urls))
             }
         } else {
-            // Clear any existing state if not resuming
+            // Not resuming, clear any existing state
             MultipartUploadState::delete(bucket_key, object_key)?;
-            None
-        };
 
-        // Create progress bar
-        let pb = ProgressBar::new(file_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
-                .progress_chars("█▓░"),
-        );
-
-        // Initialize state if needed
-        let state = if let Some(s) = state.take() {
-            // Set progress for already completed parts
-            let completed_bytes: u64 = s
-                .completed_parts
-                .iter()
-                .map(|&part| {
-                    let start = (part as u64 - 1) * s.chunk_size;
-                    let end = std::cmp::min(start + s.chunk_size, s.file_size);
-                    end - start
-                })
-                .sum();
-            pb.set_position(completed_bytes);
-            pb.set_message(format!(
-                "Resuming {} ({} parts done)",
-                object_key,
-                s.completed_parts.len()
-            ));
-            s
-        } else {
-            pb.set_message(format!("Starting multipart upload for {}", object_key));
-
-            // Get signed URLs for all parts
             let signed = self
                 .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
                 .await?;
@@ -718,8 +744,38 @@ impl OssClient {
                 file_mtime,
             };
             new_state.save()?;
-            new_state
+            (new_state, Some(signed.urls))
         };
+
+        // Create progress bar
+        let pb = ProgressBar::new(file_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
+                .unwrap()
+                .progress_chars("█▓░"),
+        );
+
+        // Update progress if resuming
+        if !state.completed_parts.is_empty() {
+            let completed_bytes: u64 = state
+                .completed_parts
+                .iter()
+                .map(|&part| {
+                    let start = (part as u64 - 1) * state.chunk_size;
+                    let end = std::cmp::min(start + state.chunk_size, state.file_size);
+                    end - start
+                })
+                .sum();
+            pb.set_position(completed_bytes);
+            pb.set_message(format!(
+                "Resuming {} ({} parts done)",
+                object_key,
+                state.completed_parts.len()
+            ));
+        } else {
+            pb.set_message(format!("Starting multipart upload for {}", object_key));
+        }
 
         // Get remaining parts to upload
         let remaining_parts = state.remaining_parts();
@@ -734,12 +790,22 @@ impl OssClient {
             ));
         }
 
-        // We need to get fresh signed URLs for remaining parts
-        let signed = self
-            .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
-            .await?;
+        // If we have initial_urls, use them. Otherwise (resuming), fetch new ones.
+        // NOTE: If we are resuming, the URLs in state (if we stored them, which we don't currently) might be expired.
+        // It's safest to fetch fresh URLs if we are resuming.
+        // If we just created the state, we have fresh URLs in `initial_urls`.
 
-        let mut current_state = state;
+        let urls = if let Some(u) = initial_urls {
+            u
+        } else {
+            // Fetch fresh URLs for the remaining parts
+            // Ideally we'd only fetch for remaining parts, but API returns all or we need logic to map
+            // Let's just fetch all and index carefully.
+            let signed = self
+                .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+                .await?;
+            signed.urls
+        };
 
         // Open file for reading
         let mut file = File::open(file_path)
@@ -761,7 +827,7 @@ impl OssClient {
             file.read_exact(&mut buffer).await?;
 
             // Upload part
-            let s3_url = &signed.urls[part_index];
+            let s3_url = &urls[part_index];
             let response = self
                 .http_client
                 .put(s3_url)
@@ -792,15 +858,15 @@ impl OssClient {
                 .unwrap_or_default();
 
             // Update state
-            current_state.completed_parts.push(part_num);
-            current_state.part_etags.insert(part_num, etag);
-            current_state.save()?;
+            state.completed_parts.push(part_num);
+            state.part_etags.insert(part_num, etag);
+            state.save()?;
 
             pb.set_position(end);
             pb.set_message(format!(
                 "Uploading {} ({}/{})",
                 object_key,
-                current_state.completed_parts.len(),
+                state.completed_parts.len(),
                 total_parts
             ));
         }
@@ -808,7 +874,7 @@ impl OssClient {
         // Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
         let object_info = self
-            .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
+            .complete_signed_upload(bucket_key, object_key, &state.upload_key)
             .await?;
 
         // Clean up state file

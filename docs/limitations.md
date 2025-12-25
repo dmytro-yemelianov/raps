@@ -93,16 +93,16 @@ For projects with many items (hundreds or thousands), list commands may take lon
 ## Plugin System
 
 ### Status: ✅ Fully Supported
-
-The plugin system is fully functional and allows:
-
-- External command plugins (`raps-<name>` executables in PATH)
-- Pre/post command hooks for automation
-- Command aliases for frequently used patterns
-- Plugin management via `raps plugin list/enable/disable`
-- Alias management via `raps plugin alias list/add/remove`
-
+...
 See [Plugin Documentation](plugins.md) for details.
+
+## Test Data Generation
+
+### Status: ✅ Fully Supported
+
+- `raps generate files` - Generate synthetic engineering files for testing.
+
+Supported formats: OBJ, DXF, STL, IFC, JSON, XYZ.
 
 ## Output Format Stability
 

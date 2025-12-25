@@ -7,6 +7,10 @@ title: Feature Overview
 
 This page provides a visual overview of RAPS CLI capabilities and how different components work together.
 
+### 🔍 Full APS Coverage
+Detailed comparison of RAPS CLI against available APS services:
+- **[APS Feature Coverage](aps-coverage.md)** - See the full matrix of implemented features.
+
 ## Command Architecture
 
 ```mermaid
@@ -22,10 +26,15 @@ graph TB
         Folder[📂 folder]
         Item[📎 item]
         Issue[🔧 issue]
+        Acc[📋 acc]
+        Rfi[❓ rfi]
         Webhook[🔔 webhook]
         DA[⚙️ da]
         RC[📸 reality-capture]
         Pipeline[📋 pipeline]
+        Plugin[🧩 plugin]
+        Generate[🛠️ generate]
+        Demo[🧪 demo]
         Config[⚙️ config]
     end
 
@@ -49,10 +58,15 @@ graph TB
     Folder --> DMAPI
     Item --> DMAPI
     Issue --> IssuesAPI
+    Acc --> IssuesAPI
+    Rfi --> IssuesAPI
     Webhook --> WebhooksAPI
     DA --> DAAPI
     RC --> RCAPI
     Pipeline --> CLI
+    Plugin --> CLI
+    Generate --> CLI
+    Demo --> CLI
     Config --> CLI
 ```
 

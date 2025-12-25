@@ -114,6 +114,10 @@
 - **Command aliases** - create shortcuts for frequent operations
 - **Plugin management** (`plugin list/enable/disable`)
 
+### Development Tools (v1.0.0+)
+- **Test Data Generation** (`generate`) - create synthetic OBJ, IFC, and other files for testing
+- **Demo Scenarios** (`demo`) - run end-to-end scenarios like bucket lifecycle or model pipeline
+
 ## Installation
 
 ### Prerequisites
@@ -482,8 +486,13 @@ raps reality result <photoscene-id>
 | `webhook` | Webhook subscriptions (create, list, delete, test) |
 | `da` | Design Automation (engines, appbundles, activities, workitem) |
 | `issue` | ACC/BIM 360 issues (list, create, update, comment, attachment, transition) |
+| `acc` | ACC extended modules (assets, submittals, checklists) |
+| `rfi` | ACC RFIs (list, get, create, update) |
 | `reality` | Reality Capture photogrammetry |
 | `pipeline` | Pipeline automation (run, validate, sample) |
+| `plugin` | Plugin management (list, install, remove) |
+| `generate` | Generate (synthetic files for testing) |
+| `demo` | Run demo scenarios |
 | `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
 
@@ -498,6 +507,10 @@ This CLI covers the following APS APIs (validated against OpenAPI specs):
 - **Webhooks API v1** - Event subscriptions
 - **Design Automation API v3** - Engines, activities, work items
 - **Construction Issues API v1** - Issues, issue types
+- **ACC RFIs API v1** - Requests for Information
+- **ACC Assets API v1** - Assets, categories, status
+- **ACC Submittals API v1** - Submittals, spec sections
+- **ACC Checklists API v1** - Checklists, templates
 - **Reality Capture API v1** - Photogrammetry processing
 
 ## Release Verification
