@@ -194,6 +194,149 @@ Issue Types (Categories):
 - 3-legged OAuth authentication
 - Project access permissions
 
+### `raps issue comment`
+
+Manage comments on issues.
+
+**Usage:**
+```bash
+raps issue comment <subcommand> <project-id> <issue-id>
+```
+
+**Subcommands:**
+- `list` - List comments on an issue
+- `add` - Add a comment to an issue
+- `delete` - Delete a comment
+
+**List Comments:**
+```bash
+$ raps issue comment list project123 abc123xyz
+Fetching comments...
+
+Comments on Issue #abc123xyz:
+────────────────────────────────────────────────────────────
+  [2024-01-15 10:30] john.doe@example.com:
+    "Inspected the site. Window installation is scheduled for next week."
+
+  [2024-01-16 14:20] jane.smith@example.com:
+    "Confirmed with contractor. Parts are on order."
+────────────────────────────────────────────────────────────
+```
+
+**Add Comment:**
+```bash
+$ raps issue comment add project123 abc123xyz --body "Issue has been resolved."
+Adding comment...
+✓ Comment added!
+  ID: comment456
+```
+
+**Delete Comment:**
+```bash
+$ raps issue comment delete project123 abc123xyz --comment-id comment456
+Deleting comment...
+✓ Comment deleted!
+```
+
+**Requirements:**
+- 3-legged OAuth authentication
+- Project write permissions (for add/delete)
+
+### `raps issue attachment`
+
+Manage attachments on issues.
+
+**Usage:**
+```bash
+raps issue attachment <subcommand> <project-id> <issue-id>
+```
+
+**Subcommands:**
+- `list` - List attachments on an issue
+- `upload` - Upload an attachment to an issue
+- `download` - Download an attachment
+
+**List Attachments:**
+```bash
+$ raps issue attachment list project123 abc123xyz
+Fetching attachments...
+
+Attachments on Issue #abc123xyz:
+────────────────────────────────────────────────────────────
+Name                    Size        Uploaded By           Date
+────────────────────────────────────────────────────────────
+photo-001.jpg          1.2 MB      john.doe@example.com  2024-01-15
+floor-plan.pdf         3.5 MB      jane.smith@example.com 2024-01-16
+────────────────────────────────────────────────────────────
+```
+
+**Upload Attachment:**
+```bash
+$ raps issue attachment upload project123 abc123xyz --file ./photo.jpg
+Uploading photo.jpg...
+✓ Attachment uploaded!
+  ID: attach789
+  Size: 1.2 MB
+```
+
+**Download Attachment:**
+```bash
+$ raps issue attachment download project123 abc123xyz --attachment-id attach789 --output ./downloads/
+Downloading attachment...
+✓ Downloaded to: ./downloads/photo.jpg
+```
+
+**Requirements:**
+- 3-legged OAuth authentication
+- Project write permissions (for upload)
+
+### `raps issue transition`
+
+Transition an issue to a new status.
+
+**Usage:**
+```bash
+raps issue transition <project-id> <issue-id> --status STATUS
+```
+
+**Arguments:**
+- `project-id`: Project ID (without "b." prefix)
+- `issue-id`: Issue ID to transition
+
+**Options:**
+- `--status, -s`: New status (open, answered, closed, void)
+
+**Example:**
+```bash
+$ raps issue transition project123 abc123xyz --status closed
+Transitioning issue...
+✓ Issue status updated!
+  Previous: open
+  New: closed
+```
+
+**Interactive Example:**
+```bash
+$ raps issue transition project123 abc123xyz
+Select new status:
+  > open
+    answered
+    closed
+    void
+Transitioning issue...
+✓ Issue status updated!
+```
+
+**Valid Status Transitions:**
+- `open` → `answered`, `closed`, `void`
+- `answered` → `open`, `closed`, `void`
+- `closed` → `open`
+- `void` → `open`
+
+**Requirements:**
+- 3-legged OAuth authentication
+- Project write permissions
+
 ## Issue Statuses
 
 Common issue statuses:

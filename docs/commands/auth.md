@@ -178,6 +178,75 @@ User Profile:
 **Requirements:**
 - Must be logged in with 3-legged OAuth (`raps auth login`)
 
+### `raps auth inspect-token`
+
+Inspect the current access token for scope, expiry, and metadata.
+
+**Usage:**
+```bash
+raps auth inspect-token [--warn-expiry SECONDS]
+```
+
+**Options:**
+- `--warn-expiry, -w`: Warn if token expires within N seconds (default: 300)
+
+**Example:**
+```bash
+$ raps auth inspect-token
+Token Information:
+────────────────────────────────────────────────────────────
+  Valid: ✓ Yes
+  Expires At: 2024-01-15 15:30:00 UTC
+  Expires In: 45 minutes
+
+  Scopes:
+    • data:read
+    • data:write
+    • data:create
+    • account:read
+    • user:read
+    • viewables:read
+────────────────────────────────────────────────────────────
+```
+
+**With expiry warning:**
+```bash
+$ raps auth inspect-token --warn-expiry 3600
+Token Information:
+────────────────────────────────────────────────────────────
+  Valid: ✓ Yes
+  Expires At: 2024-01-15 15:30:00 UTC
+  Expires In: 45 minutes
+
+  ⚠ WARNING: Token expires in less than 1 hour!
+
+  Scopes:
+    • data:read
+    • data:write
+────────────────────────────────────────────────────────────
+```
+
+**Expired token:**
+```bash
+$ raps auth inspect-token
+Token Information:
+────────────────────────────────────────────────────────────
+  Valid: ✗ No (Expired)
+  Expired At: 2024-01-15 14:30:00 UTC
+
+  ⚠ Token has expired! Run 'raps auth login' to refresh.
+────────────────────────────────────────────────────────────
+```
+
+**Use Cases:**
+- Verify token is valid before running scripts
+- Check available scopes for debugging permission issues
+- Monitor token expiry in CI/CD pipelines
+- Debug authentication issues
+
+**Requirements:**
+- Must be logged in with 3-legged OAuth
+
 ## Authentication Types
 
 ### 2-Legged OAuth (Client Credentials)

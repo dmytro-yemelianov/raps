@@ -1,6 +1,6 @@
 [package]
 name = "raps"
-version = "0.7.0-dev"
+version = "0.7.0"
 edition = "2021"
 description = "Command-line interface for Autodesk Platform Services (APS)"
 authors = ["APS Developer"]

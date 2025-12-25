@@ -129,6 +129,100 @@ Manifest:
 - 2-legged OAuth authentication
 - Translation must be completed (status: success)
 
+### `raps translate download`
+
+Download translated derivative outputs.
+
+**Usage:**
+```bash
+raps translate download <urn> [--format FORMAT] [--guid GUID] [--output-dir DIR]
+```
+
+**Arguments:**
+- `urn`: Base64-encoded URN of the source file
+
+**Options:**
+- `--format, -f`: Derivative format to download (svf2, obj, stl, step, iges)
+- `--guid, -g`: Specific derivative GUID (from manifest)
+- `--output-dir, -o`: Output directory (default: current directory)
+
+**Example:**
+```bash
+$ raps translate download <urn> --format obj --output-dir ./exports
+Fetching manifest...
+Downloading OBJ derivative...
+  ████████████████████████████ 100%
+✓ Download complete!
+  Saved to: ./exports/model.obj (2.3 MB)
+```
+
+**Download with GUID:**
+```bash
+$ raps translate download <urn> --guid "abc123-def456"
+Downloading derivative...
+✓ Download complete!
+```
+
+**Requirements:**
+- 2-legged OAuth authentication
+- Translation must be completed
+
+### `raps translate preset`
+
+Manage translation presets for common translation configurations.
+
+**Usage:**
+```bash
+raps translate preset <subcommand>
+```
+
+**Subcommands:**
+- `list` - List all available presets
+- `create` - Create a new preset
+- `delete` - Delete a preset
+- `use` - Start a translation using a preset
+
+**List Presets:**
+```bash
+$ raps translate preset list
+Translation Presets:
+────────────────────────────────────────────────────────────
+Name              Format    Description
+────────────────────────────────────────────────────────────
+viewer            svf2      Optimized for Forge Viewer
+3d-print          stl       Ready for 3D printing
+cad-exchange      step      CAD data exchange format
+bim               ifc       BIM interoperability format
+────────────────────────────────────────────────────────────
+```
+
+**Create a Preset:**
+```bash
+$ raps translate preset create --name "my-preset" --format obj --description "Custom OBJ export"
+✓ Preset 'my-preset' created!
+```
+
+**Use a Preset:**
+```bash
+$ raps translate preset use <urn> --preset viewer
+→ Using preset: viewer (svf2)
+✓ Translation started with preset 'viewer'!
+  Format: svf2
+  URN: dXJuOmFkc2sub2...
+```
+
+**Delete a Preset:**
+```bash
+$ raps translate preset delete my-preset
+✓ Preset 'my-preset' deleted!
+```
+
+**Default Presets:**
+- `viewer` - SVF2 format optimized for Forge Viewer
+- `3d-print` - STL format for 3D printing
+- `cad-exchange` - STEP format for CAD data exchange
+- `bim` - IFC format for BIM interoperability
+
 ## Common Workflows
 
 ### Complete Translation Workflow

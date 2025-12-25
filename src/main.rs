@@ -18,6 +18,7 @@ mod http;
 mod interactive;
 mod logging;
 mod output;
+mod plugins;
 mod storage;
 
 use anyhow::Result;
@@ -31,9 +32,9 @@ use api::{
     OssClient, RealityCaptureClient, WebhooksClient,
 };
 use commands::{
-    AuthCommands, BucketCommands, ConfigCommands, DaCommands, DemoCommands, FolderCommands,
-    GenerateArgs, HubCommands, IssueCommands, ItemCommands, ObjectCommands, ProjectCommands,
-    RealityCommands, TranslateCommands, WebhookCommands,
+    AccCommands, AuthCommands, BucketCommands, ConfigCommands, DaCommands, DemoCommands,
+    FolderCommands, GenerateArgs, HubCommands, IssueCommands, ItemCommands, ObjectCommands,
+    PipelineCommands, ProjectCommands, RealityCommands, TranslateCommands, WebhookCommands,
 };
 use config::Config;
 use error::ExitCode;
@@ -133,6 +134,10 @@ enum Commands {
     #[command(subcommand)]
     Issue(IssueCommands),
 
+    /// ACC extended modules: Assets, Submittals, Checklists (requires 3-legged auth)
+    #[command(subcommand)]
+    Acc(AccCommands),
+
     /// Reality Capture / Photogrammetry
     #[command(subcommand)]
     Reality(RealityCommands),
@@ -147,6 +152,10 @@ enum Commands {
     /// Configuration management (profiles, settings)
     #[command(subcommand)]
     Config(ConfigCommands),
+
+    /// Run pipeline from YAML/JSON file
+    #[command(subcommand)]
+    Pipeline(PipelineCommands),
 
     /// Generate shell completions for bash, zsh, fish, PowerShell, or elvish
     Completions {
@@ -314,6 +323,11 @@ async fn run(mut cli: Cli) -> Result<()> {
             cmd.execute(&issues_client, output_format).await?;
         }
 
+        Commands::Acc(cmd) => {
+            let acc_client = api::AccClient::new(config.clone(), auth_client.clone());
+            cmd.execute(&acc_client, output_format).await?;
+        }
+
         Commands::Reality(cmd) => {
             cmd.execute(&rc_client, output_format).await?;
         }
@@ -331,6 +345,8 @@ async fn run(mut cli: Cli) -> Result<()> {
             // Already handled above
             unreachable!()
         }
+
+        Commands::Pipeline(cmd) => cmd.execute(output_format).await?,
 
         Commands::Completions { .. } => {
             // Already handled above

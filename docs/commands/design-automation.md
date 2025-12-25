@@ -171,6 +171,49 @@ Activities:
 - 2-legged OAuth authentication
 - `APS_DA_NICKNAME` environment variable
 
+### `raps da activity create`
+
+Create a new activity.
+
+**Usage:**
+```bash
+raps da activity create [--id ID] [--engine ENGINE] [--appbundle APPBUNDLE] [--commandline CMD]
+```
+
+**Options:**
+- `--id, -i`: Activity ID
+- `--engine, -e`: Engine ID (e.g., `Autodesk.AutoCAD+24`)
+- `--appbundle, -a`: App bundle to use
+- `--commandline, -c`: Command line to execute
+
+**Example:**
+```bash
+$ raps da activity create --id ProcessDWG --engine Autodesk.AutoCAD+24 --appbundle MyApp
+Creating activity...
+✓ Activity created!
+  ID: ProcessDWG+1.0.0
+  Engine: Autodesk.AutoCAD+24
+  App Bundle: MyApp+1.0.0
+```
+
+**Interactive Example:**
+```bash
+$ raps da activity create
+Fetching engines...
+Select engine:
+  > Autodesk.AutoCAD+24
+    Autodesk.Revit+2024
+Enter activity ID: ProcessDWG
+Select app bundle:
+  > MyApp+1.0.0
+Creating activity...
+✓ Activity created!
+```
+
+**Requirements:**
+- 2-legged OAuth authentication
+- `APS_DA_NICKNAME` environment variable
+
 ### `raps da activity-delete`
 
 Delete an activity.
@@ -188,6 +231,90 @@ raps da activity-delete <id>
 $ raps da activity-delete MyActivity
 Deleting activity...
 ✓ Activity 'MyActivity' deleted!
+```
+
+**Requirements:**
+- 2-legged OAuth authentication
+- `APS_DA_NICKNAME` environment variable
+
+### `raps da workitem run`
+
+Submit a work item to execute an activity.
+
+**Usage:**
+```bash
+raps da workitem run <activity-id> [--input-url URL] [--output-url URL] [--wait]
+```
+
+**Arguments:**
+- `activity-id`: Activity ID to execute
+
+**Options:**
+- `--input-url, -i`: Input file URL (signed OSS URL or public URL)
+- `--output-url, -o`: Output destination URL
+- `--wait, -w`: Wait for completion
+
+**Example:**
+```bash
+$ raps da workitem run ProcessDWG+1.0.0 --input-url "https://..." --output-url "https://..."
+Submitting work item...
+✓ Work item submitted!
+  Work Item ID: abc123xyz
+  Status: pending
+
+Use 'raps da workitem get abc123xyz --wait' to monitor progress
+```
+
+**With wait flag:**
+```bash
+$ raps da workitem run ProcessDWG+1.0.0 --input-url "https://..." --wait
+Submitting work item...
+  ⋯ Status: pending
+  ⋯ Status: inprogress (25%)
+  ⋯ Status: inprogress (75%)
+✓ Work item completed!
+  Status: success
+  Report: https://...
+```
+
+**Requirements:**
+- 2-legged OAuth authentication
+- `APS_DA_NICKNAME` environment variable
+- Activity must exist
+
+### `raps da workitem get`
+
+Get work item results and status.
+
+**Usage:**
+```bash
+raps da workitem get <workitem-id> [--wait] [--download-report]
+```
+
+**Arguments:**
+- `workitem-id`: Work item ID
+
+**Options:**
+- `--wait, -w`: Wait for completion if still processing
+- `--download-report, -d`: Download the work item report
+
+**Example:**
+```bash
+$ raps da workitem get abc123xyz
+Work Item Status:
+────────────────────────────────────────────────────────────
+  ID: abc123xyz
+  Status: success
+  Progress: 100%
+  Report: https://developer.api.autodesk.com/...
+────────────────────────────────────────────────────────────
+```
+
+**Download report:**
+```bash
+$ raps da workitem get abc123xyz --download-report
+Downloading work item report...
+✓ Report saved to: abc123xyz-report.txt
 ```
 
 **Requirements:**

@@ -27,6 +27,21 @@ pub enum ItemCommands {
         /// Item ID
         item_id: String,
     },
+
+    /// Create an item from an OSS object (bind OSS upload to ACC folder)
+    #[command(name = "create-from-oss")]
+    CreateFromOss {
+        /// Project ID (with "b." prefix)
+        project_id: String,
+        /// Target folder ID (get from folder list)
+        folder_id: String,
+        /// Display name for the item
+        #[arg(short, long)]
+        name: String,
+        /// OSS object ID (urn:adsk.objects:os.object:bucket/objectkey)
+        #[arg(long)]
+        object_id: String,
+    },
 }
 
 impl ItemCommands {
@@ -44,6 +59,22 @@ impl ItemCommands {
                 project_id,
                 item_id,
             } => list_versions(client, &project_id, &item_id, output_format).await,
+            ItemCommands::CreateFromOss {
+                project_id,
+                folder_id,
+                name,
+                object_id,
+            } => {
+                create_from_oss(
+                    client,
+                    &project_id,
+                    &folder_id,
+                    &name,
+                    &object_id,
+                    output_format,
+                )
+                .await
+            }
         }
     }
 }
@@ -243,4 +274,54 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len - 3])
     }
+}
+
+#[derive(Serialize)]
+struct CreateFromOssOutput {
+    success: bool,
+    item_id: String,
+    name: String,
+    message: String,
+}
+
+async fn create_from_oss(
+    client: &DataManagementClient,
+    project_id: &str,
+    folder_id: &str,
+    name: &str,
+    object_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Creating item from OSS object...".dimmed());
+        println!("  {} {}", "Project:".bold(), project_id);
+        println!("  {} {}", "Folder:".bold(), folder_id);
+        println!("  {} {}", "Name:".bold(), name.cyan());
+        println!("  {} {}", "Object ID:".bold(), object_id.dimmed());
+    }
+
+    // Create the item using the Data Management API
+    let item = client
+        .create_item_from_storage(project_id, folder_id, name, object_id)
+        .await?;
+
+    let output = CreateFromOssOutput {
+        success: true,
+        item_id: item.id.clone(),
+        name: item.attributes.display_name.clone(),
+        message: format!("Item '{}' created successfully from OSS object", name),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} {}", "✓".green().bold(), output.message);
+            println!("  {} {}", "Item ID:".bold(), output.item_id);
+            println!("  {} {}", "Name:".bold(), output.name.cyan());
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
 }

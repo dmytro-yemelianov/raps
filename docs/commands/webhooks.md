@@ -126,6 +126,69 @@ Available Webhook Events:
 ────────────────────────────────────────────────────────────
 ```
 
+### `raps webhook test`
+
+Test a webhook endpoint by sending a sample payload.
+
+**Usage:**
+```bash
+raps webhook test <callback-url> [--event EVENT] [--secret SECRET] [--payload-file FILE]
+```
+
+**Arguments:**
+- `callback-url`: The webhook callback URL to test
+
+**Options:**
+- `--event, -e`: Event type to simulate (default: dm.version.added)
+- `--secret, -s`: Webhook secret for HMAC signature validation
+- `--payload-file, -p`: Custom JSON payload file
+
+**Example:**
+```bash
+$ raps webhook test https://example.com/webhook
+Testing webhook endpoint...
+Sending test payload to: https://example.com/webhook
+
+✓ Webhook test successful!
+  Response Status: 200 OK
+  Response Time: 234ms
+```
+
+**With custom event type:**
+```bash
+$ raps webhook test https://example.com/webhook --event extraction.finished
+Testing webhook endpoint...
+Sending 'extraction.finished' event to: https://example.com/webhook
+
+✓ Webhook test successful!
+```
+
+**With secret for signature validation:**
+```bash
+$ raps webhook test https://example.com/webhook --secret "my-webhook-secret"
+Testing webhook endpoint with HMAC signature...
+  X-APS-Signature: sha256=abc123...
+
+✓ Webhook test successful!
+```
+
+**With custom payload:**
+```bash
+$ raps webhook test https://example.com/webhook --payload-file ./custom-payload.json
+Testing webhook endpoint with custom payload...
+
+✓ Webhook test successful!
+```
+
+**Use Cases:**
+- Verify your endpoint is accessible
+- Test HMAC signature validation
+- Debug webhook handling before going live
+- Simulate specific events for testing
+
+**Requirements:**
+- Callback URL must be publicly accessible (or use tools like ngrok for local testing)
+
 ## Available Events
 
 ### Data Management Events

@@ -553,4 +553,96 @@ impl DataManagementClient {
 
         Ok(api_response.data)
     }
+
+    /// Create an item from OSS storage object
+    /// This binds an OSS object to a folder in ACC/BIM 360
+    pub async fn create_item_from_storage(
+        &self,
+        project_id: &str,
+        folder_id: &str,
+        display_name: &str,
+        storage_id: &str,
+    ) -> Result<Item> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!("{}/projects/{}/items", self.config.data_url(), project_id);
+
+        // Build JSON:API request for creating an item
+        let request = serde_json::json!({
+            "jsonapi": {
+                "version": "1.0"
+            },
+            "data": {
+                "type": "items",
+                "attributes": {
+                    "displayName": display_name,
+                    "extension": {
+                        "type": "items:autodesk.core:File",
+                        "version": "1.0"
+                    }
+                },
+                "relationships": {
+                    "tip": {
+                        "data": {
+                            "type": "versions",
+                            "id": "1"
+                        }
+                    },
+                    "parent": {
+                        "data": {
+                            "type": "folders",
+                            "id": folder_id
+                        }
+                    }
+                }
+            },
+            "included": [
+                {
+                    "type": "versions",
+                    "id": "1",
+                    "attributes": {
+                        "name": display_name,
+                        "extension": {
+                            "type": "versions:autodesk.core:File",
+                            "version": "1.0"
+                        }
+                    },
+                    "relationships": {
+                        "storage": {
+                            "data": {
+                                "type": "objects",
+                                "id": storage_id
+                            }
+                        }
+                    }
+                }
+            ]
+        });
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/vnd.api+json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create item from storage")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!(
+                "Failed to create item from storage ({}): {}",
+                status,
+                error_text
+            );
+        }
+
+        let api_response: JsonApiResponse<Item> = response
+            .json()
+            .await
+            .context("Failed to parse item response")?;
+
+        Ok(api_response.data)
+    }
 }

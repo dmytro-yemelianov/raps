@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
+use serde::Serialize;
 
 use crate::api::issues::CreateIssueRequest;
 use crate::api::IssuesClient;
@@ -60,6 +61,61 @@ pub enum IssueCommands {
         /// Project ID (without "b." prefix)
         project_id: String,
     },
+
+    /// Manage issue comments
+    #[command(subcommand)]
+    Comment(CommentCommands),
+
+    /// List attachments for an issue
+    Attachments {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+    },
+
+    /// Transition an issue to a new status
+    Transition {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+        /// Target status (open, answered, closed, etc.)
+        #[arg(short, long)]
+        to: Option<String>,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CommentCommands {
+    /// List comments on an issue
+    List {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+    },
+
+    /// Add a comment to an issue
+    Add {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+        /// Comment body
+        #[arg(short, long)]
+        body: String,
+    },
+
+    /// Delete a comment from an issue
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+        /// Comment ID to delete
+        comment_id: String,
+    },
 }
 
 impl IssueCommands {
@@ -82,6 +138,37 @@ impl IssueCommands {
             IssueCommands::Types { project_id } => {
                 list_issue_types(client, &project_id, output_format).await
             }
+            IssueCommands::Comment(cmd) => cmd.execute(client, output_format).await,
+            IssueCommands::Attachments {
+                project_id,
+                issue_id,
+            } => list_attachments(client, &project_id, &issue_id, output_format).await,
+            IssueCommands::Transition {
+                project_id,
+                issue_id,
+                to,
+            } => transition_issue(client, &project_id, &issue_id, to, output_format).await,
+        }
+    }
+}
+
+impl CommentCommands {
+    pub async fn execute(self, client: &IssuesClient, output_format: OutputFormat) -> Result<()> {
+        match self {
+            CommentCommands::List {
+                project_id,
+                issue_id,
+            } => list_comments(client, &project_id, &issue_id, output_format).await,
+            CommentCommands::Add {
+                project_id,
+                issue_id,
+                body,
+            } => add_comment(client, &project_id, &issue_id, &body, output_format).await,
+            CommentCommands::Delete {
+                project_id,
+                issue_id,
+                comment_id,
+            } => delete_comment(client, &project_id, &issue_id, &comment_id, output_format).await,
         }
     }
 }
@@ -307,4 +394,327 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len - 3])
     }
+}
+
+// ============== COMMENTS ==============
+
+#[derive(Serialize)]
+struct CommentOutput {
+    id: String,
+    body: String,
+    created_at: Option<String>,
+    created_by: Option<String>,
+}
+
+async fn list_comments(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching comments...".dimmed());
+    }
+
+    let comments = client.list_comments(project_id, issue_id).await?;
+
+    let outputs: Vec<CommentOutput> = comments
+        .iter()
+        .map(|c| CommentOutput {
+            id: c.id.clone(),
+            body: c.body.clone(),
+            created_at: c.created_at.clone(),
+            created_by: c.created_by.clone(),
+        })
+        .collect();
+
+    if outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No comments found.".yellow()),
+            _ => output_format.write(&Vec::<CommentOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Comments:".bold());
+            println!("{}", "─".repeat(80));
+
+            for comment in &outputs {
+                let created = comment.created_at.as_deref().unwrap_or("-");
+                let author = comment.created_by.as_deref().unwrap_or("-");
+
+                println!("{} {}", "ID:".bold(), comment.id.dimmed());
+                println!("{} {}", "Author:".bold(), author);
+                println!("{} {}", "Created:".bold(), created.dimmed());
+                println!("{}", comment.body);
+                println!("{}", "─".repeat(80));
+            }
+        }
+        _ => output_format.write(&outputs)?,
+    }
+
+    Ok(())
+}
+
+async fn add_comment(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    body: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Adding comment...".dimmed());
+    }
+
+    let comment = client.add_comment(project_id, issue_id, body).await?;
+
+    #[derive(Serialize)]
+    struct AddCommentOutput {
+        success: bool,
+        id: String,
+        body: String,
+    }
+
+    let output = AddCommentOutput {
+        success: true,
+        id: comment.id.clone(),
+        body: comment.body.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Comment added!", "✓".green().bold());
+            println!("  {} {}", "ID:".bold(), output.id);
+            println!("  {} {}", "Body:".bold(), truncate_str(&output.body, 50));
+        }
+        _ => output_format.write(&output)?,
+    }
+
+    Ok(())
+}
+
+async fn delete_comment(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    comment_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting comment...".dimmed());
+    }
+
+    client
+        .delete_comment(project_id, issue_id, comment_id)
+        .await?;
+
+    #[derive(Serialize)]
+    struct DeleteCommentOutput {
+        success: bool,
+        comment_id: String,
+        message: String,
+    }
+
+    let output = DeleteCommentOutput {
+        success: true,
+        comment_id: comment_id.to_string(),
+        message: "Comment deleted successfully".to_string(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+        }
+        _ => output_format.write(&output)?,
+    }
+
+    Ok(())
+}
+
+// ============== ATTACHMENTS ==============
+
+#[derive(Serialize)]
+struct AttachmentOutput {
+    id: String,
+    name: String,
+    urn: Option<String>,
+    created_at: Option<String>,
+    created_by: Option<String>,
+}
+
+async fn list_attachments(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching attachments...".dimmed());
+    }
+
+    let attachments = client.list_attachments(project_id, issue_id).await?;
+
+    let outputs: Vec<AttachmentOutput> = attachments
+        .iter()
+        .map(|a| AttachmentOutput {
+            id: a.id.clone(),
+            name: a.name.clone(),
+            urn: a.urn.clone(),
+            created_at: a.created_at.clone(),
+            created_by: a.created_by.clone(),
+        })
+        .collect();
+
+    if outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No attachments found.".yellow()),
+            _ => output_format.write(&Vec::<AttachmentOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Attachments:".bold());
+            println!("{}", "─".repeat(80));
+            println!(
+                "{:<40} {:<20} {}",
+                "Name".bold(),
+                "Created".bold(),
+                "ID".bold()
+            );
+            println!("{}", "─".repeat(80));
+
+            for attachment in &outputs {
+                let created = attachment.created_at.as_deref().unwrap_or("-");
+                println!(
+                    "{:<40} {:<20} {}",
+                    truncate_str(&attachment.name, 40).cyan(),
+                    created.dimmed(),
+                    attachment.id.dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(80));
+        }
+        _ => output_format.write(&outputs)?,
+    }
+
+    Ok(())
+}
+
+// ============== STATE TRANSITIONS ==============
+
+/// Allowed issue status transitions
+const STATUS_TRANSITIONS: &[(&str, &[&str])] = &[
+    ("open", &["answered", "closed"]),
+    ("answered", &["open", "closed"]),
+    ("closed", &["open"]),
+    ("draft", &["open"]),
+];
+
+fn get_allowed_transitions(current_status: &str) -> Vec<&'static str> {
+    for (status, transitions) in STATUS_TRANSITIONS {
+        if *status == current_status.to_lowercase() {
+            return transitions.to_vec();
+        }
+    }
+    // Default: allow any common transitions
+    vec!["open", "answered", "closed"]
+}
+
+async fn transition_issue(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    target_status: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Get current issue to determine valid transitions
+    let current_issue = client.get_issue(project_id, issue_id).await?;
+    let current_status = current_issue.status.clone();
+    let allowed = get_allowed_transitions(&current_status);
+
+    // Get target status
+    let new_status = match target_status {
+        Some(s) => {
+            let s_lower = s.to_lowercase();
+            if !allowed.contains(&s_lower.as_str()) {
+                anyhow::bail!(
+                    "Cannot transition from '{}' to '{}'. Allowed transitions: {:?}",
+                    current_status,
+                    s,
+                    allowed
+                );
+            }
+            s_lower
+        }
+        None => {
+            // In non-interactive mode, require the target status
+            if interactive::is_non_interactive() {
+                anyhow::bail!(
+                    "Target status is required. Current: '{}'. Allowed: {:?}",
+                    current_status,
+                    allowed
+                );
+            }
+
+            // Interactive: show allowed transitions
+            println!("{} Current status: {}", "→".cyan(), current_status.bold());
+
+            let selection = Select::new()
+                .with_prompt("Select new status")
+                .items(&allowed)
+                .interact()?;
+
+            allowed[selection].to_string()
+        }
+    };
+
+    if output_format.supports_colors() {
+        println!("{}", "Transitioning issue...".dimmed());
+    }
+
+    let request = crate::api::issues::UpdateIssueRequest {
+        title: None,
+        description: None,
+        status: Some(new_status.clone()),
+        assigned_to: None,
+        due_date: None,
+    };
+
+    let updated_issue = client.update_issue(project_id, issue_id, request).await?;
+
+    #[derive(Serialize)]
+    struct TransitionOutput {
+        success: bool,
+        issue_id: String,
+        from_status: String,
+        to_status: String,
+    }
+
+    let output = TransitionOutput {
+        success: true,
+        issue_id: updated_issue.id.clone(),
+        from_status: current_status.clone(),
+        to_status: updated_issue.status.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Issue transitioned!", "✓".green().bold());
+            println!(
+                "  {} {} → {}",
+                "Status:".bold(),
+                output.from_status.dimmed(),
+                output.to_status.cyan()
+            );
+        }
+        _ => output_format.write(&output)?,
+    }
+
+    Ok(())
 }

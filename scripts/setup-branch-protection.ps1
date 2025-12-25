@@ -22,13 +22,14 @@ if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# Check if authenticated
-$authStatus = gh auth status 2>&1
+# Check if authenticated - verify token works by making a simple API call
+$authCheck = gh api user 2>&1
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Not authenticated with GitHub CLI." -ForegroundColor Red
+    Write-Host "Error: Not authenticated with GitHub CLI or token is invalid." -ForegroundColor Red
     Write-Host "Run: gh auth login" -ForegroundColor Yellow
     exit 1
 }
+Write-Host "Authenticated as: $((ConvertFrom-Json $authCheck).login)" -ForegroundColor Gray
 
 Write-Host "Configuring branch protection rules..." -ForegroundColor Green
 
@@ -50,18 +51,28 @@ $requiredChecks = @(
     "all-checks-pass"
 )
 
-$checksString = $requiredChecks -join ","
+# Build the JSON payload for branch protection
+$protectionPayload = @{
+    required_status_checks = @{
+        strict = $true
+        contexts = $requiredChecks
+    }
+    enforce_admins = $true
+    required_pull_request_reviews = @{
+        required_approving_review_count = 1
+        dismiss_stale_reviews = $true
+        require_code_owner_reviews = $false
+    }
+    restrictions = $null
+    required_linear_history = $false
+    allow_force_pushes = $false
+    allow_deletions = $false
+}
 
-# Configure branch protection
-gh api repos/$Repository/branches/$Branch/protection `
-    --method PUT `
-    --field required_status_checks='{"strict":true,"contexts":["' + $checksString + '"]}' `
-    --field enforce_admins=true `
-    --field required_pull_request_reviews='{"required_approving_review_count":1,"dismiss_stale_reviews":true,"require_code_owner_reviews":false}' `
-    --field restrictions=null `
-    --field required_linear_history=false `
-    --field allow_force_pushes=false `
-    --field allow_deletions=false
+$jsonPayload = $protectionPayload | ConvertTo-Json -Depth 10 -Compress
+
+# Configure branch protection (pipe JSON to gh api)
+$jsonPayload | gh api "repos/$Repository/branches/$Branch/protection" --method PUT --input -
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""

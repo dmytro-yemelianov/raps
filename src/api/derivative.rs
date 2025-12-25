@@ -1,12 +1,18 @@
 //! Model Derivative API module
 //!
 //! Handles translation of CAD files and retrieval of derivative manifests.
+//! Supports downloading translated derivatives directly from manifest.
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
 
 use anyhow::{Context, Result};
+use futures_util::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 
 use super::AuthClient;
 use crate::config::Config;
@@ -186,7 +192,7 @@ pub struct Derivative {
     pub children: Vec<DerivativeChild>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DerivativeChild {
     pub guid: String,
@@ -195,8 +201,26 @@ pub struct DerivativeChild {
     pub role: String,
     pub name: Option<String>,
     pub status: Option<String>,
+    /// URN for downloadable derivatives
+    pub urn: Option<String>,
+    /// MIME type for downloadable files
+    pub mime: Option<String>,
+    /// File size in bytes
+    pub size: Option<u64>,
     #[serde(default)]
     pub children: Vec<DerivativeChild>,
+}
+
+/// Information about a downloadable derivative
+#[derive(Debug, Clone, Serialize)]
+pub struct DownloadableDerivative {
+    pub guid: String,
+    pub name: String,
+    pub output_type: String,
+    pub role: String,
+    pub urn: String,
+    pub mime: Option<String>,
+    pub size: Option<u64>,
 }
 
 /// Model Derivative API client
@@ -364,5 +388,194 @@ impl DerivativeClient {
     pub async fn get_status(&self, urn: &str) -> Result<(String, String)> {
         let manifest = self.get_manifest(urn).await?;
         Ok((manifest.status, manifest.progress))
+    }
+
+    /// Get list of downloadable derivatives from manifest
+    pub async fn list_downloadable_derivatives(
+        &self,
+        urn: &str,
+    ) -> Result<Vec<DownloadableDerivative>> {
+        let manifest = self.get_manifest(urn).await?;
+        let mut downloadables = Vec::new();
+
+        for derivative in &manifest.derivatives {
+            self.collect_downloadables(derivative, &derivative.output_type, &mut downloadables);
+        }
+
+        Ok(downloadables)
+    }
+
+    /// Recursively collect downloadable items from derivative tree
+    fn collect_downloadables(
+        &self,
+        derivative: &Derivative,
+        output_type: &str,
+        downloadables: &mut Vec<DownloadableDerivative>,
+    ) {
+        for child in &derivative.children {
+            self.collect_downloadables_from_child(child, output_type, downloadables);
+        }
+    }
+
+    /// Recursively collect downloadable items from child nodes
+    fn collect_downloadables_from_child(
+        &self,
+        child: &DerivativeChild,
+        output_type: &str,
+        downloadables: &mut Vec<DownloadableDerivative>,
+    ) {
+        // Check if this child has a URN (is downloadable)
+        if let Some(ref urn) = child.urn {
+            let name = child.name.clone().unwrap_or_else(|| {
+                // Generate name from GUID and type
+                format!(
+                    "{}.{}",
+                    &child.guid[..8.min(child.guid.len())],
+                    output_type.to_lowercase()
+                )
+            });
+
+            downloadables.push(DownloadableDerivative {
+                guid: child.guid.clone(),
+                name,
+                output_type: output_type.to_string(),
+                role: child.role.clone(),
+                urn: urn.clone(),
+                mime: child.mime.clone(),
+                size: child.size,
+            });
+        }
+
+        // Recurse into children
+        for grandchild in &child.children {
+            self.collect_downloadables_from_child(grandchild, output_type, downloadables);
+        }
+    }
+
+    /// Filter derivatives by format (output type)
+    pub fn filter_by_format(
+        derivatives: &[DownloadableDerivative],
+        format: &str,
+    ) -> Vec<DownloadableDerivative> {
+        derivatives
+            .iter()
+            .filter(|d| d.output_type.to_lowercase() == format.to_lowercase())
+            .cloned()
+            .collect()
+    }
+
+    /// Filter derivatives by GUID
+    pub fn filter_by_guid(
+        derivatives: &[DownloadableDerivative],
+        guid: &str,
+    ) -> Option<DownloadableDerivative> {
+        derivatives.iter().find(|d| d.guid == guid).cloned()
+    }
+
+    /// Download a derivative to a local file
+    pub async fn download_derivative(
+        &self,
+        source_urn: &str,
+        derivative_urn: &str,
+        output_path: &Path,
+    ) -> Result<u64> {
+        let token = self.auth.get_token().await?;
+
+        // The derivative URN needs to be URL-encoded
+        let encoded_derivative_urn = urlencoding::encode(derivative_urn);
+        let url = format!(
+            "{}/designdata/{}/manifest/{}",
+            self.config.derivative_url(),
+            source_urn,
+            encoded_derivative_urn
+        );
+
+        crate::logging::log_request("GET", &url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to download derivative")?;
+
+        crate::logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to download derivative ({}): {}", status, error_text);
+        }
+
+        let total_size = response.content_length().unwrap_or(0);
+
+        // Create progress bar
+        let pb = ProgressBar::new(total_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
+                .unwrap()
+                .progress_chars("█▓░"),
+        );
+
+        let filename = output_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("derivative");
+        pb.set_message(format!("Downloading {}", filename));
+
+        // Create parent directories if needed
+        if let Some(parent) = output_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+
+        // Stream download
+        let mut file = File::create(output_path)
+            .await
+            .context("Failed to create output file")?;
+
+        let mut stream = response.bytes_stream();
+        let mut downloaded: u64 = 0;
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.context("Error while downloading")?;
+            file.write_all(&chunk)
+                .await
+                .context("Failed to write to file")?;
+            downloaded += chunk.len() as u64;
+            pb.set_position(downloaded);
+        }
+
+        pb.finish_with_message(format!("Downloaded {}", filename));
+
+        Ok(downloaded)
+    }
+
+    /// Download all derivatives matching a format
+    pub async fn download_derivatives_by_format(
+        &self,
+        source_urn: &str,
+        format: &str,
+        output_dir: &Path,
+    ) -> Result<Vec<(String, u64)>> {
+        let downloadables = self.list_downloadable_derivatives(source_urn).await?;
+        let filtered = Self::filter_by_format(&downloadables, format);
+
+        if filtered.is_empty() {
+            anyhow::bail!("No derivatives found with format '{}'", format);
+        }
+
+        let mut results = Vec::new();
+
+        for derivative in filtered {
+            let output_path = output_dir.join(&derivative.name);
+            let size = self
+                .download_derivative(source_urn, &derivative.urn, &output_path)
+                .await?;
+            results.push((derivative.name, size));
+        }
+
+        Ok(results)
     }
 }
