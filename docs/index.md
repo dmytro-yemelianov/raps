@@ -1,7 +1,12 @@
 # RAPS CLI Documentation
 
 <div align="center">
-  <img src="logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
+  <img src="logo/output/raps-logo.webp" 
+       srcset="logo/output/raps-logo-256.webp 256w, logo/output/raps-logo-512.webp 512w, logo/output/raps-logo.webp 512w"
+       sizes="(max-width: 512px) 256px, 512px"
+       alt="RAPS Logo" 
+       width="200"
+       style="max-width: 200px; height: auto;"/>
   <h1>RAPS CLI Documentation</h1>
   <p><strong>R</strong>ust <strong>APS</strong> CLI - A comprehensive command-line interface for Autodesk Platform Services</p>
 </div>

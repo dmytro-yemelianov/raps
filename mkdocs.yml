@@ -46,7 +46,7 @@ theme:
     - content.code.copy
   icon:
     logo: material/console
-  logo: logo/output/raps-logo.png
+  logo: logo/output/raps-logo.webp
 
 # Markdown extensions
 markdown_extensions:
