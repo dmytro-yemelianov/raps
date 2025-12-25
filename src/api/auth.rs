@@ -137,31 +137,23 @@ impl AuthClient {
 
     /// Save token to persistent storage
     fn save_token(&self, token: &StoredToken) -> Result<()> {
-        let path = self.token_path();
-        let json = serde_json::to_string_pretty(token)?;
-        let mut file = fs::File::create(&path)?;
-        file.write_all(json.as_bytes())?;
-        Ok(())
+        let storage = self.token_storage();
+        storage.save(token)
     }
 
     /// Load token from persistent storage
     #[allow(dead_code)]
     fn load_stored_token(&self) -> Result<StoredToken> {
-        let path = self.token_path();
-        let mut file = fs::File::open(&path)?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents)?;
-        let token: StoredToken = serde_json::from_str(&contents)?;
-        Ok(token)
+        let storage = self.token_storage();
+        storage
+            .load()?
+            .ok_or_else(|| anyhow::anyhow!("No stored token found"))
     }
 
     /// Delete stored token
     pub fn delete_stored_token(&self) -> Result<()> {
-        let path = self.token_path();
-        if path.exists() {
-            fs::remove_file(&path)?;
-        }
-        Ok(())
+        let storage = self.token_storage();
+        storage.delete()
     }
 
     /// Get a valid 2-legged access token

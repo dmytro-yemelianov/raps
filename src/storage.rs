@@ -94,8 +94,8 @@ impl TokenStorage {
             return Ok(None);
         }
         let contents = std::fs::read_to_string(&path)?;
-        let token: StoredToken = serde_json::from_str(&contents)
-            .context("Failed to parse token file")?;
+        let token: StoredToken =
+            serde_json::from_str(&contents).context("Failed to parse token file")?;
         Ok(Some(token))
     }
 
@@ -111,8 +111,7 @@ impl TokenStorage {
     /// Save token to OS keychain
     fn save_keychain(&self, token: &StoredToken) -> Result<()> {
         // Serialize token to JSON
-        let json = serde_json::to_string(token)
-            .context("Failed to serialize token")?;
+        let json = serde_json::to_string(token).context("Failed to serialize token")?;
 
         // Store in keychain
         let entry = match keyring::Entry::new(&self.service_name, &self.username) {
@@ -147,8 +146,8 @@ impl TokenStorage {
 
         match entry.get_password() {
             Ok(json) => {
-                let token: StoredToken = serde_json::from_str(&json)
-                    .context("Failed to parse token from keychain")?;
+                let token: StoredToken =
+                    serde_json::from_str(&json).context("Failed to parse token from keychain")?;
                 Ok(Some(token))
             }
             Err(keyring::Error::NoEntry) => Ok(None),
@@ -188,6 +187,7 @@ impl TokenStorage {
     }
 
     /// Get the current backend being used
+    #[allow(dead_code)]
     pub fn backend(&self) -> StorageBackend {
         self.backend
     }
@@ -220,4 +220,3 @@ mod tests {
         std::env::remove_var("RAPS_USE_KEYCHAIN");
     }
 }
-
