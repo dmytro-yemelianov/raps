@@ -183,7 +183,17 @@ impl DaCommands {
                 command,
                 description,
             } => {
-                create_activity(client, file, id, engine, appbundle, command, description, output_format).await
+                create_activity(
+                    client,
+                    file,
+                    id,
+                    engine,
+                    appbundle,
+                    command,
+                    description,
+                    output_format,
+                )
+                .await
             }
             DaCommands::ActivityDelete { id } => delete_activity(client, &id, output_format).await,
             DaCommands::Run {
@@ -192,8 +202,21 @@ impl DaCommands {
                 output,
                 wait,
             } => run_workitem(client, &activity, input, output, wait, output_format).await,
-            DaCommands::Status { workitem_id, wait, download, output_dir } => {
-                check_status(client, &workitem_id, wait, download, output_dir, output_format).await
+            DaCommands::Status {
+                workitem_id,
+                wait,
+                download,
+                output_dir,
+            } => {
+                check_status(
+                    client,
+                    &workitem_id,
+                    wait,
+                    download,
+                    output_dir,
+                    output_format,
+                )
+                .await
             }
         }
     }
@@ -442,15 +465,27 @@ async fn create_activity(
         // Load activity definition from file
         let content = std::fs::read_to_string(&file_path)
             .with_context(|| format!("Failed to read activity file: {}", file_path.display()))?;
-        
-        let def: ActivityDefinition = if file_path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
-            serde_yaml::from_str(&content)
-                .with_context(|| format!("Failed to parse YAML activity file: {}", file_path.display()))?
+
+        let def: ActivityDefinition = if file_path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
+            serde_yaml::from_str(&content).with_context(|| {
+                format!(
+                    "Failed to parse YAML activity file: {}",
+                    file_path.display()
+                )
+            })?
         } else {
-            serde_json::from_str(&content)
-                .with_context(|| format!("Failed to parse JSON activity file: {}", file_path.display()))?
+            serde_json::from_str(&content).with_context(|| {
+                format!(
+                    "Failed to parse JSON activity file: {}",
+                    file_path.display()
+                )
+            })?
         };
-        
+
         // Validate required fields
         if def.id.is_empty() {
             anyhow::bail!("Activity definition must have an 'id' field");
@@ -461,20 +496,23 @@ async fn create_activity(
         if def.command_line.is_empty() {
             anyhow::bail!("Activity definition must have a 'commandLine' field");
         }
-        
+
         def
     } else {
         // Build activity from command line arguments
-        let activity_id = id.ok_or_else(|| anyhow::anyhow!("--id is required when not using --file"))?;
-        let activity_engine = engine.ok_or_else(|| anyhow::anyhow!("--engine is required when not using --file"))?;
-        let activity_command = command.ok_or_else(|| anyhow::anyhow!("--command is required when not using --file"))?;
-        
+        let activity_id =
+            id.ok_or_else(|| anyhow::anyhow!("--id is required when not using --file"))?;
+        let activity_engine =
+            engine.ok_or_else(|| anyhow::anyhow!("--engine is required when not using --file"))?;
+        let activity_command = command
+            .ok_or_else(|| anyhow::anyhow!("--command is required when not using --file"))?;
+
         let app_bundles = if let Some(bundle) = appbundle {
             vec![bundle]
         } else {
             Vec::new()
         };
-        
+
         ActivityDefinition {
             id: activity_id,
             engine: activity_engine,

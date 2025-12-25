@@ -391,7 +391,10 @@ impl DerivativeClient {
     }
 
     /// Get list of downloadable derivatives from manifest
-    pub async fn list_downloadable_derivatives(&self, urn: &str) -> Result<Vec<DownloadableDerivative>> {
+    pub async fn list_downloadable_derivatives(
+        &self,
+        urn: &str,
+    ) -> Result<Vec<DownloadableDerivative>> {
         let manifest = self.get_manifest(urn).await?;
         let mut downloadables = Vec::new();
 
@@ -425,9 +428,13 @@ impl DerivativeClient {
         if let Some(ref urn) = child.urn {
             let name = child.name.clone().unwrap_or_else(|| {
                 // Generate name from GUID and type
-                format!("{}.{}", &child.guid[..8.min(child.guid.len())], output_type.to_lowercase())
+                format!(
+                    "{}.{}",
+                    &child.guid[..8.min(child.guid.len())],
+                    output_type.to_lowercase()
+                )
             });
-            
+
             downloadables.push(DownloadableDerivative {
                 guid: child.guid.clone(),
                 name,
@@ -446,7 +453,10 @@ impl DerivativeClient {
     }
 
     /// Filter derivatives by format (output type)
-    pub fn filter_by_format(derivatives: &[DownloadableDerivative], format: &str) -> Vec<DownloadableDerivative> {
+    pub fn filter_by_format(
+        derivatives: &[DownloadableDerivative],
+        format: &str,
+    ) -> Vec<DownloadableDerivative> {
         derivatives
             .iter()
             .filter(|d| d.output_type.to_lowercase() == format.to_lowercase())
@@ -455,11 +465,11 @@ impl DerivativeClient {
     }
 
     /// Filter derivatives by GUID
-    pub fn filter_by_guid(derivatives: &[DownloadableDerivative], guid: &str) -> Option<DownloadableDerivative> {
-        derivatives
-            .iter()
-            .find(|d| d.guid == guid)
-            .cloned()
+    pub fn filter_by_guid(
+        derivatives: &[DownloadableDerivative],
+        guid: &str,
+    ) -> Option<DownloadableDerivative> {
+        derivatives.iter().find(|d| d.guid == guid).cloned()
     }
 
     /// Download a derivative to a local file
@@ -470,11 +480,11 @@ impl DerivativeClient {
         output_path: &Path,
     ) -> Result<u64> {
         let token = self.auth.get_token().await?;
-        
+
         // The derivative URN needs to be URL-encoded
         let encoded_derivative_urn = urlencoding::encode(derivative_urn);
         let url = format!(
-            "{}/designdata/{}/manifest/{}", 
+            "{}/designdata/{}/manifest/{}",
             self.config.derivative_url(),
             source_urn,
             encoded_derivative_urn
@@ -508,7 +518,7 @@ impl DerivativeClient {
                 .unwrap()
                 .progress_chars("█▓░"),
         );
-        
+
         let filename = output_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -538,7 +548,7 @@ impl DerivativeClient {
         }
 
         pb.finish_with_message(format!("Downloaded {}", filename));
-        
+
         Ok(downloaded)
     }
 
@@ -551,16 +561,18 @@ impl DerivativeClient {
     ) -> Result<Vec<(String, u64)>> {
         let downloadables = self.list_downloadable_derivatives(source_urn).await?;
         let filtered = Self::filter_by_format(&downloadables, format);
-        
+
         if filtered.is_empty() {
             anyhow::bail!("No derivatives found with format '{}'", format);
         }
 
         let mut results = Vec::new();
-        
+
         for derivative in filtered {
             let output_path = output_dir.join(&derivative.name);
-            let size = self.download_derivative(source_urn, &derivative.urn, &output_path).await?;
+            let size = self
+                .download_derivative(source_urn, &derivative.urn, &output_path)
+                .await?;
             results.push((derivative.name, size));
         }
 

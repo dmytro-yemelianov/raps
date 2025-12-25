@@ -141,9 +141,13 @@ impl TranslateCommands {
             TranslateCommands::Derivatives { urn, format } => {
                 list_derivatives(client, &urn, format, output_format).await
             }
-            TranslateCommands::Download { urn, format, guid, output, all } => {
-                download_derivatives(client, &urn, format, guid, output, all, output_format).await
-            }
+            TranslateCommands::Download {
+                urn,
+                format,
+                guid,
+                output,
+                all,
+            } => download_derivatives(client, &urn, format, guid, output, all, output_format).await,
             TranslateCommands::Preset(cmd) => cmd.execute(client, output_format).await,
         }
     }
@@ -158,9 +162,11 @@ impl PresetCommands {
         match self {
             PresetCommands::List => list_presets(output_format),
             PresetCommands::Show { name } => show_preset(&name, output_format),
-            PresetCommands::Create { name, format, description } => {
-                create_preset(&name, &format, description, output_format)
-            }
+            PresetCommands::Create {
+                name,
+                format,
+                description,
+            } => create_preset(&name, &format, description, output_format),
             PresetCommands::Delete { name } => delete_preset(&name, output_format),
             PresetCommands::Use { urn, preset } => {
                 use_preset(client, &urn, &preset, output_format).await
@@ -497,7 +503,10 @@ async fn list_derivatives(
         match output_format {
             OutputFormat::Table => {
                 if format_filter.is_some() {
-                    println!("{}", "No derivatives found matching the specified format.".yellow());
+                    println!(
+                        "{}",
+                        "No derivatives found matching the specified format.".yellow()
+                    );
                 } else {
                     println!("{}", "No downloadable derivatives found.".yellow());
                 }
@@ -628,8 +637,11 @@ async fn download_derivatives(
 
     for derivative in to_download {
         let file_path = output_path.join(&derivative.name);
-        
-        match client.download_derivative(urn, &derivative.urn, &file_path).await {
+
+        match client
+            .download_derivative(urn, &derivative.urn, &file_path)
+            .await
+        {
             Ok(size) => {
                 total_size += size;
                 downloaded_files.push(DownloadedFile {
@@ -663,13 +675,22 @@ async fn download_derivatives(
                 println!("{} No files were downloaded.", "✗".red().bold());
             } else {
                 println!("\n{} Download complete!", "✓".green().bold());
-                println!("  {} {} files", "Downloaded:".bold(), output.downloaded.len());
+                println!(
+                    "  {} {} files",
+                    "Downloaded:".bold(),
+                    output.downloaded.len()
+                );
                 println!("  {} {}", "Total size:".bold(), output.total_size_human);
-                
+
                 if output.downloaded.len() <= 10 {
                     println!("\n  {}:", "Files".bold());
                     for file in &output.downloaded {
-                        println!("    {} {} ({})", "•".cyan(), file.name, file.size_human.dimmed());
+                        println!(
+                            "    {} {} ({})",
+                            "•".cyan(),
+                            file.name,
+                            file.size_human.dimmed()
+                        );
                     }
                 }
             }
@@ -822,7 +843,7 @@ fn list_presets(output_format: OutputFormat) -> Result<()> {
 
 fn show_preset(name: &str, output_format: OutputFormat) -> Result<()> {
     let store = PresetStore::load()?;
-    
+
     let preset = store
         .presets
         .iter()
@@ -865,7 +886,11 @@ fn create_preset(
     let mut store = PresetStore::load()?;
 
     // Check for duplicate
-    if store.presets.iter().any(|p| p.name.eq_ignore_ascii_case(name)) {
+    if store
+        .presets
+        .iter()
+        .any(|p| p.name.eq_ignore_ascii_case(name))
+    {
         anyhow::bail!("Preset '{}' already exists", name);
     }
 
@@ -932,7 +957,7 @@ async fn use_preset(
     output_format: OutputFormat,
 ) -> Result<()> {
     let store = PresetStore::load()?;
-    
+
     let preset = store
         .presets
         .iter()
@@ -973,7 +998,11 @@ async fn use_preset(
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Translation started with preset '{}'!", "✓".green().bold(), preset.name);
+            println!(
+                "{} Translation started with preset '{}'!",
+                "✓".green().bold(),
+                preset.name
+            );
             println!("  {} {}", "Format:".bold(), output.format.cyan());
             println!("  {} {}", "URN:".bold(), output.urn.dimmed());
             println!(
@@ -1010,10 +1039,10 @@ mod tests {
     #[test]
     fn test_preset_store_default_presets() {
         let store = PresetStore::default_presets();
-        
+
         // Should have default presets
         assert!(!store.presets.is_empty());
-        
+
         // Check for expected presets
         let preset_names: Vec<&str> = store.presets.iter().map(|p| p.name.as_str()).collect();
         assert!(preset_names.contains(&"viewer"));
@@ -1024,18 +1053,16 @@ mod tests {
     #[test]
     fn test_preset_store_serialization() {
         let store = PresetStore {
-            presets: vec![
-                TranslationPreset {
-                    name: "custom".to_string(),
-                    format: "obj".to_string(),
-                    description: Some("Custom preset".to_string()),
-                },
-            ],
+            presets: vec![TranslationPreset {
+                name: "custom".to_string(),
+                format: "obj".to_string(),
+                description: Some("Custom preset".to_string()),
+            }],
         };
 
         let json = serde_json::to_string(&store).unwrap();
         let parsed: PresetStore = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(parsed.presets.len(), 1);
         assert_eq!(parsed.presets[0].name, "custom");
     }

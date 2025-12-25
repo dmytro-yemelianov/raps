@@ -74,9 +74,11 @@ pub struct PipelineStep {
 impl PipelineCommands {
     pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
         match self {
-            PipelineCommands::Run { file, continue_on_error, dry_run } => {
-                run_pipeline(&file, continue_on_error, dry_run, output_format).await
-            }
+            PipelineCommands::Run {
+                file,
+                continue_on_error,
+                dry_run,
+            } => run_pipeline(&file, continue_on_error, dry_run, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format),
             PipelineCommands::Sample { output } => generate_sample(&output, output_format),
         }
@@ -87,7 +89,11 @@ fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
     let content = std::fs::read_to_string(file)
         .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?;
 
-    let pipeline: Pipeline = if file.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+    let pipeline: Pipeline = if file
+        .extension()
+        .map(|e| e == "yaml" || e == "yml")
+        .unwrap_or(false)
+    {
         serde_yaml::from_str(&content)
             .with_context(|| format!("Failed to parse YAML pipeline: {}", file.display()))?
     } else {
@@ -120,7 +126,7 @@ async fn run_pipeline(
 
     for (i, step) in pipeline.steps.iter().enumerate() {
         let step_num = i + 1;
-        
+
         if output_format.supports_colors() {
             println!(
                 "\n[{}/{}] {}",
@@ -175,7 +181,11 @@ async fn run_pipeline(
                 failed += 1;
 
                 if !step.continue_on_error && !global_continue_on_error {
-                    anyhow::bail!("Pipeline aborted at step '{}' (exit code: {})", step.name, exit_code);
+                    anyhow::bail!(
+                        "Pipeline aborted at step '{}' (exit code: {})",
+                        step.name,
+                        exit_code
+                    );
                 }
             }
             Err(e) => {
@@ -234,8 +244,7 @@ async fn run_pipeline(
 
 fn execute_raps_command(command: &str) -> Result<i32> {
     // Get the current executable path
-    let exe_path = std::env::current_exe()
-        .context("Failed to get current executable path")?;
+    let exe_path = std::env::current_exe().context("Failed to get current executable path")?;
 
     // Split command into args
     let args: Vec<&str> = command.split_whitespace().collect();
@@ -294,7 +303,11 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
     match output_format {
         OutputFormat::Table => {
             if warnings.is_empty() {
-                println!("{} Pipeline '{}' is valid!", "✓".green().bold(), pipeline.name);
+                println!(
+                    "{} Pipeline '{}' is valid!",
+                    "✓".green().bold(),
+                    pipeline.name
+                );
                 println!("  {} {} steps", "Steps:".bold(), result.steps_count);
             } else {
                 println!("{} Pipeline has warnings:", "!".yellow().bold());
@@ -398,7 +411,10 @@ steps:
         let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(pipeline.name, "Test Pipeline");
         assert_eq!(pipeline.steps.len(), 2);
-        assert_eq!(pipeline.variables.get("BUCKET"), Some(&"test-bucket".to_string()));
+        assert_eq!(
+            pipeline.variables.get("BUCKET"),
+            Some(&"test-bucket".to_string())
+        );
         assert!(!pipeline.steps[0].continue_on_error);
         assert!(pipeline.steps[1].continue_on_error);
     }
@@ -444,4 +460,3 @@ command: bucket list
         assert!(step.condition.is_none());
     }
 }
-

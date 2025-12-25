@@ -234,7 +234,10 @@ impl AccClient {
     }
 
     /// List checklist templates in a project
-    pub async fn list_checklist_templates(&self, project_id: &str) -> Result<Vec<ChecklistTemplate>> {
+    pub async fn list_checklist_templates(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<ChecklistTemplate>> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!(
             "https://developer.api.autodesk.com/construction/checklists/v1/projects/{}/templates",
@@ -252,7 +255,11 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list checklist templates ({}): {}", status, error_text);
+            anyhow::bail!(
+                "Failed to list checklist templates ({}): {}",
+                status,
+                error_text
+            );
         }
 
         #[derive(Deserialize)]
@@ -268,4 +275,3 @@ impl AccClient {
         Ok(templates_response.results)
     }
 }
-

@@ -64,7 +64,17 @@ impl ItemCommands {
                 folder_id,
                 name,
                 object_id,
-            } => create_from_oss(client, &project_id, &folder_id, &name, &object_id, output_format).await,
+            } => {
+                create_from_oss(
+                    client,
+                    &project_id,
+                    &folder_id,
+                    &name,
+                    &object_id,
+                    output_format,
+                )
+                .await
+            }
         }
     }
 }

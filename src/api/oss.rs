@@ -192,13 +192,19 @@ impl MultipartUploadState {
             .context("Failed to get project directories")?;
         let cache_dir = proj_dirs.cache_dir();
         std::fs::create_dir_all(cache_dir)?;
-        
+
         // Create a safe filename from bucket and object key
         let safe_name = format!("{}_{}", bucket_key, object_key)
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>();
-        
+
         Ok(cache_dir.join(format!("upload_{}.json", safe_name)))
     }
 
@@ -240,7 +246,7 @@ impl MultipartUploadState {
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
-            
+
             current_size == self.file_size && current_mtime == self.file_mtime
         } else {
             false
@@ -503,7 +509,8 @@ impl OssClient {
         object_key: &str,
         file_path: &Path,
     ) -> Result<ObjectInfo> {
-        self.upload_object_with_options(bucket_key, object_key, file_path, false).await
+        self.upload_object_with_options(bucket_key, object_key, file_path, false)
+            .await
     }
 
     /// Upload a file with resume option
@@ -522,9 +529,11 @@ impl OssClient {
 
         // Use multipart upload for files larger than threshold
         if file_size > MultipartUploadState::MULTIPART_THRESHOLD {
-            self.upload_multipart(bucket_key, object_key, file_path, resume).await
+            self.upload_multipart(bucket_key, object_key, file_path, resume)
+                .await
         } else {
-            self.upload_single_part(bucket_key, object_key, file_path).await
+            self.upload_single_part(bucket_key, object_key, file_path)
+                .await
         }
     }
 
@@ -663,7 +672,9 @@ impl OssClient {
         // Initialize state if needed
         let state = if let Some(s) = state.take() {
             // Set progress for already completed parts
-            let completed_bytes: u64 = s.completed_parts.iter()
+            let completed_bytes: u64 = s
+                .completed_parts
+                .iter()
                 .map(|&part| {
                     let start = (part as u64 - 1) * s.chunk_size;
                     let end = std::cmp::min(start + s.chunk_size, s.file_size);
@@ -671,11 +682,15 @@ impl OssClient {
                 })
                 .sum();
             pb.set_position(completed_bytes);
-            pb.set_message(format!("Resuming {} ({} parts done)", object_key, s.completed_parts.len()));
+            pb.set_message(format!(
+                "Resuming {} ({} parts done)",
+                object_key,
+                s.completed_parts.len()
+            ));
             s
         } else {
             pb.set_message(format!("Starting multipart upload for {}", object_key));
-            
+
             // Get signed URLs for all parts
             let signed = self
                 .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
@@ -708,11 +723,15 @@ impl OssClient {
 
         // Get remaining parts to upload
         let remaining_parts = state.remaining_parts();
-        
+
         if remaining_parts.is_empty() {
             pb.set_message(format!("All parts uploaded, completing {}", object_key));
         } else {
-            pb.set_message(format!("Uploading {} ({} parts remaining)", object_key, remaining_parts.len()));
+            pb.set_message(format!(
+                "Uploading {} ({} parts remaining)",
+                object_key,
+                remaining_parts.len()
+            ));
         }
 
         // We need to get fresh signed URLs for remaining parts
@@ -756,7 +775,12 @@ impl OssClient {
             if !response.status().is_success() {
                 let status = response.status();
                 let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to upload part {} ({}): {}", part_num, status, error_text);
+                anyhow::bail!(
+                    "Failed to upload part {} ({}): {}",
+                    part_num,
+                    status,
+                    error_text
+                );
             }
 
             // Get ETag from response
@@ -1133,7 +1157,7 @@ mod tests {
             object_key: "test-object".to_string(),
             file_path: "/tmp/test.bin".to_string(),
             file_size: 20 * 1024 * 1024, // 20MB
-            chunk_size: 5 * 1024 * 1024,  // 5MB chunks
+            chunk_size: 5 * 1024 * 1024, // 5MB chunks
             total_parts: 4,
             completed_parts: vec![1, 3], // Parts 1 and 3 done
             part_etags: std::collections::HashMap::new(),

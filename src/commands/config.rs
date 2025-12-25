@@ -110,9 +110,11 @@ impl ProfileCommands {
             ProfileCommands::Use { name } => use_profile(&name, output_format).await,
             ProfileCommands::Delete { name } => delete_profile(&name, output_format).await,
             ProfileCommands::Current => show_current_profile(output_format).await,
-            ProfileCommands::Export { output, include_secrets, name } => {
-                export_profiles(&output, include_secrets, name, output_format).await
-            }
+            ProfileCommands::Export {
+                output,
+                include_secrets,
+                name,
+            } => export_profiles(&output, include_secrets, name, output_format).await,
             ProfileCommands::Import { file, overwrite } => {
                 import_profiles(&file, overwrite, output_format).await
             }
@@ -445,13 +447,17 @@ async fn export_profiles(
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Exported {} profile(s) to {}",
+            println!(
+                "{} Exported {} profile(s) to {}",
                 "✓".green().bold(),
                 output.profiles_count,
                 output.path.cyan()
             );
             if !include_secrets {
-                println!("  {} Secrets were redacted. Use --include-secrets to export credentials.", "!".yellow());
+                println!(
+                    "  {} Secrets were redacted. Use --include-secrets to export credentials.",
+                    "!".yellow()
+                );
             }
         }
         _ => {
@@ -480,7 +486,11 @@ async fn import_profiles(
     for (name, profile) in import_data.profiles {
         if data.profiles.contains_key(&name) && !overwrite {
             if output_format.supports_colors() {
-                println!("  {} Profile '{}' already exists, skipping", "→".yellow(), name);
+                println!(
+                    "  {} Profile '{}' already exists, skipping",
+                    "→".yellow(),
+                    name
+                );
             }
             skipped += 1;
             continue;
@@ -506,9 +516,17 @@ async fn import_profiles(
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Imported {} profile(s)", "✓".green().bold(), output.imported);
+            println!(
+                "{} Imported {} profile(s)",
+                "✓".green().bold(),
+                output.imported
+            );
             if skipped > 0 {
-                println!("  {} {} profile(s) skipped (use --overwrite to replace)", "→".yellow(), skipped);
+                println!(
+                    "  {} {} profile(s) skipped (use --overwrite to replace)",
+                    "→".yellow(),
+                    skipped
+                );
             }
         }
         _ => {
@@ -519,16 +537,16 @@ async fn import_profiles(
     Ok(())
 }
 
-async fn diff_profiles(
-    profile1: &str,
-    profile2: &str,
-    output_format: OutputFormat,
-) -> Result<()> {
+async fn diff_profiles(profile1: &str, profile2: &str, output_format: OutputFormat) -> Result<()> {
     let data = load_profiles()?;
 
-    let p1 = data.profiles.get(profile1)
+    let p1 = data
+        .profiles
+        .get(profile1)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile1))?;
-    let p2 = data.profiles.get(profile2)
+    let p2 = data
+        .profiles
+        .get(profile2)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile2))?;
 
     #[derive(Serialize)]
@@ -548,13 +566,15 @@ async fn diff_profiles(
     ];
 
     for (key, v1, v2) in fields {
-        let redact = |v: Option<&String>| v.map(|s| {
-            if key == "client_id" {
-                format!("{}...", &s[..8.min(s.len())])
-            } else {
-                s.clone()
-            }
-        });
+        let redact = |v: Option<&String>| {
+            v.map(|s| {
+                if key == "client_id" {
+                    format!("{}...", &s[..8.min(s.len())])
+                } else {
+                    s.clone()
+                }
+            })
+        };
 
         diffs.push(DiffItem {
             key: key.to_string(),
@@ -580,14 +600,12 @@ async fn diff_profiles(
             for diff in &diffs {
                 let v1 = diff.value1.as_deref().unwrap_or("-");
                 let v2 = diff.value2.as_deref().unwrap_or("-");
-                let marker = if diff.different { "≠".red().to_string() } else { "=".green().to_string() };
-                println!(
-                    "{:<15} {:<25} {:<25} {}",
-                    diff.key,
-                    v1,
-                    v2,
-                    marker
-                );
+                let marker = if diff.different {
+                    "≠".red().to_string()
+                } else {
+                    "=".green().to_string()
+                };
+                println!("{:<15} {:<25} {:<25} {}", diff.key, v1, v2, marker);
             }
 
             println!("{}", "─".repeat(70));

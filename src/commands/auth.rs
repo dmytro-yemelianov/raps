@@ -104,9 +104,9 @@ impl AuthCommands {
             AuthCommands::Logout => logout(auth_client, output_format).await,
             AuthCommands::Status => status(auth_client, output_format).await,
             AuthCommands::Whoami => whoami(auth_client, output_format).await,
-            AuthCommands::Inspect { warn_expiry_seconds } => {
-                inspect_token(auth_client, warn_expiry_seconds, output_format).await
-            }
+            AuthCommands::Inspect {
+                warn_expiry_seconds,
+            } => inspect_token(auth_client, warn_expiry_seconds, output_format).await,
         }
     }
 }
@@ -512,15 +512,15 @@ async fn inspect_token(
 ) -> Result<()> {
     let backend = crate::storage::StorageBackend::from_env();
     let storage = crate::storage::TokenStorage::new(backend);
-    
+
     // Try to load stored token info
     let token_data = storage.load()?;
-    
+
     let output = if let Some(data) = token_data {
         let now = chrono::Utc::now().timestamp();
         let expires_at = data.expires_at;
         let expires_in = expires_at - now;
-        
+
         // Use scopes directly (already Vec<String>)
         let scopes: Vec<String> = data.scopes.clone();
 
@@ -528,7 +528,7 @@ async fn inspect_token(
         let warn_threshold = warn_expiry_seconds.unwrap_or(300) as i64; // Default 5 minutes
         let is_expiring_soon = expires_in > 0 && expires_in < warn_threshold;
         let is_expired = expires_in <= 0;
-        
+
         let warning = if is_expired {
             Some("Token has expired!".to_string())
         } else if is_expiring_soon {
@@ -539,12 +539,16 @@ async fn inspect_token(
 
         InspectOutput {
             authenticated: !is_expired,
-            token_type: Some(if data.access_token.starts_with("ey") { "JWT".to_string() } else { "Opaque".to_string() }),
+            token_type: Some(if data.access_token.starts_with("ey") {
+                "JWT".to_string()
+            } else {
+                "Opaque".to_string()
+            }),
             expires_in_seconds: Some(expires_in),
             expires_at: Some(
                 chrono::DateTime::from_timestamp(expires_at, 0)
                     .map(|dt| dt.to_rfc3339())
-                    .unwrap_or_else(|| "Unknown".to_string())
+                    .unwrap_or_else(|| "Unknown".to_string()),
             ),
             scopes: Some(scopes),
             is_expiring_soon: is_expiring_soon || is_expired,
@@ -583,7 +587,12 @@ async fn inspect_token(
                 } else if expires_in < 300 {
                     format!("{} seconds", expires_in).yellow().to_string()
                 } else {
-                    format!("{} seconds ({:.1} hours)", expires_in, expires_in as f64 / 3600.0).to_string()
+                    format!(
+                        "{} seconds ({:.1} hours)",
+                        expires_in,
+                        expires_in as f64 / 3600.0
+                    )
+                    .to_string()
                 };
                 println!("  {} {}", "Expires in:".bold(), color);
             }

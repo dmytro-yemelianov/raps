@@ -71,7 +71,9 @@ impl AccCommands {
 impl AssetCommands {
     pub async fn execute(self, client: &AccClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            AssetCommands::List { project_id } => list_assets(client, &project_id, output_format).await,
+            AssetCommands::List { project_id } => {
+                list_assets(client, &project_id, output_format).await
+            }
         }
     }
 }
@@ -79,7 +81,9 @@ impl AssetCommands {
 impl SubmittalCommands {
     pub async fn execute(self, client: &AccClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            SubmittalCommands::List { project_id } => list_submittals(client, &project_id, output_format).await,
+            SubmittalCommands::List { project_id } => {
+                list_submittals(client, &project_id, output_format).await
+            }
         }
     }
 }
@@ -87,8 +91,12 @@ impl SubmittalCommands {
 impl ChecklistCommands {
     pub async fn execute(self, client: &AccClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            ChecklistCommands::List { project_id } => list_checklists(client, &project_id, output_format).await,
-            ChecklistCommands::Templates { project_id } => list_templates(client, &project_id, output_format).await,
+            ChecklistCommands::List { project_id } => {
+                list_checklists(client, &project_id, output_format).await
+            }
+            ChecklistCommands::Templates { project_id } => {
+                list_templates(client, &project_id, output_format).await
+            }
         }
     }
 }
@@ -104,7 +112,11 @@ struct AssetOutput {
     updated_at: Option<String>,
 }
 
-async fn list_assets(client: &AccClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn list_assets(
+    client: &AccClient,
+    project_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching assets...".dimmed());
     }
@@ -175,7 +187,11 @@ struct SubmittalOutput {
     due_date: Option<String>,
 }
 
-async fn list_submittals(client: &AccClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn list_submittals(
+    client: &AccClient,
+    project_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching submittals...".dimmed());
     }
@@ -254,7 +270,11 @@ struct ChecklistOutput {
     due_date: Option<String>,
 }
 
-async fn list_checklists(client: &AccClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn list_checklists(
+    client: &AccClient,
+    project_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching checklists...".dimmed());
     }
@@ -328,7 +348,11 @@ struct TemplateOutput {
     description: Option<String>,
 }
 
-async fn list_templates(client: &AccClient, project_id: &str, output_format: OutputFormat) -> Result<()> {
+async fn list_templates(
+    client: &AccClient,
+    project_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
     if output_format.supports_colors() {
         println!("{}", "Fetching checklist templates...".dimmed());
     }
@@ -356,11 +380,7 @@ async fn list_templates(client: &AccClient, project_id: &str, output_format: Out
         OutputFormat::Table => {
             println!("\n{}", "Checklist Templates:".bold());
             println!("{}", "─".repeat(80));
-            println!(
-                "{:<40} {}",
-                "Title".bold(),
-                "Description".bold()
-            );
+            println!("{:<40} {}", "Title".bold(), "Description".bold());
             println!("{}", "─".repeat(80));
 
             for template in &outputs {
@@ -390,4 +410,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

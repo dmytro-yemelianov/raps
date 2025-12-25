@@ -97,12 +97,17 @@ pub enum ObjectCommands {
 impl ObjectCommands {
     pub async fn execute(self, client: &OssClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            ObjectCommands::Upload { bucket, file, key, resume } => {
-                upload_object(client, bucket, file, key, resume, output_format).await
-            }
-            ObjectCommands::UploadBatch { bucket, files, parallel } => {
-                upload_batch(client, bucket, files, parallel, output_format).await
-            }
+            ObjectCommands::Upload {
+                bucket,
+                file,
+                key,
+                resume,
+            } => upload_object(client, bucket, file, key, resume, output_format).await,
+            ObjectCommands::UploadBatch {
+                bucket,
+                files,
+                parallel,
+            } => upload_batch(client, bucket, files, parallel, output_format).await,
             ObjectCommands::Download {
                 bucket,
                 object,
@@ -669,9 +674,7 @@ async fn upload_batch(
                 .unwrap_or("unnamed")
                 .to_string();
 
-            let result = client
-                .upload_object(&bucket, &object_key, &file_path)
-                .await;
+            let result = client.upload_object(&bucket, &object_key, &file_path).await;
 
             drop(permit); // Release permit
 
@@ -768,7 +771,11 @@ async fn upload_batch(
                 batch_result.uploaded.to_string().green(),
                 batch_result.failed.to_string().red()
             );
-            println!("  {} {}", "Size:".bold(), format_size(batch_result.total_size));
+            println!(
+                "  {} {}",
+                "Size:".bold(),
+                format_size(batch_result.total_size)
+            );
         }
         _ => {
             output_format.write(&batch_result)?;

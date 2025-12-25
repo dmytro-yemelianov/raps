@@ -139,12 +139,15 @@ impl IssueCommands {
                 list_issue_types(client, &project_id, output_format).await
             }
             IssueCommands::Comment(cmd) => cmd.execute(client, output_format).await,
-            IssueCommands::Attachments { project_id, issue_id } => {
-                list_attachments(client, &project_id, &issue_id, output_format).await
-            }
-            IssueCommands::Transition { project_id, issue_id, to } => {
-                transition_issue(client, &project_id, &issue_id, to, output_format).await
-            }
+            IssueCommands::Attachments {
+                project_id,
+                issue_id,
+            } => list_attachments(client, &project_id, &issue_id, output_format).await,
+            IssueCommands::Transition {
+                project_id,
+                issue_id,
+                to,
+            } => transition_issue(client, &project_id, &issue_id, to, output_format).await,
         }
     }
 }
@@ -152,15 +155,20 @@ impl IssueCommands {
 impl CommentCommands {
     pub async fn execute(self, client: &IssuesClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            CommentCommands::List { project_id, issue_id } => {
-                list_comments(client, &project_id, &issue_id, output_format).await
-            }
-            CommentCommands::Add { project_id, issue_id, body } => {
-                add_comment(client, &project_id, &issue_id, &body, output_format).await
-            }
-            CommentCommands::Delete { project_id, issue_id, comment_id } => {
-                delete_comment(client, &project_id, &issue_id, &comment_id, output_format).await
-            }
+            CommentCommands::List {
+                project_id,
+                issue_id,
+            } => list_comments(client, &project_id, &issue_id, output_format).await,
+            CommentCommands::Add {
+                project_id,
+                issue_id,
+                body,
+            } => add_comment(client, &project_id, &issue_id, &body, output_format).await,
+            CommentCommands::Delete {
+                project_id,
+                issue_id,
+                comment_id,
+            } => delete_comment(client, &project_id, &issue_id, &comment_id, output_format).await,
         }
     }
 }
@@ -436,7 +444,7 @@ async fn list_comments(
             for comment in &outputs {
                 let created = comment.created_at.as_deref().unwrap_or("-");
                 let author = comment.created_by.as_deref().unwrap_or("-");
-                
+
                 println!("{} {}", "ID:".bold(), comment.id.dimmed());
                 println!("{} {}", "Author:".bold(), author);
                 println!("{} {}", "Created:".bold(), created.dimmed());
@@ -499,7 +507,9 @@ async fn delete_comment(
         println!("{}", "Deleting comment...".dimmed());
     }
 
-    client.delete_comment(project_id, issue_id, comment_id).await?;
+    client
+        .delete_comment(project_id, issue_id, comment_id)
+        .await?;
 
     #[derive(Serialize)]
     struct DeleteCommentOutput {
@@ -651,19 +661,15 @@ async fn transition_issue(
                     allowed
                 );
             }
-            
+
             // Interactive: show allowed transitions
-            println!(
-                "{} Current status: {}",
-                "→".cyan(),
-                current_status.bold()
-            );
-            
+            println!("{} Current status: {}", "→".cyan(), current_status.bold());
+
             let selection = Select::new()
                 .with_prompt("Select new status")
                 .items(&allowed)
                 .interact()?;
-            
+
             allowed[selection].to_string()
         }
     };

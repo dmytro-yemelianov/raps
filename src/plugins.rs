@@ -88,10 +88,9 @@ impl PluginConfig {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let content = std::fs::read_to_string(&path)
-            .context("Failed to read plugin config")?;
-        let config: Self = serde_json::from_str(&content)
-            .context("Failed to parse plugin config")?;
+        let content = std::fs::read_to_string(&path).context("Failed to read plugin config")?;
+        let config: Self =
+            serde_json::from_str(&content).context("Failed to parse plugin config")?;
         Ok(config)
     }
 
@@ -150,7 +149,10 @@ impl PluginManager {
                     for entry in entries.flatten() {
                         if let Some(plugin) = self.check_plugin_entry(&entry.path()) {
                             // Avoid duplicates
-                            if !plugins.iter().any(|p: &DiscoveredPlugin| p.name == plugin.name) {
+                            if !plugins
+                                .iter()
+                                .any(|p: &DiscoveredPlugin| p.name == plugin.name)
+                            {
                                 plugins.push(plugin);
                             }
                         }
@@ -165,7 +167,7 @@ impl PluginManager {
     /// Check if a path is a raps plugin
     fn check_plugin_entry(&self, path: &Path) -> Option<DiscoveredPlugin> {
         let file_name = path.file_name()?.to_str()?;
-        
+
         // Check for raps-* pattern
         let plugin_name = if cfg!(windows) {
             if file_name.starts_with("raps-") && file_name.ends_with(".exe") {
@@ -178,7 +180,9 @@ impl PluginManager {
         }?;
 
         // Check if enabled in config
-        let enabled = self.config.plugins
+        let enabled = self
+            .config
+            .plugins
             .get(plugin_name)
             .map(|e| e.enabled)
             .unwrap_or(true);
@@ -315,12 +319,17 @@ mod tests {
     #[test]
     fn test_plugin_config_serialization() {
         let mut config = PluginConfig::default();
-        config.aliases.insert("up".to_string(), "object upload".to_string());
-        config.hooks.insert("pre_upload".to_string(), vec!["echo 'starting'".to_string()]);
+        config
+            .aliases
+            .insert("up".to_string(), "object upload".to_string());
+        config.hooks.insert(
+            "pre_upload".to_string(),
+            vec!["echo 'starting'".to_string()],
+        );
 
         let json = serde_json::to_string(&config).unwrap();
         let parsed: PluginConfig = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(parsed.aliases.get("up"), Some(&"object upload".to_string()));
         assert_eq!(parsed.hooks.get("pre_upload").unwrap().len(), 1);
     }
@@ -328,7 +337,9 @@ mod tests {
     #[test]
     fn test_get_alias() {
         let mut config = PluginConfig::default();
-        config.aliases.insert("quick-up".to_string(), "object upload --resume".to_string());
+        config
+            .aliases
+            .insert("quick-up".to_string(), "object upload --resume".to_string());
 
         assert_eq!(config.get_alias("quick-up"), Some("object upload --resume"));
         assert_eq!(config.get_alias("nonexistent"), None);
@@ -341,7 +352,7 @@ mod tests {
             path: PathBuf::from("/usr/bin/raps-test-plugin"),
             enabled: true,
         };
-        
+
         assert_eq!(plugin.name, "test-plugin");
         assert!(plugin.enabled);
     }
@@ -353,4 +364,3 @@ mod tests {
         assert!(manager.config.plugins.is_empty());
     }
 }
-

@@ -83,9 +83,11 @@ impl WebhookCommands {
             WebhookCommands::Test { url, timeout } => {
                 test_webhook_endpoint(&url, timeout, output_format).await
             }
-            WebhookCommands::VerifySignature { payload, signature, secret } => {
-                verify_signature(&payload, &signature, &secret, output_format)
-            }
+            WebhookCommands::VerifySignature {
+                payload,
+                signature,
+                secret,
+            } => verify_signature(&payload, &signature, &secret, output_format),
         }
     }
 }
@@ -438,7 +440,7 @@ async fn test_webhook_endpoint(
         .build()?;
 
     let start = Instant::now();
-    
+
     let result = client
         .post(url)
         .header("Content-Type", "application/json")
@@ -468,7 +470,7 @@ async fn test_webhook_endpoint(
             } else {
                 format!("Request failed: {}", e)
             };
-            
+
             TestEndpointOutput {
                 success: false,
                 url: url.to_string(),
@@ -490,7 +492,11 @@ async fn test_webhook_endpoint(
             if let Some(status) = output.status_code {
                 println!("  {} {}", "Status:".bold(), status);
             }
-            println!("  {} {}ms", "Response time:".bold(), output.response_time_ms);
+            println!(
+                "  {} {}ms",
+                "Response time:".bold(),
+                output.response_time_ms
+            );
         }
         _ => {
             output_format.write(&output)?;
@@ -529,11 +535,11 @@ fn verify_signature(
     // Calculate HMAC-SHA256 signature
     // Note: In a real implementation, you'd use a crypto library like hmac + sha2
     // For now, we'll provide a placeholder that shows the expected format
-    
+
     // The APS webhook signature format is typically base64(HMAC-SHA256(secret, payload))
     // This is a simplified verification that checks format
     let is_valid_format = signature.len() > 20 && !signature.contains(' ');
-    
+
     let output = if is_valid_format {
         VerifySignatureOutput {
             valid: true,
@@ -553,7 +559,10 @@ fn verify_signature(
             } else {
                 println!("{} {}", "✗".red().bold(), output.message);
             }
-            println!("\n{}", "Tip: Use this payload in your webhook handler for testing:".dimmed());
+            println!(
+                "\n{}",
+                "Tip: Use this payload in your webhook handler for testing:".dimmed()
+            );
             println!("{}", payload_data.chars().take(200).collect::<String>());
             if payload_data.len() > 200 {
                 println!("{}...", "".dimmed());

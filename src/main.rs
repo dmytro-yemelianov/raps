@@ -346,9 +346,7 @@ async fn run(mut cli: Cli) -> Result<()> {
             unreachable!()
         }
 
-        Commands::Pipeline(cmd) => {
-            cmd.execute(output_format).await?
-        }
+        Commands::Pipeline(cmd) => cmd.execute(output_format).await?,
 
         Commands::Completions { .. } => {
             // Already handled above

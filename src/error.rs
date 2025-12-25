@@ -170,10 +170,14 @@ pub fn interpret_error(status_code: u16, response_body: &str) -> InterpretedErro
     let parsed: Option<ApsErrorResponse> = serde_json::from_str(response_body).ok();
 
     let (error_code, message) = if let Some(ref err) = parsed {
-        let code = err.error_code.clone()
+        let code = err
+            .error_code
+            .clone()
             .or(err.reason.clone())
             .unwrap_or_else(|| status_to_code(status_code));
-        let msg = err.detail.clone()
+        let msg = err
+            .detail
+            .clone()
             .or(err.description.clone())
             .or(err.developer_message.clone())
             .unwrap_or_else(|| response_body.to_string());
@@ -213,7 +217,10 @@ fn get_error_help(status_code: u16, error_code: &str, message: &str) -> (String,
     let code_lower = error_code.to_lowercase();
 
     // Authentication errors
-    if status_code == 401 || code_lower.contains("unauthorized") || code_lower.contains("invalid_token") {
+    if status_code == 401
+        || code_lower.contains("unauthorized")
+        || code_lower.contains("invalid_token")
+    {
         return (
             "Authentication failed. Your token is invalid, expired, or missing.".to_string(),
             vec![
@@ -225,7 +232,10 @@ fn get_error_help(status_code: u16, error_code: &str, message: &str) -> (String,
     }
 
     // Scope/permission errors
-    if status_code == 403 || code_lower.contains("forbidden") || code_lower.contains("insufficient_scope") {
+    if status_code == 403
+        || code_lower.contains("forbidden")
+        || code_lower.contains("insufficient_scope")
+    {
         let mut suggestions = vec![
             "Check that your app has the required scopes enabled in APS Portal".to_string(),
             "Run 'raps auth login' with the necessary scopes".to_string(),
@@ -291,11 +301,24 @@ pub fn format_interpreted_error(error: &InterpretedError, use_colors: bool) -> S
     let mut output = String::new();
 
     if use_colors {
-        output.push_str(&format!("\n{} {}\n", "Error:".red().bold(), error.explanation));
-        output.push_str(&format!("  {} {} (HTTP {})\n", "Code:".bold(), error.error_code, error.status_code));
-        
+        output.push_str(&format!(
+            "\n{} {}\n",
+            "Error:".red().bold(),
+            error.explanation
+        ));
+        output.push_str(&format!(
+            "  {} {} (HTTP {})\n",
+            "Code:".bold(),
+            error.error_code,
+            error.status_code
+        ));
+
         if !error.original_message.is_empty() && error.original_message != error.explanation {
-            output.push_str(&format!("  {} {}\n", "Details:".bold(), error.original_message.dimmed()));
+            output.push_str(&format!(
+                "  {} {}\n",
+                "Details:".bold(),
+                error.original_message.dimmed()
+            ));
         }
 
         if !error.suggestions.is_empty() {
@@ -306,8 +329,11 @@ pub fn format_interpreted_error(error: &InterpretedError, use_colors: bool) -> S
         }
     } else {
         output.push_str(&format!("\nError: {}\n", error.explanation));
-        output.push_str(&format!("  Code: {} (HTTP {})\n", error.error_code, error.status_code));
-        
+        output.push_str(&format!(
+            "  Code: {} (HTTP {})\n",
+            error.error_code, error.status_code
+        ));
+
         if !error.original_message.is_empty() {
             output.push_str(&format!("  Details: {}\n", error.original_message));
         }
