@@ -249,105 +249,108 @@ async fn run(mut cli: Cli) -> Result<()> {
     // Load configuration
     let config = Config::from_env()?;
 
-    // Create HTTP client config from CLI flags
+    // Create HTTP client with shared config
     let http_config = http::HttpClientConfig::from_cli_and_env(cli.timeout);
 
-    // Create API clients with shared HTTP config
-    let auth_client = AuthClient::new_with_http_config(config.clone(), http_config.clone());
-    let oss_client =
-        OssClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let derivative_client = DerivativeClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
-    let dm_client = DataManagementClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
-    let webhooks_client = WebhooksClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
-    let da_client = DesignAutomationClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
-    let issues_client = IssuesClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
-    let rc_client = RealityCaptureClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
-    );
+    // Helper closure to create clients on demand
+    let get_auth_client =
+        || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };
+
+    let get_oss_client = || -> OssClient {
+        let auth = get_auth_client();
+        OssClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_derivative_client = || -> DerivativeClient {
+        let auth = get_auth_client();
+        DerivativeClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_dm_client = || -> DataManagementClient {
+        let auth = get_auth_client();
+        DataManagementClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_webhooks_client = || -> WebhooksClient {
+        let auth = get_auth_client();
+        WebhooksClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_da_client = || -> DesignAutomationClient {
+        let auth = get_auth_client();
+        DesignAutomationClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_issues_client = || -> IssuesClient {
+        let auth = get_auth_client();
+        IssuesClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_rc_client = || -> RealityCaptureClient {
+        let auth = get_auth_client();
+        RealityCaptureClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
 
     match cli.command {
         Commands::Auth(cmd) => {
-            cmd.execute(&auth_client, output_format).await?;
+            cmd.execute(&get_auth_client(), output_format).await?;
         }
 
         Commands::Bucket(cmd) => {
-            cmd.execute(&oss_client, output_format).await?;
+            cmd.execute(&get_oss_client(), output_format).await?;
         }
 
         Commands::Object(cmd) => {
-            cmd.execute(&oss_client, output_format).await?;
+            cmd.execute(&get_oss_client(), output_format).await?;
         }
 
         Commands::Translate(cmd) => {
-            cmd.execute(&derivative_client, output_format).await?;
+            cmd.execute(&get_derivative_client(), output_format).await?;
         }
 
         Commands::Hub(cmd) => {
-            cmd.execute(&dm_client, output_format).await?;
+            cmd.execute(&get_dm_client(), output_format).await?;
         }
 
         Commands::Project(cmd) => {
-            cmd.execute(&dm_client, output_format).await?;
+            cmd.execute(&get_dm_client(), output_format).await?;
         }
 
         Commands::Folder(cmd) => {
-            cmd.execute(&dm_client, output_format).await?;
+            cmd.execute(&get_dm_client(), output_format).await?;
         }
 
         Commands::Item(cmd) => {
-            cmd.execute(&dm_client, output_format).await?;
+            cmd.execute(&get_dm_client(), output_format).await?;
         }
 
         Commands::Webhook(cmd) => {
-            cmd.execute(&webhooks_client, output_format).await?;
+            cmd.execute(&get_webhooks_client(), output_format).await?;
         }
 
         Commands::Da(cmd) => {
-            cmd.execute(&da_client, output_format).await?;
+            cmd.execute(&get_da_client(), output_format).await?;
         }
 
         Commands::Issue(cmd) => {
-            cmd.execute(&issues_client, output_format).await?;
+            cmd.execute(&get_issues_client(), output_format).await?;
         }
 
         Commands::Acc(cmd) => {
-            let acc_client = api::AccClient::new(config.clone(), auth_client.clone());
+            let auth_client = get_auth_client();
+            let acc_client = api::AccClient::new(config.clone(), auth_client);
             cmd.execute(&acc_client, output_format).await?;
         }
 
         Commands::Rfi(cmd) => {
-            let rfi_client = RfiClient::new_with_http_config(
-                config.clone(),
-                auth_client.clone(),
-                http_config.clone(),
-            );
+            let auth_client = get_auth_client();
+            let rfi_client =
+                RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
             cmd.execute(&rfi_client, output_format).await?;
         }
 
         Commands::Reality(cmd) => {
-            cmd.execute(&rc_client, output_format).await?;
+            cmd.execute(&get_rc_client(), output_format).await?;
         }
 
         Commands::Plugin(cmd) => {

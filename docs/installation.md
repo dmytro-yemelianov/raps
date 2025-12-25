@@ -104,7 +104,7 @@ raps --version
 You should see output like:
 
 ```
-raps 0.3.0
+raps 1.0.0
 ```
 
 ## Shell Completions

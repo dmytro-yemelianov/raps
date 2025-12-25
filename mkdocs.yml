@@ -98,7 +98,11 @@ nav:
     - Webhooks: commands/webhooks.md
     - Design Automation: commands/design-automation.md
     - Issues: commands/issues.md
+    - ACC Modules: commands/acc.md
+    - RFIs: commands/rfi.md
     - Reality Capture: commands/reality-capture.md
+    - Plugin Management: commands/plugin.md
+    - Generate Data: commands/generate.md
     - Demo Scenarios: commands/demo.md
   - CLI Reference:
     - Exit Codes: cli/exit-codes.md
@@ -106,6 +110,7 @@ nav:
   - Additional Topics:
     - Examples: examples.md
     - Feature Overview: features.md
+    - APS Feature Coverage: aps-coverage.md
     - Plugins: plugins.md
     - Proxy Support: proxy-support.md
     - SBOM & Build Provenance: sbom.md

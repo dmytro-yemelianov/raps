@@ -73,7 +73,7 @@ for urn in $(raps object list batch-processing | grep "urn:"); do
 done
 
 # Or use the batch processing demo
-raps demo batch-processing model1.dwg model2.dwg model3.dwg
+raps demo batch-processing --input ./models --max-parallel 5
 ```
 
 ### Set Up Webhook for File Uploads
@@ -114,6 +114,54 @@ raps issue list project123 --status open
 
 # 5. Update issue status
 raps issue update project123 abc123xyz --status closed
+
+### Manage RFIs
+
+List and update Requests for Information:
+
+```bash
+# 1. List RFIs in a project
+raps rfi list project123 --status open
+
+# 2. Get RFI details
+raps rfi get project123 rfi-123
+
+# 3. Answer an RFI
+raps rfi update project123 rfi-123 --answer "The specified glass is Type A" --status answered
+```
+
+### Manage ACC Assets
+
+Track and list project assets:
+
+```bash
+# 1. List assets
+raps acc asset list project123
+
+# 2. Update asset status
+raps acc asset update project123 asset-123 --status-id <status-id>
+```
+
+### Plugin Aliases
+
+Simplify your workflow with aliases:
+
+```bash
+# 1. Add alias for recurring translation task
+raps plugin alias add convert "translate start --format obj"
+
+# 2. Use the alias
+raps convert <urn>
+```
+
+### Testing with Synthetic Data
+
+Generate test data for validation:
+
+```bash
+# Generate 10 simple building models for pipeline testing
+raps generate files --count 10 --output ./test-data --complexity simple
+```
 ```
 
 ### Photogrammetry Workflow

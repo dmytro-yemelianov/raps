@@ -78,6 +78,15 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - **Manage comments and attachments**
 - **State transitions** between statuses
 
+### 📋 ACC Extended Modules
+- **Assets**: Manage project assets, tracking markers, categories
+- **Submittals**: Manage submittal items and specs
+- **Checklists**: Manage field checklists and templates
+
+### ❓ RFIs
+- **Manage Requests for Information**
+- Create, update, answer, and track status
+
 ### 🔗 ACC Data Binding
 - **Bind OSS objects to ACC project folders**
 - Create linked items from external uploads
@@ -87,12 +96,21 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - Upload photos and start processing
 - Monitor progress and download results
 
+### 🧩 Plugins & Aliases
+- **External Plugins**: Extend RAPS with `raps-<name>` executables
+- **Aliases**: Create custom command shortcuts
+
+### 🛠️ Development Tools
+- **Synthetic Data Generation**: Create OBJ, IFC, JSON files for testing
+- **Demo Scenarios**: Run end-to-end workflows (bucket lifecycle, model pipeline)
+
 ## Documentation Structure
 
 - **[Getting Started](getting-started.md)** - Overview and prerequisites
 - **[Installation](installation.md)** - Installation methods
 - **[Configuration](configuration.md)** - Setting up credentials and profiles
 - **[Feature Overview](features.md)** - Visual feature matrix and diagrams
+- **[APS Feature Coverage](aps-coverage.md)** - Detailed APS service coverage matrix
 - **[Proxy Support](proxy-support.md)** - Configure proxy for corporate networks
 - **[SBOM & Build Provenance](sbom.md)** - Software Bill of Materials
 - **[Exit Codes](cli/exit-codes.md)** - CI/CD-friendly error handling
