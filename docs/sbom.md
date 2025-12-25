@@ -241,7 +241,7 @@ Many organizations require SBOM for:
 
 ## Related Documentation
 
-- [Release Process](RELEASE)
-- [Checksums](cli/checksums)
-- [Security Policy](SECURITY)
+- [Release Process](RELEASE.md)
+- [Checksums](cli/checksums.md)
+- [Security Policy](../../SECURITY.md)
 

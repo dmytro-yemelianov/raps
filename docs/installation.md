@@ -109,13 +109,13 @@ raps 0.3.0
 
 ## Shell Completions
 
-RAPS supports auto-completion for several shells. See the [Shell Completions](configuration#shell-completions) section for setup instructions.
+RAPS supports auto-completion for several shells. See the [Shell Completions](configuration.md#shell-completions) section for setup instructions.
 
 ## Next Steps
 
 After installation:
 
-1. **[Configure your credentials](configuration)**
-2. **[Test authentication](commands/auth#test)**
-3. **[Start using commands](commands/buckets)**
+1. **[Configure your credentials](configuration.md)**
+2. **[Test authentication](commands/auth.md#test)**
+3. **[Start using commands](commands/buckets.md)**
 

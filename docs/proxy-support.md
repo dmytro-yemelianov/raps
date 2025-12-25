@@ -349,6 +349,6 @@ test:
 
 ## Related Documentation
 
-- [Configuration Guide](configuration)
-- [Troubleshooting](troubleshooting)
+- [Configuration Guide](configuration.md)
+- [Troubleshooting](troubleshooting.md)
 

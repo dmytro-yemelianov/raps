@@ -206,7 +206,7 @@ raps translate start <urn> --format svf2 --root-filename model.dwg
 
 ## Related Commands
 
-- [Objects](commands/objects) - Upload files to OSS
-- [Buckets](commands/buckets) - Manage buckets
-- [Authentication](commands/auth) - Set up authentication
+- [Objects](commands/objects.md) - Upload files to OSS
+- [Buckets](commands/buckets.md) - Manage buckets
+- [Authentication](commands/auth.md) - Set up authentication
 

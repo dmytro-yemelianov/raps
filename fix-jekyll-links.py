@@ -36,6 +36,10 @@ def fix_file(file_path):
             # Remove leading slash
             url = url_part.lstrip('/')
             
+            # Add .md extension if not already present (MkDocs requires it)
+            if not url.endswith('.md') and not url.startswith('http') and not url.startswith('#'):
+                url = f"{url}.md"
+            
             # Add anchor if present
             if anchor:
                 url = f"{url}#{anchor}"

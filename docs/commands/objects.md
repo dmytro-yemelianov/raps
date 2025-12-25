@@ -238,7 +238,7 @@ Object keys can include:
 
 ## Related Commands
 
-- [Buckets](commands/buckets) - Manage buckets
-- [Translation](commands/translation) - Translate uploaded files
-- [Authentication](commands/auth) - Set up authentication
+- [Buckets](commands/buckets.md) - Manage buckets
+- [Translation](commands/translation.md) - Translate uploaded files
+- [Authentication](commands/auth.md) - Set up authentication
 

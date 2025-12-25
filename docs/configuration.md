@@ -274,7 +274,7 @@ raps auth logout
 
 After configuration:
 
-1. **[Test authentication](commands/auth)**
-2. **[Create your first bucket](commands/buckets)**
-3. **[Upload and translate a model](examples)**
+1. **[Test authentication](commands/auth.md)**
+2. **[Create your first bucket](commands/buckets.md)**
+3. **[Upload and translate a model](examples.md)**
 

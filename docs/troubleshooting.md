@@ -452,7 +452,7 @@ If you're still experiencing issues:
 
 ## Related Documentation
 
-- [Getting Started](getting-started) - Setup guide
-- [Configuration](configuration) - Configuration options
-- [Command Reference](commands/auth) - Complete command documentation
+- [Getting Started](getting-started.md) - Setup guide
+- [Configuration](configuration.md) - Configuration options
+- [Command Reference](commands/auth.md) - Complete command documentation
 

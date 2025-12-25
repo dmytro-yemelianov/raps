@@ -283,7 +283,7 @@ Processing time depends on:
 
 ## Related Commands
 
-- [Authentication](commands/auth) - Set up authentication
-- [Objects](commands/objects) - Download processed results
-- [Buckets](commands/buckets) - Store processed models
+- [Authentication](commands/auth.md) - Set up authentication
+- [Objects](commands/objects.md) - Download processed results
+- [Buckets](commands/buckets.md) - Store processed models
 

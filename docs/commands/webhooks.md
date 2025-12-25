@@ -247,7 +247,7 @@ app.post('/webhook', (req, res) => {
 
 ## Related Commands
 
-- [Authentication](commands/auth) - Set up authentication
-- [Data Management](commands/data-management) - Manage data that triggers events
-- [Translation](commands/translation) - Translation events
+- [Authentication](commands/auth.md) - Set up authentication
+- [Data Management](commands/data-management.md) - Manage data that triggers events
+- [Translation](commands/translation.md) - Translation events
 

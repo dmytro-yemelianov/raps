@@ -304,7 +304,7 @@ done
 
 ## Related Documentation
 
-- [Getting Started](getting-started) - Overview and prerequisites
-- [Command Reference](commands/buckets) - Complete command documentation
-- [Troubleshooting](troubleshooting) - Common issues and solutions
+- [Getting Started](getting-started.md) - Overview and prerequisites
+- [Command Reference](commands/buckets.md) - Complete command documentation
+- [Troubleshooting](troubleshooting.md) - Common issues and solutions
 

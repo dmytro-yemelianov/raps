@@ -209,8 +209,8 @@ Some demos can generate synthetic test data if files aren't provided:
 
 ## Related Commands
 
-- [Buckets](commands/buckets) - Bucket operations used in demos
-- [Objects](commands/objects) - Object operations used in demos
-- [Translation](commands/translation) - Translation operations used in demos
-- [Data Management](commands/data-management) - Data management operations used in demos
+- [Buckets](commands/buckets.md) - Bucket operations used in demos
+- [Objects](commands/objects.md) - Object operations used in demos
+- [Translation](commands/translation.md) - Translation operations used in demos
+- [Data Management](commands/data-management.md) - Data management operations used in demos
 
