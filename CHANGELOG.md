@@ -70,7 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.3.0
 
