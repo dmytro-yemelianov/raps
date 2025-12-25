@@ -206,6 +206,69 @@ v1       2024-01-10 14:20:00     jane.smith@example.com 2.12 MB
 **Requirements:**
 - 3-legged OAuth authentication
 
+### `raps item bind`
+
+Bind an OSS object to an ACC/BIM 360 project folder, creating a linked item.
+
+**Usage:**
+```bash
+raps item bind <project-id> <folder-id> [--object-id OBJECT_ID] [--file-name NAME] [--version-type TYPE]
+```
+
+**Arguments:**
+- `project-id`: Project ID (with "b." prefix)
+- `folder-id`: Target folder ID/URN
+
+**Options:**
+- `--object-id, -o`: OSS object ID/URN to bind
+- `--file-name, -f`: Display name for the item in ACC
+- `--version-type, -t`: Version type (file, folder, attachment)
+
+**Example:**
+```bash
+$ raps item bind b.project123 urn:adsk.wiprod:fs.folder:co.abc --object-id urn:adsk.objects:os.object:my-bucket/model.dwg --file-name "Building Model.dwg"
+Binding OSS object to ACC folder...
+✓ Item created!
+  Item ID: urn:adsk.wiprod:fs.file:co.xyz789
+  Name: Building Model.dwg
+  Folder: Plans/Models
+  Version: v1
+```
+
+**Interactive Example:**
+```bash
+$ raps item bind b.project123 urn:adsk.wiprod:fs.folder:co.abc
+Enter OSS object ID: urn:adsk.objects:os.object:my-bucket/model.dwg
+Enter display name (default: model.dwg): Building Model.dwg
+Binding OSS object to ACC folder...
+✓ Item created!
+```
+
+**Workflow: Upload and Bind**
+
+Upload a file to OSS and bind it to an ACC project:
+
+```bash
+# 1. Upload to OSS
+$ raps object upload my-bucket model.dwg
+# Note the object ID: urn:adsk.objects:os.object:my-bucket/model.dwg
+
+# 2. Bind to ACC folder
+$ raps item bind b.project123 urn:adsk.wiprod:fs.folder:co.abc \
+    --object-id urn:adsk.objects:os.object:my-bucket/model.dwg \
+    --file-name "Building Model.dwg"
+```
+
+**Use Cases:**
+- Link externally uploaded files to ACC projects
+- Create items from Design Automation outputs
+- Migrate files from OSS to ACC while preserving metadata
+
+**Requirements:**
+- 3-legged OAuth authentication
+- Write permissions on target folder
+- OSS object must exist and be accessible
+
 ## Common Workflows
 
 ### Browse a Project Structure

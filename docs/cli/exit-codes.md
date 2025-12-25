@@ -88,9 +88,54 @@ Exit codes are determined by analyzing the error chain. Common patterns:
 - **Validation errors**: Contains "invalid", "required", "missing", "cannot be empty"
 - **Remote errors**: Contains "500", "502", "503", "504", "timeout", "connection", "network"
 
+## Enhanced Error Interpretation
+
+RAPS provides human-readable error explanations and suggestions for common API errors:
+
+### Example Error Output
+
+```
+Error: Authentication failed - token may be expired or invalid.
+  Code: Unauthorized (HTTP 401)
+  Details: {"error": "invalid_token"}
+
+Suggestions:
+  → Run 'raps auth login' to refresh your token
+  → Check if your credentials have expired
+  → Verify your APS application is active
+```
+
+### Error Codes and Suggestions
+
+| HTTP Status | Error Code | Explanation | Suggestions |
+|-------------|------------|-------------|-------------|
+| 401 | Unauthorized | Authentication failed | Login again, check credentials |
+| 403 | Forbidden | Permission denied | Check scopes, verify access |
+| 404 | NotFound | Resource not found | Verify resource ID/name |
+| 409 | Conflict | Resource conflict | Check if resource exists |
+| 429 | TooManyRequests | Rate limit exceeded | Wait and retry |
+| 500+ | ServerError | Server error | Wait and retry, check status |
+
+### Programmatic Error Handling
+
+For machine-readable errors, use JSON output:
+
+```bash
+$ raps bucket get nonexistent --format json
+{
+  "error": {
+    "status_code": 404,
+    "code": "NotFound",
+    "message": "Bucket 'nonexistent' not found",
+    "suggestions": ["Verify bucket name", "List available buckets"]
+  }
+}
+```
+
 ## Notes
 
 - Exit code `1` is reserved for general errors (not used by RAPS CLI)
 - Exit code `2` is also used by clap for argument parsing errors
 - All commands follow the same exit code conventions
+- Use `--format json` for machine-readable error output
 

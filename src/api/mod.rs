@@ -7,9 +7,10 @@
 //! - Data Management (Hubs, Projects, Folders, Items)
 //! - Webhooks
 //! - Design Automation
-//! - ACC/BIM 360 (Issues, RFIs)
+//! - ACC/BIM 360 (Issues, RFIs, Assets, Submittals, Checklists)
 //! - Reality Capture
 
+pub mod acc;
 pub mod auth;
 pub mod data_management;
 pub mod derivative;
@@ -19,6 +20,7 @@ pub mod oss;
 pub mod reality_capture;
 pub mod webhooks;
 
+pub use acc::AccClient;
 pub use auth::AuthClient;
 pub use data_management::DataManagementClient;
 pub use derivative::DerivativeClient;

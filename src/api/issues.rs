@@ -110,6 +110,50 @@ pub struct UpdateIssueRequest {
     pub due_date: Option<String>,
 }
 
+/// Issue comment
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueComment {
+    pub id: String,
+    pub body: String,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+    pub created_by: Option<String>,
+}
+
+/// Comments response
+#[derive(Debug, Deserialize)]
+pub struct CommentsResponse {
+    pub results: Vec<IssueComment>,
+    pub pagination: Option<Pagination>,
+}
+
+/// Request to create a comment
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCommentRequest {
+    pub body: String,
+}
+
+/// Issue attachment
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueAttachment {
+    pub id: String,
+    pub name: String,
+    pub urn: Option<String>,
+    pub url: Option<String>,
+    pub created_at: Option<String>,
+    pub created_by: Option<String>,
+}
+
+/// Attachments response
+#[derive(Debug, Deserialize)]
+pub struct AttachmentsResponse {
+    pub results: Vec<IssueAttachment>,
+    pub pagination: Option<Pagination>,
+}
+
 /// Issues API client
 pub struct IssuesClient {
     config: Config,
@@ -315,5 +359,157 @@ impl IssuesClient {
             .context("Failed to parse issue types response")?;
 
         Ok(types_response.results)
+    }
+
+    // ============== COMMENTS ==============
+
+    /// List comments for an issue
+    pub async fn list_comments(
+        &self,
+        project_id: &str,
+        issue_id: &str,
+    ) -> Result<Vec<IssueComment>> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/issues/{}/comments",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to list comments")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list comments ({}): {}", status, error_text);
+        }
+
+        let comments_response: CommentsResponse = response
+            .json()
+            .await
+            .context("Failed to parse comments response")?;
+
+        Ok(comments_response.results)
+    }
+
+    /// Add a comment to an issue
+    pub async fn add_comment(
+        &self,
+        project_id: &str,
+        issue_id: &str,
+        body: &str,
+    ) -> Result<IssueComment> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/issues/{}/comments",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
+
+        let request = CreateCommentRequest {
+            body: body.to_string(),
+        };
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to add comment")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to add comment ({}): {}", status, error_text);
+        }
+
+        let comment: IssueComment = response
+            .json()
+            .await
+            .context("Failed to parse comment response")?;
+
+        Ok(comment)
+    }
+
+    /// Delete a comment from an issue
+    pub async fn delete_comment(
+        &self,
+        project_id: &str,
+        issue_id: &str,
+        comment_id: &str,
+    ) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/issues/{}/comments/{}",
+            self.config.issues_url(),
+            project_id,
+            issue_id,
+            comment_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete comment")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete comment ({}): {}", status, error_text);
+        }
+
+        Ok(())
+    }
+
+    // ============== ATTACHMENTS ==============
+
+    /// List attachments for an issue
+    pub async fn list_attachments(
+        &self,
+        project_id: &str,
+        issue_id: &str,
+    ) -> Result<Vec<IssueAttachment>> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/issues/{}/attachments",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to list attachments")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list attachments ({}): {}", status, error_text);
+        }
+
+        let attachments_response: AttachmentsResponse = response
+            .json()
+            .await
+            .context("Failed to parse attachments response")?;
+
+        Ok(attachments_response.results)
     }
 }

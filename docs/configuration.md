@@ -93,7 +93,47 @@ raps config profile current
 
 # Delete a profile
 raps config profile delete old-profile
+
+# Export a profile to file (for backup or sharing)
+raps config profile export production --output ./prod-profile.json
+
+# Import a profile from file
+raps config profile import ./prod-profile.json --name production-backup
 ```
+
+### Profile Import/Export
+
+Profiles can be exported and imported for backup, sharing, or migration between machines.
+
+**Export a Profile:**
+```bash
+$ raps config profile export production --output ./profiles/prod.json
+✓ Profile 'production' exported to ./profiles/prod.json
+```
+
+**Export with Secrets (use with caution):**
+```bash
+$ raps config profile export production --include-secrets --output ./prod-secret.json
+⚠ WARNING: Exported file contains sensitive credentials!
+   Store securely and do not commit to version control.
+✓ Profile 'production' exported with secrets
+```
+
+**Import a Profile:**
+```bash
+$ raps config profile import ./profiles/prod.json
+✓ Profile 'production' imported successfully!
+
+# Import with a different name
+$ raps config profile import ./profiles/prod.json --name prod-backup
+✓ Profile 'prod-backup' imported successfully!
+```
+
+**Use Cases:**
+- Backup configuration before changes
+- Share profiles across team (without secrets)
+- Migrate configuration to a new machine
+- Standardize team environments
 
 ### Profile Storage
 

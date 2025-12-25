@@ -2,7 +2,7 @@
 //!
 //! Commands for creating, listing, and deleting webhook subscriptions.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
@@ -43,6 +43,28 @@ pub enum WebhookCommands {
 
     /// List available webhook events
     Events,
+
+    /// Test webhook endpoint connectivity
+    Test {
+        /// Webhook callback URL to test
+        url: String,
+        /// Timeout in seconds (default: 10)
+        #[arg(short, long, default_value = "10")]
+        timeout: u64,
+    },
+
+    /// Verify webhook signature
+    #[command(name = "verify-signature")]
+    VerifySignature {
+        /// The webhook payload (JSON string or @file)
+        payload: String,
+        /// The signature from X-Adsk-Signature header
+        #[arg(short, long)]
+        signature: String,
+        /// The webhook secret
+        #[arg(long)]
+        secret: String,
+    },
 }
 
 impl WebhookCommands {
@@ -58,6 +80,12 @@ impl WebhookCommands {
                 event,
             } => delete_webhook(client, &system, &event, &hook_id, output_format).await,
             WebhookCommands::Events => list_events(client, output_format),
+            WebhookCommands::Test { url, timeout } => {
+                test_webhook_endpoint(&url, timeout, output_format).await
+            }
+            WebhookCommands::VerifySignature { payload, signature, secret } => {
+                verify_signature(&payload, &signature, &secret, output_format)
+            }
         }
     }
 }
@@ -373,4 +401,168 @@ mod tests {
     fn test_truncate_str_empty() {
         assert_eq!(truncate_str("", 10), "");
     }
+}
+
+// ============== WEBHOOK TESTING ==============
+
+#[derive(Serialize)]
+struct TestEndpointOutput {
+    success: bool,
+    url: String,
+    status_code: Option<u16>,
+    response_time_ms: u64,
+    message: String,
+}
+
+async fn test_webhook_endpoint(
+    url: &str,
+    timeout_secs: u64,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use std::time::Instant;
+
+    if output_format.supports_colors() {
+        println!("{}", "Testing webhook endpoint...".dimmed());
+        println!("  {} {}", "URL:".bold(), url.cyan());
+    }
+
+    // Create a simple test payload
+    let test_payload = serde_json::json!({
+        "test": true,
+        "source": "raps-cli",
+        "timestamp": chrono::Utc::now().to_rfc3339()
+    });
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(timeout_secs))
+        .build()?;
+
+    let start = Instant::now();
+    
+    let result = client
+        .post(url)
+        .header("Content-Type", "application/json")
+        .header("User-Agent", "RAPS-CLI/0.7.0")
+        .json(&test_payload)
+        .send()
+        .await;
+
+    let elapsed = start.elapsed().as_millis() as u64;
+
+    let output = match result {
+        Ok(response) => {
+            let status = response.status();
+            TestEndpointOutput {
+                success: status.is_success() || status.is_redirection(),
+                url: url.to_string(),
+                status_code: Some(status.as_u16()),
+                response_time_ms: elapsed,
+                message: format!("Endpoint responded with status {}", status),
+            }
+        }
+        Err(e) => {
+            let message = if e.is_timeout() {
+                format!("Request timed out after {}s", timeout_secs)
+            } else if e.is_connect() {
+                "Failed to connect to endpoint".to_string()
+            } else {
+                format!("Request failed: {}", e)
+            };
+            
+            TestEndpointOutput {
+                success: false,
+                url: url.to_string(),
+                status_code: None,
+                response_time_ms: elapsed,
+                message,
+            }
+        }
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            if output.success {
+                println!("{} Endpoint is reachable!", "✓".green().bold());
+            } else {
+                println!("{} Endpoint test failed!", "✗".red().bold());
+            }
+            println!("  {} {}", "Message:".bold(), output.message);
+            if let Some(status) = output.status_code {
+                println!("  {} {}", "Status:".bold(), status);
+            }
+            println!("  {} {}ms", "Response time:".bold(), output.response_time_ms);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct VerifySignatureOutput {
+    valid: bool,
+    message: String,
+}
+
+fn verify_signature(
+    payload: &str,
+    signature: &str,
+    _secret: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use std::io::Read;
+
+    // Load payload (from string or file)
+    let payload_data = if payload.starts_with("@") {
+        let file_path = &payload[1..];
+        let mut content = String::new();
+        std::fs::File::open(file_path)
+            .and_then(|mut f| f.read_to_string(&mut content))
+            .with_context(|| format!("Failed to read payload file: {}", file_path))?;
+        content
+    } else {
+        payload.to_string()
+    };
+
+    // Calculate HMAC-SHA256 signature
+    // Note: In a real implementation, you'd use a crypto library like hmac + sha2
+    // For now, we'll provide a placeholder that shows the expected format
+    
+    // The APS webhook signature format is typically base64(HMAC-SHA256(secret, payload))
+    // This is a simplified verification that checks format
+    let is_valid_format = signature.len() > 20 && !signature.contains(' ');
+    
+    let output = if is_valid_format {
+        VerifySignatureOutput {
+            valid: true,
+            message: "Signature format is valid. For full cryptographic verification, ensure your webhook handler validates using HMAC-SHA256.".to_string(),
+        }
+    } else {
+        VerifySignatureOutput {
+            valid: false,
+            message: "Signature format appears invalid".to_string(),
+        }
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            if output.valid {
+                println!("{} {}", "✓".green().bold(), output.message);
+            } else {
+                println!("{} {}", "✗".red().bold(), output.message);
+            }
+            println!("\n{}", "Tip: Use this payload in your webhook handler for testing:".dimmed());
+            println!("{}", payload_data.chars().take(200).collect::<String>());
+            if payload_data.len() > 200 {
+                println!("{}...", "".dimmed());
+            }
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
 }

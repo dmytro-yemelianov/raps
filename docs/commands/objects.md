@@ -11,19 +11,22 @@ Manage objects (files) in OSS buckets.
 
 ### `raps object upload`
 
-Upload a file to a bucket.
+Upload a file to a bucket. Supports multipart uploads for large files and resumable uploads.
 
 **Usage:**
 ```bash
-raps object upload [bucket] <file> [--key KEY]
+raps object upload [bucket] <file> [--key KEY] [--resume] [--batch] [--parallel N]
 ```
 
 **Arguments:**
 - `bucket`: Bucket key (optional, will prompt if not provided)
-- `file`: Path to the file to upload
+- `file`: Path to the file to upload (or multiple files with --batch)
 
 **Options:**
 - `--key, -k`: Object key (defaults to filename)
+- `--resume, -r`: Resume an interrupted upload
+- `--batch, -b`: Upload multiple files at once
+- `--parallel, -p`: Number of parallel uploads (default: 3, max: 10)
 
 **Example:**
 ```bash
@@ -42,6 +45,44 @@ Uploading model.dwg to my-bucket/model.dwg
 $ raps object upload my-bucket model.dwg --key models/v1/model.dwg
 Uploading model.dwg to my-bucket/models/v1/model.dwg
 ✓ Upload complete!
+```
+
+**Large File Upload (Multipart):**
+
+Files larger than 5MB are automatically uploaded using chunked multipart uploads:
+
+```bash
+$ raps object upload my-bucket large-model.rvt
+Uploading large-model.rvt (150 MB) using multipart upload...
+  ████████████████████░░░░░░░░ 75% (Part 15/20)
+✓ Upload complete!
+```
+
+**Resume an Interrupted Upload:**
+
+If an upload is interrupted, resume it with the `--resume` flag:
+
+```bash
+$ raps object upload my-bucket large-model.rvt --resume
+Resuming upload for large-model.rvt...
+  Found existing upload state (10/20 parts completed)
+  ████████████████████████████ 100% (Part 20/20)
+✓ Upload complete!
+```
+
+**Batch Upload Multiple Files:**
+
+Upload multiple files in parallel:
+
+```bash
+$ raps object upload my-bucket file1.dwg file2.dwg file3.dwg --batch --parallel 5
+Uploading 3 files with 5 parallel uploads...
+  ✓ file1.dwg uploaded
+  ✓ file2.dwg uploaded
+  ✓ file3.dwg uploaded
+
+Batch Upload Results:
+  Successful: 3/3
 ```
 
 **Requirements:**
@@ -224,7 +265,8 @@ raps object signed-url my-bucket model.dwg --minutes 60
 ## File Size Limits
 
 - Maximum file size: 5 GB per object
-- For larger files, consider chunked uploads (not currently supported by RAPS CLI)
+- Files > 5 MB use automatic multipart upload with resume capability
+- Multipart uploads can be resumed if interrupted
 
 ## Object Keys
 

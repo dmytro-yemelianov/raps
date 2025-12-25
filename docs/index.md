@@ -32,12 +32,16 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 ### 📦 Object Storage Service (OSS)
 - Create, list, and delete buckets (multi-region support)
 - Upload, download, and manage objects
+- **Resumable multipart uploads** for large files
+- **Batch uploads** with parallel processing
 - Generate signed S3 URLs for direct downloads
 
 ### 🔄 Model Derivative
 - Translate CAD files to various formats (SVF2, OBJ, STL, STEP, etc.)
 - Check translation status with polling
 - View manifests and available derivatives
+- **Download derivatives** (OBJ, STL, STEP, etc.)
+- **Translation presets** for common workflows
 
 ### 🏗️ Data Management
 - Browse hubs, projects, folders, and items
@@ -47,16 +51,36 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 ### 🔔 Webhooks
 - Create, list, and delete webhook subscriptions
 - Support for data management and model derivative events
+- **Test webhook endpoints** with sample payloads
+
+### 📋 Pipelines & Automation
+- **Execute batch operations** from YAML/JSON files
+- Variable substitution and conditional steps
+- Continue-on-error support for robust automation
+- Dry-run mode for validation
+
+### 🔍 Token Inspection
+- **Inspect token scopes and expiry**
+- Validate tokens before script execution
+- CI/CD-friendly expiry warnings
 
 ### ⚙️ Design Automation
 - List available engines (AutoCAD, Revit, Inventor, 3ds Max)
 - Manage app bundles and activities
-- Submit and monitor work items
+- **Create activities** with custom commands
+- **Submit and monitor work items**
+- **Download work item results and reports**
 
 ### 🏗️ ACC Issues
 - List, create, and update issues
 - View issue types and subtypes
 - Filter by status
+- **Manage comments and attachments**
+- **State transitions** between statuses
+
+### 🔗 ACC Data Binding
+- **Bind OSS objects to ACC project folders**
+- Create linked items from external uploads
 
 ### 📸 Reality Capture
 - Create photoscenes for photogrammetry
@@ -67,10 +91,13 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 
 - **[Getting Started](getting-started.md)** - Overview and prerequisites
 - **[Installation](installation.md)** - Installation methods
-- **[Configuration](configuration.md)** - Setting up credentials
+- **[Configuration](configuration.md)** - Setting up credentials and profiles
+- **[Feature Overview](features.md)** - Visual feature matrix and diagrams
 - **[Proxy Support](proxy-support.md)** - Configure proxy for corporate networks
 - **[SBOM & Build Provenance](sbom.md)** - Software Bill of Materials
+- **[Exit Codes](cli/exit-codes.md)** - CI/CD-friendly error handling
 - **[Commands](commands/buckets.md)** - Complete command reference
+- **[Pipelines](commands/pipeline.md)** - Batch operations and automation
 - **[Examples](examples.md)** - Common use cases and workflows
 - **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 

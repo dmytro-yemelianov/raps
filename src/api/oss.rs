@@ -1,6 +1,7 @@
 //! Object Storage Service (OSS) API module
 //!
 //! Handles bucket and object operations for storing files in APS.
+//! Supports multipart chunked uploads for large files with resume capability.
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
@@ -9,9 +10,9 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs::File;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
 use super::AuthClient;
 use crate::config::Config;
@@ -139,7 +140,7 @@ pub struct SignedS3DownloadResponse {
 }
 
 /// Signed S3 upload response
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignedS3UploadResponse {
     /// Upload key to use for completion
@@ -148,6 +149,110 @@ pub struct SignedS3UploadResponse {
     pub urls: Vec<String>,
     /// Expiration timestamp
     pub upload_expiration: Option<String>,
+}
+
+/// Multipart upload state for resume capability
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultipartUploadState {
+    /// Bucket key
+    pub bucket_key: String,
+    /// Object key
+    pub object_key: String,
+    /// Local file path
+    pub file_path: String,
+    /// Total file size
+    pub file_size: u64,
+    /// Chunk size used
+    pub chunk_size: u64,
+    /// Total number of parts
+    pub total_parts: u32,
+    /// Completed part numbers (1-indexed)
+    pub completed_parts: Vec<u32>,
+    /// ETags for completed parts (part_number -> etag)
+    pub part_etags: std::collections::HashMap<u32, String>,
+    /// Upload key from signed URL request
+    pub upload_key: String,
+    /// Timestamp when upload started
+    pub started_at: i64,
+    /// File modification time for validation
+    pub file_mtime: i64,
+}
+
+impl MultipartUploadState {
+    /// Default chunk size: 5MB (minimum for S3 multipart)
+    pub const DEFAULT_CHUNK_SIZE: u64 = 5 * 1024 * 1024;
+    /// Maximum chunk size: 100MB
+    pub const MAX_CHUNK_SIZE: u64 = 100 * 1024 * 1024;
+    /// Threshold for multipart upload: 5MB
+    pub const MULTIPART_THRESHOLD: u64 = 5 * 1024 * 1024;
+
+    /// Get the state file path for a given upload
+    pub fn state_file_path(bucket_key: &str, object_key: &str) -> Result<PathBuf> {
+        let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
+            .context("Failed to get project directories")?;
+        let cache_dir = proj_dirs.cache_dir();
+        std::fs::create_dir_all(cache_dir)?;
+        
+        // Create a safe filename from bucket and object key
+        let safe_name = format!("{}_{}", bucket_key, object_key)
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect::<String>();
+        
+        Ok(cache_dir.join(format!("upload_{}.json", safe_name)))
+    }
+
+    /// Save state to file
+    pub fn save(&self) -> Result<()> {
+        let path = Self::state_file_path(&self.bucket_key, &self.object_key)?;
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&path, json)?;
+        Ok(())
+    }
+
+    /// Load state from file
+    pub fn load(bucket_key: &str, object_key: &str) -> Result<Option<Self>> {
+        let path = Self::state_file_path(bucket_key, object_key)?;
+        if !path.exists() {
+            return Ok(None);
+        }
+        let json = std::fs::read_to_string(&path)?;
+        let state: Self = serde_json::from_str(&json)?;
+        Ok(Some(state))
+    }
+
+    /// Delete state file
+    pub fn delete(bucket_key: &str, object_key: &str) -> Result<()> {
+        let path = Self::state_file_path(bucket_key, object_key)?;
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
+        Ok(())
+    }
+
+    /// Check if the upload can be resumed (file hasn't changed)
+    pub fn can_resume(&self, file_path: &Path) -> bool {
+        if let Ok(metadata) = std::fs::metadata(file_path) {
+            let current_size = metadata.len();
+            let current_mtime = metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            
+            current_size == self.file_size && current_mtime == self.file_mtime
+        } else {
+            false
+        }
+    }
+
+    /// Calculate which parts still need to be uploaded
+    pub fn remaining_parts(&self) -> Vec<u32> {
+        (1..=self.total_parts)
+            .filter(|p| !self.completed_parts.contains(p))
+            .collect()
+    }
 }
 
 /// Object information
@@ -187,6 +292,7 @@ pub struct ObjectItem {
 }
 
 /// OSS API client
+#[derive(Clone)]
 pub struct OssClient {
     config: Config,
     auth: AuthClient,
@@ -389,8 +495,41 @@ impl OssClient {
         Ok(())
     }
 
-    /// Upload a file to a bucket using S3 signed URLs (new API)
+    /// Upload a file to a bucket using S3 signed URLs
+    /// Automatically uses multipart upload for files larger than 5MB
     pub async fn upload_object(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &Path,
+    ) -> Result<ObjectInfo> {
+        self.upload_object_with_options(bucket_key, object_key, file_path, false).await
+    }
+
+    /// Upload a file with resume option
+    /// If resume is true, will attempt to resume an interrupted upload
+    pub async fn upload_object_with_options(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &Path,
+        resume: bool,
+    ) -> Result<ObjectInfo> {
+        let metadata = tokio::fs::metadata(file_path)
+            .await
+            .context("Failed to get file metadata")?;
+        let file_size = metadata.len();
+
+        // Use multipart upload for files larger than threshold
+        if file_size > MultipartUploadState::MULTIPART_THRESHOLD {
+            self.upload_multipart(bucket_key, object_key, file_path, resume).await
+        } else {
+            self.upload_single_part(bucket_key, object_key, file_path).await
+        }
+    }
+
+    /// Upload a small file using single-part upload
+    async fn upload_single_part(
         &self,
         bucket_key: &str,
         object_key: &str,
@@ -462,6 +601,196 @@ impl OssClient {
             .await?;
 
         pb.finish_with_message(format!("Uploaded {}", object_key));
+
+        Ok(object_info)
+    }
+
+    /// Upload a large file using multipart upload with resume capability
+    pub async fn upload_multipart(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &Path,
+        resume: bool,
+    ) -> Result<ObjectInfo> {
+        let metadata = tokio::fs::metadata(file_path)
+            .await
+            .context("Failed to get file metadata")?;
+        let file_size = metadata.len();
+        let file_mtime = metadata
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
+        let total_parts = ((file_size + chunk_size - 1) / chunk_size) as u32;
+
+        // Check for existing upload state
+        let mut state = if resume {
+            if let Some(existing_state) = MultipartUploadState::load(bucket_key, object_key)? {
+                if existing_state.can_resume(file_path) {
+                    crate::logging::log_verbose(&format!(
+                        "Resuming upload: {}/{} completed parts",
+                        existing_state.completed_parts.len(),
+                        existing_state.total_parts
+                    ));
+                    Some(existing_state)
+                } else {
+                    crate::logging::log_verbose("File changed since last upload, starting fresh");
+                    MultipartUploadState::delete(bucket_key, object_key)?;
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            // Clear any existing state if not resuming
+            MultipartUploadState::delete(bucket_key, object_key)?;
+            None
+        };
+
+        // Create progress bar
+        let pb = ProgressBar::new(file_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
+                .unwrap()
+                .progress_chars("█▓░"),
+        );
+
+        // Initialize state if needed
+        let state = if let Some(s) = state.take() {
+            // Set progress for already completed parts
+            let completed_bytes: u64 = s.completed_parts.iter()
+                .map(|&part| {
+                    let start = (part as u64 - 1) * s.chunk_size;
+                    let end = std::cmp::min(start + s.chunk_size, s.file_size);
+                    end - start
+                })
+                .sum();
+            pb.set_position(completed_bytes);
+            pb.set_message(format!("Resuming {} ({} parts done)", object_key, s.completed_parts.len()));
+            s
+        } else {
+            pb.set_message(format!("Starting multipart upload for {}", object_key));
+            
+            // Get signed URLs for all parts
+            let signed = self
+                .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+                .await?;
+
+            if signed.urls.len() != total_parts as usize {
+                anyhow::bail!(
+                    "Expected {} URLs but got {}",
+                    total_parts,
+                    signed.urls.len()
+                );
+            }
+
+            let new_state = MultipartUploadState {
+                bucket_key: bucket_key.to_string(),
+                object_key: object_key.to_string(),
+                file_path: file_path.to_string_lossy().to_string(),
+                file_size,
+                chunk_size,
+                total_parts,
+                completed_parts: Vec::new(),
+                part_etags: std::collections::HashMap::new(),
+                upload_key: signed.upload_key,
+                started_at: chrono::Utc::now().timestamp(),
+                file_mtime,
+            };
+            new_state.save()?;
+            new_state
+        };
+
+        // Get remaining parts to upload
+        let remaining_parts = state.remaining_parts();
+        
+        if remaining_parts.is_empty() {
+            pb.set_message(format!("All parts uploaded, completing {}", object_key));
+        } else {
+            pb.set_message(format!("Uploading {} ({} parts remaining)", object_key, remaining_parts.len()));
+        }
+
+        // We need to get fresh signed URLs for remaining parts
+        let signed = self
+            .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+            .await?;
+
+        let mut current_state = state;
+
+        // Open file for reading
+        let mut file = File::open(file_path)
+            .await
+            .context("Failed to open file for upload")?;
+
+        // Upload remaining parts
+        for part_num in remaining_parts {
+            let part_index = (part_num - 1) as usize;
+            let start = (part_num as u64 - 1) * chunk_size;
+            let end = std::cmp::min(start + chunk_size, file_size);
+            let part_size = end - start;
+
+            // Seek to part start
+            file.seek(SeekFrom::Start(start)).await?;
+
+            // Read part data
+            let mut buffer = vec![0u8; part_size as usize];
+            file.read_exact(&mut buffer).await?;
+
+            // Upload part
+            let s3_url = &signed.urls[part_index];
+            let response = self
+                .http_client
+                .put(s3_url)
+                .header("Content-Type", "application/octet-stream")
+                .header("Content-Length", part_size.to_string())
+                .body(buffer)
+                .send()
+                .await
+                .with_context(|| format!("Failed to upload part {}", part_num))?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                anyhow::bail!("Failed to upload part {} ({}): {}", part_num, status, error_text);
+            }
+
+            // Get ETag from response
+            let etag = response
+                .headers()
+                .get("etag")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.trim_matches('"').to_string())
+                .unwrap_or_default();
+
+            // Update state
+            current_state.completed_parts.push(part_num);
+            current_state.part_etags.insert(part_num, etag);
+            current_state.save()?;
+
+            pb.set_position(end);
+            pb.set_message(format!(
+                "Uploading {} ({}/{})",
+                object_key,
+                current_state.completed_parts.len(),
+                total_parts
+            ));
+        }
+
+        // Complete the upload
+        pb.set_message(format!("Completing upload for {}", object_key));
+        let object_info = self
+            .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
+            .await?;
+
+        // Clean up state file
+        MultipartUploadState::delete(bucket_key, object_key)?;
+
+        pb.finish_with_message(format!("Uploaded {} (multipart)", object_key));
 
         Ok(object_info)
     }
@@ -786,6 +1115,55 @@ mod tests {
         };
         let auth = AuthClient::new(config.clone());
         OssClient::new(config, auth)
+    }
+
+    // ============== MULTIPART UPLOAD STATE TESTS ==============
+
+    #[test]
+    fn test_multipart_upload_state_constants() {
+        assert_eq!(MultipartUploadState::DEFAULT_CHUNK_SIZE, 5 * 1024 * 1024);
+        assert_eq!(MultipartUploadState::MAX_CHUNK_SIZE, 100 * 1024 * 1024);
+        assert_eq!(MultipartUploadState::MULTIPART_THRESHOLD, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_multipart_upload_state_remaining_parts() {
+        let state = MultipartUploadState {
+            bucket_key: "test-bucket".to_string(),
+            object_key: "test-object".to_string(),
+            file_path: "/tmp/test.bin".to_string(),
+            file_size: 20 * 1024 * 1024, // 20MB
+            chunk_size: 5 * 1024 * 1024,  // 5MB chunks
+            total_parts: 4,
+            completed_parts: vec![1, 3], // Parts 1 and 3 done
+            part_etags: std::collections::HashMap::new(),
+            upload_key: "test-key".to_string(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert_eq!(remaining, vec![2, 4]); // Parts 2 and 4 remaining
+    }
+
+    #[test]
+    fn test_multipart_upload_state_all_complete() {
+        let state = MultipartUploadState {
+            bucket_key: "test-bucket".to_string(),
+            object_key: "test-object".to_string(),
+            file_path: "/tmp/test.bin".to_string(),
+            file_size: 10 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 2,
+            completed_parts: vec![1, 2],
+            part_etags: std::collections::HashMap::new(),
+            upload_key: "test-key".to_string(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert!(remaining.is_empty());
     }
 
     #[test]

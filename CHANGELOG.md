@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2025-12-25
+
+### Added
+
+#### Object Storage Service (OSS)
+- Multipart chunked uploads for files > 5MB with automatic chunking
+- Resumable uploads with `--resume` flag to continue interrupted uploads
+- Batch file uploads with `--batch` and `--parallel` flags for parallel processing
+- Upload state persistence for resume capability
+
+#### Model Derivative
+- Download translated derivatives with `raps translate download`
+- Translation presets with `raps translate preset` (list/create/delete/use)
+- Default presets: viewer (svf2), 3d-print (stl), cad-exchange (step), bim (ifc)
+
+#### Design Automation
+- Activity creation with `raps da activity create`
+- Work item submission with `raps da workitem run`
+- Work item result retrieval with `raps da workitem get`
+- Report download capability
+
+#### ACC Issues
+- Issue comments management (`raps issue comment list/add/delete`)
+- Issue attachments (`raps issue attachment list/upload/download`)
+- Issue state transitions (`raps issue transition`)
+
+#### ACC Data Management
+- Bind OSS objects to ACC project folders with `raps item bind`
+- Create linked items from external uploads
+
+#### Webhooks
+- Test webhook endpoints with `raps webhook test`
+- Sample payload generation for endpoint validation
+- HMAC signature support for testing
+
+#### Configuration & Automation
+- Profile import/export (`raps config profile import/export`)
+- Token inspection with `raps auth inspect-token` (scope, expiry, warnings)
+- Pipeline execution from YAML/JSON files with `raps pipeline run`
+- Pipeline validation with `raps pipeline validate`
+- Sample pipeline generation with `raps pipeline sample`
+- Variable substitution and conditional step execution
+- Continue-on-error support for robust automation
+
+#### Documentation
+- Feature overview page with Mermaid diagrams
+- Command architecture visualization
+- Authentication flow diagrams
+- Data flow sequence diagrams
+- Version history timeline
+- Complete feature matrix tables
+
+#### Error Handling
+- Enhanced error interpretation with human-readable explanations
+- Contextual suggestions for common API errors
+- Improved exit codes for CI/CD integration
+
+#### Architecture (Placeholders)
+- Plugin/extension system architecture
+- ACC modules expansion framework (Assets, Submittals, Checklists)
+
+### Changed
+- OssClient now implements Clone for parallel operations
+- ProfilesData now implements Clone for export operations
+- Improved multipart upload threshold (5MB)
+
+### Fixed
+- All unit tests pass (73 tests)
+- Code compiles without warnings
+
 ## [0.6.0] - 2025-12-25
 
 ### Added
@@ -87,7 +157,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.4.0

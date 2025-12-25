@@ -6,8 +6,11 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Confirm, Select};
+use futures_util::future;
 use serde::Serialize;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 use crate::api::OssClient;
 use crate::output::OutputFormat;
@@ -25,6 +28,24 @@ pub enum ObjectCommands {
         /// Object key (defaults to filename)
         #[arg(short, long)]
         key: Option<String>,
+
+        /// Resume interrupted upload (for large files)
+        #[arg(short, long)]
+        resume: bool,
+    },
+
+    /// Upload multiple files in parallel
+    #[command(name = "upload-batch")]
+    UploadBatch {
+        /// Bucket key
+        bucket: Option<String>,
+
+        /// Files to upload
+        files: Vec<PathBuf>,
+
+        /// Number of parallel uploads (default: 4)
+        #[arg(short, long, default_value = "4")]
+        parallel: usize,
     },
 
     /// Download an object from a bucket
@@ -76,8 +97,11 @@ pub enum ObjectCommands {
 impl ObjectCommands {
     pub async fn execute(self, client: &OssClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            ObjectCommands::Upload { bucket, file, key } => {
-                upload_object(client, bucket, file, key, output_format).await
+            ObjectCommands::Upload { bucket, file, key, resume } => {
+                upload_object(client, bucket, file, key, resume, output_format).await
+            }
+            ObjectCommands::UploadBatch { bucket, files, parallel } => {
+                upload_batch(client, bucket, files, parallel, output_format).await
             }
             ObjectCommands::Download {
                 bucket,
@@ -137,6 +161,7 @@ async fn upload_object(
     bucket: Option<String>,
     file: PathBuf,
     key: Option<String>,
+    resume: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Validate file exists
@@ -156,17 +181,19 @@ async fn upload_object(
     });
 
     if output_format.supports_colors() {
+        let resume_msg = if resume { " (with resume)" } else { "" };
         println!(
-            "{} {} {} {}",
+            "{} {} {} {}{}",
             "Uploading".dimmed(),
             file.display().to_string().cyan(),
             "to".dimmed(),
-            format!("{}/{}", bucket_key, object_key).cyan()
+            format!("{}/{}", bucket_key, object_key).cyan(),
+            resume_msg.dimmed()
         );
     }
 
     let object_info = client
-        .upload_object(&bucket_key, &object_key, &file)
+        .upload_object_with_options(&bucket_key, &object_key, &file, resume)
         .await?;
 
     let urn = client.get_urn(&bucket_key, &object_key);
@@ -571,4 +598,186 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len - 3])
     }
+}
+
+// ============== PARALLEL UPLOADS ==============
+
+#[derive(Serialize)]
+struct BatchUploadResult {
+    success: bool,
+    uploaded: usize,
+    failed: usize,
+    total_size: u64,
+    files: Vec<BatchFileResult>,
+}
+
+#[derive(Serialize)]
+struct BatchFileResult {
+    name: String,
+    success: bool,
+    size: Option<u64>,
+    error: Option<String>,
+}
+
+async fn upload_batch(
+    client: &OssClient,
+    bucket: Option<String>,
+    files: Vec<PathBuf>,
+    parallel: usize,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if files.is_empty() {
+        anyhow::bail!("No files specified for upload");
+    }
+
+    // Validate all files exist
+    for file in &files {
+        if !file.exists() {
+            anyhow::bail!("File not found: {}", file.display());
+        }
+    }
+
+    // Select bucket
+    let bucket_key = select_bucket(client, bucket).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "{} {} files to bucket '{}' with {} parallel uploads",
+            "Uploading".dimmed(),
+            files.len().to_string().cyan(),
+            bucket_key.cyan(),
+            parallel.to_string().cyan()
+        );
+    }
+
+    let semaphore = Arc::new(Semaphore::new(parallel));
+    let client = Arc::new(client.clone());
+    let bucket_key = Arc::new(bucket_key);
+
+    let mut handles = Vec::new();
+
+    for file in files {
+        let permit = semaphore.clone().acquire_owned().await?;
+        let client = client.clone();
+        let bucket = bucket_key.clone();
+        let file_path = file.clone();
+
+        let handle = tokio::spawn(async move {
+            let object_key = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unnamed")
+                .to_string();
+
+            let result = client
+                .upload_object(&bucket, &object_key, &file_path)
+                .await;
+
+            drop(permit); // Release permit
+
+            (file_path, object_key, result)
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all uploads
+    let results = future::join_all(handles).await;
+
+    let mut batch_result = BatchUploadResult {
+        success: true,
+        uploaded: 0,
+        failed: 0,
+        total_size: 0,
+        files: Vec::new(),
+    };
+
+    for result in results {
+        match result {
+            Ok((file_path, _object_key, upload_result)) => {
+                let file_name = file_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+
+                match upload_result {
+                    Ok(info) => {
+                        batch_result.uploaded += 1;
+                        batch_result.total_size += info.size as u64;
+                        batch_result.files.push(BatchFileResult {
+                            name: file_name,
+                            success: true,
+                            size: Some(info.size as u64),
+                            error: None,
+                        });
+                    }
+                    Err(e) => {
+                        batch_result.failed += 1;
+                        batch_result.success = false;
+                        batch_result.files.push(BatchFileResult {
+                            name: file_name,
+                            success: false,
+                            size: None,
+                            error: Some(e.to_string()),
+                        });
+                    }
+                }
+            }
+            Err(e) => {
+                batch_result.failed += 1;
+                batch_result.success = false;
+                batch_result.files.push(BatchFileResult {
+                    name: "unknown".to_string(),
+                    success: false,
+                    size: None,
+                    error: Some(e.to_string()),
+                });
+            }
+        }
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Batch Upload Summary:".bold());
+            println!("{}", "─".repeat(60));
+
+            for file in &batch_result.files {
+                if file.success {
+                    let size = file.size.map(format_size).unwrap_or_default();
+                    println!(
+                        "  {} {} {}",
+                        "✓".green().bold(),
+                        file.name.cyan(),
+                        size.dimmed()
+                    );
+                } else {
+                    println!(
+                        "  {} {} {}",
+                        "✗".red().bold(),
+                        file.name,
+                        file.error.as_deref().unwrap_or("Unknown error").red()
+                    );
+                }
+            }
+
+            println!("{}", "─".repeat(60));
+            println!(
+                "  {} {} uploaded, {} failed",
+                "Total:".bold(),
+                batch_result.uploaded.to_string().green(),
+                batch_result.failed.to_string().red()
+            );
+            println!("  {} {}", "Size:".bold(), format_size(batch_result.total_size));
+        }
+        _ => {
+            output_format.write(&batch_result)?;
+        }
+    }
+
+    if batch_result.failed > 0 {
+        anyhow::bail!("{} file(s) failed to upload", batch_result.failed);
+    }
+
+    Ok(())
 }

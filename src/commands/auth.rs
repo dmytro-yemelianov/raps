@@ -66,6 +66,13 @@ pub enum AuthCommands {
 
     /// Show logged-in user profile (requires 3-legged auth)
     Whoami,
+
+    /// Inspect token details (scopes, expiry) - useful for CI
+    Inspect {
+        /// Exit with code 1 if token expires within N seconds (for CI)
+        #[arg(long)]
+        warn_expiry_seconds: Option<u64>,
+    },
 }
 
 impl AuthCommands {
@@ -97,6 +104,9 @@ impl AuthCommands {
             AuthCommands::Logout => logout(auth_client, output_format).await,
             AuthCommands::Status => status(auth_client, output_format).await,
             AuthCommands::Whoami => whoami(auth_client, output_format).await,
+            AuthCommands::Inspect { warn_expiry_seconds } => {
+                inspect_token(auth_client, warn_expiry_seconds, output_format).await
+            }
         }
     }
 }
@@ -482,4 +492,128 @@ fn mask_string(s: &str) -> String {
     } else {
         format!("{}...{}", &s[..4], &s[s.len() - 4..])
     }
+}
+
+#[derive(Serialize)]
+struct InspectOutput {
+    authenticated: bool,
+    token_type: Option<String>,
+    expires_in_seconds: Option<i64>,
+    expires_at: Option<String>,
+    scopes: Option<Vec<String>>,
+    is_expiring_soon: bool,
+    warning: Option<String>,
+}
+
+async fn inspect_token(
+    _auth_client: &AuthClient,
+    warn_expiry_seconds: Option<u64>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let backend = crate::storage::StorageBackend::from_env();
+    let storage = crate::storage::TokenStorage::new(backend);
+    
+    // Try to load stored token info
+    let token_data = storage.load()?;
+    
+    let output = if let Some(data) = token_data {
+        let now = chrono::Utc::now().timestamp();
+        let expires_at = data.expires_at;
+        let expires_in = expires_at - now;
+        
+        // Use scopes directly (already Vec<String>)
+        let scopes: Vec<String> = data.scopes.clone();
+
+        // Check if expiring soon
+        let warn_threshold = warn_expiry_seconds.unwrap_or(300) as i64; // Default 5 minutes
+        let is_expiring_soon = expires_in > 0 && expires_in < warn_threshold;
+        let is_expired = expires_in <= 0;
+        
+        let warning = if is_expired {
+            Some("Token has expired!".to_string())
+        } else if is_expiring_soon {
+            Some(format!("Token expires in {} seconds", expires_in))
+        } else {
+            None
+        };
+
+        InspectOutput {
+            authenticated: !is_expired,
+            token_type: Some(if data.access_token.starts_with("ey") { "JWT".to_string() } else { "Opaque".to_string() }),
+            expires_in_seconds: Some(expires_in),
+            expires_at: Some(
+                chrono::DateTime::from_timestamp(expires_at, 0)
+                    .map(|dt| dt.to_rfc3339())
+                    .unwrap_or_else(|| "Unknown".to_string())
+            ),
+            scopes: Some(scopes),
+            is_expiring_soon: is_expiring_soon || is_expired,
+            warning,
+        }
+    } else {
+        InspectOutput {
+            authenticated: false,
+            token_type: None,
+            expires_in_seconds: None,
+            expires_at: None,
+            scopes: None,
+            is_expiring_soon: true,
+            warning: Some("No token found. Run 'raps auth login' first.".to_string()),
+        }
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Token Inspection".bold());
+            println!("{}", "─".repeat(60));
+
+            if output.authenticated {
+                println!("  {} {}", "Authenticated:".bold(), "Yes".green());
+            } else {
+                println!("  {} {}", "Authenticated:".bold(), "No".red());
+            }
+
+            if let Some(ref token_type) = output.token_type {
+                println!("  {} {}", "Token type:".bold(), token_type);
+            }
+
+            if let Some(expires_in) = output.expires_in_seconds {
+                let color = if expires_in <= 0 {
+                    "Expired".red().to_string()
+                } else if expires_in < 300 {
+                    format!("{} seconds", expires_in).yellow().to_string()
+                } else {
+                    format!("{} seconds ({:.1} hours)", expires_in, expires_in as f64 / 3600.0).to_string()
+                };
+                println!("  {} {}", "Expires in:".bold(), color);
+            }
+
+            if let Some(ref expires_at) = output.expires_at {
+                println!("  {} {}", "Expires at:".bold(), expires_at.dimmed());
+            }
+
+            if let Some(ref scopes) = output.scopes {
+                println!("  {} {}", "Scopes:".bold(), scopes.len());
+                for scope in scopes {
+                    println!("    {} {}", "•".cyan(), scope);
+                }
+            }
+
+            if let Some(ref warning) = output.warning {
+                println!("\n  {} {}", "!".yellow().bold(), warning.yellow());
+            }
+
+            println!("{}", "─".repeat(60));
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    // Exit with code 1 if token is expiring soon (for CI)
+    if warn_expiry_seconds.is_some() && output.is_expiring_soon {
+        std::process::exit(1);
+    }
+
+    Ok(())
 }
