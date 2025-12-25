@@ -363,11 +363,11 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
         let value = if let Some(profile_name) = &data.active_profile {
             if let Some(profile) = data.profiles.get(profile_name) {
                 match key {
-                    "client_id" => profile.client_id.as_ref().map(|s| s.as_str()),
-                    "client_secret" => profile.client_secret.as_ref().map(|s| s.as_str()),
-                    "base_url" => profile.base_url.as_ref().map(|s| s.as_str()),
-                    "callback_url" => profile.callback_url.as_ref().map(|s| s.as_str()),
-                    "da_nickname" => profile.da_nickname.as_ref().map(|s| s.as_str()),
+                    "client_id" => profile.client_id.as_deref(),
+                    "client_secret" => profile.client_secret.as_deref(),
+                    "base_url" => profile.base_url.as_deref(),
+                    "callback_url" => profile.callback_url.as_deref(),
+                    "da_nickname" => profile.da_nickname.as_deref(),
                     _ => {
                         anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
                     }
