@@ -794,6 +794,10 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
     println!("\n  Processing {} files with concurrency limit of {}...", files.len(), max_parallel);
 
+    // Wrap clients in Arc for sharing across tasks
+    let oss = Arc::new(oss);
+    let derivative = Arc::new(derivative);
+
     // Process files in parallel with concurrency limit
     for file in &files {
         let file_name = file.file_name().unwrap().to_string_lossy().to_string();
