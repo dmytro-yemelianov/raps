@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-25
+
+### Added
+- `--timeout` CLI flag for HTTP request timeouts (default: 120s)
+- `--concurrency` CLI flag for bulk operations (default: 5)
+- Parallel processing with semaphore-based concurrency control in batch operations
+- Config precedence documentation (CLI flags > env vars > profile > defaults)
+- OS keychain integration for secure token storage (opt-in via `RAPS_USE_KEYCHAIN` env var)
+- TokenStorage abstraction supporting both file and keychain backends
+
+### Changed
+- All API clients now accept `HttpClientConfig` for consistent timeout configuration
+- Batch processing demo now uses parallel processing with configurable concurrency limits
+- Config precedence updated to include CLI flags as highest priority
+
+### Fixed
+- Batch processing now properly respects concurrency limits
+- All API clients use shared HTTP configuration from CLI flags
+
 ## [0.4.0] - 2025-12-24
 
 ### Added

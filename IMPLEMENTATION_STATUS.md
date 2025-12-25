@@ -95,8 +95,8 @@
 | Issue | Status | Notes |
 |---|---|---|
 | Introduce `raps config profile` (create/list/use/delete) | ✅ **Implemented** | Profile management commands implemented. Config loading supports profile precedence. |
-| Config precedence spec (env vs config vs flags) | ✅ **Implemented** | Precedence: env vars > profile > defaults. Documented in code. |
-| Optional OS keychain integration (credential storage) | ❌ **Not Implemented** | Tokens still stored in plain JSON file. |
+| Config precedence spec (env vs config vs flags) | ✅ **Implemented** | Precedence: CLI flags > env vars > profile > defaults. Fully documented. |
+| Optional OS keychain integration (credential storage) | ✅ **Implemented** | TokenStorage abstraction with file and keychain backends. Controlled via RAPS_USE_KEYCHAIN env var. |
 
 ### EPIC: Reliability: retries, backoff, timeouts, rate limits
 

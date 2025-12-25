@@ -43,7 +43,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "APS Developer")]
-#[command(version = "0.3.0")]
+#[command(version = "0.5.0")]
 #[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
