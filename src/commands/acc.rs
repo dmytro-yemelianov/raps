@@ -217,8 +217,15 @@ impl AssetCommands {
                 barcode,
                 category_id,
             } => {
-                create_asset(client, &project_id, description, barcode, category_id, output_format)
-                    .await
+                create_asset(
+                    client,
+                    &project_id,
+                    description,
+                    barcode,
+                    category_id,
+                    output_format,
+                )
+                .await
             }
             AssetCommands::Update {
                 project_id,
@@ -258,8 +265,15 @@ impl SubmittalCommands {
                 spec_section,
                 due_date,
             } => {
-                create_submittal(client, &project_id, &title, spec_section, due_date, output_format)
-                    .await
+                create_submittal(
+                    client,
+                    &project_id,
+                    &title,
+                    spec_section,
+                    due_date,
+                    output_format,
+                )
+                .await
             }
             SubmittalCommands::Update {
                 project_id,
@@ -853,10 +867,7 @@ async fn create_submittal(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} Submittal created successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} Submittal created successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), submittal.id.cyan());
             println!("{:<15} {}", "Title:".bold(), submittal.title);
         }
@@ -897,10 +908,7 @@ async fn update_submittal(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} Submittal updated successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} Submittal updated successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), submittal.id.cyan());
         }
         _ => {
@@ -990,10 +998,7 @@ async fn create_checklist(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} Checklist created successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} Checklist created successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), checklist.id.cyan());
             println!("{:<15} {}", "Title:".bold(), checklist.title);
         }
@@ -1037,10 +1042,7 @@ async fn update_checklist(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} Checklist updated successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} Checklist updated successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), checklist.id.cyan());
         }
         _ => {

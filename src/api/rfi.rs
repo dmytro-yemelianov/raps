@@ -232,7 +232,10 @@ impl RfiClient {
             anyhow::bail!("Failed to get RFI ({}): {}", status, error_text);
         }
 
-        let rfi: Rfi = response.json().await.context("Failed to parse RFI response")?;
+        let rfi: Rfi = response
+            .json()
+            .await
+            .context("Failed to parse RFI response")?;
         Ok(rfi)
     }
 
@@ -259,7 +262,10 @@ impl RfiClient {
             anyhow::bail!("Failed to create RFI ({}): {}", status, error_text);
         }
 
-        let rfi: Rfi = response.json().await.context("Failed to parse RFI response")?;
+        let rfi: Rfi = response
+            .json()
+            .await
+            .context("Failed to parse RFI response")?;
         Ok(rfi)
     }
 
@@ -291,7 +297,10 @@ impl RfiClient {
             anyhow::bail!("Failed to update RFI ({}): {}", status, error_text);
         }
 
-        let rfi: Rfi = response.json().await.context("Failed to parse RFI response")?;
+        let rfi: Rfi = response
+            .json()
+            .await
+            .context("Failed to parse RFI response")?;
         Ok(rfi)
     }
 }
@@ -347,4 +356,3 @@ mod tests {
         assert!(!json.contains("title"));
     }
 }
-

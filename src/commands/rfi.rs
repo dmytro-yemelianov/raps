@@ -409,10 +409,7 @@ async fn create_rfi(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} RFI created successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} RFI created successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), rfi.id.cyan());
             println!(
                 "{:<15} {}",
@@ -477,10 +474,7 @@ async fn update_rfi(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} RFI updated successfully!",
-                "✓".green().bold()
-            );
+            println!("\n{} RFI updated successfully!", "✓".green().bold());
             println!("{:<15} {}", "ID:".bold(), rfi.id.cyan());
             println!("{:<15} {}", "Title:".bold(), rfi.title);
             println!("{:<15} {}", "Status:".bold(), rfi.status);
@@ -500,4 +494,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

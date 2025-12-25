@@ -163,11 +163,7 @@ fn enable_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "{} Plugin '{}' enabled",
-                "✓".green().bold(),
-                name.cyan()
-            );
+            println!("{} Plugin '{}' enabled", "✓".green().bold(), name.cyan());
         }
         _ => {
             output_format.write(&serde_json::json!({
@@ -201,11 +197,7 @@ fn disable_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "{} Plugin '{}' disabled",
-                "✓".green().bold(),
-                name.cyan()
-            );
+            println!("{} Plugin '{}' disabled", "✓".green().bold(), name.cyan());
         }
         _ => {
             output_format.write(&serde_json::json!({
@@ -241,10 +233,7 @@ fn list_aliases(output_format: OutputFormat) -> Result<()> {
             if outputs.is_empty() {
                 println!("{}", "No aliases configured.".yellow());
                 println!("\n{}", "To add an alias:".dimmed());
-                println!(
-                    "  {}",
-                    "raps plugin alias add <name> \"<command>\"".cyan()
-                );
+                println!("  {}", "raps plugin alias add <name> \"<command>\"".cyan());
                 println!("\n{}", "Example:".dimmed());
                 println!(
                     "  {}",
@@ -279,12 +268,13 @@ fn add_alias(name: &str, command: &str, output_format: OutputFormat) -> Result<(
 
     match output_format {
         OutputFormat::Table => {
+            println!("{} Alias '{}' added", "✓".green().bold(), name.cyan());
             println!(
-                "{} Alias '{}' added",
-                "✓".green().bold(),
-                name.cyan()
+                "  {} {} → {}",
+                "Usage:".dimmed(),
+                format!("raps {}", name).cyan(),
+                command
             );
-            println!("  {} {} → {}", "Usage:".dimmed(), format!("raps {}", name).cyan(), command);
         }
         _ => {
             output_format.write(&serde_json::json!({
@@ -305,11 +295,7 @@ fn remove_alias(name: &str, output_format: OutputFormat) -> Result<()> {
 
         match output_format {
             OutputFormat::Table => {
-                println!(
-                    "{} Alias '{}' removed",
-                    "✓".green().bold(),
-                    name.cyan()
-                );
+                println!("{} Alias '{}' removed", "✓".green().bold(), name.cyan());
             }
             _ => {
                 output_format.write(&serde_json::json!({
@@ -321,11 +307,7 @@ fn remove_alias(name: &str, output_format: OutputFormat) -> Result<()> {
     } else {
         match output_format {
             OutputFormat::Table => {
-                println!(
-                    "{} Alias '{}' not found",
-                    "!".yellow().bold(),
-                    name
-                );
+                println!("{} Alias '{}' not found", "!".yellow().bold(), name);
             }
             _ => {
                 output_format.write(&serde_json::json!({
@@ -346,4 +328,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
-

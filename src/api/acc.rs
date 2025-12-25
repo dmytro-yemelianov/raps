@@ -299,12 +299,19 @@ impl AccClient {
             anyhow::bail!("Failed to get asset ({}): {}", status, error_text);
         }
 
-        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        let asset: Asset = response
+            .json()
+            .await
+            .context("Failed to parse asset response")?;
         Ok(asset)
     }
 
     /// Create a new asset
-    pub async fn create_asset(&self, project_id: &str, request: CreateAssetRequest) -> Result<Asset> {
+    pub async fn create_asset(
+        &self,
+        project_id: &str,
+        request: CreateAssetRequest,
+    ) -> Result<Asset> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!(
             "https://developer.api.autodesk.com/construction/assets/v1/projects/{}/assets",
@@ -326,7 +333,10 @@ impl AccClient {
             anyhow::bail!("Failed to create asset ({}): {}", status, error_text);
         }
 
-        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        let asset: Asset = response
+            .json()
+            .await
+            .context("Failed to parse asset response")?;
         Ok(asset)
     }
 
@@ -358,7 +368,10 @@ impl AccClient {
             anyhow::bail!("Failed to update asset ({}): {}", status, error_text);
         }
 
-        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        let asset: Asset = response
+            .json()
+            .await
+            .context("Failed to parse asset response")?;
         Ok(asset)
     }
 
@@ -386,12 +399,19 @@ impl AccClient {
             anyhow::bail!("Failed to get submittal ({}): {}", status, error_text);
         }
 
-        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        let submittal: Submittal = response
+            .json()
+            .await
+            .context("Failed to parse submittal response")?;
         Ok(submittal)
     }
 
     /// Create a new submittal
-    pub async fn create_submittal(&self, project_id: &str, request: CreateSubmittalRequest) -> Result<Submittal> {
+    pub async fn create_submittal(
+        &self,
+        project_id: &str,
+        request: CreateSubmittalRequest,
+    ) -> Result<Submittal> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!(
             "https://developer.api.autodesk.com/construction/submittals/v1/projects/{}/items",
@@ -413,7 +433,10 @@ impl AccClient {
             anyhow::bail!("Failed to create submittal ({}): {}", status, error_text);
         }
 
-        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        let submittal: Submittal = response
+            .json()
+            .await
+            .context("Failed to parse submittal response")?;
         Ok(submittal)
     }
 
@@ -445,7 +468,10 @@ impl AccClient {
             anyhow::bail!("Failed to update submittal ({}): {}", status, error_text);
         }
 
-        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        let submittal: Submittal = response
+            .json()
+            .await
+            .context("Failed to parse submittal response")?;
         Ok(submittal)
     }
 
@@ -473,12 +499,19 @@ impl AccClient {
             anyhow::bail!("Failed to get checklist ({}): {}", status, error_text);
         }
 
-        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        let checklist: Checklist = response
+            .json()
+            .await
+            .context("Failed to parse checklist response")?;
         Ok(checklist)
     }
 
     /// Create a new checklist
-    pub async fn create_checklist(&self, project_id: &str, request: CreateChecklistRequest) -> Result<Checklist> {
+    pub async fn create_checklist(
+        &self,
+        project_id: &str,
+        request: CreateChecklistRequest,
+    ) -> Result<Checklist> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!(
             "https://developer.api.autodesk.com/construction/checklists/v1/projects/{}/checklists",
@@ -500,7 +533,10 @@ impl AccClient {
             anyhow::bail!("Failed to create checklist ({}): {}", status, error_text);
         }
 
-        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        let checklist: Checklist = response
+            .json()
+            .await
+            .context("Failed to parse checklist response")?;
         Ok(checklist)
     }
 
@@ -532,7 +568,10 @@ impl AccClient {
             anyhow::bail!("Failed to update checklist ({}): {}", status, error_text);
         }
 
-        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        let checklist: Checklist = response
+            .json()
+            .await
+            .context("Failed to parse checklist response")?;
         Ok(checklist)
     }
 }

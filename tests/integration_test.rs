@@ -100,7 +100,10 @@ fn test_output_format_json() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "JSON output flag should be accepted");
+    assert!(
+        output.status.success(),
+        "JSON output flag should be accepted"
+    );
 }
 
 /// Test YAML output format flag
@@ -112,7 +115,10 @@ fn test_output_format_yaml() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "YAML output flag should be accepted");
+    assert!(
+        output.status.success(),
+        "YAML output flag should be accepted"
+    );
 }
 
 /// Test table output format flag
@@ -124,7 +130,10 @@ fn test_output_format_table() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "Table output flag should be accepted");
+    assert!(
+        output.status.success(),
+        "Table output flag should be accepted"
+    );
 }
 
 // ============== GLOBAL FLAGS TESTS ==============
@@ -138,7 +147,10 @@ fn test_no_color_flag() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "--no-color flag should be accepted");
+    assert!(
+        output.status.success(),
+        "--no-color flag should be accepted"
+    );
 }
 
 /// Test --quiet flag
@@ -213,7 +225,10 @@ fn test_concurrency_flag() {
         .output()
         .expect("Failed to execute command");
 
-    assert!(output.status.success(), "--concurrency flag should be accepted");
+    assert!(
+        output.status.success(),
+        "--concurrency flag should be accepted"
+    );
 }
 
 // ============== SUBCOMMAND HELP TESTS ==============
@@ -245,7 +260,10 @@ fn test_bucket_help() {
     assert!(output.status.success(), "bucket --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("list"), "bucket help should mention list");
-    assert!(stdout.contains("create"), "bucket help should mention create");
+    assert!(
+        stdout.contains("create"),
+        "bucket help should mention create"
+    );
 }
 
 /// Test object subcommand help
@@ -259,8 +277,14 @@ fn test_object_help() {
 
     assert!(output.status.success(), "object --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("upload"), "object help should mention upload");
-    assert!(stdout.contains("download"), "object help should mention download");
+    assert!(
+        stdout.contains("upload"),
+        "object help should mention upload"
+    );
+    assert!(
+        stdout.contains("download"),
+        "object help should mention download"
+    );
 }
 
 /// Test translate subcommand help
@@ -274,8 +298,14 @@ fn test_translate_help() {
 
     assert!(output.status.success(), "translate --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("start"), "translate help should mention start");
-    assert!(stdout.contains("status"), "translate help should mention status");
+    assert!(
+        stdout.contains("start"),
+        "translate help should mention start"
+    );
+    assert!(
+        stdout.contains("status"),
+        "translate help should mention status"
+    );
 }
 
 /// Test rfi subcommand help
@@ -305,8 +335,14 @@ fn test_acc_help() {
     assert!(output.status.success(), "acc --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("asset"), "acc help should mention asset");
-    assert!(stdout.contains("submittal"), "acc help should mention submittal");
-    assert!(stdout.contains("checklist"), "acc help should mention checklist");
+    assert!(
+        stdout.contains("submittal"),
+        "acc help should mention submittal"
+    );
+    assert!(
+        stdout.contains("checklist"),
+        "acc help should mention checklist"
+    );
 }
 
 /// Test plugin subcommand help
@@ -321,8 +357,14 @@ fn test_plugin_help() {
     assert!(output.status.success(), "plugin --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("list"), "plugin help should mention list");
-    assert!(stdout.contains("enable"), "plugin help should mention enable");
-    assert!(stdout.contains("disable"), "plugin help should mention disable");
+    assert!(
+        stdout.contains("enable"),
+        "plugin help should mention enable"
+    );
+    assert!(
+        stdout.contains("disable"),
+        "plugin help should mention disable"
+    );
 }
 
 /// Test config subcommand help
@@ -336,7 +378,10 @@ fn test_config_help() {
 
     assert!(output.status.success(), "config --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("profile"), "config help should mention profile");
+    assert!(
+        stdout.contains("profile"),
+        "config help should mention profile"
+    );
 }
 
 /// Test pipeline subcommand help
@@ -351,7 +396,10 @@ fn test_pipeline_help() {
     assert!(output.status.success(), "pipeline --help should succeed");
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("run"), "pipeline help should mention run");
-    assert!(stdout.contains("validate"), "pipeline help should mention validate");
+    assert!(
+        stdout.contains("validate"),
+        "pipeline help should mention validate"
+    );
 }
 
 // ============== SHELL COMPLETION TESTS ==============
