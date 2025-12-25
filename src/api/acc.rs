@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! ACC (Autodesk Construction Cloud) Extended API module
 //!
 //! Provides support for additional ACC modules:

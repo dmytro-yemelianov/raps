@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Reality Capture API module
 //!
 //! Handles photogrammetry processing to create 3D models from photos.

@@ -9,7 +9,7 @@
   [![Crates.io](https://img.shields.io/crates/v/raps.svg)](https://crates.io/crates/raps)
   [![Downloads](https://img.shields.io/crates/d/raps.svg)](https://crates.io/crates/raps)
   [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://dmytro-yemelianov.github.io/raps/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
   [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
   [![Build Status](https://github.com/dmytro-yemelianov/raps/workflows/CI/badge.svg)](https://github.com/dmytro-yemelianov/raps/actions)
 
@@ -530,7 +530,7 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 ## License
 
-MIT License
+Apache 2.0 License
 
 ## Documentation
 

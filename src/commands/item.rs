@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Item (file) management commands
 //!
 //! Commands for listing, viewing, and downloading items (requires 3-legged auth).

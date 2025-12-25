@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Error handling and exit code management
 //!
 //! Provides standardized exit codes for CI/CD scripting:

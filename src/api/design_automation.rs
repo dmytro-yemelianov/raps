@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Design Automation API module
 //!
 //! Handles automation of CAD processing with engines like AutoCAD, Revit, Inventor, 3ds Max.

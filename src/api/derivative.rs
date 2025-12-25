@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Model Derivative API module
 //!
 //! Handles translation of CAD files and retrieval of derivative manifests.

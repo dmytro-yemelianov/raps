@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Authentication commands
 //!
 //! Commands for testing authentication, logging in with 3-legged OAuth, and logging out.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Folder management commands
 //!
 //! Commands for listing, creating, and managing folders (requires 3-legged auth).
