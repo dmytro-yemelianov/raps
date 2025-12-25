@@ -87,3 +87,6 @@ $RECYCLE.BIN/
 *.pdb
 
 site/
+
+# Development
+.dev/

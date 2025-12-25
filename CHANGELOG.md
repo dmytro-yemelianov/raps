@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2025-12-25
+
+### Added
+
+#### ACC RFIs (Requests for Information)
+- `raps rfi list` - List RFIs in a project
+- `raps rfi get` - Get RFI details
+- `raps rfi create` - Create new RFI with title, question, priority, due date
+- `raps rfi update` - Update RFI status, answer, and other fields
+
+#### ACC Assets (Full CRUD)
+- `raps acc asset get` - Get specific asset details
+- `raps acc asset create` - Create new asset with description, barcode, category
+- `raps acc asset update` - Update asset status, description, barcode
+
+#### ACC Submittals (Full CRUD)
+- `raps acc submittal get` - Get specific submittal details
+- `raps acc submittal create` - Create new submittal with title, spec section, due date
+- `raps acc submittal update` - Update submittal status, title, due date
+
+#### ACC Checklists (Full CRUD)
+- `raps acc checklist get` - Get specific checklist details
+- `raps acc checklist create` - Create new checklist from template
+- `raps acc checklist update` - Update checklist status, location, due date
+
+#### Plugin System
+- `raps plugin list` - List discovered and configured plugins
+- `raps plugin enable <name>` - Enable a plugin
+- `raps plugin disable <name>` - Disable a plugin
+- `raps plugin alias list` - List command aliases
+- `raps plugin alias add` - Add command alias
+- `raps plugin alias remove` - Remove command alias
+- Plugin discovery for `raps-<name>` executables in PATH
+- Pre/post command hooks support
+- Command aliases for frequently used patterns
+
+#### Documentation
+- Comprehensive plugin system documentation (`docs/plugins.md`)
+- Known limitations documentation (`docs/limitations.md`)
+- Stability and backward compatibility policy (`docs/STABILITY.md`)
+- Performance tuning documentation (timeout, concurrency, pagination)
+- OS keychain integration documentation
+
+### Changed
+- **BREAKING**: First stable release - backward compatibility guaranteed from this version
+- Version bumped to 1.0.0 (stable release)
+- All ACC modules now have full CRUD support (previously list-only)
+- Enhanced configuration documentation with pagination behavior
+
+### Fixed
+- Plugin system now fully functional (was placeholder in 0.7.0)
+
+---
+
 ## [0.7.0] - 2025-12-25
 
 ### Added
@@ -157,7 +211,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v1.0.0
 [0.7.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.5.0

@@ -18,6 +18,7 @@ pub mod design_automation;
 pub mod issues;
 pub mod oss;
 pub mod reality_capture;
+pub mod rfi;
 pub mod webhooks;
 
 pub use acc::AccClient;
@@ -28,4 +29,5 @@ pub use design_automation::DesignAutomationClient;
 pub use issues::IssuesClient;
 pub use oss::OssClient;
 pub use reality_capture::RealityCaptureClient;
+pub use rfi::RfiClient;
 pub use webhooks::WebhooksClient;

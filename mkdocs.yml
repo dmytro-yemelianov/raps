@@ -105,12 +105,16 @@ nav:
     - Checksums: cli/checksums.md
   - Additional Topics:
     - Examples: examples.md
+    - Feature Overview: features.md
+    - Plugins: plugins.md
     - Proxy Support: proxy-support.md
     - SBOM & Build Provenance: sbom.md
     - Troubleshooting: troubleshooting.md
+    - Known Limitations: limitations.md
   - Development:
     - Local Setup: LOCAL_SETUP.md
     - Deployment: DEPLOYMENT.md
+    - Stability & Compatibility: STABILITY.md
 
 # Extra files to include
 extra:

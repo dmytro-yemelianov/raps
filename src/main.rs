@@ -29,12 +29,13 @@ use std::io;
 
 use api::{
     AuthClient, DataManagementClient, DerivativeClient, DesignAutomationClient, IssuesClient,
-    OssClient, RealityCaptureClient, WebhooksClient,
+    OssClient, RealityCaptureClient, RfiClient, WebhooksClient,
 };
 use commands::{
     AccCommands, AuthCommands, BucketCommands, ConfigCommands, DaCommands, DemoCommands,
     FolderCommands, GenerateArgs, HubCommands, IssueCommands, ItemCommands, ObjectCommands,
-    PipelineCommands, ProjectCommands, RealityCommands, TranslateCommands, WebhookCommands,
+    PipelineCommands, PluginCommands, ProjectCommands, RealityCommands, RfiCommands,
+    TranslateCommands, WebhookCommands,
 };
 use config::Config;
 use error::ExitCode;
@@ -44,7 +45,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "APS Developer")]
-#[command(version = "0.7.0-dev")]
+#[command(version = "1.0.0")]
 #[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
@@ -138,9 +139,17 @@ enum Commands {
     #[command(subcommand)]
     Acc(AccCommands),
 
+    /// ACC RFIs (Requests for Information) (requires 3-legged auth)
+    #[command(subcommand)]
+    Rfi(RfiCommands),
+
     /// Reality Capture / Photogrammetry
     #[command(subcommand)]
     Reality(RealityCommands),
+
+    /// Manage plugins, hooks, and aliases
+    #[command(subcommand)]
+    Plugin(PluginCommands),
 
     /// Generate synthetic engineering files for testing
     Generate(GenerateArgs),
@@ -328,8 +337,21 @@ async fn run(mut cli: Cli) -> Result<()> {
             cmd.execute(&acc_client, output_format).await?;
         }
 
+        Commands::Rfi(cmd) => {
+            let rfi_client = RfiClient::new_with_http_config(
+                config.clone(),
+                auth_client.clone(),
+                http_config.clone(),
+            );
+            cmd.execute(&rfi_client, output_format).await?;
+        }
+
         Commands::Reality(cmd) => {
             cmd.execute(&rc_client, output_format).await?;
+        }
+
+        Commands::Plugin(cmd) => {
+            cmd.execute(output_format)?;
         }
 
         Commands::Generate(args) => {

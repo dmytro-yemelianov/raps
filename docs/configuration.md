@@ -310,6 +310,98 @@ Tokens are automatically refreshed when they expire. You can clear stored tokens
 raps auth logout
 ```
 
+## Performance Tuning
+
+### Request Timeout
+
+Control how long RAPS waits for API responses:
+
+```bash
+# Set timeout to 60 seconds
+raps --timeout 60 translate status $URN
+
+# Default is 120 seconds
+```
+
+**Environment Variable:**
+
+```bash
+export RAPS_TIMEOUT=60
+```
+
+### Concurrency Limits
+
+Control parallel operations for batch commands:
+
+```bash
+# Run 10 concurrent uploads
+raps object upload mybucket ./files/*.dwg --batch --parallel --concurrency 10
+
+# Default is 5 concurrent operations
+```
+
+**Environment Variable:**
+
+```bash
+export RAPS_CONCURRENCY=10
+```
+
+### Recommended Settings
+
+| Scenario | Timeout | Concurrency |
+|----------|---------|-------------|
+| Normal operations | 120s (default) | 5 (default) |
+| Large file uploads | 300s | 3 |
+| Slow networks | 180s | 2 |
+| Fast networks, many files | 60s | 10 |
+
+### Pagination Behavior
+
+RAPS automatically handles API pagination for list commands:
+
+- Fetches all pages by default
+- Uses API default page sizes (typically 20-100 items)
+- Results are aggregated before output
+
+For very large result sets (1000+ items), consider:
+
+```bash
+# Use filters to reduce results
+raps issue list $PROJECT_ID --status open --output json
+
+# Stream results for processing
+raps bucket list --output json | jq -c '.[]' | while read item; do
+  # Process each item
+done
+```
+
+## OS Keychain Integration
+
+For enhanced security, store tokens in your operating system's credential manager:
+
+```bash
+# Enable keychain storage
+export RAPS_USE_KEYCHAIN=true
+
+# Then authenticate
+raps auth login
+```
+
+**Supported Platforms:**
+
+| Platform | Credential Store |
+|----------|-----------------|
+| Windows | Windows Credential Manager |
+| macOS | Keychain |
+| Linux | Secret Service (GNOME Keyring, KWallet) |
+
+Tokens stored in the keychain are:
+- Encrypted at rest
+- Protected by OS-level access controls
+- Not accessible to other processes
+
+**Fallback:** If keychain is unavailable, RAPS falls back to file-based storage.
+
 ## Next Steps
 
 After configuration:
@@ -317,4 +409,6 @@ After configuration:
 1. **[Test authentication](commands/auth.md)**
 2. **[Create your first bucket](commands/buckets.md)**
 3. **[Upload and translate a model](examples.md)**
+4. **[Set up plugins](plugins.md)**
+5. **[Review known limitations](limitations.md)**
 

@@ -122,9 +122,46 @@ flowchart LR
 | Create Issue | `issue create` | 3-legged | ✅ Stable |
 | Update Issue | `issue update` | 3-legged | ✅ Stable |
 | Issue Types | `issue types` | 3-legged | ✅ Stable |
-| Comments | `issue comment` | 3-legged | ✅ New |
-| Attachments | `issue attachment` | 3-legged | ✅ New |
-| State Transitions | `issue transition` | 3-legged | ✅ New |
+| Comments | `issue comment` | 3-legged | ✅ Stable |
+| Attachments | `issue attachment` | 3-legged | ✅ Stable |
+| State Transitions | `issue transition` | 3-legged | ✅ Stable |
+
+### ACC RFIs
+
+| Feature | Command | Auth Type | Status |
+|---------|---------|-----------|--------|
+| List RFIs | `rfi list` | 3-legged | ✅ Stable |
+| Get RFI | `rfi get` | 3-legged | ✅ Stable |
+| Create RFI | `rfi create` | 3-legged | ✅ Stable |
+| Update RFI | `rfi update` | 3-legged | ✅ Stable |
+
+### ACC Assets
+
+| Feature | Command | Auth Type | Status |
+|---------|---------|-----------|--------|
+| List Assets | `acc asset list` | 3-legged | ✅ Stable |
+| Get Asset | `acc asset get` | 3-legged | ✅ Stable |
+| Create Asset | `acc asset create` | 3-legged | ✅ Stable |
+| Update Asset | `acc asset update` | 3-legged | ✅ Stable |
+
+### ACC Submittals
+
+| Feature | Command | Auth Type | Status |
+|---------|---------|-----------|--------|
+| List Submittals | `acc submittal list` | 3-legged | ✅ Stable |
+| Get Submittal | `acc submittal get` | 3-legged | ✅ Stable |
+| Create Submittal | `acc submittal create` | 3-legged | ✅ Stable |
+| Update Submittal | `acc submittal update` | 3-legged | ✅ Stable |
+
+### ACC Checklists
+
+| Feature | Command | Auth Type | Status |
+|---------|---------|-----------|--------|
+| List Checklists | `acc checklist list` | 3-legged | ✅ Stable |
+| Get Checklist | `acc checklist get` | 3-legged | ✅ Stable |
+| Create Checklist | `acc checklist create` | 3-legged | ✅ Stable |
+| Update Checklist | `acc checklist update` | 3-legged | ✅ Stable |
+| List Templates | `acc checklist templates` | 3-legged | ✅ Stable |
 
 ### Design Automation
 
@@ -154,11 +191,22 @@ flowchart LR
 | Feature | Command | Auth Type | Status |
 |---------|---------|-----------|--------|
 | Profile Management | `config profile` | Local | ✅ Stable |
-| Profile Import | `config profile import` | Local | ✅ New |
-| Profile Export | `config profile export` | Local | ✅ New |
-| Token Inspection | `auth inspect-token` | Local | ✅ New |
-| Pipeline Execution | `pipeline run` | Various | ✅ New |
-| Pipeline Validation | `pipeline validate` | Local | ✅ New |
+| Profile Import | `config profile import` | Local | ✅ Stable |
+| Profile Export | `config profile export` | Local | ✅ Stable |
+| Token Inspection | `auth inspect-token` | Local | ✅ Stable |
+| Pipeline Execution | `pipeline run` | Various | ✅ Stable |
+| Pipeline Validation | `pipeline validate` | Local | ✅ Stable |
+
+### Plugin System
+
+| Feature | Command | Auth Type | Status |
+|---------|---------|-----------|--------|
+| List Plugins | `plugin list` | Local | ✅ Stable |
+| Enable Plugin | `plugin enable` | Local | ✅ Stable |
+| Disable Plugin | `plugin disable` | Local | ✅ Stable |
+| List Aliases | `plugin alias list` | Local | ✅ Stable |
+| Add Alias | `plugin alias add` | Local | ✅ Stable |
+| Remove Alias | `plugin alias remove` | Local | ✅ Stable |
 
 ## Data Flow Diagrams
 
@@ -260,6 +308,11 @@ timeline
         Pipeline Execution : YAML/JSON automation
         Token Inspection : Scope and expiry analysis
         Webhook Testing : Endpoint validation
+    section v1.0.0
+        Stable Release : Backward compatibility guaranteed
+        RFI Support : Full CRUD for RFIs
+        ACC CRUD : Assets, Submittals, Checklists
+        Plugin System : Extensible architecture
 ```
 
 ## Related Documentation
