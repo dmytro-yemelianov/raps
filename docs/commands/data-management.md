@@ -268,7 +268,7 @@ raps auth login
 
 ## Related Commands
 
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up 3-legged OAuth
-- [Issues]({{ '/commands/issues' | relative_url }}) - Manage ACC/BIM 360 issues
-- [Translation]({{ '/commands/translation' | relative_url }}) - Translate files from projects
+- [Authentication](commands/auth) - Set up 3-legged OAuth
+- [Issues](commands/issues) - Manage ACC/BIM 360 issues
+- [Translation](commands/translation) - Translate files from projects
 

@@ -452,7 +452,7 @@ If you're still experiencing issues:
 
 ## Related Documentation
 
-- [Getting Started]({{ '/getting-started' | relative_url }}) - Setup guide
-- [Configuration]({{ '/configuration' | relative_url }}) - Configuration options
-- [Command Reference]({{ '/commands/auth' | relative_url }}) - Complete command documentation
+- [Getting Started](getting-started) - Setup guide
+- [Configuration](configuration) - Configuration options
+- [Command Reference](commands/auth) - Complete command documentation
 

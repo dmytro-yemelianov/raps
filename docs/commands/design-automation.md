@@ -319,7 +319,7 @@ APS_DA_NICKNAME=your_nickname
 
 ## Related Commands
 
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up authentication
-- [Buckets]({{ '/commands/buckets' | relative_url }}) - Manage OSS buckets for file storage
-- [Objects]({{ '/commands/objects' | relative_url }}) - Upload/download files for processing
+- [Authentication](commands/auth) - Set up authentication
+- [Buckets](commands/buckets) - Manage OSS buckets for file storage
+- [Objects](commands/objects) - Upload/download files for processing
 

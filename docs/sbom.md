@@ -241,7 +241,7 @@ Many organizations require SBOM for:
 
 ## Related Documentation
 
-- [Release Process]({{ '/RELEASE' | relative_url }})
-- [Checksums]({{ '/cli/checksums' | relative_url }})
-- [Security Policy]({{ '/SECURITY' | relative_url }})
+- [Release Process](RELEASE)
+- [Checksums](cli/checksums)
+- [Security Policy](SECURITY)
 

@@ -33,16 +33,16 @@ If you plan to use Design Automation features, you'll need:
 
 RAPS can be installed in several ways:
 
-1. **[From Pre-built Binaries]({{ '/installation' | relative_url }}#pre-built-binaries)** - Quickest method
-2. **[From crates.io]({{ '/installation' | relative_url }}#cratesio)** - Using Cargo package manager
-3. **[From Source]({{ '/installation' | relative_url }}#build-from-source)** - Build from GitHub repository
+1. **[From Pre-built Binaries](installation#pre-built-binaries)** - Quickest method
+2. **[From crates.io](installation#cratesio)** - Using Cargo package manager
+3. **[From Source](installation#build-from-source)** - Build from GitHub repository
 
 ## Next Steps
 
-1. **[Install RAPS]({{ '/installation' | relative_url }})** - Choose your installation method
-2. **[Configure Credentials]({{ '/configuration' | relative_url }})** - Set up environment variables
-3. **[Test Authentication]({{ '/commands/auth' | relative_url }}#test)** - Verify your setup
-4. **[Start Using Commands]({{ '/commands/buckets' | relative_url }})** - Begin working with APS
+1. **[Install RAPS](installation)** - Choose your installation method
+2. **[Configure Credentials](configuration)** - Set up environment variables
+3. **[Test Authentication](commands/auth#test)** - Verify your setup
+4. **[Start Using Commands](commands/buckets)** - Begin working with APS
 
 ## First Command
 
@@ -88,5 +88,5 @@ raps project list <hub-id>
 raps folder list <project-id> <folder-id>
 ```
 
-For more examples, see the [Examples]({{ '/examples' | relative_url }}) page.
+For more examples, see the [Examples](examples) page.
 

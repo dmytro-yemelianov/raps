@@ -283,7 +283,7 @@ Processing time depends on:
 
 ## Related Commands
 
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up authentication
-- [Objects]({{ '/commands/objects' | relative_url }}) - Download processed results
-- [Buckets]({{ '/commands/buckets' | relative_url }}) - Store processed models
+- [Authentication](commands/auth) - Set up authentication
+- [Objects](commands/objects) - Download processed results
+- [Buckets](commands/buckets) - Store processed models
 

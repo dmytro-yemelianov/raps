@@ -260,7 +260,7 @@ Tokens are automatically refreshed. If you see this error:
 
 ## Related Commands
 
-- [Buckets]({{ '/commands/buckets' | relative_url }}) - OSS bucket operations
-- [Objects]({{ '/commands/objects' | relative_url }}) - OSS object operations
-- [Data Management]({{ '/commands/data-management' | relative_url }}) - BIM 360/ACC operations (requires 3-legged auth)
+- [Buckets](commands/buckets) - OSS bucket operations
+- [Objects](commands/objects) - OSS object operations
+- [Data Management](commands/data-management) - BIM 360/ACC operations (requires 3-legged auth)
 

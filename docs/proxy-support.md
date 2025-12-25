@@ -349,6 +349,6 @@ test:
 
 ## Related Documentation
 
-- [Configuration Guide]({{ '/configuration' | relative_url }})
-- [Troubleshooting]({{ '/troubleshooting' | relative_url }})
+- [Configuration Guide](configuration)
+- [Troubleshooting](troubleshooting)
 

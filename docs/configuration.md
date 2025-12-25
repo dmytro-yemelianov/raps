@@ -274,7 +274,7 @@ raps auth logout
 
 After configuration:
 
-1. **[Test authentication]({{ '/commands/auth' | relative_url }})**
-2. **[Create your first bucket]({{ '/commands/buckets' | relative_url }})**
-3. **[Upload and translate a model]({{ '/examples' | relative_url }})**
+1. **[Test authentication](commands/auth)**
+2. **[Create your first bucket](commands/buckets)**
+3. **[Upload and translate a model](examples)**
 

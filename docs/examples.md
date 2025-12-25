@@ -304,7 +304,7 @@ done
 
 ## Related Documentation
 
-- [Getting Started]({{ '/getting-started' | relative_url }}) - Overview and prerequisites
-- [Command Reference]({{ '/commands/buckets' | relative_url }}) - Complete command documentation
-- [Troubleshooting]({{ '/troubleshooting' | relative_url }}) - Common issues and solutions
+- [Getting Started](getting-started) - Overview and prerequisites
+- [Command Reference](commands/buckets) - Complete command documentation
+- [Troubleshooting](troubleshooting) - Common issues and solutions
 

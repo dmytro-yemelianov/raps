@@ -196,7 +196,7 @@ raps bucket delete old-transient-bucket --yes
 
 ## Related Commands
 
-- [Objects]({{ '/commands/objects' | relative_url }}) - Manage objects in buckets
-- [Translation]({{ '/commands/translation' | relative_url }}) - Translate files stored in buckets
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up authentication
+- [Objects](commands/objects) - Manage objects in buckets
+- [Translation](commands/translation) - Translate files stored in buckets
+- [Authentication](commands/auth) - Set up authentication
 

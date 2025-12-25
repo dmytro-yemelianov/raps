@@ -238,7 +238,7 @@ The Issues commands use the **Construction Issues API v1**:
 
 ## Related Commands
 
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up 3-legged OAuth
-- [Data Management]({{ '/commands/data-management' | relative_url }}) - Browse projects and folders
-- [Hubs]({{ '/commands/data-management' | relative_url }}#hub-commands) - List hubs and projects
+- [Authentication](commands/auth) - Set up 3-legged OAuth
+- [Data Management](commands/data-management) - Browse projects and folders
+- [Hubs](commands/data-management#hub-commands) - List hubs and projects
 

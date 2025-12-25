@@ -238,7 +238,7 @@ Object keys can include:
 
 ## Related Commands
 
-- [Buckets]({{ '/commands/buckets' | relative_url }}) - Manage buckets
-- [Translation]({{ '/commands/translation' | relative_url }}) - Translate uploaded files
-- [Authentication]({{ '/commands/auth' | relative_url }}) - Set up authentication
+- [Buckets](commands/buckets) - Manage buckets
+- [Translation](commands/translation) - Translate uploaded files
+- [Authentication](commands/auth) - Set up authentication
 

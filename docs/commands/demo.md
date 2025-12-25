@@ -209,8 +209,8 @@ Some demos can generate synthetic test data if files aren't provided:
 
 ## Related Commands
 
-- [Buckets]({{ '/commands/buckets' | relative_url }}) - Bucket operations used in demos
-- [Objects]({{ '/commands/objects' | relative_url }}) - Object operations used in demos
-- [Translation]({{ '/commands/translation' | relative_url }}) - Translation operations used in demos
-- [Data Management]({{ '/commands/data-management' | relative_url }}) - Data management operations used in demos
+- [Buckets](commands/buckets) - Bucket operations used in demos
+- [Objects](commands/objects) - Object operations used in demos
+- [Translation](commands/translation) - Translation operations used in demos
+- [Data Management](commands/data-management) - Data management operations used in demos
 
