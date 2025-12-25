@@ -98,6 +98,14 @@
 | Config precedence spec (env vs config vs flags) | ✅ **Implemented** | Precedence: CLI flags > env vars > profile > defaults. Fully documented. |
 | Optional OS keychain integration (credential storage) | ✅ **Implemented** | TokenStorage abstraction with file and keychain backends. Controlled via RAPS_USE_KEYCHAIN env var. |
 
+### EPIC: Headless-friendly authentication
+
+| Issue | Status | Notes |
+|---|---|---|
+| Device-code flow (`raps auth login --device`) | ✅ **Implemented** | Device Authorization Grant flow implemented. Works without browser. |
+| Token-based login (`raps auth login --token`) | ✅ **Implemented** | Token-based login for CI/CD scenarios. Includes security warnings. |
+| `auth status` shows token expiry | ✅ **Implemented** | Token expiry information displayed in auth status command. |
+
 ### EPIC: Reliability: retries, backoff, timeouts, rate limits
 
 | Issue | Status | Notes |
