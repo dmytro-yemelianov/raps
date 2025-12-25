@@ -72,12 +72,31 @@
 - **Issue attachments** (`issue attachment`) - upload, download
 - **State transitions** (`issue transition`) - change issue status
 
+### ACC RFIs (Requests for Information) (v1.0.0+)
+- **List RFIs** (`rfi list`) - view all RFIs in a project
+- **Get RFI details** (`rfi get`) - view full RFI information
+- **Create RFIs** (`rfi create`) - submit new requests for information
+- **Update RFIs** (`rfi update`) - answer RFIs, change status
+
+### ACC Assets (v1.0.0+)
+- **List assets** (`acc asset list`) - view project assets
+- **CRUD operations** - get, create, update assets
+
+### ACC Submittals (v1.0.0+)
+- **List submittals** (`acc submittal list`) - view project submittals
+- **CRUD operations** - get, create, update submittals
+
+### ACC Checklists (v1.0.0+)
+- **List checklists** (`acc checklist list`) - view project checklists
+- **List templates** (`acc checklist templates`) - view available templates
+- **CRUD operations** - get, create, update checklists
+
 ### Reality Capture
 - Create photoscenes for photogrammetry
 - Upload photos and start processing
 - Monitor progress and download results (OBJ, FBX, RCS, etc.)
 
-### Pipeline Automation (v0.7.0+)
+### Pipeline Automation
 - **Execute pipelines** from YAML/JSON files (`pipeline run`)
 - **Variable substitution** and conditional step execution
 - **Dry-run mode** for validation
@@ -88,6 +107,12 @@
 - **Profile management** - create, switch, delete configurations
 - **Profile import/export** - backup and share configurations
 - Config precedence: CLI flags > env vars > profile > defaults
+
+### Plugin System (v1.0.0+)
+- **External plugins** - extend RAPS with `raps-<name>` executables
+- **Command hooks** - run pre/post command scripts
+- **Command aliases** - create shortcuts for frequent operations
+- **Plugin management** (`plugin list/enable/disable`)
 
 ## Installation
 

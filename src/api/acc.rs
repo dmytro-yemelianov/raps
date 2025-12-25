@@ -274,4 +274,349 @@ impl AccClient {
 
         Ok(templates_response.results)
     }
+
+    // ============== ASSET CRUD ==============
+
+    /// Get a specific asset by ID
+    pub async fn get_asset(&self, project_id: &str, asset_id: &str) -> Result<Asset> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/assets/v1/projects/{}/assets/{}",
+            project_id, asset_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get asset")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get asset ({}): {}", status, error_text);
+        }
+
+        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        Ok(asset)
+    }
+
+    /// Create a new asset
+    pub async fn create_asset(&self, project_id: &str, request: CreateAssetRequest) -> Result<Asset> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/assets/v1/projects/{}/assets",
+            project_id
+        );
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create asset")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create asset ({}): {}", status, error_text);
+        }
+
+        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        Ok(asset)
+    }
+
+    /// Update an existing asset
+    pub async fn update_asset(
+        &self,
+        project_id: &str,
+        asset_id: &str,
+        request: UpdateAssetRequest,
+    ) -> Result<Asset> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/assets/v1/projects/{}/assets/{}",
+            project_id, asset_id
+        );
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update asset")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to update asset ({}): {}", status, error_text);
+        }
+
+        let asset: Asset = response.json().await.context("Failed to parse asset response")?;
+        Ok(asset)
+    }
+
+    // ============== SUBMITTAL CRUD ==============
+
+    /// Get a specific submittal by ID
+    pub async fn get_submittal(&self, project_id: &str, submittal_id: &str) -> Result<Submittal> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/submittals/v1/projects/{}/items/{}",
+            project_id, submittal_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get submittal")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get submittal ({}): {}", status, error_text);
+        }
+
+        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        Ok(submittal)
+    }
+
+    /// Create a new submittal
+    pub async fn create_submittal(&self, project_id: &str, request: CreateSubmittalRequest) -> Result<Submittal> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/submittals/v1/projects/{}/items",
+            project_id
+        );
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create submittal")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create submittal ({}): {}", status, error_text);
+        }
+
+        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        Ok(submittal)
+    }
+
+    /// Update an existing submittal
+    pub async fn update_submittal(
+        &self,
+        project_id: &str,
+        submittal_id: &str,
+        request: UpdateSubmittalRequest,
+    ) -> Result<Submittal> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/submittals/v1/projects/{}/items/{}",
+            project_id, submittal_id
+        );
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update submittal")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to update submittal ({}): {}", status, error_text);
+        }
+
+        let submittal: Submittal = response.json().await.context("Failed to parse submittal response")?;
+        Ok(submittal)
+    }
+
+    // ============== CHECKLIST CRUD ==============
+
+    /// Get a specific checklist by ID
+    pub async fn get_checklist(&self, project_id: &str, checklist_id: &str) -> Result<Checklist> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/checklists/v1/projects/{}/checklists/{}",
+            project_id, checklist_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get checklist")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get checklist ({}): {}", status, error_text);
+        }
+
+        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        Ok(checklist)
+    }
+
+    /// Create a new checklist
+    pub async fn create_checklist(&self, project_id: &str, request: CreateChecklistRequest) -> Result<Checklist> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/checklists/v1/projects/{}/checklists",
+            project_id
+        );
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create checklist")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create checklist ({}): {}", status, error_text);
+        }
+
+        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        Ok(checklist)
+    }
+
+    /// Update an existing checklist
+    pub async fn update_checklist(
+        &self,
+        project_id: &str,
+        checklist_id: &str,
+        request: UpdateChecklistRequest,
+    ) -> Result<Checklist> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "https://developer.api.autodesk.com/construction/checklists/v1/projects/{}/checklists/{}",
+            project_id, checklist_id
+        );
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update checklist")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to update checklist ({}): {}", status, error_text);
+        }
+
+        let checklist: Checklist = response.json().await.context("Failed to parse checklist response")?;
+        Ok(checklist)
+    }
+}
+
+// ============== REQUEST TYPES ==============
+
+/// Request body for creating an asset
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAssetRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub barcode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_asset_id: Option<String>,
+}
+
+/// Request body for updating an asset
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAssetRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub category_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub barcode: Option<String>,
+}
+
+/// Request body for creating a submittal
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSubmittalRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub spec_section: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+}
+
+/// Request body for updating a submittal
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSubmittalRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+}
+
+/// Request body for creating a checklist
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateChecklistRequest {
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee_id: Option<String>,
+}
+
+/// Request body for updating a checklist
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateChecklistRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub due_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee_id: Option<String>,
 }
