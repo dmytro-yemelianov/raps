@@ -814,7 +814,7 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
             print!("  Processing: {}...", file_name);
 
-            let result = match oss_clone.upload_object(&bucket_prefix_clone, &file_name, &file_path).await {
+            let result: Result<Job, anyhow::Error> = match oss_clone.upload_object(&bucket_prefix_clone, &file_name, &file_path).await {
                 Ok(_) => {
                     let urn = oss_clone.get_urn(&bucket_prefix_clone, &file_name);
 
