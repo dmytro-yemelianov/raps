@@ -135,15 +135,6 @@ impl AuthClient {
         storage.load().ok().flatten()
     }
 
-    /// Get token storage path
-    fn token_path(&self) -> PathBuf {
-        let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
-            .expect("Failed to get project directories");
-        let config_dir = proj_dirs.config_dir();
-        fs::create_dir_all(config_dir).ok();
-        config_dir.join("tokens.json")
-    }
-
     /// Save token to persistent storage
     fn save_token(&self, token: &StoredToken) -> Result<()> {
         let path = self.token_path();
