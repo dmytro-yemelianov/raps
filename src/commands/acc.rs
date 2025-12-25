@@ -1014,6 +1014,7 @@ async fn create_checklist(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn update_checklist(
     client: &AccClient,
     project_id: &str,
