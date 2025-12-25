@@ -152,8 +152,15 @@
 
 ## Next Steps
 
-1. Add OS keychain integration for secure token storage (optional enhancement)
-2. Add tests for retry/backoff logic
-3. Generate and publish SBOM for releases
-4. Integrate SBOM generation into CI/CD workflow
+### Completed ✅
+- ✅ OS keychain integration for secure token storage (implemented in v0.5)
+- ✅ SHA256 checksums for releases (implemented in v0.6)
+- ✅ SBOM generation scripts and documentation (implemented in v0.6)
+
+### Future Enhancements
+1. Add tests for retry/backoff logic
+2. Integrate SBOM generation into CI/CD workflow (automated generation on release)
+3. Consider additional output formats or command enhancements based on user feedback
+4. Performance optimizations for bulk operations
+5. Enhanced error messages with actionable suggestions
 
