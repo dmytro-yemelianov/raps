@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-12-25
+
+### Added
+- SHA256 checksum generation scripts for release artifacts (PowerShell and bash)
+- Checksum verification documentation for Windows, macOS, and Linux
+- SBOM (Software Bill of Materials) generation scripts supporting CycloneDX format
+- Comprehensive SBOM documentation and usage guide
+- CODE_OF_CONDUCT.md following Contributor Covenant 2.1
+- Enhanced `.gitignore` with patterns for logs, temporary files, caches, and build artifacts
+
+### Changed
+- Release process now includes checksums.txt for all artifacts
+- Repository cleanup: enhanced `.gitignore` to prevent accidental commits of build artifacts
+
+### Fixed
+- Repository artifacts properly excluded from version control
+
 ## [0.5.0] - 2025-12-25
 
 ### Added
@@ -70,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.3.0

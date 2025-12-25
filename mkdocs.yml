@@ -1,0 +1,133 @@
+# MkDocs configuration file
+# See https://www.mkdocs.org/user-guide/configuration/ for details
+
+site_name: RAPS CLI Documentation
+site_description: Comprehensive command-line interface for Autodesk Platform Services
+site_author: APS Developer
+site_url: https://dmytro-yemelianov.github.io/raps
+
+# Documentation directory
+docs_dir: docs
+
+# Repository information
+repo_name: raps
+repo_url: https://github.com/dmytro-yemelianov/raps
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; APS Developer
+
+# Theme configuration
+theme:
+  name: material
+  palette:
+    # Light mode
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+  icon:
+    logo: material/console
+  logo: logo/output/raps-logo.png
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+# Plugins
+plugins:
+  - search:
+      lang: en
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: date
+      fallback_to_build_date: false
+
+# Navigation structure
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started.md
+    - installation.md
+    - configuration.md
+  - Commands:
+    - Authentication: commands/auth.md
+    - Buckets: commands/buckets.md
+    - Objects: commands/objects.md
+    - Translation: commands/translation.md
+    - Data Management: commands/data-management.md
+    - Webhooks: commands/webhooks.md
+    - Design Automation: commands/design-automation.md
+    - Issues: commands/issues.md
+    - Reality Capture: commands/reality-capture.md
+    - Demo Scenarios: commands/demo.md
+  - CLI Reference:
+    - Exit Codes: cli/exit-codes.md
+    - Checksums: cli/checksums.md
+  - Additional Topics:
+    - Examples: examples.md
+    - Proxy Support: proxy-support.md
+    - SBOM & Build Provenance: sbom.md
+    - Troubleshooting: troubleshooting.md
+  - Development:
+    - Local Setup: LOCAL_SETUP.md
+    - Deployment: DEPLOYMENT.md
+
+# Extra files to include
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/dmytro-yemelianov/raps
+    - icon: fontawesome/solid/globe
+      link: https://aps.autodesk.com
+
+# Extra CSS (optional - create these files if needed)
+# extra_css:
+#   - stylesheets/extra.css
+
+# Extra JavaScript (optional - create these files if needed)
+# extra_javascript:
+#   - javascripts/extra.js
+
+# Validation
+strict: false
+

@@ -109,7 +109,10 @@ impl AuthClient {
     }
 
     /// Create a new authentication client with custom HTTP config
-    pub fn new_with_http_config(config: Config, http_config: crate::http::HttpClientConfig) -> Self {
+    pub fn new_with_http_config(
+        config: Config,
+        http_config: crate::http::HttpClientConfig,
+    ) -> Self {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
 

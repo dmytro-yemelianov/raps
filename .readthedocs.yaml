@@ -1,0 +1,30 @@
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+version: 2
+
+# Build configuration
+build:
+  os: ubuntu-22.04
+  tools:
+    python:
+      version: "3.11"
+
+# Python requirements for MkDocs
+python:
+  install:
+    - requirements: docs/requirements.txt
+
+# MkDocs configuration (natively supported by Read the Docs)
+mkdocs:
+  configuration: mkdocs.yml
+  fail_on_warning: false
+
+# Format configuration
+formats:
+  - htmlzip
+  - pdf
+
+# Submodules (if any)
+submodules:
+  include: all

@@ -141,7 +141,7 @@
 | Issue | Status | Notes |
 |---|---|---|
 | Add `CHANGELOG.md` with Keep a Changelog format | ✅ **Implemented** | CHANGELOG.md created following Keep a Changelog format. Includes v0.3.0 and v0.4.0 sections. |
-| Add Issue/PR templates + CODE_OF_CONDUCT | ✅ **Implemented** | Bug report and feature request templates added. PR template updated with checklist. |
+| Add Issue/PR templates + CODE_OF_CONDUCT | ✅ **Implemented** | Bug report, feature request, and question templates added. PR template updated with checklist. CODE_OF_CONDUCT.md added following Contributor Covenant 2.1. |
 | Remove accidental artifacts from repo + extend `.gitignore` | ✅ **Implemented** | Enhanced .gitignore with additional patterns for logs, temp files, caches, and build artifacts. |
 
 ### EPIC: Release integrity & provenance

@@ -791,7 +791,11 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
     let semaphore = Arc::new(Semaphore::new(max_parallel));
     let mut handles = Vec::new();
 
-    println!("\n  Processing {} files with concurrency limit of {}...", files.len(), max_parallel);
+    println!(
+        "\n  Processing {} files with concurrency limit of {}...",
+        files.len(),
+        max_parallel
+    );
 
     // Wrap clients in Arc for sharing across tasks
     let oss = Arc::new(oss);
@@ -813,11 +817,17 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
             print!("  Processing: {}...", file_name);
 
-            let result: Result<Job, anyhow::Error> = match oss_clone.upload_object(&bucket_prefix_clone, &file_name, &file_path).await {
+            let result: Result<Job, anyhow::Error> = match oss_clone
+                .upload_object(&bucket_prefix_clone, &file_name, &file_path)
+                .await
+            {
                 Ok(_) => {
                     let urn = oss_clone.get_urn(&bucket_prefix_clone, &file_name);
 
-                    match derivative_clone.translate(&urn, output_format_clone, None).await {
+                    match derivative_clone
+                        .translate(&urn, output_format_clone, None)
+                        .await
+                    {
                         Ok(_) => {
                             println!(" {}", "submitted".green());
                             Ok(Job {

@@ -43,7 +43,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "APS Developer")]
-#[command(version = "0.6.0-dev")]
+#[command(version = "0.6.0")]
 #[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
@@ -236,13 +236,38 @@ async fn run(mut cli: Cli) -> Result<()> {
 
     // Create API clients with shared HTTP config
     let auth_client = AuthClient::new_with_http_config(config.clone(), http_config.clone());
-    let oss_client = OssClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let derivative_client = DerivativeClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let dm_client = DataManagementClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let webhooks_client = WebhooksClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let da_client = DesignAutomationClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let issues_client = IssuesClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
-    let rc_client = RealityCaptureClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
+    let oss_client =
+        OssClient::new_with_http_config(config.clone(), auth_client.clone(), http_config.clone());
+    let derivative_client = DerivativeClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+    let dm_client = DataManagementClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+    let webhooks_client = WebhooksClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+    let da_client = DesignAutomationClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+    let issues_client = IssuesClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+    let rc_client = RealityCaptureClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
 
     match cli.command {
         Commands::Auth(cmd) => {
