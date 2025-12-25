@@ -707,11 +707,11 @@ async fn upload_batch(
                 match upload_result {
                     Ok(info) => {
                         batch_result.uploaded += 1;
-                        batch_result.total_size += info.size as u64;
+                        batch_result.total_size += info.size;
                         batch_result.files.push(BatchFileResult {
                             name: file_name,
                             success: true,
-                            size: Some(info.size as u64),
+                            size: Some(info.size),
                             error: None,
                         });
                     }

@@ -521,8 +521,7 @@ fn verify_signature(
     use std::io::Read;
 
     // Load payload (from string or file)
-    let payload_data = if payload.starts_with("@") {
-        let file_path = &payload[1..];
+    let payload_data = if let Some(file_path) = payload.strip_prefix('@') {
         let mut content = String::new();
         std::fs::File::open(file_path)
             .and_then(|mut f| f.read_to_string(&mut content))

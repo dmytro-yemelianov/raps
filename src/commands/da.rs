@@ -451,6 +451,7 @@ async fn delete_activity(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn create_activity(
     client: &DesignAutomationClient,
     file: Option<PathBuf>,

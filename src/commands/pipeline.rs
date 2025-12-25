@@ -168,7 +168,7 @@ async fn run_pipeline(
         let result = execute_raps_command(&command);
 
         match result {
-            Ok(exit_code) if exit_code == 0 => {
+            Ok(0) => {
                 if output_format.supports_colors() {
                     println!("  {} Success", "✓".green().bold());
                 }
