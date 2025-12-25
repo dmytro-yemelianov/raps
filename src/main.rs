@@ -298,7 +298,8 @@ async fn run(mut cli: Cli) -> Result<()> {
         }
 
         Commands::Demo(cmd) => {
-            cmd.execute().await?;
+            let concurrency = cli.concurrency.unwrap_or(5);
+            cmd.execute(concurrency).await?;
         }
 
         Commands::Config(_) => {

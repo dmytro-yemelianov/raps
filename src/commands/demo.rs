@@ -5,10 +5,13 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
+use futures_util::stream::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::fs;
+use tokio::sync::Semaphore;
 use tokio::time::sleep;
 
 use crate::api::derivative::OutputFormat;
@@ -95,12 +98,12 @@ pub struct BatchProcessingArgs {
 }
 
 impl DemoCommands {
-    pub async fn execute(&self) -> Result<()> {
+    pub async fn execute(&self, concurrency: usize) -> Result<()> {
         match self {
             DemoCommands::BucketLifecycle(args) => bucket_lifecycle(args).await,
             DemoCommands::ModelPipeline(args) => model_pipeline(args).await,
             DemoCommands::DataManagement(args) => data_management(args).await,
-            DemoCommands::BatchProcessing(args) => batch_processing(args).await,
+            DemoCommands::BatchProcessing(args) => batch_processing(args, concurrency).await,
         }
     }
 }
@@ -649,7 +652,7 @@ async fn data_management(args: &DataManagementArgs) -> Result<()> {
 // Batch Processing Demo
 // ============================================================================
 
-async fn batch_processing(args: &BatchProcessingArgs) -> Result<()> {
+async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Result<()> {
     let config = Config::from_env()?;
     let auth = AuthClient::new(config.clone());
     let oss = OssClient::new(config.clone(), auth.clone());
@@ -784,46 +787,84 @@ async fn batch_processing(args: &BatchProcessingArgs) -> Result<()> {
     let mut jobs: Vec<Job> = Vec::new();
     let output_format = OutputFormat::from_str(&args.format).unwrap_or(OutputFormat::Svf2);
 
+    // Use the smaller of CLI concurrency or args.max_parallel
+    let max_parallel = concurrency.min(args.max_parallel);
+    let semaphore = Arc::new(Semaphore::new(max_parallel));
+    let mut handles = Vec::new();
+
+    println!("\n  Processing {} files with concurrency limit of {}...", files.len(), max_parallel);
+
+    // Process files in parallel with concurrency limit
     for file in &files {
         let file_name = file.file_name().unwrap().to_string_lossy().to_string();
-        print!("  Processing: {}...", file_name);
+        let file_path = file.clone();
+        let bucket_prefix_clone = bucket_prefix.clone();
+        let oss_clone = oss.clone();
+        let derivative_clone = derivative.clone();
+        let semaphore_clone = semaphore.clone();
+        let output_format_clone = output_format;
 
-        match oss.upload_object(&bucket_prefix, &file_name, file).await {
-            Ok(_) => {
-                let urn = oss.get_urn(&bucket_prefix, &file_name);
+        let handle = tokio::spawn(async move {
+            // Acquire semaphore permit (blocks if limit reached)
+            let _permit = semaphore_clone.acquire().await.unwrap();
 
-                match derivative.translate(&urn, output_format, None).await {
-                    Ok(_) => {
-                        jobs.push(Job {
-                            file: file_name,
-                            urn,
-                            status: "submitted".to_string(),
-                            start_time: Instant::now(),
-                            end_time: None,
-                        });
-                        println!(" {}", "submitted".green());
-                    }
-                    Err(e) => {
-                        jobs.push(Job {
-                            file: file_name,
-                            urn,
-                            status: format!("translate_failed: {}", e),
-                            start_time: Instant::now(),
-                            end_time: Some(Instant::now()),
-                        });
-                        println!(" {}", "translate failed".red());
+            print!("  Processing: {}...", file_name);
+
+            let result = match oss_clone.upload_object(&bucket_prefix_clone, &file_name, &file_path).await {
+                Ok(_) => {
+                    let urn = oss_clone.get_urn(&bucket_prefix_clone, &file_name);
+
+                    match derivative_clone.translate(&urn, output_format_clone, None).await {
+                        Ok(_) => {
+                            println!(" {}", "submitted".green());
+                            Ok(Job {
+                                file: file_name,
+                                urn,
+                                status: "submitted".to_string(),
+                                start_time: Instant::now(),
+                                end_time: None,
+                            })
+                        }
+                        Err(e) => {
+                            println!(" {}", "translate failed".red());
+                            Ok(Job {
+                                file: file_name,
+                                urn,
+                                status: format!("translate_failed: {}", e),
+                                start_time: Instant::now(),
+                                end_time: Some(Instant::now()),
+                            })
+                        }
                     }
                 }
+                Err(e) => {
+                    println!(" {}", "upload failed".red());
+                    Ok(Job {
+                        file: file_name,
+                        urn: String::new(),
+                        status: format!("upload_failed: {}", e),
+                        start_time: Instant::now(),
+                        end_time: Some(Instant::now()),
+                    })
+                }
+            };
+
+            // Permit is automatically released when dropped
+            result
+        });
+
+        handles.push(handle);
+    }
+
+    // Wait for all tasks to complete
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(job)) => jobs.push(job),
+            Ok(Err(e)) => {
+                eprintln!("  Error processing file: {}", e);
             }
             Err(e) => {
-                jobs.push(Job {
-                    file: file_name,
-                    urn: String::new(),
-                    status: format!("upload_failed: {}", e),
-                    start_time: Instant::now(),
-                    end_time: Some(Instant::now()),
-                });
-                println!(" {}", "upload failed".red());
+                eprintln!("  Task panicked: {}", e);
             }
         }
     }
