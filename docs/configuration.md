@@ -106,11 +106,12 @@ Profiles are stored in:
 
 When RAPS loads configuration, it uses this order:
 
-1. **Environment variables** (highest priority)
-2. **Active profile** (if set)
-3. **Defaults** (lowest priority)
+1. **CLI flags** (highest priority, e.g., `--timeout`, `--concurrency`)
+2. **Environment variables** (e.g., `RAPS_TIMEOUT`, `APS_CLIENT_ID`)
+3. **Active profile** (if set)
+4. **Defaults** (lowest priority)
 
-This means environment variables always override profile settings, making it easy to override for specific commands.
+This means CLI flags always override environment variables and profile settings, making it easy to override for specific commands. Environment variables override profile settings, which is useful for CI/CD scenarios.
 
 ### Example: Multi-Environment Setup
 

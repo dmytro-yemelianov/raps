@@ -181,7 +181,7 @@ raps config profile list
 raps config profile current
 ```
 
-**Config Precedence:** Environment variables > Active profile > Defaults
+**Config Precedence:** CLI flags > Environment variables > Active profile > Defaults
 
 ### Environment Variables
 
@@ -296,6 +296,12 @@ raps bucket list --no-color
 
 # Quiet mode (only output data)
 raps bucket list --quiet
+
+# Set HTTP request timeout (seconds, default: 120)
+raps bucket list --timeout 60
+
+# Set maximum concurrent operations for bulk commands (default: 5)
+raps demo batch-processing --concurrency 10
 
 # Verbose mode (show request summaries)
 raps bucket list --verbose

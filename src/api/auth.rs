@@ -105,11 +105,15 @@ pub struct AuthClient {
 impl AuthClient {
     /// Create a new authentication client
     pub fn new(config: Config) -> Self {
+        Self::new_with_http_config(config, crate::http::HttpClientConfig::default())
+    }
+
+    /// Create a new authentication client with custom HTTP config
+    pub fn new_with_http_config(config: Config, http_config: crate::http::HttpClientConfig) -> Self {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
 
         // Create HTTP client with configured timeouts
-        let http_config = crate::http::HttpClientConfig::default();
         let http_client = http_config
             .create_client()
             .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails

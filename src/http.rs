@@ -43,6 +43,19 @@ impl HttpClientConfig {
             .build()
             .context("Failed to create HTTP client")
     }
+
+    /// Create HTTP client config from CLI flags and environment variables
+    /// Precedence: CLI flag > environment variable > default
+    pub fn from_cli_and_env(timeout_flag: Option<u64>) -> Self {
+        let timeout = timeout_flag
+            .or_else(|| std::env::var("RAPS_TIMEOUT").ok().and_then(|v| v.parse().ok()))
+            .unwrap_or(120);
+
+        Self {
+            timeout,
+            ..Self::default()
+        }
+    }
 }
 
 /// Execute HTTP request with retry logic
