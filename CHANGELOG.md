@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **APS Feature Coverage**: New dedicated documentation page comparing RAPS CLI capabilities against full APS API spectrum.
 - **Enhanced Documentation**: Created comprehensive guides for ACC Modules, RFIs, Plugin Management, and Synthetic Data Generation.
+- **License Migration**: Transitioned from MIT to Apache 2.0 for better attribution preservation and patent protection.
 - **Architecture Visualization**: New Mermaid diagrams for command architecture and authentication flows.
 - **Practical Examples**: Expanded use cases for ACC Assets, RFIs, and developer tools.
 

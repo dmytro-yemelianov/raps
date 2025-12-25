@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! CLI command modules
 //!
 //! Contains subcommand implementations for all APS operations.

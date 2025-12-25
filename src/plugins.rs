@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Plugin and Extension System
 //!
 //! Provides a mechanism for extending RAPS CLI with external commands and hooks.

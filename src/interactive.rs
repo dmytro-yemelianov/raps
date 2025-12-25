@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Interactive mode control
 //!
 //! Provides functions to check if interactive mode is enabled and handle

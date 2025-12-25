@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! ACC RFI (Request for Information) API module
 //!
 //! Handles RFIs in ACC (Autodesk Construction Cloud) projects.

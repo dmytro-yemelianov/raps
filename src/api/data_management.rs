@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Data Management API module
 //!
 //! Handles access to Hubs, Projects, Folders, and Items in BIM 360/ACC.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! API modules for interacting with Autodesk Platform Services
 //!
 //! This module contains clients for:

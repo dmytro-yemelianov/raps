@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Demo scenarios for APS functionality demonstration
 //!
 //! Replaces PowerShell scripts with native Rust implementations

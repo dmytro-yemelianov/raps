@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Authentication module for APS OAuth 2.0
 //!
 //! Implements both 2-legged (client credentials) and 3-legged (authorization code) OAuth flows.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Object management commands
 //!
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.

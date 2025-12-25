@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Logging and verbosity control
 //!
 //! Provides global flags for controlling output verbosity and formatting:

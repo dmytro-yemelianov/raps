@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! Configuration module for APS CLI
 //!
 //! Handles loading and managing APS credentials from environment variables or .env file.
