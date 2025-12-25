@@ -1,10 +1,7 @@
----
-layout: default
-title: RAPS CLI Documentation
----
+# RAPS CLI Documentation
 
 <div align="center">
-  <img src="{{ '/logo/output/raps-logo.png' | relative_url }}" alt="RAPS Logo" width="200"/>
+  <img src="logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
   <h1>RAPS CLI Documentation</h1>
   <p><strong>R</strong>ust <strong>APS</strong> CLI - A comprehensive command-line interface for Autodesk Platform Services</p>
 </div>
@@ -15,10 +12,10 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 
 ## Quick Start
 
-1. **[Install RAPS]({{ '/installation' | relative_url }})** - Get started with installation instructions
-2. **[Configure Credentials]({{ '/configuration' | relative_url }})** - Set up your APS credentials
-3. **[Authenticate]({{ '/commands/auth' | relative_url }})** - Login and test authentication
-4. **[Explore Commands]({{ '/commands/buckets' | relative_url }})** - Start using RAPS commands
+1. **[Install RAPS](installation.md)** - Get started with installation instructions
+2. **[Configure Credentials](configuration.md)** - Set up your APS credentials
+3. **[Authenticate](commands/auth.md)** - Login and test authentication
+4. **[Explore Commands](commands/buckets.md)** - Start using RAPS commands
 
 ## Features
 
@@ -63,14 +60,14 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 
 ## Documentation Structure
 
-- **[Getting Started]({{ '/getting-started' | relative_url }})** - Overview and prerequisites
-- **[Installation]({{ '/installation' | relative_url }})** - Installation methods
-- **[Configuration]({{ '/configuration' | relative_url }})** - Setting up credentials
-- **[Proxy Support]({{ '/proxy-support' | relative_url }})** - Configure proxy for corporate networks
-- **[SBOM & Build Provenance]({{ '/sbom' | relative_url }})** - Software Bill of Materials
-- **[Commands]({{ '/commands/buckets' | relative_url }})** - Complete command reference
-- **[Examples]({{ '/examples' | relative_url }})** - Common use cases and workflows
-- **[Troubleshooting]({{ '/troubleshooting' | relative_url }})** - Common issues and solutions
+- **[Getting Started](getting-started.md)** - Overview and prerequisites
+- **[Installation](installation.md)** - Installation methods
+- **[Configuration](configuration.md)** - Setting up credentials
+- **[Proxy Support](proxy-support.md)** - Configure proxy for corporate networks
+- **[SBOM & Build Provenance](sbom.md)** - Software Bill of Materials
+- **[Commands](commands/buckets.md)** - Complete command reference
+- **[Examples](examples.md)** - Common use cases and workflows
+- **[Troubleshooting](troubleshooting.md)** - Common issues and solutions
 
 ## Resources
 
