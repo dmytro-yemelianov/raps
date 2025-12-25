@@ -2,6 +2,17 @@
 
 <div align="center">
   <img src="logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
+
+  <h3>Rust APS CLI</h3>
+  <p>A comprehensive command-line interface for Autodesk Platform Services (APS)</p>
+
+  [![Crates.io](https://img.shields.io/crates/v/raps.svg)](https://crates.io/crates/raps)
+  [![Downloads](https://img.shields.io/crates/d/raps.svg)](https://crates.io/crates/raps)
+  [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://dmytro-yemelianov.github.io/raps/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+  [![Build Status](https://github.com/dmytro-yemelianov/raps/workflows/CI/badge.svg)](https://github.com/dmytro-yemelianov/raps/actions)
+
 </div>
 
 **R**ust **APS** CLI - A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
@@ -13,14 +24,16 @@
 - **3-legged OAuth** (Authorization Code) with browser login for user data access
 - **Device-code authentication** (`--device`) for headless/server environments
 - **Token-based login** (`--token`) for CI/CD scenarios
+- **Token inspection** (`auth inspect-token`) - view scopes, expiry, and warnings
 - Secure token storage with automatic refresh
 - User profile information with `auth whoami`
-- Token expiry information in `auth status`
 
 ### Object Storage Service (OSS)
 - Create, list, and delete buckets (with multi-region support: US & EMEA)
 - Get detailed bucket information with `bucket info`
 - Upload, download, list, and delete objects
+- **Resumable multipart uploads** for large files (auto-chunking for files > 5MB)
+- **Batch uploads** with parallel processing (`--batch`, `--parallel`)
 - **Signed S3 URLs** for direct download bypassing OSS servers
 - Progress bars for file transfers
 
@@ -28,32 +41,53 @@
 - Translate CAD files to various formats (SVF2, OBJ, STL, STEP, etc.)
 - Check translation status with optional polling
 - View manifest and available derivatives
+- **Download derivatives** (`translate download`) - export translated models
+- **Translation presets** (`translate preset`) - save and reuse common configurations
 
 ### Data Management (BIM 360/ACC)
 - Browse hubs, projects, folders, and items
 - Create folders
 - View item versions
+- **Bind OSS objects to ACC folders** (`item bind`) - link external uploads
 - Requires 3-legged authentication
 
 ### Webhooks
 - Create, list, and delete webhook subscriptions
 - Support for data management and model derivative events
+- **Test webhook endpoints** (`webhook test`) - validate with sample payloads
 
 ### Design Automation
 - List available engines (AutoCAD, Revit, Inventor, 3ds Max)
 - Manage app bundles and activities
-- Submit and monitor work items
+- **Create activities** (`da activity create`)
+- **Submit work items** (`da workitem run`) with input/output URLs
+- **Get work item results** (`da workitem get`) - download reports
+- Monitor work item status
 
 ### ACC Issues (Construction Cloud)
 - List, create, and update issues
 - View issue types (categories) and subtypes
 - Filter by status
-- Uses the Construction Issues API v1
+- **Issue comments** (`issue comment`) - list, add, delete
+- **Issue attachments** (`issue attachment`) - upload, download
+- **State transitions** (`issue transition`) - change issue status
 
 ### Reality Capture
 - Create photoscenes for photogrammetry
 - Upload photos and start processing
 - Monitor progress and download results (OBJ, FBX, RCS, etc.)
+
+### Pipeline Automation (v0.7.0+)
+- **Execute pipelines** from YAML/JSON files (`pipeline run`)
+- **Variable substitution** and conditional step execution
+- **Dry-run mode** for validation
+- **Continue-on-error** for robust automation
+- **Sample generation** (`pipeline sample`)
+
+### Configuration & Profiles
+- **Profile management** - create, switch, delete configurations
+- **Profile import/export** - backup and share configurations
+- Config precedence: CLI flags > env vars > profile > defaults
 
 ## Installation
 
@@ -412,19 +446,20 @@ raps reality result <photoscene-id>
 
 | Command | Description |
 |---------|-------------|
-| `auth` | Authentication management (test, login, logout, status, whoami) |
+| `auth` | Authentication (test, login, logout, status, whoami, inspect-token) |
 | `bucket` | OSS bucket operations (create, list, info, delete) |
 | `object` | OSS object operations (upload, download, list, delete, signed-url) |
-| `translate` | Model Derivative translation |
+| `translate` | Model Derivative (start, status, manifest, download, preset) |
 | `hub` | List/view hubs |
 | `project` | List/view projects |
 | `folder` | Folder operations |
-| `item` | Item/file operations |
-| `webhook` | Webhook subscriptions |
-| `da` | Design Automation |
-| `issue` | ACC/BIM 360 issues |
+| `item` | Item operations (versions, bind) |
+| `webhook` | Webhook subscriptions (create, list, delete, test) |
+| `da` | Design Automation (engines, appbundles, activities, workitem) |
+| `issue` | ACC/BIM 360 issues (list, create, update, comment, attachment, transition) |
 | `reality` | Reality Capture photogrammetry |
-| `config` | Configuration and profile management |
+| `pipeline` | Pipeline automation (run, validate, sample) |
+| `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
 
 ## API Coverage
@@ -458,6 +493,14 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 ## License
 
 MIT License
+
+## Documentation
+
+- **[Full Documentation](https://dmytro-yemelianov.github.io/raps/)** - Complete user guide
+- **[Feature Overview](https://dmytro-yemelianov.github.io/raps/features/)** - Visual diagrams and feature matrix
+- **[Pipeline Guide](https://dmytro-yemelianov.github.io/raps/commands/pipeline/)** - Automation workflows
+- **[Exit Codes](https://dmytro-yemelianov.github.io/raps/cli/exit-codes/)** - CI/CD integration
+- **[Changelog](CHANGELOG.md)** - Version history
 
 ## Resources
 
