@@ -1,7 +1,7 @@
 # RAPS
 
 <div align="center">
-  <img src="logo/output/raps-logo.png" alt="RAPS Logo" width="200"/>
+  <img src="logo/output/raps-logo.webp" alt="RAPS Logo" width="200"/>
 
   <h3>Rust APS CLI</h3>
   <p>A comprehensive command-line interface for Autodesk Platform Services (APS)</p>
