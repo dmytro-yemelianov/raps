@@ -243,5 +243,5 @@ Many organizations require SBOM for:
 
 - [Release Process](RELEASE.md)
 - [Checksums](cli/checksums.md)
-- [Security Policy](../../SECURITY.md)
+- [Security Policy](https://github.com/dmytro-yemelianov/raps/blob/main/SECURITY.md)
 

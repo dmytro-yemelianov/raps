@@ -319,7 +319,7 @@ APS_DA_NICKNAME=your_nickname
 
 ## Related Commands
 
-- [Authentication](commands/auth.md) - Set up authentication
-- [Buckets](commands/buckets.md) - Manage OSS buckets for file storage
-- [Objects](commands/objects.md) - Upload/download files for processing
+- [Authentication](auth.md) - Set up authentication
+- [Buckets](buckets.md) - Manage OSS buckets for file storage
+- [Objects](objects.md) - Upload/download files for processing
 

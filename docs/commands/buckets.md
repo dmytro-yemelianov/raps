@@ -196,7 +196,7 @@ raps bucket delete old-transient-bucket --yes
 
 ## Related Commands
 
-- [Objects](commands/objects.md) - Manage objects in buckets
-- [Translation](commands/translation.md) - Translate files stored in buckets
-- [Authentication](commands/auth.md) - Set up authentication
+- [Objects](objects.md) - Manage objects in buckets
+- [Translation](translation.md) - Translate files stored in buckets
+- [Authentication](auth.md) - Set up authentication
 
