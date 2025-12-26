@@ -157,3 +157,30 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Trigger Docker build
+        if: ${{ !contains(steps.get_version.outputs.version, '-') }}
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RELEASE_TRIGGER_TOKEN }}
+          repository: dmytro-yemelianov/raps-docker
+          event-type: raps-release
+          client-payload: '{"version": "${{ steps.get_version.outputs.version }}"}'
+
+      - name: Trigger Homebrew update
+        if: ${{ !contains(steps.get_version.outputs.version, '-') }}
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RELEASE_TRIGGER_TOKEN }}
+          repository: dmytro-yemelianov/homebrew-tap
+          event-type: raps-release
+          client-payload: '{"version": "${{ steps.get_version.outputs.version }}"}'
+
+      - name: Trigger Scoop update
+        if: ${{ !contains(steps.get_version.outputs.version, '-') }}
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.RELEASE_TRIGGER_TOKEN }}
+          repository: dmytro-yemelianov/scoop-bucket
+          event-type: raps-release
+          client-payload: '{"version": "${{ steps.get_version.outputs.version }}"}'
+
