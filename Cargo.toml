@@ -2,12 +2,12 @@
 name = "raps"
 version = "2.0.0"
 edition = "2021"
-description = "Command-line interface for Autodesk Platform Services (APS)"
-authors = ["APS Developer"]
+description = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI"
+authors = ["Dmytro Yemelianov"]
 license = "Apache-2.0"
 repository = "https://github.com/dmytro-yemelianov/raps.git"
-homepage = "https://aps.autodesk.com"
-documentation = "https://github.com/dmytro-yemelianov/raps#readme"
+homepage = "https://rapscli.xyz"
+documentation = "https://rapscli.xyz/docs"
 readme = "README.md"
 keywords = ["autodesk", "aps", "forge", "bim360", "cli"]
 categories = ["command-line-utilities", "development-tools"]

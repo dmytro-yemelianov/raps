@@ -1,21 +1,21 @@
-# RAPS
+# 🌼 RAPS
 
 <div align="center">
   <img src="logo/output/raps-logo.webp" alt="RAPS Logo" width="200"/>
 
-  <h3>Rust APS CLI</h3>
-  <p>A comprehensive command-line interface for Autodesk Platform Services (APS)</p>
+  <h3>🌼 RAPS — rapeseed</h3>
+  <p><strong>R</strong>ust <strong>A</strong>utodesk <strong>P</strong>latform <strong>S</strong>ervices CLI</p>
 
   [![Crates.io](https://img.shields.io/crates/v/raps.svg)](https://crates.io/crates/raps)
   [![Downloads](https://img.shields.io/crates/d/raps.svg)](https://crates.io/crates/raps)
-  [![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://dmytro-yemelianov.github.io/raps/)
+  [![Documentation](https://img.shields.io/badge/docs-rapscli.xyz-blue.svg)](https://rapscli.xyz)
   [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
   [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
   [![Build Status](https://github.com/dmytro-yemelianov/raps/workflows/CI/badge.svg)](https://github.com/dmytro-yemelianov/raps/actions)
 
 </div>
 
-**R**ust **APS** CLI - A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
+**🌼 RAPS** (rapeseed) — **R**ust **A**utodesk **P**latform **S**ervices CLI. A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
 
 ## Features
 
@@ -534,11 +534,10 @@ Apache 2.0 License
 
 ## Documentation
 
-- **[Full Documentation](https://dmytro-yemelianov.github.io/raps/)** - Complete user guide
-- **[Feature Overview](https://dmytro-yemelianov.github.io/raps/features/)** - Visual diagrams and feature matrix
-- **[Pipeline Guide](https://dmytro-yemelianov.github.io/raps/commands/pipeline/)** - Automation workflows
-- **[Exit Codes](https://dmytro-yemelianov.github.io/raps/cli/exit-codes/)** - CI/CD integration
-- **[Changelog](CHANGELOG.md)** - Version history
+- **[🌼 rapscli.xyz](https://rapscli.xyz)** - Official website
+- **[Full Documentation](https://rapscli.xyz/docs)** - Complete user guide
+- **[Changelog](https://rapscli.xyz/changelog)** - Version history
+- **[Blog](https://rapscli.xyz/blog)** - Technical articles on APS automation
 
 ## Resources
 
