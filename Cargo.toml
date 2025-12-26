@@ -56,7 +56,7 @@ indicatif = "0.17"
 colored = "2.1"
 
 # Base64 encoding for URNs
-base64 = "0.21"
+base64 = "0.22"
 
 # Error handling
 anyhow = "1.0"
