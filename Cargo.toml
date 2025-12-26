@@ -60,7 +60,7 @@ base64 = "0.21"
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # File handling
 tokio-util = { version = "0.7", features = ["io"] }
