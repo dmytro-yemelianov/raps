@@ -118,6 +118,15 @@
 - **Test Data Generation** (`generate`) - create synthetic OBJ, IFC, and other files for testing
 - **Demo Scenarios** (`demo`) - run end-to-end scenarios like bucket lifecycle or model pipeline
 
+### MCP Server (v3.0.0+)
+- **AI Assistant Integration** (`serve`) - Model Context Protocol server for Claude, Cursor, and other MCP clients
+- **14 MCP Tools** - Direct access to APS APIs from AI assistants:
+  - Authentication: `auth_test`, `auth_status`
+  - Buckets: `bucket_list`, `bucket_create`, `bucket_get`, `bucket_delete`
+  - Objects: `object_list`, `object_delete`, `object_signed_url`, `object_urn`
+  - Translation: `translate_start`, `translate_status`
+  - Data Management: `hub_list`, `project_list`
+
 ## Installation
 
 ### Prerequisites
@@ -471,6 +480,50 @@ raps reality status <photoscene-id> --wait
 raps reality result <photoscene-id>
 ```
 
+### MCP Server (v3.0.0+)
+
+Start the MCP server for AI assistant integration:
+
+```bash
+raps serve
+```
+
+**Configure in Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "raps": {
+      "command": "raps",
+      "args": ["serve"],
+      "env": {
+        "APS_CLIENT_ID": "your_client_id",
+        "APS_CLIENT_SECRET": "your_client_secret"
+      }
+    }
+  }
+}
+```
+
+**Configure in Cursor** (`.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "raps": {
+      "command": "raps",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+Once configured, AI assistants can directly manage APS resources using natural language commands like:
+- "List all my OSS buckets"
+- "Create a bucket named 'my-test-bucket' with transient policy"
+- "Start translating the uploaded CAD file to SVF2 format"
+- "Show me all projects in my BIM 360 hub"
+
 ## Command Reference
 
 | Command | Description |
@@ -495,6 +548,7 @@ raps reality result <photoscene-id>
 | `demo` | Run demo scenarios |
 | `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
+| `serve` | Start MCP server for AI assistant integration (v3.0.0+) |
 
 ## API Coverage
 

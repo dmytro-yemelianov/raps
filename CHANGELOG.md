@@ -7,6 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2025-12-26
+
+### Added
+
+#### MCP Server (Model Context Protocol)
+- **`raps serve`** - Start MCP server for AI assistant integration
+- **14 MCP Tools** for direct APS API access from AI assistants:
+  - `auth_test` - Test 2-legged OAuth credentials
+  - `auth_status` - Check authentication status (2-legged and 3-legged)
+  - `bucket_list` - List OSS buckets with optional region filter
+  - `bucket_create` - Create new OSS bucket with retention policy
+  - `bucket_get` - Get bucket details
+  - `bucket_delete` - Delete empty bucket
+  - `object_list` - List objects in bucket
+  - `object_delete` - Delete object from bucket
+  - `object_signed_url` - Generate pre-signed S3 download URL
+  - `object_urn` - Get Base64-encoded URN for translation
+  - `translate_start` - Start CAD file translation (svf2, obj, stl, step, iges, ifc)
+  - `translate_status` - Check translation job status
+  - `hub_list` - List accessible BIM 360/ACC hubs
+  - `project_list` - List projects in a hub
+
+#### Dependencies
+- Added `rmcp` v0.12 - Official Rust SDK for Model Context Protocol
+- Added `schemars` v0.8 - JSON Schema generation for tool definitions
+- Added `tracing` and `tracing-subscriber` for MCP server logging
+
+### Changed
+- **Major Version Bump**: v3.0.0 introduces MCP server capability, a new interface paradigm for AI-assisted APS operations
+
+### Usage
+
+Start the MCP server:
+```bash
+raps serve
+```
+
+Configure in Claude Desktop (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "raps": {
+      "command": "raps",
+      "args": ["serve"],
+      "env": {
+        "APS_CLIENT_ID": "your_client_id",
+        "APS_CLIENT_SECRET": "your_client_secret"
+      }
+    }
+  }
+}
+```
+
+Configure in Cursor (`.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "raps": {
+      "command": "raps",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+---
+
 ## [2.1.0] - 2025-12-26
 
 ### Added
@@ -246,7 +313,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v3.0.0
+[2.1.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.1.0
+[2.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.0.0
 [1.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v1.0.0
 [0.7.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v0.6.0
