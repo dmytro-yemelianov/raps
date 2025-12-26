@@ -67,7 +67,7 @@ tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
 
 # OAuth browser flow
-webbrowser = "0.8"
+webbrowser = "1.0"
 tiny_http = "0.12"
 
 # Secure token storage  
