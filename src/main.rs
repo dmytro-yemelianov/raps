@@ -1,5 +1,5 @@
 // ============================================================================
-// RAPS - Rust APS CLI
+// 🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI
 // Copyright 2024-2025 Dmytro Yemelianov
 // SPDX-License-Identifier: Apache-2.0
 //
@@ -16,7 +16,7 @@
 // limitations under the License.
 // ============================================================================
 
-//! APS CLI - Command-line interface for Autodesk Platform Services
+//! 🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI
 //!
 //! This CLI tool provides comprehensive access to:
 //! - Authentication (2-legged and 3-legged OAuth)
@@ -59,12 +59,12 @@ use config::Config;
 use error::ExitCode;
 use output::OutputFormat;
 
-/// RAPS - Rust APS CLI - Command-line interface for Autodesk Platform Services
+/// 🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI
 #[derive(Parser)]
 #[command(name = "raps")]
-#[command(author = "APS Developer")]
-#[command(version = "1.0.0")]
-#[command(about = "Command-line interface for Autodesk Platform Services (APS)", long_about = None)]
+#[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
+#[command(version = "2.0.0")]
+#[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
     /// Output format: table, json, yaml, csv, or plain (default: auto-detect)
@@ -261,7 +261,7 @@ async fn run(mut cli: Cli) -> Result<()> {
 
     // Log startup info in verbose/debug mode
     if logging::verbose() || logging::debug() {
-        logging::log_verbose("RAPS CLI starting...");
+        logging::log_verbose("🌼 RAPS CLI starting...");
     }
 
     // Load configuration
