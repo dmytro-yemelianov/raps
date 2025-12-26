@@ -71,7 +71,7 @@ webbrowser = "0.8"
 tiny_http = "0.12"
 
 # Secure token storage  
-directories = "5.0"
+directories = "6.0"
 keyring = "2.3"
 
 # Date/time handling
