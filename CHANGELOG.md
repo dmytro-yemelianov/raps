@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-12-26
+
+### Added
+- 🌼 **Rapeseed Branding**: RAPS now stands for "Rust Autodesk Platform Services" with the blossom (🌼) as the brand symbol.
+- **Official Website**: New documentation and blog at [rapscli.xyz](https://rapscli.xyz).
+- **Blossom Favicon**: Updated website favicon with golden blossom design.
+
+### Changed
+- **CLI Branding**: Updated `--version` and `--help` output to show "🌼 RAPS (rapeseed)" branding.
+- **Documentation Links**: All documentation now points to [rapscli.xyz](https://rapscli.xyz).
+- **Cargo.toml**: Updated homepage, documentation URLs, and description with rapeseed branding.
+- **Package Managers**: Updated Homebrew and Scoop formulas with new branding and homepage.
+
+---
+
 ## [2.0.0] - 2025-12-25
 
 ### Added
