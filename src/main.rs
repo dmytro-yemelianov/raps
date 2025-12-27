@@ -242,7 +242,9 @@ async fn run(mut cli: Cli) -> Result<()> {
 
     // Handle MCP server command
     if let Commands::Serve = &cli.command {
-        mcp::server::run_server().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+        mcp::server::run_server()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
         return Ok(());
     }
 
