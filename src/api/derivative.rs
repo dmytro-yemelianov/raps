@@ -227,6 +227,7 @@ pub struct DownloadableDerivative {
 }
 
 /// Model Derivative API client
+#[derive(Clone)]
 pub struct DerivativeClient {
     config: Config,
     auth: AuthClient,

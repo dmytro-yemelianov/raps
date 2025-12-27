@@ -36,6 +36,17 @@ graph TB
         Generate[🛠️ generate]
         Demo[🧪 demo]
         Config[⚙️ config]
+        Serve[🤖 serve]
+    end
+    
+    subgraph MCP["MCP Server (AI Integration)"]
+        direction TB
+        MCPAuth[auth_test/status]
+        MCPBucket[bucket_*]
+        MCPObject[object_*]
+        MCPTranslate[translate_*]
+        MCPHub[hub_list]
+        MCPProject[project_list]
     end
 
     subgraph APIs["APS APIs"]
@@ -68,6 +79,14 @@ graph TB
     Generate --> CLI
     Demo --> CLI
     Config --> CLI
+    Serve --> MCP
+    
+    MCPAuth --> AuthAPI
+    MCPBucket --> OSSAPI
+    MCPObject --> OSSAPI
+    MCPTranslate --> MDAPI
+    MCPHub --> DMAPI
+    MCPProject --> DMAPI
 ```
 
 ## Authentication Flow
@@ -222,6 +241,26 @@ flowchart LR
 | Add Alias | `plugin alias add` | Local | ✅ Stable |
 | Remove Alias | `plugin alias remove` | Local | ✅ Stable |
 
+### MCP Server (AI Integration)
+
+| Feature | Tool | Auth Type | Status |
+|---------|------|-----------|--------|
+| Start MCP Server | `serve` | Various | ✅ New (v3.0.0) |
+| Test Auth | `auth_test` | 2-legged | ✅ New (v3.0.0) |
+| Auth Status | `auth_status` | Various | ✅ New (v3.0.0) |
+| List Buckets | `bucket_list` | 2-legged | ✅ New (v3.0.0) |
+| Create Bucket | `bucket_create` | 2-legged | ✅ New (v3.0.0) |
+| Get Bucket | `bucket_get` | 2-legged | ✅ New (v3.0.0) |
+| Delete Bucket | `bucket_delete` | 2-legged | ✅ New (v3.0.0) |
+| List Objects | `object_list` | 2-legged | ✅ New (v3.0.0) |
+| Delete Object | `object_delete` | 2-legged | ✅ New (v3.0.0) |
+| Signed URL | `object_signed_url` | 2-legged | ✅ New (v3.0.0) |
+| Get URN | `object_urn` | Local | ✅ New (v3.0.0) |
+| Start Translation | `translate_start` | 2-legged | ✅ New (v3.0.0) |
+| Translation Status | `translate_status` | 2-legged | ✅ New (v3.0.0) |
+| List Hubs | `hub_list` | 3-legged | ✅ New (v3.0.0) |
+| List Projects | `project_list` | 3-legged | ✅ New (v3.0.0) |
+
 ## Data Flow Diagrams
 
 ### Upload and Translate Workflow
@@ -327,6 +366,17 @@ timeline
         RFI Support : Full CRUD for RFIs
         ACC CRUD : Assets, Submittals, Checklists
         Plugin System : Extensible architecture
+    section v2.0.0
+        Apache 2.0 License : Better attribution & patents
+        Repository Reorganization : Improved maintainability
+        APS Coverage Docs : Feature comparison matrix
+    section v2.1.0
+        Rapeseed Branding : 🌼 RAPS brand identity
+        rapscli.xyz : Official website launch
+    section v3.0.0
+        MCP Server : AI assistant integration
+        14 MCP Tools : Direct API access for Claude, Cursor
+        Natural Language : Conversational APS operations
 ```
 
 ## Related Documentation

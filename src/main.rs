@@ -35,6 +35,7 @@ mod error;
 mod http;
 mod interactive;
 mod logging;
+mod mcp;
 mod output;
 mod plugins;
 mod storage;
@@ -63,7 +64,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
-#[command(version = "2.1.0")]
+#[command(version = "3.0.0")]
 #[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
@@ -190,6 +191,9 @@ enum Commands {
         #[arg(value_enum)]
         shell: Shell,
     },
+
+    /// Start MCP (Model Context Protocol) server for AI assistant integration
+    Serve,
 }
 
 #[tokio::main]
@@ -233,6 +237,14 @@ async fn run(mut cli: Cli) -> Result<()> {
     if let Commands::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
         generate(*shell, &mut cmd, "raps", &mut io::stdout());
+        return Ok(());
+    }
+
+    // Handle MCP server command
+    if let Commands::Serve = &cli.command {
+        mcp::server::run_server()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
         return Ok(());
     }
 
@@ -392,6 +404,11 @@ async fn run(mut cli: Cli) -> Result<()> {
         Commands::Pipeline(cmd) => cmd.execute(output_format).await?,
 
         Commands::Completions { .. } => {
+            // Already handled above
+            unreachable!()
+        }
+
+        Commands::Serve => {
             // Already handled above
             unreachable!()
         }
