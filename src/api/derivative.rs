@@ -403,7 +403,7 @@ impl DerivativeClient {
         let mut downloadables = Vec::new();
 
         for derivative in &manifest.derivatives {
-            self.collect_downloadables(derivative, &derivative.output_type, &mut downloadables);
+            Self::collect_downloadables(derivative, &derivative.output_type, &mut downloadables);
         }
 
         Ok(downloadables)
@@ -411,19 +411,17 @@ impl DerivativeClient {
 
     /// Recursively collect downloadable items from derivative tree
     fn collect_downloadables(
-        &self,
         derivative: &Derivative,
         output_type: &str,
         downloadables: &mut Vec<DownloadableDerivative>,
     ) {
         for child in &derivative.children {
-            self.collect_downloadables_from_child(child, output_type, downloadables);
+            Self::collect_downloadables_from_child(child, output_type, downloadables);
         }
     }
 
     /// Recursively collect downloadable items from child nodes
     fn collect_downloadables_from_child(
-        &self,
         child: &DerivativeChild,
         output_type: &str,
         downloadables: &mut Vec<DownloadableDerivative>,
@@ -452,7 +450,7 @@ impl DerivativeClient {
 
         // Recurse into children
         for grandchild in &child.children {
-            self.collect_downloadables_from_child(grandchild, output_type, downloadables);
+            Self::collect_downloadables_from_child(grandchild, output_type, downloadables);
         }
     }
 
@@ -461,9 +459,11 @@ impl DerivativeClient {
         derivatives: &[DownloadableDerivative],
         format: &str,
     ) -> Vec<DownloadableDerivative> {
+        let target_format = format.to_ascii_lowercase();
+
         derivatives
             .iter()
-            .filter(|d| d.output_type.to_lowercase() == format.to_lowercase())
+            .filter(|d| d.output_type.to_ascii_lowercase() == target_format)
             .cloned()
             .collect()
     }
