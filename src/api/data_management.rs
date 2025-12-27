@@ -205,6 +205,7 @@ pub struct CreateFolderParentData {
 }
 
 /// Data Management API client
+#[derive(Clone)]
 pub struct DataManagementClient {
     config: Config,
     auth: AuthClient,
