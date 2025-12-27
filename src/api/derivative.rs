@@ -402,29 +402,31 @@ impl DerivativeClient {
         let mut downloadables = Vec::new();
 
         for derivative in &manifest.derivatives {
-            self.collect_downloadables(derivative, &derivative.output_type, &mut downloadables);
+            Self::collect_downloadables(derivative, &mut downloadables);
         }
 
         Ok(downloadables)
     }
 
     /// Recursively collect downloadable items from derivative tree
-    fn collect_downloadables(
-        &self,
-        derivative: &Derivative,
-        output_type: &str,
-        downloadables: &mut Vec<DownloadableDerivative>,
-    ) {
+    fn collect_downloadables(derivative: &Derivative, downloadables: &mut Vec<DownloadableDerivative>) {
+        let output_type_lower = derivative.output_type.to_ascii_lowercase();
+
         for child in &derivative.children {
-            self.collect_downloadables_from_child(child, output_type, downloadables);
+            Self::collect_downloadables_from_child(
+                child,
+                &derivative.output_type,
+                &output_type_lower,
+                downloadables,
+            );
         }
     }
 
     /// Recursively collect downloadable items from child nodes
     fn collect_downloadables_from_child(
-        &self,
         child: &DerivativeChild,
         output_type: &str,
+        output_type_lower: &str,
         downloadables: &mut Vec<DownloadableDerivative>,
     ) {
         // Check if this child has a URN (is downloadable)
@@ -434,7 +436,7 @@ impl DerivativeClient {
                 format!(
                     "{}.{}",
                     &child.guid[..8.min(child.guid.len())],
-                    output_type.to_lowercase()
+                    output_type_lower
                 )
             });
 
@@ -451,7 +453,7 @@ impl DerivativeClient {
 
         // Recurse into children
         for grandchild in &child.children {
-            self.collect_downloadables_from_child(grandchild, output_type, downloadables);
+            Self::collect_downloadables_from_child(grandchild, output_type, output_type_lower, downloadables);
         }
     }
 
@@ -462,7 +464,7 @@ impl DerivativeClient {
     ) -> Vec<DownloadableDerivative> {
         derivatives
             .iter()
-            .filter(|d| d.output_type.to_lowercase() == format.to_lowercase())
+            .filter(|d| d.output_type.eq_ignore_ascii_case(format))
             .cloned()
             .collect()
     }
