@@ -27,4 +27,3 @@ pub const TOOLS: &[&str] = &[
     "hub_list",
     "project_list",
 ];
-
