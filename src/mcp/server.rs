@@ -697,31 +697,25 @@ impl ServerHandler for RapsServer {
         }
     }
 
-    fn list_tools(
+    async fn list_tools(
         &self,
         _request: Option<PaginatedRequestParam>,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListToolsResult, rmcp::ErrorData>> + Send + '_
-    {
-        async move {
-            Ok(ListToolsResult {
-                tools: get_tools(),
-                next_cursor: None,
-                meta: None,
-            })
-        }
+    ) -> Result<ListToolsResult, rmcp::ErrorData> {
+        Ok(ListToolsResult {
+            tools: get_tools(),
+            next_cursor: None,
+            meta: None,
+        })
     }
 
-    fn call_tool(
+    async fn call_tool(
         &self,
         request: CallToolRequestParam,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> impl std::future::Future<Output = Result<CallToolResult, rmcp::ErrorData>> + Send + '_
-    {
-        async move {
-            let result = self.dispatch_tool(&request.name, request.arguments).await;
-            Ok(result)
-        }
+    ) -> Result<CallToolResult, rmcp::ErrorData> {
+        let result = self.dispatch_tool(&request.name, request.arguments).await;
+        Ok(result)
     }
 }
 
