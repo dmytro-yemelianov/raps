@@ -104,7 +104,7 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - **Synthetic Data Generation**: Create OBJ, IFC, JSON files for testing
 - **Demo Scenarios**: Run end-to-end workflows (bucket lifecycle, model pipeline)
 
-### 🤖 MCP Server (v3.0.0+)
+### 🤖 MCP Server (v4.0.0+)
 - **AI Assistant Integration**: Model Context Protocol server for Claude, Cursor, and other MCP clients
 - **14 MCP Tools**: Direct access to APS APIs from AI assistants
 - **Natural Language Operations**: Manage buckets, objects, translations, and projects conversationally
@@ -117,7 +117,7 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - **[Configuration](configuration.md)** - Setting up credentials and profiles
 - **[Feature Overview](features.md)** - Visual feature matrix and diagrams
 - **[APS Feature Coverage](aps-coverage.md)** - Detailed APS service coverage matrix
-- **[MCP Server](commands/mcp.md)** - AI assistant integration (v3.0.0+)
+- **[MCP Server](commands/mcp.md)** - AI assistant integration (v4.0.0+)
 - **[Proxy Support](proxy-support.md)** - Configure proxy for corporate networks
 - **[SBOM & Build Provenance](sbom.md)** - Software Bill of Materials
 - **[Exit Codes](cli/exit-codes.md)** - CI/CD-friendly error handling

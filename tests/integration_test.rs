@@ -9,6 +9,8 @@
 
 use std::process::Command;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 // ============== BASIC CLI TESTS ==============
 
 /// Test that the CLI binary can be executed and shows help
@@ -48,7 +50,7 @@ fn test_cli_version() {
         "Version output should contain 'raps'"
     );
     assert!(
-        stdout.contains("1.0.0"),
+        stdout.contains(VERSION),
         "Version output should contain version number"
     );
 }

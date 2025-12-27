@@ -48,7 +48,7 @@ impl RapsServer {
 
     // Helper to get auth client
     async fn get_auth_client(&self) -> AuthClient {
-        if let Some(client) = self.auth_client.read().await.clone() {
+        if let Some(client) = self.auth_client.read().await.as_ref().cloned() {
             return client;
         }
 
@@ -62,7 +62,7 @@ impl RapsServer {
 
     // Helper to get OSS client
     async fn get_oss_client(&self) -> OssClient {
-        if let Some(client) = self.oss_client.read().await.clone() {
+        if let Some(client) = self.oss_client.read().await.as_ref().cloned() {
             return client;
         }
 
@@ -81,7 +81,7 @@ impl RapsServer {
 
     // Helper to get Derivative client
     async fn get_derivative_client(&self) -> DerivativeClient {
-        if let Some(client) = self.derivative_client.read().await.clone() {
+        if let Some(client) = self.derivative_client.read().await.as_ref().cloned() {
             return client;
         }
 
@@ -100,7 +100,7 @@ impl RapsServer {
 
     // Helper to get Data Management client
     async fn get_dm_client(&self) -> DataManagementClient {
-        if let Some(client) = self.dm_client.read().await.clone() {
+        if let Some(client) = self.dm_client.read().await.as_ref().cloned() {
             return client;
         }
 
@@ -701,21 +701,27 @@ impl ServerHandler for RapsServer {
         &self,
         _request: Option<PaginatedRequestParam>,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> Result<ListToolsResult, rmcp::ErrorData> {
-        Ok(ListToolsResult {
-            tools: get_tools(),
-            next_cursor: None,
-            meta: None,
-        })
+    ) -> impl std::future::Future<Output = Result<ListToolsResult, rmcp::ErrorData>> + Send + '_
+    {
+        async move {
+            Ok(ListToolsResult {
+                tools: get_tools(),
+                next_cursor: None,
+                meta: None,
+            })
+        }
     }
 
     async fn call_tool(
         &self,
         request: CallToolRequestParam,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> Result<CallToolResult, rmcp::ErrorData> {
-        let result = self.dispatch_tool(&request.name, request.arguments).await;
-        Ok(result)
+    ) -> impl std::future::Future<Output = Result<CallToolResult, rmcp::ErrorData>> + Send + '_
+    {
+        async move {
+            let result = self.dispatch_tool(&request.name, request.arguments).await;
+            Ok(result)
+        }
     }
 }
 

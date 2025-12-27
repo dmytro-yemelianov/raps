@@ -245,21 +245,21 @@ flowchart LR
 
 | Feature | Tool | Auth Type | Status |
 |---------|------|-----------|--------|
-| Start MCP Server | `serve` | Various | ✅ New (v3.0.0) |
-| Test Auth | `auth_test` | 2-legged | ✅ New (v3.0.0) |
-| Auth Status | `auth_status` | Various | ✅ New (v3.0.0) |
-| List Buckets | `bucket_list` | 2-legged | ✅ New (v3.0.0) |
-| Create Bucket | `bucket_create` | 2-legged | ✅ New (v3.0.0) |
-| Get Bucket | `bucket_get` | 2-legged | ✅ New (v3.0.0) |
-| Delete Bucket | `bucket_delete` | 2-legged | ✅ New (v3.0.0) |
-| List Objects | `object_list` | 2-legged | ✅ New (v3.0.0) |
-| Delete Object | `object_delete` | 2-legged | ✅ New (v3.0.0) |
-| Signed URL | `object_signed_url` | 2-legged | ✅ New (v3.0.0) |
-| Get URN | `object_urn` | Local | ✅ New (v3.0.0) |
-| Start Translation | `translate_start` | 2-legged | ✅ New (v3.0.0) |
-| Translation Status | `translate_status` | 2-legged | ✅ New (v3.0.0) |
-| List Hubs | `hub_list` | 3-legged | ✅ New (v3.0.0) |
-| List Projects | `project_list` | 3-legged | ✅ New (v3.0.0) |
+| Start MCP Server | `serve` | Various | ✅ Updated (v4.0.0) |
+| Test Auth | `auth_test` | 2-legged | ✅ Updated (v4.0.0) |
+| Auth Status | `auth_status` | Various | ✅ Updated (v4.0.0) |
+| List Buckets | `bucket_list` | 2-legged | ✅ Updated (v4.0.0) |
+| Create Bucket | `bucket_create` | 2-legged | ✅ Updated (v4.0.0) |
+| Get Bucket | `bucket_get` | 2-legged | ✅ Updated (v4.0.0) |
+| Delete Bucket | `bucket_delete` | 2-legged | ✅ Updated (v4.0.0) |
+| List Objects | `object_list` | 2-legged | ✅ Updated (v4.0.0) |
+| Delete Object | `object_delete` | 2-legged | ✅ Updated (v4.0.0) |
+| Signed URL | `object_signed_url` | 2-legged | ✅ Updated (v4.0.0) |
+| Get URN | `object_urn` | Local | ✅ Updated (v4.0.0) |
+| Start Translation | `translate_start` | 2-legged | ✅ Updated (v4.0.0) |
+| Translation Status | `translate_status` | 2-legged | ✅ Updated (v4.0.0) |
+| List Hubs | `hub_list` | 3-legged | ✅ Updated (v4.0.0) |
+| List Projects | `project_list` | 3-legged | ✅ Updated (v4.0.0) |
 
 ## Data Flow Diagrams
 

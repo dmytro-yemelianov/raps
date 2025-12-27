@@ -320,7 +320,8 @@ Configure in Cursor (`.cursor/mcp.json`):
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v4.0.0...HEAD
+[4.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v4.0.0
 [3.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v3.0.0
 [2.1.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.1.0
 [2.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.0.0
