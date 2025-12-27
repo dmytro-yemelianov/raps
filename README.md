@@ -118,7 +118,7 @@
 - **Test Data Generation** (`generate`) - create synthetic OBJ, IFC, and other files for testing
 - **Demo Scenarios** (`demo`) - run end-to-end scenarios like bucket lifecycle or model pipeline
 
-### MCP Server (v3.0.0+)
+### MCP Server (v4.0.0+)
 - **AI Assistant Integration** (`serve`) - Model Context Protocol server for Claude, Cursor, and other MCP clients
 - **14 MCP Tools** - Direct access to APS APIs from AI assistants:
   - Authentication: `auth_test`, `auth_status`
@@ -480,7 +480,7 @@ raps reality status <photoscene-id> --wait
 raps reality result <photoscene-id>
 ```
 
-### MCP Server (v3.0.0+)
+### MCP Server (v4.0.0+)
 
 Start the MCP server for AI assistant integration:
 
@@ -548,7 +548,7 @@ Once configured, AI assistants can directly manage APS resources using natural l
 | `demo` | Run demo scenarios |
 | `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
-| `serve` | Start MCP server for AI assistant integration (v3.0.0+) |
+| `serve` | Start MCP server for AI assistant integration (v4.0.0+) |
 
 ## API Coverage
 

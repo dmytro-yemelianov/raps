@@ -5,18 +5,14 @@
 //!
 //! Exposes APS API functionality as MCP tools for AI assistants.
 
-use rmcp::{
-    model::*,
-    transport::stdio,
-    ServerHandler, ServiceExt,
-};
+use rmcp::{model::*, transport::stdio, ServerHandler, ServiceExt};
 use serde_json::{json, Map, Value};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::api::{AuthClient, DataManagementClient, DerivativeClient, OssClient};
 use crate::api::derivative::OutputFormat;
 use crate::api::oss::Region;
+use crate::api::{AuthClient, DataManagementClient, DerivativeClient, OssClient};
 use crate::config::Config;
 use crate::http::HttpClientConfig;
 
@@ -29,6 +25,9 @@ pub struct RapsServer {
     http_config: HttpClientConfig,
     // Cached clients
     auth_client: Arc<RwLock<Option<AuthClient>>>,
+    oss_client: Arc<RwLock<Option<OssClient>>>,
+    derivative_client: Arc<RwLock<Option<DerivativeClient>>>,
+    dm_client: Arc<RwLock<Option<DataManagementClient>>>,
 }
 
 impl RapsServer {
@@ -41,45 +40,103 @@ impl RapsServer {
             config: Arc::new(config),
             http_config,
             auth_client: Arc::new(RwLock::new(None)),
+            oss_client: Arc::new(RwLock::new(None)),
+            derivative_client: Arc::new(RwLock::new(None)),
+            dm_client: Arc::new(RwLock::new(None)),
         })
     }
 
     // Helper to get auth client
     async fn get_auth_client(&self) -> AuthClient {
-        let mut guard = self.auth_client.write().await;
-        if guard.is_none() {
-            *guard = Some(AuthClient::new_with_http_config(
-                (*self.config).clone(),
-                self.http_config.clone(),
-            ));
+        if let Some(client) = self.auth_client.read().await.as_ref().cloned() {
+            return client;
         }
-        guard.as_ref().unwrap().clone()
+
+        let mut guard = self.auth_client.write().await;
+        guard
+            .get_or_insert_with(|| {
+                AuthClient::new_with_http_config((*self.config).clone(), self.http_config.clone())
+            })
+            .clone()
     }
 
     // Helper to get OSS client
     async fn get_oss_client(&self) -> OssClient {
+        if let Some(client) = self.oss_client.read().await.as_ref().cloned() {
+            return client;
+        }
+
         let auth = self.get_auth_client().await;
-        OssClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+        let mut guard = self.oss_client.write().await;
+        guard
+            .get_or_insert_with(|| {
+                OssClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+            })
+            .clone()
     }
 
     // Helper to get Derivative client
     async fn get_derivative_client(&self) -> DerivativeClient {
+        if let Some(client) = self.derivative_client.read().await.as_ref().cloned() {
+            return client;
+        }
+
         let auth = self.get_auth_client().await;
-        DerivativeClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        let mut guard = self.derivative_client.write().await;
+        guard
+            .get_or_insert_with(|| {
+                DerivativeClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+            })
+            .clone()
     }
 
     // Helper to get Data Management client
     async fn get_dm_client(&self) -> DataManagementClient {
+        if let Some(client) = self.dm_client.read().await.as_ref().cloned() {
+            return client;
+        }
+
         let auth = self.get_auth_client().await;
-        DataManagementClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        let mut guard = self.dm_client.write().await;
+        guard
+            .get_or_insert_with(|| {
+                DataManagementClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+            })
+            .clone()
+    }
+
+    fn clamp_limit(limit: Option<usize>, default: usize, max: usize) -> usize {
+        let limit = limit.unwrap_or(default).max(1);
+        limit.min(max)
+    }
+
+    fn required_arg(args: &Map<String, Value>, key: &str) -> Result<String, String> {
+        args.get(key)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(|v| v.to_string())
+            .ok_or_else(|| format!("❌ Missing required argument '{}'.", key))
+    }
+
+    fn optional_arg(args: &Map<String, Value>, key: &str) -> Option<String> {
+        args.get(key)
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+            .map(|v| v.to_string())
     }
 
     // ========================================================================
@@ -89,7 +146,9 @@ impl RapsServer {
     async fn auth_test(&self) -> String {
         let auth = self.get_auth_client().await;
         match auth.get_token().await {
-            Ok(_) => "✅ Authentication successful! 2-legged OAuth credentials are valid.".to_string(),
+            Ok(_) => {
+                "✅ Authentication successful! 2-legged OAuth credentials are valid.".to_string()
+            }
             Err(e) => format!("❌ Authentication failed: {}", e),
         }
     }
@@ -107,7 +166,8 @@ impl RapsServer {
         // Check 3-legged
         match auth.get_3leg_token().await {
             Ok(_) => status.push_str("✅ 3-legged OAuth: Valid (user logged in)\n"),
-            Err(_) => status.push_str("⚠️ 3-legged OAuth: Not logged in (run 'raps auth login' to log in)\n"),
+            Err(_) => status
+                .push_str("⚠️ 3-legged OAuth: Not logged in (run 'raps auth login' to log in)\n"),
         }
 
         status
@@ -115,7 +175,7 @@ impl RapsServer {
 
     async fn bucket_list(&self, region: Option<String>, limit: Option<usize>) -> String {
         let client = self.get_oss_client().await;
-        let limit = limit.unwrap_or(100);
+        let limit = Self::clamp_limit(limit, 100, 500);
 
         match client.list_buckets().await {
             Ok(buckets) => {
@@ -124,14 +184,17 @@ impl RapsServer {
                     .into_iter()
                     .filter(|b| {
                         if let Some(ref r) = region {
-                            b.region.as_ref().map(|br| br.eq_ignore_ascii_case(r)).unwrap_or(true)
+                            b.region
+                                .as_ref()
+                                .map(|br| br.eq_ignore_ascii_case(r))
+                                .unwrap_or(true)
                         } else {
                             true
                         }
                     })
                     .take(limit)
                     .collect();
-                
+
                 // Format as simple output
                 let mut output = format!("Found {} bucket(s):\n\n", buckets.len());
                 for b in &buckets {
@@ -155,12 +218,15 @@ impl RapsServer {
             "transient" => crate::api::oss::RetentionPolicy::Transient,
             "temporary" => crate::api::oss::RetentionPolicy::Temporary,
             "persistent" => crate::api::oss::RetentionPolicy::Persistent,
-            _ => crate::api::oss::RetentionPolicy::Transient,
+            _ => {
+                return "❌ Invalid policy. Use transient, temporary, or persistent.".to_string();
+            }
         };
 
         let reg = match region.to_uppercase().as_str() {
             "EMEA" => Region::EMEA,
-            _ => Region::US,
+            "US" => Region::US,
+            _ => return "❌ Invalid region. Use US or EMEA.".to_string(),
         };
 
         match client.create_bucket(&bucket_key, retention, reg).await {
@@ -178,10 +244,7 @@ impl RapsServer {
         match client.get_bucket_details(&bucket_key).await {
             Ok(bucket) => format!(
                 "Bucket: {}\n• Owner: {}\n• Policy: {}\n• Created: {}",
-                bucket.bucket_key,
-                bucket.bucket_owner,
-                bucket.policy_key,
-                bucket.created_date
+                bucket.bucket_key, bucket.bucket_owner, bucket.policy_key, bucket.created_date
             ),
             Err(e) => format!("❌ Bucket not found or error: {}", e),
         }
@@ -198,17 +261,15 @@ impl RapsServer {
 
     async fn object_list(&self, bucket_key: String, limit: Option<usize>) -> String {
         let client = self.get_oss_client().await;
-        let limit = limit.unwrap_or(100);
+        let limit = Self::clamp_limit(limit, 100, 1000);
 
         match client.list_objects(&bucket_key).await {
             Ok(objects) => {
                 let objects: Vec<_> = objects.into_iter().take(limit).collect();
-                let mut output = format!("Found {} object(s) in '{}':\n\n", objects.len(), bucket_key);
+                let mut output =
+                    format!("Found {} object(s) in '{}':\n\n", objects.len(), bucket_key);
                 for obj in &objects {
-                    output.push_str(&format!(
-                        "• {} ({} bytes)\n",
-                        obj.object_key, obj.size
-                    ));
+                    output.push_str(&format!("• {} ({} bytes)\n", obj.object_key, obj.size));
                 }
                 output
             }
@@ -220,19 +281,33 @@ impl RapsServer {
         let client = self.get_oss_client().await;
 
         match client.delete_object(&bucket_key, &object_key).await {
-            Ok(()) => format!("✅ Object '{}' deleted from bucket '{}'", object_key, bucket_key),
+            Ok(()) => format!(
+                "✅ Object '{}' deleted from bucket '{}'",
+                object_key, bucket_key
+            ),
             Err(e) => format!("❌ Failed to delete object: {}", e),
         }
     }
 
-    async fn object_signed_url(&self, bucket_key: String, object_key: String, minutes: u32) -> String {
+    async fn object_signed_url(
+        &self,
+        bucket_key: String,
+        object_key: String,
+        minutes: u32,
+    ) -> String {
         let client = self.get_oss_client().await;
         let minutes = minutes.clamp(2, 60);
 
-        match client.get_signed_download_url(&bucket_key, &object_key, Some(minutes)).await {
+        match client
+            .get_signed_download_url(&bucket_key, &object_key, Some(minutes))
+            .await
+        {
             Ok(response) => {
                 if let Some(url) = response.url {
-                    format!("Pre-signed download URL (expires in {} minutes):\n{}", minutes, url)
+                    format!(
+                        "Pre-signed download URL (expires in {} minutes):\n{}",
+                        minutes, url
+                    )
                 } else {
                     "No URL returned. The object may have been uploaded in chunks.".to_string()
                 }
@@ -250,7 +325,12 @@ impl RapsServer {
     async fn translate_start(&self, urn: String, format: String) -> String {
         let client = self.get_derivative_client().await;
 
-        let output_format = OutputFormat::from_str(&format).unwrap_or(OutputFormat::Svf2);
+        let output_format = match OutputFormat::from_str(&format) {
+            Some(format) => format,
+            None => {
+                return "❌ Invalid output format. Supported: svf2, svf, thumbnail, obj, stl, step, iges, ifc.".to_string();
+            }
+        };
 
         match client.translate(&urn, output_format, None).await {
             Ok(result) => format!(
@@ -276,7 +356,7 @@ impl RapsServer {
 
     async fn hub_list(&self, limit: Option<usize>) -> String {
         let client = self.get_dm_client().await;
-        let limit = limit.unwrap_or(50);
+        let limit = Self::clamp_limit(limit, 50, 200);
 
         match client.list_hubs().await {
             Ok(hubs) => {
@@ -284,17 +364,23 @@ impl RapsServer {
                 let mut output = format!("Found {} hub(s):\n\n", hubs.len());
                 for hub in &hubs {
                     let region = hub.attributes.region.as_deref().unwrap_or("unknown");
-                    output.push_str(&format!("• {} (id: {}, region: {})\n", hub.attributes.name, hub.id, region));
+                    output.push_str(&format!(
+                        "• {} (id: {}, region: {})\n",
+                        hub.attributes.name, hub.id, region
+                    ));
                 }
                 output
             }
-            Err(e) => format!("❌ Failed to list hubs (ensure you're logged in with 'raps auth login'): {}", e),
+            Err(e) => format!(
+                "❌ Failed to list hubs (ensure you're logged in with 'raps auth login'): {}",
+                e
+            ),
         }
     }
 
     async fn project_list(&self, hub_id: String, limit: Option<usize>) -> String {
         let client = self.get_dm_client().await;
-        let limit = limit.unwrap_or(50);
+        let limit = Self::clamp_limit(limit, 50, 200);
 
         match client.list_projects(&hub_id).await {
             Ok(projects) => {
@@ -312,66 +398,121 @@ impl RapsServer {
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
-        
+
         let result = match name {
             "auth_test" => self.auth_test().await,
             "auth_status" => self.auth_status().await,
             "bucket_list" => {
-                let region = args.get("region").and_then(|v| v.as_str()).map(String::from);
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let region = Self::optional_arg(&args, "region");
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.bucket_list(region, limit).await
             }
             "bucket_create" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let policy = args.get("policy").and_then(|v| v.as_str()).unwrap_or("transient").to_string();
-                let region = args.get("region").and_then(|v| v.as_str()).unwrap_or("US").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let policy =
+                    Self::optional_arg(&args, "policy").unwrap_or_else(|| "transient".to_string());
+                let region =
+                    Self::optional_arg(&args, "region").unwrap_or_else(|| "US".to_string());
                 self.bucket_create(bucket_key, policy, region).await
             }
             "bucket_get" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 self.bucket_get(bucket_key).await
             }
             "bucket_delete" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 self.bucket_delete(bucket_key).await
             }
             "object_list" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.object_list(bucket_key, limit).await
             }
             "object_delete" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let object_key = args.get("object_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = match Self::required_arg(&args, "object_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 self.object_delete(bucket_key, object_key).await
             }
             "object_signed_url" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let object_key = args.get("object_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = match Self::required_arg(&args, "object_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 let minutes = args.get("minutes").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
-                self.object_signed_url(bucket_key, object_key, minutes).await
+                self.object_signed_url(bucket_key, object_key, minutes)
+                    .await
             }
             "object_urn" => {
-                let bucket_key = args.get("bucket_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let object_key = args.get("object_key").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = match Self::required_arg(&args, "object_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 self.object_urn(bucket_key, object_key).await
             }
             "translate_start" => {
-                let urn = args.get("urn").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("svf2").to_string();
+                let urn = match Self::required_arg(&args, "urn") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let format =
+                    Self::optional_arg(&args, "format").unwrap_or_else(|| "svf2".to_string());
                 self.translate_start(urn, format).await
             }
             "translate_status" => {
-                let urn = args.get("urn").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let urn = match Self::required_arg(&args, "urn") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
                 self.translate_status(urn).await
             }
             "hub_list" => {
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.hub_list(limit).await
             }
             "project_list" => {
-                let hub_id = args.get("hub_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let hub_id = match Self::required_arg(&args, "hub_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.project_list(hub_id, limit).await
             }
             _ => format!("Unknown tool: {}", name),
@@ -406,96 +547,132 @@ fn get_tools() -> Vec<Tool> {
         Tool::new(
             "bucket_list",
             "List OSS buckets. Buckets are containers for storing files.",
-            schema(json!({
-                "region": {"type": "string", "description": "Filter by region: US or EMEA"},
-                "limit": {"type": "integer", "description": "Max buckets (default: 100)"}
-            }), &[]),
+            schema(
+                json!({
+                    "region": {"type": "string", "description": "Filter by region: US or EMEA"},
+                    "limit": {"type": "integer", "description": "Max buckets (default: 100)"}
+                }),
+                &[],
+            ),
         ),
         Tool::new(
             "bucket_create",
             "Create a new OSS bucket. Keys must be globally unique, 3-128 chars.",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "Unique bucket key"},
-                "policy": {"type": "string", "description": "transient (24h), temporary (30d), or persistent"},
-                "region": {"type": "string", "description": "US or EMEA (default: US)"}
-            }), &["bucket_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Unique bucket key"},
+                    "policy": {"type": "string", "description": "transient (24h), temporary (30d), or persistent"},
+                    "region": {"type": "string", "description": "US or EMEA (default: US)"}
+                }),
+                &["bucket_key"],
+            ),
         ),
         Tool::new(
             "bucket_get",
             "Get detailed bucket information",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "The bucket key"}
-            }), &["bucket_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "The bucket key"}
+                }),
+                &["bucket_key"],
+            ),
         ),
         Tool::new(
             "bucket_delete",
             "Delete an OSS bucket (must be empty)",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "Bucket key to delete"}
-            }), &["bucket_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Bucket key to delete"}
+                }),
+                &["bucket_key"],
+            ),
         ),
         Tool::new(
             "object_list",
             "List objects (files) in an OSS bucket",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "The bucket key"},
-                "limit": {"type": "integer", "description": "Max objects (default: 100)"}
-            }), &["bucket_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "The bucket key"},
+                    "limit": {"type": "integer", "description": "Max objects (default: 100)"}
+                }),
+                &["bucket_key"],
+            ),
         ),
         Tool::new(
             "object_delete",
             "Delete an object from an OSS bucket",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "The bucket key"},
-                "object_key": {"type": "string", "description": "Object key (filename)"}
-            }), &["bucket_key", "object_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "The bucket key"},
+                    "object_key": {"type": "string", "description": "Object key (filename)"}
+                }),
+                &["bucket_key", "object_key"],
+            ),
         ),
         Tool::new(
             "object_signed_url",
             "Generate pre-signed S3 URL for direct download",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "The bucket key"},
-                "object_key": {"type": "string", "description": "The object key"},
-                "minutes": {"type": "integer", "description": "Expiry (2-60 min, default: 10)"}
-            }), &["bucket_key", "object_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "The bucket key"},
+                    "object_key": {"type": "string", "description": "The object key"},
+                    "minutes": {"type": "integer", "description": "Expiry (2-60 min, default: 10)"}
+                }),
+                &["bucket_key", "object_key"],
+            ),
         ),
         Tool::new(
             "object_urn",
             "Get Base64-encoded URN for an object (used for translation)",
-            schema(json!({
-                "bucket_key": {"type": "string", "description": "The bucket key"},
-                "object_key": {"type": "string", "description": "The object key"}
-            }), &["bucket_key", "object_key"]),
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "The bucket key"},
+                    "object_key": {"type": "string", "description": "The object key"}
+                }),
+                &["bucket_key", "object_key"],
+            ),
         ),
         Tool::new(
             "translate_start",
             "Start CAD translation. Formats: svf2, obj, stl, step, iges, ifc",
-            schema(json!({
-                "urn": {"type": "string", "description": "Base64-encoded URN"},
-                "format": {"type": "string", "description": "Output format (default: svf2)"}
-            }), &["urn"]),
+            schema(
+                json!({
+                    "urn": {"type": "string", "description": "Base64-encoded URN"},
+                    "format": {"type": "string", "description": "Output format (default: svf2)"}
+                }),
+                &["urn"],
+            ),
         ),
         Tool::new(
             "translate_status",
             "Check translation status: pending, inprogress, success, failed",
-            schema(json!({
-                "urn": {"type": "string", "description": "Base64-encoded URN"}
-            }), &["urn"]),
+            schema(
+                json!({
+                    "urn": {"type": "string", "description": "Base64-encoded URN"}
+                }),
+                &["urn"],
+            ),
         ),
         Tool::new(
             "hub_list",
             "List accessible hubs (BIM 360/ACC). Requires 3-legged auth.",
-            schema(json!({
-                "limit": {"type": "integer", "description": "Max hubs (default: 50)"}
-            }), &[]),
+            schema(
+                json!({
+                    "limit": {"type": "integer", "description": "Max hubs (default: 50)"}
+                }),
+                &[],
+            ),
         ),
         Tool::new(
             "project_list",
             "List projects in a hub. Requires 3-legged auth.",
-            schema(json!({
-                "hub_id": {"type": "string", "description": "The hub ID"},
-                "limit": {"type": "integer", "description": "Max projects (default: 50)"}
-            }), &["hub_id"]),
+            schema(
+                json!({
+                    "hub_id": {"type": "string", "description": "The hub ID"},
+                    "limit": {"type": "integer", "description": "Max projects (default: 50)"}
+                }),
+                &["hub_id"],
+            ),
         ),
     ]
 }
@@ -524,7 +701,8 @@ impl ServerHandler for RapsServer {
         &self,
         _request: Option<PaginatedRequestParam>,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> impl std::future::Future<Output = Result<ListToolsResult, rmcp::ErrorData>> + Send + '_ {
+    ) -> impl std::future::Future<Output = Result<ListToolsResult, rmcp::ErrorData>> + Send + '_
+    {
         async move {
             Ok(ListToolsResult {
                 tools: get_tools(),
@@ -538,7 +716,8 @@ impl ServerHandler for RapsServer {
         &self,
         request: CallToolRequestParam,
         _context: rmcp::service::RequestContext<rmcp::service::RoleServer>,
-    ) -> impl std::future::Future<Output = Result<CallToolResult, rmcp::ErrorData>> + Send + '_ {
+    ) -> impl std::future::Future<Output = Result<CallToolResult, rmcp::ErrorData>> + Send + '_
+    {
         async move {
             let result = self.dispatch_tool(&request.name, request.arguments).await;
             Ok(result)

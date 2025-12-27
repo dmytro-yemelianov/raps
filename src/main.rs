@@ -64,7 +64,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
-#[command(version = "3.0.0")]
+#[command(version)]
 #[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
@@ -242,7 +242,9 @@ async fn run(mut cli: Cli) -> Result<()> {
 
     // Handle MCP server command
     if let Commands::Serve = &cli.command {
-        mcp::server::run_server().await.map_err(|e| anyhow::anyhow!("{}", e))?;
+        mcp::server::run_server()
+            .await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
         return Ok(());
     }
 

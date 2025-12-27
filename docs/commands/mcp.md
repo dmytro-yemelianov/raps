@@ -3,7 +3,7 @@ layout: default
 title: MCP Server
 ---
 
-# MCP Server (v3.0.0+)
+# MCP Server (v4.0.0+)
 
 The MCP (Model Context Protocol) server enables AI assistants like Claude Desktop and Cursor to interact directly with Autodesk Platform Services.
 
