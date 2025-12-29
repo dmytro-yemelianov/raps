@@ -1,7 +1,7 @@
 [package]
 name = "raps"
 version = "3.0.0"
-edition = "2021"
+edition = "2024"
 description = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI"
 authors = ["Dmytro Yemelianov"]
 license = "Apache-2.0"
@@ -11,7 +11,7 @@ documentation = "https://rapscli.xyz/docs"
 readme = "README.md"
 keywords = ["autodesk", "aps", "forge", "bim360", "cli"]
 categories = ["command-line-utilities", "development-tools"]
-rust-version = "1.70"
+rust-version = "1.85"
 exclude = [
     ".github/",
     ".env",

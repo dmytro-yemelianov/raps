@@ -203,23 +203,29 @@ mod tests {
     #[test]
     fn test_storage_backend_from_env() {
         // Test default (file)
-        std::env::remove_var("RAPS_USE_KEYCHAIN");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("RAPS_USE_KEYCHAIN") };
         assert_eq!(StorageBackend::from_env(), StorageBackend::File);
 
         // Test keychain enabled
-        std::env::set_var("RAPS_USE_KEYCHAIN", "true");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "true") };
         assert_eq!(StorageBackend::from_env(), StorageBackend::Keychain);
 
-        std::env::set_var("RAPS_USE_KEYCHAIN", "1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "1") };
         assert_eq!(StorageBackend::from_env(), StorageBackend::Keychain);
 
-        std::env::set_var("RAPS_USE_KEYCHAIN", "yes");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "yes") };
         assert_eq!(StorageBackend::from_env(), StorageBackend::Keychain);
 
         // Test disabled
-        std::env::set_var("RAPS_USE_KEYCHAIN", "false");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "false") };
         assert_eq!(StorageBackend::from_env(), StorageBackend::File);
 
-        std::env::remove_var("RAPS_USE_KEYCHAIN");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var("RAPS_USE_KEYCHAIN") };
     }
 }
