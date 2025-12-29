@@ -1,6 +1,6 @@
 [package]
 name = "raps"
-version = "3.1.0"
+version = "3.2.0"
 edition = "2024"
 description = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI"
 authors = ["Dmytro Yemelianov"]
@@ -25,7 +25,40 @@ exclude = [
 name = "raps"
 path = "src/main.rs"
 
+# =============================================================================
+# Product Tier Feature Flags
+# =============================================================================
+# Build commands:
+#   Core only:     cargo build --no-default-features --features core
+#   Community:     cargo build  (default)
+#   Pro:           cargo build --features pro
+# =============================================================================
+
+[features]
+default = ["community"]
+
+# Core tier: Essential foundation (Auth, OSS, Derivative, DM)
+core = []
+
+# Community tier: Extended features (ACC, DA, Reality, Webhooks, Pipelines, Plugins)
+community = ["core", "dep:raps-community"]
+
+# Pro tier: Enterprise features (Analytics, Audit, Compliance, SSO)
+# Note: raps-pro is in a separate private repository
+# pro = ["community", "dep:raps-pro"]  # Uncomment when raps-pro is available
+pro = ["community"]  # Placeholder - raps-pro must be added separately
+
 [dependencies]
+# Service crates (microkernel architecture) - always included
+raps-kernel = { path = "../raps-kernel" }
+raps-oss = { path = "../raps-oss" }
+raps-derivative = { path = "../raps-derivative" }
+raps-dm = { path = "../raps-dm" }
+
+# Tiered feature crates (optional)
+raps-community = { path = "../raps-community", optional = true }
+# raps-pro = { path = "../raps-pro", optional = true }  # Commercial - separate private repo
+
 # CLI framework
 clap = { version = "4.4", features = ["derive"] }
 clap_complete = "4.4"
@@ -103,3 +136,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # CLI testing utilities
 assert_cmd = "2.0"
 predicates = "3.1"
+
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "monolith_benchmarks"
+harness = false
