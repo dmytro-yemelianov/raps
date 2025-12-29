@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::api::{derivative::OutputFormat as DerivativeOutputFormat, DerivativeClient};
+use crate::api::{DerivativeClient, derivative::OutputFormat as DerivativeOutputFormat};
 use crate::interactive;
 use crate::output::OutputFormat;
 
@@ -199,7 +199,9 @@ async fn start_translation(
         None => {
             // In non-interactive mode, require the URN
             if interactive::is_non_interactive() {
-                anyhow::bail!("URN is required in non-interactive mode. Use --urn flag or provide as argument.");
+                anyhow::bail!(
+                    "URN is required in non-interactive mode. Use --urn flag or provide as argument."
+                );
             }
 
             // Interactive mode: prompt for URN
@@ -234,7 +236,9 @@ async fn start_translation(
         None => {
             // In non-interactive mode, require the format
             if interactive::is_non_interactive() {
-                anyhow::bail!("--format is required in non-interactive mode. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc");
+                anyhow::bail!(
+                    "--format is required in non-interactive mode. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc"
+                );
             }
 
             // Interactive mode: prompt for format

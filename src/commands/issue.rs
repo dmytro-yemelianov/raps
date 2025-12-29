@@ -12,8 +12,8 @@ use colored::Colorize;
 use dialoguer::{Input, Select};
 use serde::Serialize;
 
-use crate::api::issues::CreateIssueRequest;
 use crate::api::IssuesClient;
+use crate::api::issues::CreateIssueRequest;
 use crate::interactive;
 use crate::output::OutputFormat;
 
@@ -264,11 +264,7 @@ async fn create_issue(
                     .with_prompt("Enter description (optional)")
                     .allow_empty(true)
                     .interact_text()?;
-                if desc.is_empty() {
-                    None
-                } else {
-                    Some(desc)
-                }
+                if desc.is_empty() { None } else { Some(desc) }
             }
         }
     };

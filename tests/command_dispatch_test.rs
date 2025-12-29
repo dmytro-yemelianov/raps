@@ -216,7 +216,7 @@ fn test_auth_test_graceful_failure() {
         .args(["auth", "test"])
         .output()
         .unwrap();
-    
+
     // Rust panic exit code is 101
     // Command may fail with auth error, but should NOT be 101 (panic)
     let exit_code = output.status.code().unwrap_or(-1);
@@ -237,7 +237,7 @@ fn test_bucket_list_graceful_failure() {
         .args(["bucket", "list"])
         .output()
         .unwrap();
-    
+
     let exit_code = output.status.code().unwrap_or(-1);
     assert_ne!(
         exit_code, 101,
@@ -251,9 +251,25 @@ fn test_bucket_list_graceful_failure() {
 #[test]
 fn test_all_help_flags_work() {
     let subcommands = [
-        "auth", "bucket", "object", "translate", "hub", "project",
-        "folder", "item", "webhook", "da", "issue", "acc", "rfi",
-        "reality", "plugin", "generate", "demo", "config", "pipeline",
+        "auth",
+        "bucket",
+        "object",
+        "translate",
+        "hub",
+        "project",
+        "folder",
+        "item",
+        "webhook",
+        "da",
+        "issue",
+        "acc",
+        "rfi",
+        "reality",
+        "plugin",
+        "generate",
+        "demo",
+        "config",
+        "pipeline",
     ];
 
     for subcmd in subcommands {

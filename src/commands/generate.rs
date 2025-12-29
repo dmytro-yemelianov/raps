@@ -325,7 +325,7 @@ fn generate_dxf(output: &Path, index: u32) -> anyhow::Result<u64> {
     let path = output.join(format!("floorplan-{}.dxf", index));
 
     let mut content = String::from(
-        "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n"
+        "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1015\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n",
     );
 
     // Outer walls
@@ -398,7 +398,9 @@ fn generate_stl(output: &Path, index: u32) -> anyhow::Result<u64> {
           facet normal 1 0 0\n    outer loop\n      vertex {s} 0 0\n      vertex {s} {s} 0\n      vertex {s} {s} {s}\n    endloop\n  endfacet\n\
           facet normal 1 0 0\n    outer loop\n      vertex {s} 0 0\n      vertex {s} {s} {s}\n      vertex {s} 0 {s}\n    endloop\n  endfacet\n\
         endsolid Part_{}\n",
-        index, index, s = scale
+        index,
+        index,
+        s = scale
     );
 
     let mut file = File::create(&path)?;
@@ -445,8 +447,15 @@ fn generate_ifc(output: &Path, index: u32, settings: &ComplexitySettings) -> any
         #31=IFCLOCALPLACEMENT(#21,#8);\n\n\
         #40=IFCRELAGGREGATES('{}',#2,`$,`$,#1,(#20));\n\
         #41=IFCRELAGGREGATES('{}',#2,`$,`$,#20,(#30));\n\n",
-        index, timestamp, project_guid, index, site_guid, building_guid, index,
-        generate_ifc_guid(), generate_ifc_guid()
+        index,
+        timestamp,
+        project_guid,
+        index,
+        site_guid,
+        building_guid,
+        index,
+        generate_ifc_guid(),
+        generate_ifc_guid()
     );
 
     // Add storeys and elements

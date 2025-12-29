@@ -12,8 +12,8 @@ use dialoguer::{Confirm, Input, Select};
 use serde::Serialize;
 
 use crate::api::{
-    oss::{Region, RetentionPolicy},
     OssClient,
+    oss::{Region, RetentionPolicy},
 };
 use crate::interactive;
 use crate::output::OutputFormat;

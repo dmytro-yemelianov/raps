@@ -14,8 +14,8 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::api::reality_capture::{OutputFormat as RealityOutputFormat, SceneType};
 use crate::api::RealityCaptureClient;
+use crate::api::reality_capture::{OutputFormat as RealityOutputFormat, SceneType};
 use crate::interactive;
 use crate::output::OutputFormat;
 

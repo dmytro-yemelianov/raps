@@ -643,7 +643,10 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
                     "callback_url" => profile.callback_url.as_deref(),
                     "da_nickname" => profile.da_nickname.as_deref(),
                     _ => {
-                        anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
+                        anyhow::bail!(
+                            "Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain",
+                            key
+                        );
                     }
                 }
             } else {
@@ -719,7 +722,10 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
             }
         }
         _ => {
-            anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
+            anyhow::bail!(
+                "Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain",
+                key
+            );
         }
     }
 
