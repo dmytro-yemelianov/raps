@@ -3,213 +3,33 @@
 
 //! Data Management API module
 //!
-//! Handles access to Hubs, Projects, Folders, and Items in BIM 360/ACC.
+//! This module is now an adapter that wraps raps-dm service crate
+//! to maintain backward compatibility with existing commands.
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use super::AuthClient;
 use crate::config::Config;
 
-/// Hub information
-#[derive(Debug, Clone, Deserialize)]
-pub struct Hub {
-    #[serde(rename = "type")]
-    pub hub_type: String,
-    pub id: String,
-    pub attributes: HubAttributes,
-}
+// Re-export types from raps-dm for backward compatibility
+pub use raps_dm::types::*;
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct HubAttributes {
-    pub name: String,
-    pub region: Option<String>,
-    #[serde(rename = "extension")]
-    pub extension: Option<HubExtension>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct HubExtension {
-    #[serde(rename = "type")]
-    pub extension_type: Option<String>,
-}
-
-/// Project information
-#[derive(Debug, Clone, Deserialize)]
-pub struct Project {
-    #[serde(rename = "type")]
-    pub project_type: String,
-    pub id: String,
-    pub attributes: ProjectAttributes,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ProjectAttributes {
-    pub name: String,
-    #[serde(rename = "scopes")]
-    pub scopes: Option<Vec<String>>,
-}
-
-/// Folder information
-#[derive(Debug, Clone, Deserialize)]
-pub struct Folder {
-    #[serde(rename = "type")]
-    pub folder_type: String,
-    pub id: String,
-    pub attributes: FolderAttributes,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct FolderAttributes {
-    pub name: String,
-    #[serde(rename = "displayName")]
-    pub display_name: Option<String>,
-    #[serde(rename = "createTime")]
-    pub create_time: Option<String>,
-    #[serde(rename = "lastModifiedTime")]
-    pub last_modified_time: Option<String>,
-}
-
-/// Item (file) information
-#[derive(Debug, Clone, Deserialize)]
-pub struct Item {
-    #[serde(rename = "type")]
-    pub item_type: String,
-    pub id: String,
-    pub attributes: ItemAttributes,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ItemAttributes {
-    #[serde(rename = "displayName")]
-    pub display_name: String,
-    #[serde(rename = "createTime")]
-    pub create_time: Option<String>,
-    #[serde(rename = "lastModifiedTime")]
-    pub last_modified_time: Option<String>,
-    #[serde(rename = "extension")]
-    pub extension: Option<ItemExtension>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct ItemExtension {
-    #[serde(rename = "type")]
-    pub extension_type: Option<String>,
-    pub version: Option<String>,
-}
-
-/// Version information for an item
-#[derive(Debug, Clone, Deserialize)]
-pub struct Version {
-    #[serde(rename = "type")]
-    pub version_type: String,
-    pub id: String,
-    pub attributes: VersionAttributes,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct VersionAttributes {
-    pub name: String,
-    #[serde(rename = "displayName")]
-    pub display_name: Option<String>,
-    #[serde(rename = "versionNumber")]
-    pub version_number: Option<i32>,
-    #[serde(rename = "createTime")]
-    pub create_time: Option<String>,
-    #[serde(rename = "storageSize")]
-    pub storage_size: Option<i64>,
-}
-
-/// Folder contents (can be folders or items)
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum FolderContent {
-    Folder(Folder),
-    Item(Item),
-}
-
-/// JSON:API response wrapper
-#[derive(Debug, Deserialize)]
-pub struct JsonApiResponse<T> {
-    pub data: T,
-    #[serde(default)]
-    pub included: Vec<serde_json::Value>,
-    pub links: Option<JsonApiLinks>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct JsonApiLinks {
-    #[serde(rename = "self")]
-    pub self_link: Option<JsonApiLink>,
-    pub next: Option<JsonApiLink>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum JsonApiLink {
-    Simple(String),
-    Complex { href: String },
-}
-
-/// Request to create a folder
-#[derive(Debug, Serialize)]
-pub struct CreateFolderRequest {
-    pub jsonapi: JsonApiVersion,
-    pub data: CreateFolderData,
-}
-
-#[derive(Debug, Serialize)]
-pub struct JsonApiVersion {
-    pub version: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderData {
-    #[serde(rename = "type")]
-    pub data_type: String,
-    pub attributes: CreateFolderAttributes,
-    pub relationships: CreateFolderRelationships,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderAttributes {
-    pub name: String,
-    pub extension: CreateFolderExtension,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderExtension {
-    #[serde(rename = "type")]
-    pub ext_type: String,
-    pub version: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderRelationships {
-    pub parent: CreateFolderParent,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderParent {
-    pub data: CreateFolderParentData,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CreateFolderParentData {
-    #[serde(rename = "type")]
-    pub data_type: String,
-    pub id: String,
-}
-
-/// Data Management API client
+/// Data Management API client (adapter wrapping raps-dm service crate with cached clients)
 #[derive(Clone)]
 pub struct DataManagementClient {
     config: Config,
     auth: AuthClient,
     http_client: reqwest::Client,
+    // Cached kernel clients (lazy-initialized)
+    kernel_config: Arc<Mutex<Option<raps_kernel::Config>>>,
+    kernel_http: Arc<Mutex<Option<raps_kernel::HttpClient>>>,
+    kernel_auth: Arc<Mutex<Option<raps_kernel::AuthClient>>>,
 }
 
 impl DataManagementClient {
@@ -224,216 +44,178 @@ impl DataManagementClient {
         auth: AuthClient,
         http_config: crate::http::HttpClientConfig,
     ) -> Self {
-        // Create HTTP client with configured timeouts
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         Self {
             config,
             auth,
             http_client,
+            kernel_config: Arc::new(Mutex::new(None)),
+            kernel_http: Arc::new(Mutex::new(None)),
+            kernel_auth: Arc::new(Mutex::new(None)),
         }
     }
 
-    /// List all accessible hubs (requires 3-legged auth)
-    pub async fn list_hubs(&self) -> Result<Vec<Hub>> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs", self.config.project_url());
-
-        // Log request in verbose/debug mode
-        crate::logging::log_request("GET", &url);
-
-        // Use retry logic for API requests
-        let http_config = crate::http::HttpClientConfig::default();
-        let response = crate::http::execute_with_retry(&http_config, || {
-            let client = self.http_client.clone();
-            let url = url.clone();
-            let token = token.clone();
-            Box::pin(async move {
-                client
-                    .get(&url)
-                    .bearer_auth(&token)
-                    .send()
-                    .await
-                    .context("Failed to list hubs")
-            })
-        })
-        .await?;
-
-        // Log response in verbose/debug mode
-        crate::logging::log_response(response.status().as_u16(), &url);
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list hubs ({}): {}", status, error_text);
+    /// Get or create kernel config (cached)
+    async fn get_kernel_config(&self) -> Result<raps_kernel::Config> {
+        let mut config = self.kernel_config.lock().await;
+        if config.is_none() {
+            *config = Some(raps_kernel::Config {
+                client_id: self.config.client_id.clone(),
+                client_secret: self.config.client_secret.clone(),
+                base_url: self.config.base_url.clone(),
+                callback_url: self.config.callback_url.clone(),
+                da_nickname: self.config.da_nickname.clone(),
+            });
         }
+        Ok(config.as_ref().unwrap().clone())
+    }
 
-        let api_response: JsonApiResponse<Vec<Hub>> = response
-            .json()
-            .await
-            .context("Failed to parse hubs response")?;
+    /// Get or create kernel HTTP client (cached)
+    async fn get_kernel_http(&self) -> Result<raps_kernel::HttpClient> {
+        let mut http = self.kernel_http.lock().await;
+        if http.is_none() {
+            let config = raps_kernel::HttpClientConfig {
+                timeout: std::time::Duration::from_secs(120),
+                connect_timeout: std::time::Duration::from_secs(30),
+                max_retries: 3,
+                retry_base_delay: std::time::Duration::from_secs(1),
+                retry_max_delay: std::time::Duration::from_secs(60),
+                retry_jitter: true,
+            };
+            *http = Some(raps_kernel::HttpClient::new(config)
+                .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?);
+        }
+        Ok(http.as_ref().unwrap().clone())
+    }
 
-        Ok(api_response.data)
+    /// Get or create kernel auth client (cached)
+    async fn get_kernel_auth(&self) -> Result<raps_kernel::AuthClient> {
+        let mut auth = self.kernel_auth.lock().await;
+        if auth.is_none() {
+            let kernel_config = self.get_kernel_config().await?;
+            *auth = Some(raps_kernel::AuthClient::new(kernel_config)
+                .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?);
+        }
+        Ok(auth.as_ref().unwrap().clone())
+    }
+
+    /// List all accessible hubs
+    pub async fn list_hubs(&self) -> Result<Vec<Hub>> {
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
+
+        let hub_client = raps_dm::HubClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+        );
+
+        hub_client.list_hubs().await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Get hub details
     pub async fn get_hub(&self, hub_id: &str) -> Result<Hub> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}", self.config.project_url(), hub_id);
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get hub")?;
+        let hub_client = raps_dm::HubClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+        );
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get hub ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Hub> = response
-            .json()
-            .await
-            .context("Failed to parse hub response")?;
-
-        Ok(api_response.data)
+        hub_client.get_hub(hub_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// List projects in a hub
     pub async fn list_projects(&self, hub_id: &str) -> Result<Vec<Project>> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}/projects", self.config.project_url(), hub_id);
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list projects")?;
+        let project_client = raps_dm::ProjectClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+        );
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Vec<Project>> = response
-            .json()
-            .await
-            .context("Failed to parse projects response")?;
-
-        Ok(api_response.data)
+        project_client.list_projects(hub_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Get project details
     pub async fn get_project(&self, hub_id: &str, project_id: &str) -> Result<Project> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/hubs/{}/projects/{}",
-            self.config.project_url(),
-            hub_id,
-            project_id
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
+
+        let project_client = raps_dm::ProjectClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Project> = response
-            .json()
-            .await
-            .context("Failed to parse project response")?;
-
-        Ok(api_response.data)
+        project_client.get_project(hub_id, project_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Get top folders for a project
+    /// Get top-level folders in a project
     pub async fn get_top_folders(&self, hub_id: &str, project_id: &str) -> Result<Vec<Folder>> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/hubs/{}/projects/{}/topFolders",
-            self.config.project_url(),
-            hub_id,
-            project_id
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
+        let data_url = kernel_config.data_url();
+
+        let folder_client = raps_dm::FolderClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+            data_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get top folders")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get top folders ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Vec<Folder>> = response
-            .json()
-            .await
-            .context("Failed to parse folders response")?;
-
-        Ok(api_response.data)
+        folder_client.get_top_folders(hub_id, project_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// List folder contents
+    /// List contents of a folder (returns raw JSON values)
     pub async fn list_folder_contents(
         &self,
         project_id: &str,
         folder_id: &str,
     ) -> Result<Vec<serde_json::Value>> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/projects/{}/folders/{}/contents",
-            self.config.data_url(),
-            project_id,
-            folder_id
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
+        let data_url = kernel_config.data_url();
+
+        let folder_client = raps_dm::FolderClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+            data_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list folder contents")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to list folder contents ({}): {}",
-                status,
-                error_text
-            );
-        }
-
-        let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
-            .json()
-            .await
-            .context("Failed to parse folder contents")?;
-
-        Ok(api_response.data)
+        folder_client.list_folder_contents(project_id, folder_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Create a new folder
@@ -441,212 +223,83 @@ impl DataManagementClient {
         &self,
         project_id: &str,
         parent_folder_id: &str,
-        name: &str,
+        folder_name: &str,
     ) -> Result<Folder> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/folders", self.config.data_url(), project_id);
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let project_url = kernel_config.project_url();
+        let data_url = kernel_config.data_url();
 
-        let request = CreateFolderRequest {
-            jsonapi: JsonApiVersion {
-                version: "1.0".to_string(),
-            },
-            data: CreateFolderData {
-                data_type: "folders".to_string(),
-                attributes: CreateFolderAttributes {
-                    name: name.to_string(),
-                    extension: CreateFolderExtension {
-                        ext_type: "folders:autodesk.core:Folder".to_string(),
-                        version: "1.0".to_string(),
-                    },
-                },
-                relationships: CreateFolderRelationships {
-                    parent: CreateFolderParent {
-                        data: CreateFolderParentData {
-                            data_type: "folders".to_string(),
-                            id: parent_folder_id.to_string(),
-                        },
-                    },
-                },
-            },
-        };
+        let folder_client = raps_dm::FolderClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            project_url,
+            data_url,
+        );
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create folder")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create folder ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Folder> = response
-            .json()
-            .await
-            .context("Failed to parse folder response")?;
-
-        Ok(api_response.data)
+        folder_client.create_folder(project_id, parent_folder_id, folder_name).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
     /// Get item details
     pub async fn get_item(&self, project_id: &str, item_id: &str) -> Result<Item> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/projects/{}/items/{}",
-            self.config.data_url(),
-            project_id,
-            item_id
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let data_url = kernel_config.data_url();
+
+        let item_client = raps_dm::ItemClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            data_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get item")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Item> = response
-            .json()
-            .await
-            .context("Failed to parse item response")?;
-
-        Ok(api_response.data)
+        item_client.get_item(project_id, item_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Get item versions
+    /// Get versions of an item
     pub async fn get_item_versions(&self, project_id: &str, item_id: &str) -> Result<Vec<Version>> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/projects/{}/items/{}/versions",
-            self.config.data_url(),
-            project_id,
-            item_id
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let data_url = kernel_config.data_url();
+
+        let item_client = raps_dm::ItemClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            data_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get item versions")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item versions ({}): {}", status, error_text);
-        }
-
-        let api_response: JsonApiResponse<Vec<Version>> = response
-            .json()
-            .await
-            .context("Failed to parse versions response")?;
-
-        Ok(api_response.data)
+        item_client.get_item_versions(project_id, item_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Create an item from OSS storage object
-    /// This binds an OSS object to a folder in ACC/BIM 360
+    /// Create an item from storage (upload a file)
     pub async fn create_item_from_storage(
         &self,
         project_id: &str,
         folder_id: &str,
-        display_name: &str,
+        filename: &str,
         storage_id: &str,
     ) -> Result<Item> {
-        let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/items", self.config.data_url(), project_id);
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let data_url = kernel_config.data_url();
 
-        // Build JSON:API request for creating an item
-        let request = serde_json::json!({
-            "jsonapi": {
-                "version": "1.0"
-            },
-            "data": {
-                "type": "items",
-                "attributes": {
-                    "displayName": display_name,
-                    "extension": {
-                        "type": "items:autodesk.core:File",
-                        "version": "1.0"
-                    }
-                },
-                "relationships": {
-                    "tip": {
-                        "data": {
-                            "type": "versions",
-                            "id": "1"
-                        }
-                    },
-                    "parent": {
-                        "data": {
-                            "type": "folders",
-                            "id": folder_id
-                        }
-                    }
-                }
-            },
-            "included": [
-                {
-                    "type": "versions",
-                    "id": "1",
-                    "attributes": {
-                        "name": display_name,
-                        "extension": {
-                            "type": "versions:autodesk.core:File",
-                            "version": "1.0"
-                        }
-                    },
-                    "relationships": {
-                        "storage": {
-                            "data": {
-                                "type": "objects",
-                                "id": storage_id
-                            }
-                        }
-                    }
-                }
-            ]
-        });
+        let item_client = raps_dm::ItemClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            data_url,
+        );
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create item from storage")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to create item from storage ({}): {}",
-                status,
-                error_text
-            );
-        }
-
-        let api_response: JsonApiResponse<Item> = response
-            .json()
-            .await
-            .context("Failed to parse item response")?;
-
-        Ok(api_response.data)
+        item_client.create_item_from_storage(project_id, folder_id, filename, storage_id).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 }

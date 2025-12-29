@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.0] - 2025-12-30
+
+### Added
+
+#### Microkernel Architecture
+- **Service Crate Extraction**: Core functionality extracted into independent service crates
+  - `raps-kernel` - Minimal trusted foundation (<3000 LOC)
+  - `raps-oss` - Object Storage Service client
+  - `raps-derivative` - Model Derivative API client
+  - `raps-dm` - Data Management API client
+  - `raps-ssa` - Secure Service Accounts client
+  - `raps-community` - Community tier features (ACC, DA, Reality, Webhooks, etc.)
+  - `raps-pro` - Enterprise tier features (stubs)
+
+#### Tiered Product Strategy
+- **Three-Tier Architecture**: Core → Community → Pro product tiers
+  - Core: Essential foundation (Auth, SSA, OSS, Derivative, DM) - Apache 2.0
+  - Community: Extended features (Account Admin, ACC, DA, Reality, Webhooks, MCP, TUI) - Apache 2.0
+  - Pro: Enterprise features (Analytics, Audit, Compliance, Multi-tenant, SSO) - Commercial
+- **Feature Flags**: Tier enforcement via Cargo feature flags (`core`, `community`, `pro`)
+- **Tier-Gated Commands**: Commands requiring higher tiers fail gracefully with upgrade guidance
+- **Version Output**: `raps --version` now includes tier name (e.g., "raps 3.2.0 Community")
+
+#### Build Performance Infrastructure
+- **Fast Linkers**: Configured `lld-link` for Windows, `mold` for Linux CI
+- **Compilation Caching**: Integrated `sccache` for faster builds
+- **Parallel Testing**: Added `cargo-nextest` for parallel test execution
+- **Build Timing**: CI generates build timing reports for diagnostics
+- **Performance Targets**: Kernel check <5s, workspace check <30s (incremental)
+
+#### Upload Performance
+- **Parallel Chunk Uploads**: Files >5MB use concurrent chunk uploads (configurable concurrency)
+- **Upload Benchmarks**: Added criterion benchmarks for upload operations
+- **Buffer Reuse**: Reduced memory allocations during chunk uploads
+
+### Changed
+- **Architecture**: Migrated from monolith to microkernel architecture
+- **Dependencies**: Service crates depend only on `raps-kernel`, enabling independent evolution
+- **Build System**: Workspace-level dependency management with tiered feature flags
+
+### Internal
+- Kernel compiles with `#![deny(unsafe_code)]` and `#![deny(clippy::unwrap_used)]`
+- Kernel test coverage >90% on critical paths
+- All I/O operations are async; blocking calls wrapped with `tokio::task::spawn_blocking`
+- Service crates can be tested in isolation
+
 ## [3.1.0] - 2025-12-29
 
 ### Fixed

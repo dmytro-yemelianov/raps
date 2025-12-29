@@ -3,8 +3,8 @@
 
 //! Model Derivative API module
 //!
-//! Handles translation of CAD files and retrieval of derivative manifests.
-//! Supports downloading translated derivatives directly from manifest.
+//! This module is now an adapter that wraps raps-derivative service crate
+//! to maintain backward compatibility with existing commands.
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
@@ -14,572 +14,269 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
 
 use super::AuthClient;
 use crate::config::Config;
 
-/// Supported output formats for translation
-#[derive(Debug, Clone, Copy, Serialize)]
-pub enum OutputFormat {
-    /// Streaming format for Viewer (recommended)
-    #[serde(rename = "svf2")]
-    Svf2,
-    /// Legacy streaming format
-    #[serde(rename = "svf")]
-    Svf,
-    /// Thumbnail images
-    #[serde(rename = "thumbnail")]
-    Thumbnail,
-    /// OBJ format (mesh export)
-    #[serde(rename = "obj")]
-    Obj,
-    /// STL format (3D printing)
-    #[serde(rename = "stl")]
-    Stl,
-    /// STEP format (CAD interchange)
-    #[serde(rename = "step")]
-    Step,
-    /// IGES format (CAD interchange)
-    #[serde(rename = "iges")]
-    Iges,
-    /// IFC format (BIM)
-    #[serde(rename = "ifc")]
-    Ifc,
-}
+// Re-export types from raps-derivative for backward compatibility
+pub use raps_derivative::types::*;
 
-impl std::fmt::Display for OutputFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OutputFormat::Svf2 => write!(f, "SVF2 (Viewer)"),
-            OutputFormat::Svf => write!(f, "SVF (Legacy Viewer)"),
-            OutputFormat::Thumbnail => write!(f, "Thumbnail"),
-            OutputFormat::Obj => write!(f, "OBJ (Mesh)"),
-            OutputFormat::Stl => write!(f, "STL (3D Print)"),
-            OutputFormat::Step => write!(f, "STEP (CAD)"),
-            OutputFormat::Iges => write!(f, "IGES (CAD)"),
-            OutputFormat::Ifc => write!(f, "IFC (BIM)"),
-        }
-    }
-}
+/// Supported output formats for translation (re-exported for compatibility)
+pub use raps_derivative::types::OutputFormat;
 
-impl OutputFormat {
-    pub fn all() -> Vec<Self> {
-        vec![
-            Self::Svf2,
-            Self::Svf,
-            Self::Thumbnail,
-            Self::Obj,
-            Self::Stl,
-            Self::Step,
-            Self::Iges,
-            Self::Ifc,
-        ]
-    }
-
-    pub fn type_name(&self) -> &str {
-        match self {
-            OutputFormat::Svf2 => "svf2",
-            OutputFormat::Svf => "svf",
-            OutputFormat::Thumbnail => "thumbnail",
-            OutputFormat::Obj => "obj",
-            OutputFormat::Stl => "stl",
-            OutputFormat::Step => "step",
-            OutputFormat::Iges => "iges",
-            OutputFormat::Ifc => "ifc",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "svf2" => Some(Self::Svf2),
-            "svf" => Some(Self::Svf),
-            "thumbnail" => Some(Self::Thumbnail),
-            "obj" => Some(Self::Obj),
-            "stl" => Some(Self::Stl),
-            "step" => Some(Self::Step),
-            "iges" => Some(Self::Iges),
-            "ifc" => Some(Self::Ifc),
-            _ => None,
-        }
-    }
-}
-
-/// Request to start a translation job
-#[derive(Debug, Serialize)]
-pub struct TranslationRequest {
-    pub input: TranslationInput,
-    pub output: TranslationOutput,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TranslationInput {
-    pub urn: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub compressed_urn: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub root_filename: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct TranslationOutput {
-    pub destination: OutputDestination,
-    pub formats: Vec<OutputFormatSpec>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct OutputDestination {
-    pub region: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct OutputFormatSpec {
-    #[serde(rename = "type")]
-    pub format_type: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub views: Option<Vec<String>>,
-}
-
-/// Translation job response
-#[derive(Debug, Deserialize)]
-pub struct TranslationResponse {
-    pub result: String,
-    pub urn: String,
-    #[serde(rename = "acceptedJobs")]
-    pub accepted_jobs: Option<AcceptedJobs>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AcceptedJobs {
-    pub output: OutputJobInfo,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OutputJobInfo {
-    pub formats: Vec<FormatJobInfo>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct FormatJobInfo {
-    #[serde(rename = "type")]
-    pub format_type: String,
-}
-
-/// Manifest response (translation status and derivatives)
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Manifest {
-    #[serde(rename = "type")]
-    pub manifest_type: String,
-    pub has_thumbnail: String,
-    pub status: String,
-    pub progress: String,
-    pub region: String,
-    pub urn: String,
-    pub version: Option<String>,
-    #[serde(default)]
-    pub derivatives: Vec<Derivative>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Derivative {
-    pub name: Option<String>,
-    pub has_thumbnail: Option<String>,
-    pub status: String,
-    pub progress: Option<String>,
-    pub output_type: String,
-    #[serde(default)]
-    pub children: Vec<DerivativeChild>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DerivativeChild {
-    pub guid: String,
-    #[serde(rename = "type")]
-    pub child_type: String,
-    pub role: String,
-    pub name: Option<String>,
-    pub status: Option<String>,
-    /// URN for downloadable derivatives
-    pub urn: Option<String>,
-    /// MIME type for downloadable files
-    pub mime: Option<String>,
-    /// File size in bytes
-    pub size: Option<u64>,
-    #[serde(default)]
-    pub children: Vec<DerivativeChild>,
-}
-
-/// Information about a downloadable derivative
-#[derive(Debug, Clone, Serialize)]
-pub struct DownloadableDerivative {
-    pub guid: String,
-    pub name: String,
-    pub output_type: String,
-    pub role: String,
-    pub urn: String,
-    pub mime: Option<String>,
-    pub size: Option<u64>,
-}
-
-/// Model Derivative API client
+/// Model Derivative API client (adapter wrapping raps-derivative service crate with cached clients)
 #[derive(Clone)]
 pub struct DerivativeClient {
     config: Config,
     auth: AuthClient,
     http_client: reqwest::Client,
+    // Cached kernel clients (lazy-initialized)
+    kernel_config: Arc<Mutex<Option<raps_kernel::Config>>>,
+    kernel_http: Arc<Mutex<Option<raps_kernel::HttpClient>>>,
+    kernel_auth: Arc<Mutex<Option<raps_kernel::AuthClient>>>,
 }
 
 impl DerivativeClient {
-    /// Create a new Model Derivative client
+    /// Create a new Derivative client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, crate::http::HttpClientConfig::default())
     }
 
-    /// Create a new Model Derivative client with custom HTTP config
+    /// Create a new Derivative client with custom HTTP config
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: crate::http::HttpClientConfig,
     ) -> Self {
-        // Create HTTP client with configured timeouts
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         Self {
             config,
             auth,
             http_client,
+            kernel_config: Arc::new(Mutex::new(None)),
+            kernel_http: Arc::new(Mutex::new(None)),
+            kernel_auth: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Get or create kernel config (cached)
+    async fn get_kernel_config(&self) -> Result<raps_kernel::Config> {
+        let mut config = self.kernel_config.lock().await;
+        if config.is_none() {
+            *config = Some(raps_kernel::Config {
+                client_id: self.config.client_id.clone(),
+                client_secret: self.config.client_secret.clone(),
+                base_url: self.config.base_url.clone(),
+                callback_url: self.config.callback_url.clone(),
+                da_nickname: self.config.da_nickname.clone(),
+            });
+        }
+        Ok(config.as_ref().unwrap().clone())
+    }
+
+    /// Get or create kernel HTTP client (cached)
+    async fn get_kernel_http(&self) -> Result<raps_kernel::HttpClient> {
+        let mut http = self.kernel_http.lock().await;
+        if http.is_none() {
+            let config = raps_kernel::HttpClientConfig {
+                timeout: std::time::Duration::from_secs(120),
+                connect_timeout: std::time::Duration::from_secs(30),
+                max_retries: 3,
+                retry_base_delay: std::time::Duration::from_secs(1),
+                retry_max_delay: std::time::Duration::from_secs(60),
+                retry_jitter: true,
+            };
+            *http = Some(raps_kernel::HttpClient::new(config)
+                .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?);
+        }
+        Ok(http.as_ref().unwrap().clone())
+    }
+
+    /// Get or create kernel auth client (cached)
+    async fn get_kernel_auth(&self) -> Result<raps_kernel::AuthClient> {
+        let mut auth = self.kernel_auth.lock().await;
+        if auth.is_none() {
+            let kernel_config = self.get_kernel_config().await?;
+            *auth = Some(raps_kernel::AuthClient::new(kernel_config)
+                .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?);
+        }
+        Ok(auth.as_ref().unwrap().clone())
     }
 
     /// Start a translation job
     pub async fn translate(
         &self,
         urn: &str,
-        format: OutputFormat,
+        output_format: OutputFormat,
         root_filename: Option<&str>,
     ) -> Result<TranslationResponse> {
-        let token = self.auth.get_token().await?;
-        let url = format!("{}/designdata/job", self.config.derivative_url());
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
 
-        let request = TranslationRequest {
-            input: TranslationInput {
-                urn: urn.to_string(),
-                compressed_urn: None,
-                root_filename: root_filename.map(|s| s.to_string()),
-            },
-            output: TranslationOutput {
-                destination: OutputDestination {
-                    region: "us".to_string(),
-                },
-                formats: vec![OutputFormatSpec {
-                    format_type: format.type_name().to_string(),
-                    views: if matches!(format, OutputFormat::Svf2 | OutputFormat::Svf) {
-                        Some(vec!["2d".to_string(), "3d".to_string()])
-                    } else {
-                        None
-                    },
-                }],
-            },
-        };
+        let translate_client = raps_derivative::TranslateClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
+        );
 
-        // Log request in verbose/debug mode
-        crate::logging::log_request("POST", &url);
-
-        // Use retry logic for translation requests
-        let http_config = crate::http::HttpClientConfig::default();
-        let response = crate::http::execute_with_retry(&http_config, || {
-            let client = self.http_client.clone();
-            let url = url.clone();
-            let token = token.clone();
-            let request_json = serde_json::to_value(&request).ok();
-            Box::pin(async move {
-                let mut req = client
-                    .post(&url)
-                    .bearer_auth(&token)
-                    .header("Content-Type", "application/json")
-                    .header("x-ads-force", "true");
-                if let Some(json) = request_json {
-                    req = req.json(&json);
-                }
-                req.send().await.context("Failed to start translation")
-            })
-        })
-        .await?;
-
-        // Log response in verbose/debug mode
-        crate::logging::log_response(response.status().as_u16(), &url);
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to start translation ({}): {}", status, error_text);
-        }
-
-        let translation_response: TranslationResponse = response
-            .json()
-            .await
-            .context("Failed to parse translation response")?;
-
-        Ok(translation_response)
+        translate_client.translate(urn, output_format, root_filename).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Get the manifest (translation status and available derivatives)
+    /// Get translation manifest
     pub async fn get_manifest(&self, urn: &str) -> Result<Manifest> {
-        let token = self.auth.get_token().await?;
-        let url = format!(
-            "{}/designdata/{}/manifest",
-            self.config.derivative_url(),
-            urn
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
+
+        let manifest_client = raps_derivative::ManifestClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get manifest")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get manifest ({}): {}", status, error_text);
-        }
-
-        let manifest: Manifest = response
-            .json()
-            .await
-            .context("Failed to parse manifest response")?;
-
-        Ok(manifest)
+        manifest_client.get_manifest(urn).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Delete manifest (and all derivatives)
-    #[allow(dead_code)]
+    /// Delete a manifest
     pub async fn delete_manifest(&self, urn: &str) -> Result<()> {
-        let token = self.auth.get_token().await?;
-        let url = format!(
-            "{}/designdata/{}/manifest",
-            self.config.derivative_url(),
-            urn
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
+
+        let manifest_client = raps_derivative::ManifestClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
         );
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete manifest")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete manifest ({}): {}", status, error_text);
-        }
-
-        Ok(())
+        manifest_client.delete_manifest(urn).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Check translation status and return progress percentage
+    /// Get translation status
     pub async fn get_status(&self, urn: &str) -> Result<(String, String)> {
-        let manifest = self.get_manifest(urn).await?;
-        Ok((manifest.status, manifest.progress))
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
+
+        let manifest_client = raps_derivative::ManifestClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
+        );
+
+        manifest_client.get_status(urn).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Get list of downloadable derivatives from manifest
+    /// List downloadable derivatives
     pub async fn list_downloadable_derivatives(
         &self,
         urn: &str,
     ) -> Result<Vec<DownloadableDerivative>> {
-        let manifest = self.get_manifest(urn).await?;
-        let mut downloadables = Vec::new();
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
 
-        for derivative in &manifest.derivatives {
-            Self::collect_downloadables(derivative, &derivative.output_type, &mut downloadables);
-        }
+        let manifest_client = raps_derivative::ManifestClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
+        );
 
-        Ok(downloadables)
+        manifest_client.list_downloadable_derivatives(urn).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Recursively collect downloadable items from derivative tree
-    fn collect_downloadables(
-        derivative: &Derivative,
-        output_type: &str,
-        downloadables: &mut Vec<DownloadableDerivative>,
-    ) {
-        for child in &derivative.children {
-            Self::collect_downloadables_from_child(child, output_type, downloadables);
-        }
-    }
-
-    /// Recursively collect downloadable items from child nodes
-    fn collect_downloadables_from_child(
-        child: &DerivativeChild,
-        output_type: &str,
-        downloadables: &mut Vec<DownloadableDerivative>,
-    ) {
-        // Check if this child has a URN (is downloadable)
-        if let Some(ref urn) = child.urn {
-            let name = child.name.clone().unwrap_or_else(|| {
-                // Generate name from GUID and type
-                format!(
-                    "{}.{}",
-                    &child.guid[..8.min(child.guid.len())],
-                    output_type.to_lowercase()
-                )
-            });
-
-            downloadables.push(DownloadableDerivative {
-                guid: child.guid.clone(),
-                name,
-                output_type: output_type.to_string(),
-                role: child.role.clone(),
-                urn: urn.clone(),
-                mime: child.mime.clone(),
-                size: child.size,
-            });
-        }
-
-        // Recurse into children
-        for grandchild in &child.children {
-            Self::collect_downloadables_from_child(grandchild, output_type, downloadables);
-        }
-    }
-
-    /// Filter derivatives by format (output type)
-    pub fn filter_by_format(
-        derivatives: &[DownloadableDerivative],
-        format: &str,
-    ) -> Vec<DownloadableDerivative> {
-        let target_format = format.to_ascii_lowercase();
-
-        derivatives
-            .iter()
-            .filter(|d| d.output_type.to_ascii_lowercase() == target_format)
-            .cloned()
-            .collect()
-    }
-
-    /// Filter derivatives by GUID
-    pub fn filter_by_guid(
-        derivatives: &[DownloadableDerivative],
-        guid: &str,
-    ) -> Option<DownloadableDerivative> {
-        derivatives.iter().find(|d| d.guid == guid).cloned()
-    }
-
-    /// Download a derivative to a local file
+    /// Download a derivative by GUID
     pub async fn download_derivative(
         &self,
-        source_urn: &str,
-        derivative_urn: &str,
+        urn: &str,
+        guid: &str,
         output_path: &Path,
     ) -> Result<u64> {
-        let token = self.auth.get_token().await?;
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
 
-        // The derivative URN needs to be URL-encoded
-        let encoded_derivative_urn = urlencoding::encode(derivative_urn);
-        let url = format!(
-            "{}/designdata/{}/manifest/{}",
-            self.config.derivative_url(),
-            source_urn,
-            encoded_derivative_urn
+        let download_client = raps_derivative::DownloadClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
         );
 
-        crate::logging::log_request("GET", &url);
-
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to download derivative")?;
-
-        crate::logging::log_response(response.status().as_u16(), &url);
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download derivative ({}): {}", status, error_text);
-        }
-
-        let total_size = response.content_length().unwrap_or(0);
-
-        // Create progress bar
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
-                .progress_chars("█▓░"),
-        );
-
-        let filename = output_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("derivative");
-        pb.set_message(format!("Downloading {}", filename));
-
-        // Create parent directories if needed
-        if let Some(parent) = output_path.parent() {
-            tokio::fs::create_dir_all(parent).await?;
-        }
-
-        // Stream download
-        let mut file = File::create(output_path)
-            .await
-            .context("Failed to create output file")?;
-
-        let mut stream = response.bytes_stream();
-        let mut downloaded: u64 = 0;
-
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("Error while downloading")?;
-            file.write_all(&chunk)
-                .await
-                .context("Failed to write to file")?;
-            downloaded += chunk.len() as u64;
-            pb.set_position(downloaded);
-        }
-
-        pb.finish_with_message(format!("Downloaded {}", filename));
-
-        Ok(downloaded)
+        download_client.download_derivative(urn, guid, output_path).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
-    /// Download all derivatives matching a format
+    /// Download derivatives by format
     pub async fn download_derivatives_by_format(
         &self,
-        source_urn: &str,
+        urn: &str,
         format: &str,
         output_dir: &Path,
     ) -> Result<Vec<(String, u64)>> {
-        let downloadables = self.list_downloadable_derivatives(source_urn).await?;
-        let filtered = Self::filter_by_format(&downloadables, format);
+        let kernel_config = self.get_kernel_config().await?;
+        let kernel_http = self.get_kernel_http().await?;
+        let kernel_auth = self.get_kernel_auth().await?;
+        let derivative_url = kernel_config.derivative_url();
 
-        if filtered.is_empty() {
-            anyhow::bail!("No derivatives found with format '{}'", format);
-        }
+        // Get downloadables first
+        let manifest_client = raps_derivative::ManifestClient::new(
+            kernel_http.clone(),
+            kernel_auth.clone(),
+            kernel_config.clone(),
+            derivative_url.clone(),
+        );
+        let downloadables = manifest_client.list_downloadable_derivatives(urn).await
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
 
-        let mut results = Vec::new();
+        let download_client = raps_derivative::DownloadClient::new(
+            kernel_http,
+            kernel_auth,
+            kernel_config,
+            derivative_url,
+        );
 
-        for derivative in filtered {
-            let output_path = output_dir.join(&derivative.name);
-            let size = self
-                .download_derivative(source_urn, &derivative.urn, &output_path)
-                .await?;
-            results.push((derivative.name, size));
-        }
+        download_client.download_derivatives_by_format(urn, format, output_dir, &downloadables).await
+            .map_err(|e| anyhow::anyhow!("{}", e))
+    }
 
-        Ok(results)
+    /// Filter derivatives by format (helper method for commands)
+    pub fn filter_by_format(
+        downloadables: &[DownloadableDerivative],
+        format: &str,
+    ) -> Vec<DownloadableDerivative> {
+        raps_derivative::ManifestClient::filter_by_format(downloadables, format)
+    }
+
+    /// Filter derivatives by GUID (helper method for commands)
+    pub fn filter_by_guid(
+        downloadables: &[DownloadableDerivative],
+        guid: &str,
+    ) -> Option<DownloadableDerivative> {
+        raps_derivative::ManifestClient::filter_by_guid(downloadables, guid)
     }
 }
