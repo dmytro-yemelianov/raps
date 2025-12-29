@@ -8,8 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Minimum Rust version required for Edition 2024
-  RUST_VERSION: "1.85"
+  # Minimum Rust version required for dependencies (darling 0.23, home 0.5.12)
+  RUST_VERSION: "1.88"
 
 jobs:
   check:

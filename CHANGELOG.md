@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **Rust 2024 Edition**: Migrated from Edition 2021 to 2024
-  - Updated minimum supported Rust version (MSRV) from 1.70 to 1.85
+  - Updated minimum supported Rust version (MSRV) from 1.70 to 1.88
   - `std::env::set_var`/`remove_var` now wrapped in `unsafe` blocks (2024 edition requirement for thread safety)
   - Benefits: `Future`/`IntoFuture` in prelude, MSRV-aware cargo resolver, improved match ergonomics
 

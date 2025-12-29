@@ -11,7 +11,7 @@ documentation = "https://rapscli.xyz/docs"
 readme = "README.md"
 keywords = ["autodesk", "aps", "forge", "bim360", "cli"]
 categories = ["command-line-utilities", "development-tools"]
-rust-version = "1.85"
+rust-version = "1.88"
 exclude = [
     ".github/",
     ".env",
