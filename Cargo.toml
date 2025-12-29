@@ -98,3 +98,8 @@ rmcp = { version = "0.12", features = ["server", "transport-io", "schemars"] }
 schemars = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# CLI testing utilities
+assert_cmd = "2.0"
+predicates = "3.1"
