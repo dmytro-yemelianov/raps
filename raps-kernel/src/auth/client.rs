@@ -7,90 +7,14 @@ use crate::config::Config;
 use crate::error::{RapsError, Result};
 use crate::http::{HttpClient, HttpClientConfig};
 use crate::storage::{StorageBackend, TokenStorage};
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-/// User profile information from /userinfo endpoint
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-pub struct UserInfo {
-    /// The unique APS ID of the user
-    pub sub: String,
-    /// Full name
-    pub name: Option<String>,
-    /// First name
-    pub given_name: Option<String>,
-    /// Last name
-    pub family_name: Option<String>,
-    /// Preferred username
-    pub preferred_username: Option<String>,
-    /// Email address
-    pub email: Option<String>,
-    /// Whether email is verified
-    pub email_verified: Option<bool>,
-    /// Profile URL
-    pub profile: Option<String>,
-    /// Profile picture URL
-    pub picture: Option<String>,
-}
-
-/// OAuth 2.0 token response from APS
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TokenResponse {
-    /// Access token string
-    pub access_token: String,
-    /// Token type (usually "Bearer")
-    pub token_type: String,
-    /// Expiration time in seconds
-    pub expires_in: u64,
-    /// Refresh token (if available)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub refresh_token: Option<String>,
-    /// OAuth scopes granted
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub scope: Option<String>,
-}
-
-/// Device code response from APS Device Authorization endpoint
-#[derive(Debug, Clone, Deserialize)]
-pub struct DeviceCodeResponse {
-    /// Device code for polling
-    pub device_code: String,
-    /// User code to display
-    pub user_code: String,
-    /// Verification URI
-    pub verification_uri: String,
-    /// Complete verification URI with user code
-    pub verification_uri_complete: Option<String>,
-    /// Expiration time in seconds
-    pub expires_in: u64,
-    /// Polling interval in seconds
-    pub interval: Option<u64>,
-}
-
-/// Stored token with metadata for persistence
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StoredToken {
-    /// Access token string
-    pub access_token: String,
-    /// Refresh token (if available)
-    pub refresh_token: Option<String>,
-    /// Expiration timestamp (Unix epoch seconds)
-    pub expires_at: i64,
-    /// OAuth scopes granted
-    pub scopes: Vec<String>,
-}
-
-impl StoredToken {
-    /// Check if token is still valid (not expired)
-    pub fn is_valid(&self) -> bool {
-        let now = chrono::Utc::now().timestamp();
-        // Consider expired 60 seconds before actual expiry
-        self.expires_at > now + 60
-    }
-}
+// Re-export types for backward compatibility
+pub use super::types::{
+    DeviceCodeResponse, Scopes, StoredToken, TokenResponse, UserInfo,
+};
 
 /// Cached token with expiry tracking (for 2-legged)
 #[derive(Debug, Clone)]

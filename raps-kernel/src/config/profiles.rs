@@ -25,6 +25,18 @@ pub struct Config {
     pub da_nickname: Option<String>,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            client_id: String::new(),
+            client_secret: String::new(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT),
+            da_nickname: None,
+        }
+    }
+}
+
 impl Config {
     /// Load configuration with precedence: env vars > active profile > defaults
     pub fn from_env() -> Result<Self> {
