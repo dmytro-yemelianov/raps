@@ -8,8 +8,12 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 1
   # Minimum Rust version required for dependencies (darling 0.23, home 0.5.12)
   RUST_VERSION: "1.88"
+  # Reduce debug info for faster builds
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   check:
@@ -35,7 +39,17 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --all-features
+      
+      # Install cargo-nextest for faster test execution
+      - uses: taiki-e/install-action@nextest
+      
+      # Run tests with nextest (parallel execution, better output)
+      - name: Run tests
+        run: cargo nextest run --all-features --no-fail-fast
+        
+      # Also run doc tests (nextest doesn't support them)
+      - name: Run doc tests
+        run: cargo test --doc --all-features
 
   test:
     name: test
@@ -53,7 +67,7 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2
+      # No cache needed for fmt - it's fast
       - run: cargo fmt --all -- --check
 
   clippy:
