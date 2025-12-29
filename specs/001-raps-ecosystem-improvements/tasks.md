@@ -237,17 +237,14 @@
   pro = ["community", "raps-pro"]
   ```
 - [ ] T048 [US9] Refactor command handlers to dispatch to services
-- [ ] T049 [US9] Implement tier-gated command handling:
-  ```rust
-  #[cfg(not(feature = "community"))]
-  pub fn handle_issue_list() -> Result<()> {
-      Err(RapsError::TierRequired { 
-          feature: "ACC Issues",
-          required_tier: "Community" 
-      })
-  }
-  ```
-- [ ] T050 [US9] Update `--version` to show tier name
+- [x] T049 [US9] Implement tier-gated command handling: ✅
+  - New `tier.rs` module with Tier enum (Core, Community, Pro)
+  - `require_tier()`, `require_community()`, `require_pro()` helpers
+  - `community_only!` and `pro_only!` macros for compile-time gating
+  - 4 unit tests for tier logic
+- [x] T050 [US9] Update `--version` to show tier name: ✅
+  - Version now shows "raps 3.2.0 Community" format
+  - Compile-time constant VERSION_WITH_TIER
 - [ ] T051 [US3] Audit all commands for non-interactive mode
 - [ ] T052 [US3] Wrap all `dialoguer` calls with `spawn_blocking`
 - [ ] T053 [US3] Wrap OAuth callback with `spawn_blocking`
