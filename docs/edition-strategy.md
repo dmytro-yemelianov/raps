@@ -27,7 +27,7 @@ This plan separates RAPS into purpose-built editions and repositories while keep
 | Design Automation | ✅ Engines, activities, work items | ⬜ Basic CLI parity (finish remaining endpoints) | ✅ **Work item batching**, render farms, cold-start mitigation |
 | Webhooks | ✅ Subscription CRUD | ✅ CLI | ✅ **Bulk subscription management**, routing/transform rules |
 | Pipelines & Plugins | ✅ Pipeline runner engine | ✅ CLI pipelines & community plugins | ✅ **Managed pipeline runs**, schedules, org-level secrets |
-| MCP Server | ✅ Protocol adapter traits | ✅ AI tools exposed as today | ✅ **Org-scoped tools**, audit logging, enterprise policies |
+| MCP Server | ✅ Protocol adapter traits | ✅ AI tools exposed as today (single-tenant, local policy only) | ✅ **Org-scoped tools**, per-tool RBAC, audited tool runs, rate limits, secret management, policy bundles |
 | Support/Docs | ✅ Inline docs | ✅ Community docs | ✅ Pro-only runbooks, SSO, support SLAs |
 
 > **Batch processing is Pro-only**: Parallel uploads/downloads, bulk translations, and mass issue/subscription operations live in `raps-pro`, with the community edition keeping single-item or small-batch workflows.
@@ -42,8 +42,11 @@ The following Autodesk APIs are either absent or only partially covered. Align i
 | **Model Properties / Metadata API** | Property database download and querying for SVF2 | Community | Enables property queries alongside manifests; foundation for downstream analytics. |
 | **Data Exchange API** | Exchange creation/export/import flows | Community | Bridges ACC/DM with other tools; exposes exchange IDs and lifecycle. |
 | **ACC Cost Management API** | Budget, cost items, contracts, change orders | Pro | Enterprise-only workflows; include reporting exports and approval routing. |
+| **ACC Transmittals API** | Package creation, distribution lists, download tracking | Pro | Align with commercial/legal workflows; pair with audit exports. |
+| **ACC Model Coordination / Clash API** | Coordination spaces, clash tests, issue linking | Community (core flows); Pro (batch reruns) | Supports clash-to-issue pipelines; Pro handles batch reruns and analytics. |
 | **ACC Forms & Meetings APIs** | Forms CRUD, meeting minutes, attendance | Community | Completes ACC project-management surface area. |
 | **ACC Data Connector** | Data extraction jobs and dataset downloads | Pro | Fits batch/analytics theme; integrate with pipeline runner. |
+| **ACC Checklists API** | Templates, assignments, inspections | Community | Complements Issues/Assets for field ops; surface in CLI. |
 | **BIM 360/ACC Locations API** | Location tree CRUD for field management | Community | Needed for richer issue/checklist context. |
 | **Reality Capture** | Webhook-style callbacks for photoscene completion | Community | Extend existing client with callback registration/testing. |
 
