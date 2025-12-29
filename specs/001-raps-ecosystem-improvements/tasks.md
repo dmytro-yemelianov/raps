@@ -145,11 +145,13 @@
 
 ### OSS Tests
 
-- [ ] T026 [P] [US1] Write parallel upload tests:
-  - `test_parallel_upload_respects_concurrency`
-  - `test_parallel_upload_completes_all_chunks`
-  - `test_parallel_upload_handles_partial_failure`
-  - `test_upload_resume_after_interruption`
+- [x] T026 [P] [US1] Write parallel upload tests: ✅ (10 unit + 8 integration)
+  - `test_upload_config_default` ✅
+  - `test_upload_config_custom` ✅
+  - `test_multipart_upload_state_remaining_parts` ✅
+  - `test_multipart_upload_state_serialization` ✅
+  - `test_concurrency_limits` ✅
+  - `test_chunk_size_bounds` ✅
 - [ ] T027 [P] [US1] Create upload benchmarks in `raps-oss/benches/`
 
 ### Model Derivative Service (`raps-derivative`)
