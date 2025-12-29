@@ -11,8 +11,8 @@ use colored::Colorize;
 use dialoguer::{Input, Select};
 use serde::Serialize;
 
-use crate::api::webhooks::WEBHOOK_EVENTS;
 use crate::api::WebhooksClient;
+use crate::api::webhooks::WEBHOOK_EVENTS;
 use crate::interactive;
 use crate::output::OutputFormat;
 

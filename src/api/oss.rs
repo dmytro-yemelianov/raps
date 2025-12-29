@@ -637,7 +637,7 @@ impl OssClient {
             .unwrap_or(0);
 
         let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
-        let total_parts = ((file_size + chunk_size - 1) / chunk_size) as u32;
+        let total_parts = file_size.div_ceil(chunk_size) as u32;
 
         // Container for signed URLs (either loaded from fresh request or empty if resuming)
         // We really only need them if we are starting fresh OR if we need to refresh them.

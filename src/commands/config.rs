@@ -643,7 +643,10 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
                     "callback_url" => profile.callback_url.as_deref(),
                     "da_nickname" => profile.da_nickname.as_deref(),
                     _ => {
-                        anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
+                        anyhow::bail!(
+                            "Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain",
+                            key
+                        );
                     }
                 }
             } else {
@@ -711,13 +714,18 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
         "use_keychain" => {
             // Set environment variable for keychain usage
             if value.to_lowercase() == "true" || value == "1" || value.to_lowercase() == "yes" {
-                std::env::set_var("RAPS_USE_KEYCHAIN", "true");
+                // TODO: Audit that the environment access only happens in single-threaded code.
+                unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "true") };
             } else {
-                std::env::remove_var("RAPS_USE_KEYCHAIN");
+                // TODO: Audit that the environment access only happens in single-threaded code.
+                unsafe { std::env::remove_var("RAPS_USE_KEYCHAIN") };
             }
         }
         _ => {
-            anyhow::bail!("Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain", key);
+            anyhow::bail!(
+                "Unknown configuration key: {}. Valid keys: client_id, client_secret, base_url, callback_url, da_nickname, use_keychain",
+                key
+            );
         }
     }
 

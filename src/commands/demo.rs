@@ -386,7 +386,7 @@ f 5//6 1//6 4//6 8//6
             if e.to_string().contains("already exists") {
                 println!("  Bucket already exists, continuing...");
             } else {
-                println!("  Warning: {}", e);
+                println!("  Warning: {e}");
             }
         }
     }

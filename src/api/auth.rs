@@ -543,7 +543,7 @@ impl AuthClient {
                     tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
                 );
                 request.respond(response).ok();
-                anyhow::bail!("Authorization error: {} - {}", error, desc);
+                anyhow::bail!("Authorization error: {error} - {desc}");
             }
 
             // Check state

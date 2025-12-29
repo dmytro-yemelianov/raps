@@ -3,6 +3,9 @@
 // Copyright 2024-2025 Dmytro Yemelianov
 // SPDX-License-Identifier: Apache-2.0
 //
+// Allow older format string style - will migrate to inline format in a future PR
+#![allow(clippy::uninlined_format_args)]
+//
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -42,7 +45,7 @@ mod storage;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use colored::Colorize;
 use std::io;
 
@@ -64,7 +67,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
-#[command(version = "3.0.0")]
+#[command(version = "3.1.0")]
 #[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {
@@ -232,7 +235,7 @@ async fn main() {
     }
 }
 
-async fn run(mut cli: Cli) -> Result<()> {
+async fn run(cli: Cli) -> Result<()> {
     // Handle completions command first (doesn't need config/auth)
     if let Commands::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
@@ -249,10 +252,7 @@ async fn run(mut cli: Cli) -> Result<()> {
     }
 
     // Handle config commands (they don't need authentication)
-    if let Commands::Config(cmd) = std::mem::replace(
-        &mut cli.command,
-        Commands::Completions { shell: Shell::Bash },
-    ) {
+    if let Commands::Config(_) = &cli.command {
         // Determine output format for config commands
         let output_format = if let Some(format_str) = &cli.output {
             Some(format_str.parse()?)
@@ -260,7 +260,11 @@ async fn run(mut cli: Cli) -> Result<()> {
             None
         };
         let output_format = OutputFormat::determine(output_format);
-        return cmd.execute(output_format).await;
+        // Extract and execute the config command
+        if let Commands::Config(cmd) = cli.command {
+            return cmd.execute(output_format).await;
+        }
+        unreachable!()
     }
 
     // Determine output format

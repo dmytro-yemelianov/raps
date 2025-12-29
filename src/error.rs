@@ -124,7 +124,7 @@ impl<T> ResultExt<T> for Result<T, Error> {
             Ok(val) => val,
             Err(err) => {
                 let exit_code = ExitCode::from_error(&err);
-                eprintln!("Error: {}", err);
+                eprintln!("Error: {err}");
 
                 // Print chain of errors
                 let mut source = err.source();
