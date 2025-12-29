@@ -64,7 +64,7 @@ use output::OutputFormat;
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
-#[command(version = "3.0.0")]
+#[command(version = "3.1.0")]
 #[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {

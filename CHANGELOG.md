@@ -7,10 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.0] - 2025-12-29
+
+### Fixed
+- **Critical Bug Fix**: Auth commands (`raps auth test`, `raps auth login`) no longer panic with "unreachable code" error
+  - Root cause: `std::mem::replace` pattern incorrectly corrupted command state for non-Config commands
+  - All CLI commands now properly dispatch to their handlers
+
+### Added
+- **Command Dispatch Tests**: New test suite to catch routing/dispatch bugs
+  - Smoke tests for all major subcommands
+  - Exit code validation (panic detection)
+  - Regression tests for the auth routing bug
+  - New dev dependencies: `assert_cmd` 2.0, `predicates` 3.1
+
 ### Changed
+- **Rust 2024 Edition**: Migrated from Edition 2021 to 2024
+  - Updated minimum supported Rust version (MSRV) from 1.70 to 1.85
+  - `std::env::set_var`/`remove_var` now wrapped in `unsafe` blocks (2024 edition requirement for thread safety)
+  - Benefits: `Future`/`IntoFuture` in prelude, MSRV-aware cargo resolver, improved match ergonomics
+
+### Internal
 - Hardened MCP server tool invocation with strict argument validation, safer defaults, and clearer errors to prevent invalid API calls.
 - Cached APS client instances to reduce lock contention and repeated client construction during MCP sessions.
 - Added sensible limit clamping and output format validation to MCP tools to mitigate abusive requests and clarify supported conversions.
+
+---
 
 ## [3.0.0] - 2025-12-27
 
@@ -318,7 +340,8 @@ Configure in Cursor (`.cursor/mcp.json`):
 - JSON and CSV output formats
 - Shell completions (bash, zsh, fish, PowerShell, elvish)
 
-[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/dmytro-yemelianov/raps/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v3.1.0
 [3.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v3.0.0
 [2.1.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.1.0
 [2.0.0]: https://github.com/dmytro-yemelianov/raps/releases/tag/v2.0.0
