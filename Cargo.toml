@@ -6,7 +6,7 @@ members = [
     "raps-derivative",
     "raps-dm",
     "raps-community",
-    "raps-pro",
+    # "raps-pro",  # Commercial - kept in separate private repository
     "raps",
     "aps-tui",
 ]

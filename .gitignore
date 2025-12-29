@@ -1,0 +1,38 @@
+# Build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+*.pem
+*.key
+
+# Commercial/Private components (keep separate)
+raps-pro/  # Commercial license code - kept in separate private repository
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Test coverage
+coverage/
+*.gcda
+*.gcno
+
+# Documentation builds
+site/
+docs/_build/
