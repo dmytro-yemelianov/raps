@@ -7,14 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.0.0] - 2025-12-27
-
 ### Changed
 - Hardened MCP server tool invocation with strict argument validation, safer defaults, and clearer errors to prevent invalid API calls.
 - Cached APS client instances to reduce lock contention and repeated client construction during MCP sessions.
 - Added sensible limit clamping and output format validation to MCP tools to mitigate abusive requests and clarify supported conversions.
 
-## [3.0.0] - 2025-12-26
+## [3.0.0] - 2025-12-27
 
 ### Added
 
