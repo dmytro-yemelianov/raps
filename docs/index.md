@@ -118,6 +118,7 @@ RAPS (Rust APS CLI) is a powerful command-line tool for interacting with Autodes
 - **[Feature Overview](features.md)** - Visual feature matrix and diagrams
 - **[APS Feature Coverage](aps-coverage.md)** - Detailed APS service coverage matrix
 - **[MCP Server](commands/mcp.md)** - AI assistant integration (v4.0.0+)
+- **[Edition Strategy](edition-strategy.md)** - Core, Community, and Pro split with API coverage roadmap
 - **[Proxy Support](proxy-support.md)** - Configure proxy for corporate networks
 - **[SBOM & Build Provenance](sbom.md)** - Software Bill of Materials
 - **[Exit Codes](cli/exit-codes.md)** - CI/CD-friendly error handling
