@@ -299,6 +299,27 @@ mod tests {
     }
 
     #[test]
+    fn test_upload_config_custom() {
+        let config = UploadConfig {
+            concurrency: 10,
+            chunk_size: 10 * 1024 * 1024,
+            resume: true,
+        };
+        assert_eq!(config.concurrency, 10);
+        assert_eq!(config.chunk_size, 10 * 1024 * 1024);
+        assert!(config.resume);
+    }
+
+    #[test]
+    fn test_upload_config_clone() {
+        let config = UploadConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.concurrency, cloned.concurrency);
+        assert_eq!(config.chunk_size, cloned.chunk_size);
+        assert_eq!(config.resume, cloned.resume);
+    }
+
+    #[test]
     fn test_multipart_upload_state_remaining_parts() {
         let state = MultipartUploadState {
             bucket_key: "test".to_string(),
@@ -316,5 +337,103 @@ mod tests {
 
         let remaining = state.remaining_parts();
         assert_eq!(remaining, vec![2, 4]);
+    }
+
+    #[test]
+    fn test_multipart_upload_state_no_remaining() {
+        let state = MultipartUploadState {
+            bucket_key: "test".to_string(),
+            object_key: "file".to_string(),
+            file_path: "/tmp/file".to_string(),
+            file_size: 10 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 2,
+            completed_parts: vec![1, 2],
+            part_etags: std::collections::HashMap::new(),
+            upload_key: String::new(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_multipart_upload_state_all_remaining() {
+        let state = MultipartUploadState {
+            bucket_key: "test".to_string(),
+            object_key: "file".to_string(),
+            file_path: "/tmp/file".to_string(),
+            file_size: 15 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 3,
+            completed_parts: vec![],
+            part_etags: std::collections::HashMap::new(),
+            upload_key: String::new(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert_eq!(remaining, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_multipart_constants() {
+        assert_eq!(MultipartUploadState::DEFAULT_CHUNK_SIZE, 5 * 1024 * 1024);
+        assert_eq!(MultipartUploadState::MAX_CHUNK_SIZE, 100 * 1024 * 1024);
+        assert_eq!(MultipartUploadState::MULTIPART_THRESHOLD, 5 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_multipart_upload_state_serialization() {
+        let state = MultipartUploadState {
+            bucket_key: "test-bucket".to_string(),
+            object_key: "test-object".to_string(),
+            file_path: "/tmp/test.bin".to_string(),
+            file_size: 20 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 4,
+            completed_parts: vec![1, 2],
+            part_etags: {
+                let mut m = std::collections::HashMap::new();
+                m.insert(1, "etag1".to_string());
+                m.insert(2, "etag2".to_string());
+                m
+            },
+            upload_key: "upload-key-123".to_string(),
+            started_at: 1704067200,
+            file_mtime: 1704067000,
+        };
+
+        let json = serde_json::to_string(&state).expect("serialize");
+        assert!(json.contains("test-bucket"));
+        assert!(json.contains("test-object"));
+        assert!(json.contains("etag1"));
+
+        let deserialized: MultipartUploadState = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.bucket_key, "test-bucket");
+        assert_eq!(deserialized.total_parts, 4);
+        assert_eq!(deserialized.completed_parts, vec![1, 2]);
+    }
+
+    #[test]
+    fn test_concurrency_limits() {
+        // Test that concurrency value is within reasonable bounds
+        let config = UploadConfig::default();
+        assert!(config.concurrency >= 1, "Concurrency should be at least 1");
+        assert!(config.concurrency <= 20, "Concurrency should not exceed 20");
+    }
+
+    #[test]
+    fn test_chunk_size_bounds() {
+        // Test that chunk size is within S3 limits
+        let min_chunk = MultipartUploadState::DEFAULT_CHUNK_SIZE;
+        let max_chunk = MultipartUploadState::MAX_CHUNK_SIZE;
+
+        // S3 minimum: 5MB, maximum: 5GB (we cap at 100MB for practicality)
+        assert!(min_chunk >= 5 * 1024 * 1024, "Min chunk must be >= 5MB");
+        assert!(max_chunk <= 5 * 1024 * 1024 * 1024, "Max chunk must be <= 5GB");
     }
 }

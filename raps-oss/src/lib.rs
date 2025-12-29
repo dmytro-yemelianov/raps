@@ -14,7 +14,7 @@ pub mod types;
 
 pub use bucket::BucketClient;
 pub use object::ObjectClient;
-pub use upload::UploadClient;
+pub use upload::{UploadClient, UploadConfig, MultipartUploadState};
 pub use download::DownloadClient;
 pub use signed_url::SignedUrlClient;
 pub use types::*;
