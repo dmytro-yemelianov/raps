@@ -1,0 +1,15 @@
+[package]
+name = "raps-dm"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+description = "RAPS Data Management Service - Hubs, projects, folders, items"
+
+[dependencies]
+raps-kernel = { path = "../raps-kernel" }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }

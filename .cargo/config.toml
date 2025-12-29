@@ -1,0 +1,42 @@
+# Build Performance Configuration
+# See: specs/001-raps-ecosystem-improvements/plan.md (Section 0.5)
+#
+# IMPORTANT: Fast linkers are OPTIONAL for local development.
+# Uncomment the appropriate section if you have lld-link/mold installed.
+# CI workflows install these automatically.
+
+# Windows: Use LLD linker for faster link times
+# Requires: winget install LLVM.LLVM
+# Uncomment below if lld-link is installed:
+# [target.x86_64-pc-windows-msvc]
+# linker = "lld-link"
+
+# Linux x86_64: Use mold linker for faster link times
+# Requires: sudo apt install mold (or brew install mold)
+# Uncomment below if mold is installed:
+# [target.x86_64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Linux ARM64: Use mold linker for faster link times
+# Uncomment below if mold is installed:
+# [target.aarch64-unknown-linux-gnu]
+# linker = "clang"
+# rustflags = ["-C", "link-arg=-fuse-ld=mold"]
+
+# Build configuration
+[build]
+# Uncomment to use sccache automatically (if installed)
+# rustc-wrapper = "sccache"
+
+# Enable incremental compilation (default, but explicit)
+[profile.dev]
+incremental = true
+
+[profile.test]
+incremental = true
+
+# Environment variables for build tools
+[env]
+# Uncomment if sccache is installed
+# RUSTC_WRAPPER = "sccache"

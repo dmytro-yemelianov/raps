@@ -1,0 +1,82 @@
+[package]
+name = "raps-kernel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0"
+description = "RAPS Kernel - Minimal trusted core for APS CLI operations"
+repository = "https://github.com/dmytro-yemelianov/raps.git"
+homepage = "https://rapscli.xyz"
+documentation = "https://rapscli.xyz/docs"
+
+[lib]
+name = "raps_kernel"
+path = "src/lib.rs"
+
+[dependencies]
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Environment loading
+dotenvy = { workspace = true }
+
+# Secure token storage
+directories = { workspace = true }
+keyring = { workspace = true }
+
+# Base64 encoding
+base64 = { workspace = true }
+
+# URL parsing
+url = { workspace = true }
+urlencoding = { workspace = true }
+
+# Date/time handling
+chrono = { workspace = true }
+
+# UUID generation
+uuid = { workspace = true }
+
+# Random number generation
+rand = { workspace = true }
+
+# Regex for secret redaction
+regex = { workspace = true }
+
+# Tracing
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# OAuth browser flow
+webbrowser = { workspace = true }
+tiny_http = { workspace = true }
+
+# Terminal colors (for error formatting)
+colored = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "kernel_vs_monolith"
+harness = false
+
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
