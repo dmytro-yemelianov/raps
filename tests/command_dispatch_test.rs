@@ -26,8 +26,8 @@ fn test_auth_test_no_panic() {
         .args(["auth", "test"])
         .assert()
         // Command may fail (no auth), but should NOT panic
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that auth login command dispatches without panicking
@@ -37,8 +37,8 @@ fn test_auth_login_no_panic() {
         // Use --non-interactive to prevent blocking on prompts
         .args(["--non-interactive", "auth", "login"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that auth logout command dispatches without panicking
@@ -47,8 +47,8 @@ fn test_auth_logout_no_panic() {
     raps_cmd()
         .args(["auth", "logout"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that bucket list command dispatches without panicking
@@ -57,8 +57,8 @@ fn test_bucket_list_no_panic() {
     raps_cmd()
         .args(["bucket", "list"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that object list command dispatches without panicking
@@ -67,8 +67,8 @@ fn test_object_list_no_panic() {
     raps_cmd()
         .args(["object", "list", "test-bucket"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that translate status command dispatches without panicking
@@ -77,8 +77,8 @@ fn test_translate_status_no_panic() {
     raps_cmd()
         .args(["translate", "status", "dXJuOnRlc3Q"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that hub list command dispatches without panicking
@@ -87,8 +87,8 @@ fn test_hub_list_no_panic() {
     raps_cmd()
         .args(["hub", "list"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that webhook list command dispatches without panicking
@@ -97,8 +97,8 @@ fn test_webhook_list_no_panic() {
     raps_cmd()
         .args(["webhook", "list"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that da engine list command dispatches without panicking
@@ -107,8 +107,8 @@ fn test_da_engine_list_no_panic() {
     raps_cmd()
         .args(["da", "engine", "list"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that plugin list command dispatches without panicking
@@ -119,8 +119,8 @@ fn test_plugin_list_no_panic() {
         .assert()
         // Plugin list should succeed (no auth required)
         .success()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that config profile list command dispatches without panicking
@@ -131,8 +131,8 @@ fn test_config_profile_list_no_panic() {
         .assert()
         // Config commands should succeed (no auth required)
         .success()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that completions command dispatches without panicking
@@ -146,8 +146,8 @@ fn test_completions_bash_no_panic() {
         .assert()
         // Completions should succeed
         .success()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 /// Test that reality job list command dispatches without panicking
@@ -156,8 +156,8 @@ fn test_reality_job_list_no_panic() {
     raps_cmd()
         .args(["reality", "job", "list"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
 
 // ============== COMPREHENSIVE DISPATCH TEST ==============
@@ -195,9 +195,9 @@ fn test_all_commands_dispatch_no_panic() {
             .args(args)
             .assert()
             // Check for panic indicators
-            .stderr(predicate::str::contains("panicked").not())
-            .stderr(predicate::str::contains("unreachable").not())
-            .stderr(predicate::str::contains("RUST_BACKTRACE").not());
+            .stderr(predicates::str::contains("panicked").not())
+            .stderr(predicates::str::contains("unreachable").not())
+            .stderr(predicates::str::contains("RUST_BACKTRACE").not());
     }
 }
 
@@ -277,8 +277,8 @@ fn test_all_help_flags_work() {
             .args([subcmd, "--help"])
             .assert()
             // Help should show usage information and not panic
-            .stdout(predicate::str::contains("Usage"))
-            .stderr(predicate::str::contains("panicked").not());
+            .stdout(predicates::str::contains("Usage"))
+            .stderr(predicates::str::contains("panicked").not());
     }
 }
 
@@ -293,11 +293,11 @@ fn test_auth_not_routed_to_completions() {
         .args(["auth", "test"])
         .assert()
         // The bug caused auth commands to hit unreachable!() in Completions handler
-        .stderr(predicate::str::contains("unreachable").not())
+        .stderr(predicates::str::contains("unreachable").not())
         // Verify we're not getting completions output
-        .stdout(predicate::str::contains("_raps").not())
-        .stdout(predicate::str::contains("complete -F").not())
-        .stdout(predicate::str::contains("Register-ArgumentCompleter").not());
+        .stdout(predicates::str::contains("_raps").not())
+        .stdout(predicates::str::contains("complete -F").not())
+        .stdout(predicates::str::contains("Register-ArgumentCompleter").not());
 }
 
 /// Regression test: config commands should work and not affect other commands
@@ -313,6 +313,6 @@ fn test_config_dispatch_isolation() {
     raps_cmd()
         .args(["auth", "test"])
         .assert()
-        .stderr(predicate::str::contains("panicked").not())
-        .stderr(predicate::str::contains("unreachable").not());
+        .stderr(predicates::str::contains("panicked").not())
+        .stderr(predicates::str::contains("unreachable").not());
 }
