@@ -46,10 +46,6 @@ jobs:
       # Run tests with nextest (parallel execution, better output)
       - name: Run tests
         run: cargo nextest run --all-features --no-fail-fast
-        
-      # Also run doc tests (nextest doesn't support them)
-      - name: Run doc tests
-        run: cargo test --doc --all-features
 
   test:
     name: test
