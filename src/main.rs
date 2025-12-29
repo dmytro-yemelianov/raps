@@ -232,7 +232,7 @@ async fn main() {
     }
 }
 
-async fn run(mut cli: Cli) -> Result<()> {
+async fn run(cli: Cli) -> Result<()> {
     // Handle completions command first (doesn't need config/auth)
     if let Commands::Completions { shell } = &cli.command {
         let mut cmd = Cli::command();
@@ -249,10 +249,7 @@ async fn run(mut cli: Cli) -> Result<()> {
     }
 
     // Handle config commands (they don't need authentication)
-    if let Commands::Config(cmd) = std::mem::replace(
-        &mut cli.command,
-        Commands::Completions { shell: Shell::Bash },
-    ) {
+    if let Commands::Config(_) = &cli.command {
         // Determine output format for config commands
         let output_format = if let Some(format_str) = &cli.output {
             Some(format_str.parse()?)
@@ -260,7 +257,11 @@ async fn run(mut cli: Cli) -> Result<()> {
             None
         };
         let output_format = OutputFormat::determine(output_format);
-        return cmd.execute(output_format).await;
+        // Extract and execute the config command
+        if let Commands::Config(cmd) = cli.command {
+            return cmd.execute(output_format).await;
+        }
+        unreachable!()
     }
 
     // Determine output format
