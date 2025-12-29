@@ -72,7 +72,7 @@ tiny_http = "0.12"
 
 # Secure token storage  
 directories = "5.0"
-keyring = "2.3"
+keyring = "3.6"
 
 # Date/time handling
 chrono = { version = "0.4", features = ["serde"] }
