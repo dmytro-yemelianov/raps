@@ -14,9 +14,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   BINARY_NAME: raps
-  # Use sccache for faster builds (optional - will fall back to direct rustc if unavailable)
-  SCCACHE_GHA_ENABLED: "true"
-  # RUSTC_WRAPPER will be set conditionally by sccache-action
+  # sccache disabled for release builds - reliability over speed
+  RUSTC_WRAPPER: ""
 
 jobs:
   build:
@@ -142,10 +141,6 @@ jobs:
             ${{ matrix.asset_name }}.tar.gz
           if-no-files-found: error
           retention-days: 7
-
-      - name: Show sccache stats
-        run: sccache --show-stats
-        continue-on-error: true
 
   release:
     name: Create Release
