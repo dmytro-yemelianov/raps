@@ -15,7 +15,7 @@ env:
   CARGO_INCREMENTAL: 0
   BINARY_NAME: raps
   # Use sccache for faster builds (optional - will fall back to direct rustc if unavailable)
-  SCCACHE_GHA_ENABLED: "true"
+  SCCACHE_GHA_ENABLED: "false"
   # RUSTC_WRAPPER will be set conditionally by sccache-action
 
 jobs:
@@ -76,6 +76,7 @@ jobs:
         id: sccache
       
       - name: Set RUSTC_WRAPPER conditionally
+        shell: bash
         run: |
           # Test if sccache is actually working (not just if the step succeeded)
           if command -v sccache >/dev/null 2>&1 && sccache --version >/dev/null 2>&1; then
