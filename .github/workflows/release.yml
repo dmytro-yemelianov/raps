@@ -173,6 +173,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Verify RELEASE_TRIGGER_TOKEN present
+        run: |
+          if [ -z "${{ secrets.RELEASE_TRIGGER_TOKEN }}" ]; then
+            echo "ERROR: RELEASE_TRIGGER_TOKEN secret is not set. Create a PAT and add it as a repository secret."
+            exit 1
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
