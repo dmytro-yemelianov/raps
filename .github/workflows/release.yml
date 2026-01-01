@@ -118,11 +118,32 @@ jobs:
           lld-link --version
 
       - name: Build release binary
+        id: build
         run: cargo build --release --target ${{ matrix.target }} -p raps
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           # Use lld for faster linking on Linux
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
+        continue-on-error: true
+      
+      - name: Check sccache status and retry if needed
+        if: steps.build.outcome != 'success'
+        run: |
+          if [ "${{ env.RUSTC_WRAPPER }}" == "sccache" ]; then
+            echo "Build failed with sccache, checking if sccache is the issue..."
+            if ! sccache --show-stats >/dev/null 2>&1; then
+              echo "sccache failed during build, retrying without sccache"
+              echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+              cargo clean
+              cargo build --release --target ${{ matrix.target }} -p raps
+            else
+              echo "sccache appears to be working, build failure may be unrelated"
+              exit 1
+            fi
+          else
+            echo "Build failed without sccache, failure is unrelated"
+            exit 1
+          fi
 
       - name: Create archive (Windows)
         if: matrix.archive_ext == 'zip'
