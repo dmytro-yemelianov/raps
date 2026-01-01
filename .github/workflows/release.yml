@@ -171,6 +171,11 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Show sccache stats
+        if: env.RUSTC_WRAPPER == 'sccache'
+        run: sccache --show-stats
+        continue-on-error: true
+
   release:
     name: Create Release
     needs: build
