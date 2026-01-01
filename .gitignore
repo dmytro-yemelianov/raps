@@ -21,7 +21,10 @@ Thumbs.db
 *.key
 
 # Commercial/Private components (keep separate)
-raps-pro/  # Commercial license code - kept in separate private repository
+# Note: raps-pro is now in monorepo workspace but has Commercial license
+
+# Archive directory
+archive/
 
 # Temporary files
 *.tmp
