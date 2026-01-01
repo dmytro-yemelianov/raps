@@ -70,27 +70,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        continue-on-error: true
-        id: sccache
-      
-      - name: Set RUSTC_WRAPPER conditionally
+      # Disable sccache for release builds - they need to be reliable and don't benefit as much from caching
+      # Release builds are infrequent and clean builds, so caching overhead isn't worth the reliability risk
+      - name: Disable sccache for release builds
         run: |
-          # Test if sccache is actually working (not just if the step succeeded)
-          if command -v sccache >/dev/null 2>&1 && sccache --version >/dev/null 2>&1; then
-            # Test if sccache can actually start (check if it can query stats)
-            if sccache --show-stats >/dev/null 2>&1; then
-              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-              echo "sccache enabled and working"
-            else
-              echo "sccache installed but not working, using direct rustc"
-              echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-            fi
-          else
-            echo "sccache unavailable, using direct rustc"
-            echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-          fi
+          echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+          echo "sccache disabled for release builds (reliability over speed)"
 
       - name: Cache cargo registry and git index
         uses: Swatinem/rust-cache@v2
