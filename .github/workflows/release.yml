@@ -14,9 +14,9 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   BINARY_NAME: raps
-  # Use sccache for faster builds
+  # Use sccache for faster builds (optional - will fall back to direct rustc if unavailable)
   SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: "sccache"
+  # RUSTC_WRAPPER will be set conditionally by sccache-action
 
 jobs:
   build:
@@ -72,6 +72,18 @@ jobs:
 
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.6
+        continue-on-error: true
+        id: sccache
+      
+      - name: Set RUSTC_WRAPPER conditionally
+        run: |
+          if [ "${{ steps.sccache.outcome }}" == "success" ]; then
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            echo "sccache enabled"
+          else
+            echo "sccache unavailable, using direct rustc"
+            echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+          fi
 
       - name: Cache cargo registry and git index
         uses: Swatinem/rust-cache@v2
@@ -88,8 +100,26 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get install -y lld
 
+      - name: Setup lld-link for Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # LLVM is pre-installed on GitHub Actions Windows runners
+          $llvmPaths = @(
+            "C:\Program Files\LLVM\bin",
+            "C:\Program Files (x86)\LLVM\bin"
+          )
+          foreach ($path in $llvmPaths) {
+            if (Test-Path $path) {
+              echo "$path" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+              Write-Host "Added $path to PATH"
+              break
+            }
+          }
+          lld-link --version
+
       - name: Build release binary
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} -p raps
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           # Use lld for faster linking on Linux
@@ -123,6 +153,7 @@ jobs:
 
       - name: Show sccache stats
         run: sccache --show-stats
+        continue-on-error: true
 
   release:
     name: Create Release
