@@ -31,7 +31,7 @@ clap = { version = "4.4", features = ["derive"] }
 clap_complete = "4.4"
 
 # Interactive prompts
-dialoguer = { version = "0.11", features = ["fuzzy-select"] }
+dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 console = "0.15"
 
 # HTTP client (using rustls-tls instead of OpenSSL for better cross-compilation support)
