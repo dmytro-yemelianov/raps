@@ -1,7 +1,7 @@
 # 🌼 RAPS
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/docs/logo/output/raps-logo-512.png" alt="RAPS Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/docs/logo/output/raps-logo-512.webp" alt="RAPS Logo" width="200"/>
 
   <h3>🌼 RAPS — rapeseed</h3>
   <p><strong>R</strong>ust <strong>A</strong>utodesk <strong>P</strong>latform <strong>S</strong>ervices CLI</p>

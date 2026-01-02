@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-01-02
+
+### Fixed
+- **Version Display**: Fixed hardcoded version string in CLI
+  - Changed from hardcoded `"3.1.0"` to `env!("CARGO_PKG_VERSION")` macro
+  - Version now automatically syncs with `Cargo.toml` for all releases
+  - Ensures `raps -V` displays the correct installed version
+
+### Changed
+- Updated logo reference in README from PNG to WebP format for better performance
+
 ## [3.1.0] - 2025-12-29
 
 ### Fixed
