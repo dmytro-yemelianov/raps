@@ -15,7 +15,8 @@ env:
   CARGO_INCREMENTAL: 0
   BINARY_NAME: raps
   # Use sccache for faster builds (optional - will fall back to direct rustc if unavailable)
-  SCCACHE_GHA_ENABLED: "true"
+  SCCACHE_GHA_ENABLED: "false"
+  # RUSTC_WRAPPER will be set conditionally by sccache-action
 
 jobs:
   build:
@@ -70,15 +71,27 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Setup sccache
+<<<<<<< HEAD
+=======
+        if: env.SCCACHE_GHA_ENABLED == 'true'
+>>>>>>> master
         uses: mozilla-actions/sccache-action@v0.0.6
         continue-on-error: true
         id: sccache
       
       - name: Set RUSTC_WRAPPER conditionally
+        shell: bash
         run: |
-          if [ "${{ steps.sccache.outcome }}" == "success" ]; then
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            echo "sccache enabled"
+          # Test if sccache is actually working (not just if the step succeeded)
+          if command -v sccache >/dev/null 2>&1 && sccache --version >/dev/null 2>&1; then
+            # Test if sccache can actually start (check if it can query stats)
+            if sccache --show-stats >/dev/null 2>&1; then
+              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+              echo "sccache enabled and working"
+            else
+              echo "sccache installed but not working, using direct rustc"
+              echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
+            fi
           else
             echo "sccache unavailable, using direct rustc"
             echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
@@ -118,32 +131,11 @@ jobs:
           lld-link --version
 
       - name: Build release binary
-        id: build
         run: cargo build --release --target ${{ matrix.target }} -p raps
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           # Use lld for faster linking on Linux
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=lld"
-        continue-on-error: true
-      
-      - name: Check sccache status and retry if needed
-        if: steps.build.outcome != 'success'
-        run: |
-          if [ "${{ env.RUSTC_WRAPPER }}" == "sccache" ]; then
-            echo "Build failed with sccache, checking if sccache is the issue..."
-            if ! sccache --show-stats >/dev/null 2>&1; then
-              echo "sccache failed during build, retrying without sccache"
-              echo "RUSTC_WRAPPER=" >> $GITHUB_ENV
-              cargo clean
-              cargo build --release --target ${{ matrix.target }} -p raps
-            else
-              echo "sccache appears to be working, build failure may be unrelated"
-              exit 1
-            fi
-          else
-            echo "Build failed without sccache, failure is unrelated"
-            exit 1
-          fi
 
       - name: Create archive (Windows)
         if: matrix.archive_ext == 'zip'
@@ -172,7 +164,10 @@ jobs:
           retention-days: 7
 
       - name: Show sccache stats
-        if: env.RUSTC_WRAPPER == 'sccache'
+<<<<<<< HEAD
+=======
+        if: env.SCCACHE_GHA_ENABLED == 'true'
+>>>>>>> master
         run: sccache --show-stats
         continue-on-error: true
 
@@ -185,6 +180,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify RELEASE_TRIGGER_TOKEN present
+        run: |
+          if [ -z "${{ secrets.RELEASE_TRIGGER_TOKEN }}" ]; then
+            echo "ERROR: RELEASE_TRIGGER_TOKEN secret is not set. Create a PAT and add it as a repository secret."
+            exit 1
+          fi
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

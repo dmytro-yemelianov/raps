@@ -1,0 +1,6 @@
+{
+  "consolidated_date": "2026-01-01",
+  "name": "raps-derivative",
+  "remote": "https://github.com/dmytro-yemelianov/raps-derivative.git",
+  "note": "Consolidated into monorepo workspace"
+}

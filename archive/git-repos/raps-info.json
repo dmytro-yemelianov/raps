@@ -1,0 +1,8 @@
+{
+  "name": "raps",
+  "remote": "https://github.com/dmytro-yemelianov/raps.git",
+  "branch": "main",
+  "commit": "6c18205",
+  "consolidated_date": "2026-01-01",
+  "note": "Main CLI application - consolidated into monorepo workspace"
+}
