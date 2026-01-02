@@ -42,7 +42,6 @@ mod mcp;
 mod output;
 mod plugins;
 mod storage;
-pub mod tier;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};

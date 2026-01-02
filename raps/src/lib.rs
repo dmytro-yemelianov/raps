@@ -40,12 +40,7 @@ pub mod plugins;
 #[path = "commands/mod.rs"]
 pub mod commands;
 
-// Product tier gating
-#[path = "tier.rs"]
-pub mod tier;
-
 // Re-exports for convenience
 pub use api::AuthClient;
 pub use config::Config;
 pub use http::HttpClientConfig;
-pub use tier::Tier;

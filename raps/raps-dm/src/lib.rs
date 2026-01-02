@@ -10,9 +10,11 @@ pub mod project;
 pub mod folder;
 pub mod item;
 pub mod types;
+pub mod acc;
 
 pub use hub::HubClient;
 pub use project::ProjectClient;
 pub use folder::FolderClient;
 pub use item::ItemClient;
 pub use types::*;
+pub use acc::{AccClient, Asset, Checklist, Issue, Rfi, Submittal};

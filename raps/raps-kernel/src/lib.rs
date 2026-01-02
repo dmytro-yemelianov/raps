@@ -26,6 +26,8 @@ pub mod auth;
 pub use auth::AuthClient;
 pub mod types;
 pub mod logging;
+pub mod pipeline;
+pub mod plugin;
 
 // Re-exports for convenience
 pub use error::{RapsError, Result, ExitCode};
@@ -33,3 +35,5 @@ pub use config::{ApsEndpoints, Config, Profile};
 pub use http::{HttpClient, HttpClientConfig, RetryConfig};
 pub use storage::{TokenStorage, StorageBackend};
 pub use types::{BucketKey, ObjectKey, Urn};
+pub use pipeline::PipelineRunner;
+pub use plugin::PluginManager;

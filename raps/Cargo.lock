@@ -2102,7 +2102,7 @@ dependencies = [
 
 [[package]]
 name = "raps"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2122,12 +2122,14 @@ dependencies = [
  "keyring",
  "predicates",
  "rand",
- "raps-community",
+ "raps-da",
  "raps-derivative",
  "raps-dm",
  "raps-kernel",
  "raps-oss",
+ "raps-reality",
  "raps-ssa",
+ "raps-webhooks",
  "regex",
  "reqwest",
  "rmcp",
@@ -2148,24 +2150,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "raps-community"
-version = "3.3.3"
+name = "raps-da"
+version = "3.4.0"
 dependencies = [
  "anyhow",
- "raps-derivative",
- "raps-dm",
+ "chrono",
  "raps-kernel",
- "raps-oss",
  "reqwest",
  "serde",
  "serde_json",
- "serde_yaml",
+ "thiserror 1.0.69",
  "tokio",
+ "url",
 ]
 
 [[package]]
 name = "raps-derivative"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2179,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "raps-kernel",
@@ -2191,7 +2192,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2206,6 +2207,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror 1.0.69",
  "tiny_http",
  "tokio",
@@ -2220,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2237,26 +2239,23 @@ dependencies = [
 ]
 
 [[package]]
-name = "raps-pro"
-version = "3.3.3"
+name = "raps-reality"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "chrono",
- "directories",
- "raps-derivative",
- "raps-dm",
  "raps-kernel",
- "raps-oss",
+ "reqwest",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
  "tokio",
- "uuid",
+ "url",
 ]
 
 [[package]]
 name = "raps-ssa"
-version = "3.3.3"
+version = "3.4.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2268,6 +2267,21 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+]
+
+[[package]]
+name = "raps-webhooks"
+version = "3.4.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "url",
 ]
 
 [[package]]

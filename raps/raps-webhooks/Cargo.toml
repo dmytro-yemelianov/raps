@@ -1,0 +1,23 @@
+[package]
+name = "raps-webhooks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Webhooks support for RAPS CLI"
+
+[dependencies]
+raps-kernel = { path = "../raps-kernel" }
+
+# Workspace dependencies
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+chrono.workspace = true
