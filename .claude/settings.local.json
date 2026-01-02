@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(where:*)",
+      "Bash(scoop install:*)",
+      "Bash(vhs:*)",
+      "Bash(timeout /t 60 vhs auth-demo.tape)",
+      "Bash(tree:*)"
+    ]
+  }
+}

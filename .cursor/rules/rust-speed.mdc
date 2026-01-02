@@ -1,0 +1,80 @@
+---
+name: rust-speed
+description: Speed up Rust compilation on Windows with fast linker, caching, and targeted builds
+alwaysApply: true
+---
+
+# Overview
+
+### Windows Rust: fast feedback loop (instructions for an LLM)
+
+**Goal:** reduce `cargo test/clippy/run` from 5+ minutes to seconds by avoiding linking, speeding the linker, and cutting debug/PDB overhead.
+
+1. **Use fast commands during iteration (avoid linking):**
+
+* `cargo check`
+* `cargo check --all-targets`
+* For linting: `cargo clippy -p <crate> --no-deps`
+* Compile tests only: `cargo test --no-run`
+* Run a single test: `cargo test <test_name>` or `cargo test <module::path::test_name>`
+
+2. **Maximize parallelism:**
+
+* Use `-j N` flag (adjust N to your CPU cores): `cargo build -j 16`
+* Check core count: `(Get-CimInstance Win32_Processor).NumberOfLogicalProcessors`
+
+3. **Speed up linking on Windows (use lld-link):**
+
+* Install LLVM: `winget install LLVM.LLVM`
+* Add `.cargo/config.toml`:
+
+  ```toml
+  [target.x86_64-pc-windows-msvc]
+  linker = "lld-link"
+  ```
+
+4. **Reduce debug symbol / PDB cost (dev + test):**
+
+* In `Cargo.toml`:
+
+  ```toml
+  [profile.dev]
+  debug = 0   # or 1 as a compromise
+
+  [profile.test]
+  debug = 0
+  ```
+
+5. **Enable compilation caching (sccache):**
+
+* `cargo install sccache`
+* `setx RUSTC_WRAPPER sccache` (restart terminal)
+* Verify: `sccache --show-stats`
+
+6. **Use cargo-nextest for faster tests:**
+
+* Install: `cargo install cargo-nextest`
+* Run: `cargo nextest run` (parallel test execution, better output)
+* Single test: `cargo nextest run <test_name>`
+
+7. **Reduce build scope:**
+
+* Prefer `-p <crate>` for workspaces.
+* Avoid `--all-targets` / `--all-features` unless required.
+* Clippy fix: `cargo clippy -p <crate> --fix --allow-dirty --allow-staged`
+
+8. **Auto-rebuild on save (cargo-watch):**
+
+* Install: `cargo install cargo-watch`
+* Auto-check: `cargo watch -x check`
+* Auto-test: `cargo watch -x "nextest run"`
+
+9. **Ensure incremental compilation:**
+
+* Usually on by default, but verify: `$env:CARGO_INCREMENTAL=1`
+
+10. **Diagnose where time goes:**
+
+* Run `cargo build -vv`
+* Timing info: `cargo build --timings` (generates HTML report)
+* If it's slow at the end → linking/PDB is the issue (lld-link + debug=0 usually fixes it).

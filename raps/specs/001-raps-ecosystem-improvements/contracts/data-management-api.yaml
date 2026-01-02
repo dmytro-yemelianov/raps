@@ -1,0 +1,293 @@
+openapi: 3.0.3
+info:
+  title: RAPS Data Management API
+  version: 1.0.0
+  description: |
+    API contract for Data Management operations in RAPS.
+    Implements APS Data Management API endpoints for hub, project, folder, and item navigation.
+  
+paths:
+  /project/v1/hubs:
+    get:
+      summary: List all accessible hubs
+      operationId: dm_hubs_list
+      tags:
+        - Data Management
+      responses:
+        '200':
+          description: List of hubs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Hub'
+  
+  /project/v1/hubs/{hub_id}/projects:
+    get:
+      summary: List projects in a hub
+      operationId: dm_projects_list
+      tags:
+        - Data Management
+      parameters:
+        - name: hub_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+  
+  /data/v1/projects/{project_id}/folders/{folder_id}/contents:
+    get:
+      summary: List folder contents (items and subfolders)
+      operationId: dm_folders_list
+      tags:
+        - Data Management
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: folder_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Folder contents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [folders, items]
+                      attributes:
+                        type: object
+                      relationships:
+                        type: object
+  
+  /data/v1/projects/{project_id}/items/{item_id}/versions:
+    get:
+      summary: List all versions of an item
+      operationId: dm_versions_list
+      tags:
+        - Data Management
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of versions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Version'
+  
+  /data/v1/projects/{project_id}/items/{item_id}/tip:
+    get:
+      summary: Get tip (latest) version of an item
+      operationId: dm_tip_version
+      tags:
+        - Data Management
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: item_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tip version with derivatives URN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Version'
+  
+  /data/v1/projects/{project_id}/storage:
+    post:
+      summary: Create storage location for file upload
+      operationId: dm_storage_create
+      tags:
+        - Data Management
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - relationships
+              properties:
+                relationships:
+                  type: object
+                  properties:
+                    target:
+                      type: object
+                      properties:
+                        data:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              enum: [folders, items]
+                            id:
+                              type: string
+      responses:
+        '201':
+          description: Storage created with S3 signed URLs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Storage'
+
+components:
+  schemas:
+    Hub:
+      type: object
+      required:
+        - id
+        - type
+        - attributes
+      properties:
+        id:
+          type: string
+          example: "b.12345678-1234-1234-1234-123456789abc"
+        type:
+          type: string
+          enum: [hubs]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+            extension:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum: [hubs:autodesk.bim360:Account, hubs:autodesk.core:Hub]
+    
+    Project:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [projects]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+    
+    Version:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [versions]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+            displayName:
+              type: string
+            createTime:
+              type: string
+              format: date-time
+        relationships:
+          type: object
+          properties:
+            derivatives:
+              type: object
+              properties:
+                data:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: URN for Model Derivative API
+                      example: "urn:adsk.objects:os.object:bucket/file.dwg"
+    
+    Storage:
+      type: object
+      required:
+        - id
+        - type
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [objects]
+        attributes:
+          type: object
+          properties:
+            bucketKey:
+              type: string
+            objectId:
+              type: string
+            objectKey:
+              type: string
+            uploadKey:
+              type: string
+            uploadExpiration:
+              type: string
+            uploadFormData:
+              type: object
+              description: S3 signed POST form data for upload

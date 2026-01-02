@@ -1,0 +1,92 @@
+# Rust
+/target
+**/*.rs.bk
+*.pdb
+# Note: Cargo.lock should be committed for binaries/applications
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.rlib
+*.lib
+
+# Test coverage
+tarpaulin-report.html
+coverage/
+*.profraw
+
+# Generated files
+generated-files/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Rust-analyzer
+.rust-analyzer/
+rust-project.json
+
+# Logs
+*.log
+*.log.*
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+
+# CI/CD artifacts (if any are generated locally)
+.ci/
+ci-artifacts/
+
+# Release artifacts (should be generated, not committed)
+*.zip
+*.tar.gz
+*.tar.bz2
+checksums.txt
+
+# Editor backups
+*~
+*.bak
+*.backup
+*_backup
+
+# macOS
+.AppleDouble
+.LSOverride
+
+# Windows
+ehthumbs.db
+$RECYCLE.BIN/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+site/
+
+# Development
+.dev/

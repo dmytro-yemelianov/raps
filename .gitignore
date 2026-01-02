@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 # Rust
 /target
 **/*.rs.bk
 *.pdb
 # Note: Cargo.lock should be committed for binaries/applications
+=======
+# Build artifacts
+target/
+**/*.rs.bk
+Cargo.lock
+>>>>>>> master
 
 # IDE
 .vscode/
@@ -10,12 +17,20 @@
 *.swp
 *.swo
 *~
+<<<<<<< HEAD
 *.sublime-project
 *.sublime-workspace
+=======
+
+# OS
+.DS_Store
+Thumbs.db
+>>>>>>> master
 
 # Environment
 .env
 .env.local
+<<<<<<< HEAD
 .env.*.local
 
 # Build artifacts
@@ -90,3 +105,27 @@ site/
 
 # Development
 .dev/
+=======
+*.pem
+*.key
+
+# Commercial/Private components (keep separate)
+# Note: raps-pro is now in monorepo workspace but has Commercial license
+
+# Archive directory
+archive/
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# Test coverage
+coverage/
+*.gcda
+*.gcno
+
+# Documentation builds
+site/
+docs/_build/
+>>>>>>> master

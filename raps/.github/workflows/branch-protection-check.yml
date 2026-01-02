@@ -1,0 +1,26 @@
+name: Branch Protection Check
+
+# This workflow helps enforce branch protection by checking if commits are made via PRs
+# Note: Actual branch protection must be configured in repository settings
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  check-pr:
+    name: Verify PR Workflow
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    steps:
+      - name: Check if push is from a PR
+        run: |
+          echo "⚠️ Warning: Direct push detected to protected branch"
+          echo "This should not happen if branch protection is properly configured."
+          echo "Please ensure branch protection is enabled in repository settings."
+          echo ""
+          echo "To set up branch protection, see: docs/BRANCH_PROTECTION.md"
+          exit 1
+

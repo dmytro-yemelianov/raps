@@ -71,6 +71,10 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Setup sccache
+<<<<<<< HEAD
+=======
+        if: env.SCCACHE_GHA_ENABLED == 'true'
+>>>>>>> master
         uses: mozilla-actions/sccache-action@v0.0.6
         continue-on-error: true
         id: sccache
@@ -160,6 +164,10 @@ jobs:
           retention-days: 7
 
       - name: Show sccache stats
+<<<<<<< HEAD
+=======
+        if: env.SCCACHE_GHA_ENABLED == 'true'
+>>>>>>> master
         run: sccache --show-stats
         continue-on-error: true
 

@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: RAPS SSA (Secure Service Accounts) API
+  version: 1.0.0
+  description: |
+    API contract for Secure Service Account operations in RAPS.
+    Implements APS Authentication API v2 endpoints for SSA management.
+  
+paths:
+  /authentication/v2/service-accounts:
+    post:
+      summary: Create a new service account
+      operationId: ssa_create
+      tags:
+        - SSA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Display name for the service account
+                  example: "pipeline-bot"
+      responses:
+        '201':
+          description: Service account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceAccount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  
+  /authentication/v2/service-accounts/{id}/keys:
+    post:
+      summary: Create a new key for a service account
+      operationId: ssa_key_create
+      tags:
+        - SSA
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Service account ID
+      responses:
+        '201':
+          description: Key created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceAccountKey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+    ServiceAccount:
+      type: object
+      required:
+        - id
+        - email
+        - name
+      properties:
+        id:
+          type: string
+          description: Unique service account identifier
+          example: "urn:adsk.serviceaccount:12345678-1234-1234-1234-123456789abc"
+        email:
+          type: string
+          format: email
+          description: Service account email address
+          example: "pipeline-bot@autodesk.com"
+        name:
+          type: string
+          description: Display name
+          example: "pipeline-bot"
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+    
+    ServiceAccountKey:
+      type: object
+      required:
+        - id
+        - private_key
+      properties:
+        id:
+          type: string
+          description: Key identifier
+          example: "urn:adsk.serviceaccountkey:87654321-4321-4321-4321-cba987654321"
+        private_key:
+          type: string
+          format: binary
+          description: RSA private key in PEM format (only returned once)
+          example: "-----BEGIN RSA PRIVATE KEY-----\n..."
+        public_key:
+          type: string
+          description: Public key for JWT validation
+        created_at:
+          type: string
+          format: date-time
+  
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
