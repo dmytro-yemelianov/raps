@@ -14,6 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Changed from hardcoded `"3.1.0"` to `env!("CARGO_PKG_VERSION")` macro
   - Version now automatically syncs with `Cargo.toml` for all releases
   - Ensures `raps -V` displays the correct installed version
+- **OAuth Callback Server**: Fixed Windows compatibility and added intelligent port fallback
+  - Changed callback server binding from `0.0.0.0` to `127.0.0.1` for better Windows localhost support
+  - Added automatic port fallback system with RAPS-themed leet-speak ports:
+    - 8080 (default)
+    - 12495 (🌼 RAPS: R=12, A=4, P=9, S=5)
+    - 7495 (🌼 RAPS alternative)
+    - 9247 (🌼 RAPS variation)
+    - 3000, 5000 (common fallbacks)
+  - Helpful error messages when all ports are unavailable
+  - **Note**: Add all fallback ports to your APS app's Callback URLs at https://aps.autodesk.com/myapps
 
 ### Changed
 - Updated logo reference in README from PNG to WebP format for better performance

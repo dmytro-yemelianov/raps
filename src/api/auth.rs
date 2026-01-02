@@ -472,12 +472,75 @@ impl AuthClient {
         let state = uuid::Uuid::new_v4().to_string();
         let scope = scopes.join(" ");
 
+        // Parse port from callback URL or default to DEFAULT_CALLBACK_PORT
+        let preferred_port = match url::Url::parse(&self.config.callback_url) {
+            Ok(u) => u.port().unwrap_or(crate::config::DEFAULT_CALLBACK_PORT),
+            Err(_) => crate::config::DEFAULT_CALLBACK_PORT,
+        };
+
+        // Fallback ports (RAPS in leet speak + common alternatives)
+        // 12495 = RAPS (R=12, A=4, P=9, S=5)
+        // 7495 = RAPS alternative (7 looks like backwards R)
+        // 9247 = Another leet variation
+        let fallback_ports: Vec<u16> = vec![
+            preferred_port, // Try user's preferred port first
+            12495,          // 🌼 RAPS in leet (R=12, A=4, P=9, S=5)
+            7495,           // 🌼 RAPS alternative
+            9247,           // 🌼 RAPS variation
+            3000,           // Common dev port
+            5000,           // Common dev port
+        ];
+
+        // Try to bind to a port
+        let mut server = None;
+        let mut actual_port = preferred_port;
+        
+        for &port in &fallback_ports {
+            match Server::http(format!("127.0.0.1:{}", port)) {
+                Ok(s) => {
+                    server = Some(s);
+                    actual_port = port;
+                    break;
+                }
+                Err(e) => {
+                    if logging::debug() {
+                        println!("Port {} unavailable: {}", port, e);
+                    }
+                    continue;
+                }
+            }
+        }
+
+        let server = server.ok_or_else(|| {
+            anyhow::anyhow!(
+                "Failed to start callback server. Tried ports: {:?}. \
+                 This usually means:\n\
+                 1. All ports are in use by other applications\n\
+                 2. Windows Firewall or antivirus is blocking localhost connections\n\
+                 3. Hyper-V has reserved these ports\n\
+                 \n\
+                 Try:\n\
+                 - Close other applications using these ports\n\
+                 - Set APS_CALLBACK_URL=http://localhost:<custom-port>/callback\n\
+                 - Run 'netsh interface ipv4 show excludedportrange protocol=tcp' to check reserved ports",
+                fallback_ports
+            )
+        })?;
+
+        println!("Callback server started on port {}", actual_port);
+        if actual_port != preferred_port {
+            println!("  (Using fallback port {} - preferred port {} was unavailable)", actual_port, preferred_port);
+        }
+
+        // Build callback URL with the actual port we bound to
+        let actual_callback_url = format!("http://localhost:{}/callback", actual_port);
+
         // Build authorization URL
         let auth_url = format!(
             "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}",
             self.config.authorize_url(),
             urlencoding::encode(&self.config.client_id),
-            urlencoding::encode(&self.config.callback_url),
+            urlencoding::encode(&actual_callback_url),
             urlencoding::encode(&scope),
             urlencoding::encode(&state)
         );
@@ -485,19 +548,6 @@ impl AuthClient {
         println!("Opening browser for authentication...");
         println!("If the browser doesn't open, visit this URL:");
         println!("{}", auth_url);
-
-        // Start local server to listen for callback
-        // Parse port from callback URL or default to DEFAULT_CALLBACK_PORT
-        let port = match url::Url::parse(&self.config.callback_url) {
-            Ok(u) => u.port().unwrap_or(crate::config::DEFAULT_CALLBACK_PORT),
-            Err(_) => crate::config::DEFAULT_CALLBACK_PORT,
-        };
-
-        let server = Server::http(format!("0.0.0.0:{}", port)).map_err(|e| {
-            anyhow::anyhow!("Failed to start callback server on port {}: {}", port, e)
-        })?;
-
-        println!("Callback server started on port {}", port);
 
         // Open browser
         if webbrowser::open(&auth_url).is_err() {
