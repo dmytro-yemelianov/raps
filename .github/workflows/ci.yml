@@ -1,28 +1,13 @@
-<<<<<<< HEAD
-=======
-# CI Workflow with Build Performance Optimizations
-# See: specs/001-raps-ecosystem-improvements/plan.md (Section 0.5.3)
-#
-# Build Tooling:
-# - sccache: Compilation caching (80%+ hit rate target)
-# - cargo-nextest: Parallel test execution
-# - mold: Fast linker for Linux
-# - lld-link: Fast linker for Windows
-# - --timings: Build timing reports
-
->>>>>>> master
 name: CI
 
 on:
   push:
-<<<<<<< HEAD
     branches: [main, master]
   pull_request:
     branches: [main, master]
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 1
   # Minimum Rust version required for dependencies (darling 0.23, home 0.5.12)
   RUST_VERSION: "1.88"
   # Reduce debug info for faster builds
@@ -45,59 +30,10 @@ jobs:
     name: test-matrix
     runs-on: ${{ matrix.os }}
     strategy:
-=======
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-
-env:
-  CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
-  # sccache configuration
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: sccache
-
-jobs:
-  check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
-          
-      - name: Cargo check
-        run: cargo check --workspace --all-targets
-        
-      - name: Check kernel (performance target: <5s)
-        run: |
-          echo "::group::Kernel check timing"
-          time cargo check -p raps-kernel
-          echo "::endgroup::"
-          
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-  test:
-    name: Test (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
->>>>>>> master
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-<<<<<<< HEAD
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -162,163 +98,3 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - run: echo "All CI checks passed successfully!"
-=======
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-        
-      - name: Install mold linker (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
-          
-      - name: Run tests with nextest
-        run: cargo nextest run --workspace
-        
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-  build:
-    name: Build (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Install mold linker (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
-          
-      - name: Build with timing report
-        run: cargo build --workspace --timings --release
-        
-      - name: Upload build timing report
-        uses: actions/upload-artifact@v4
-        with:
-          name: cargo-timing-${{ matrix.os }}
-          path: target/cargo-timings/cargo-timing-*.html
-          retention-days: 7
-          
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        with:
-          components: clippy
-          
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
-          
-      - name: Run Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-        
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-  fmt:
-    name: Format
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        with:
-          components: rustfmt
-          
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-  doc:
-    name: Documentation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-          
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Build documentation
-        run: cargo doc --workspace --no-deps
-        env:
-          RUSTDOCFLAGS: -D warnings
-          
-      - name: Show sccache stats
-        run: sccache --show-stats
-
-  # Performance gate: Ensure build times meet targets
-  perf-check:
-    name: Performance Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-action@stable
-        
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.6
-        
-      - name: Install mold linker
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold
-          
-      - name: Install hyperfine
-        run: |
-          wget https://github.com/sharkdp/hyperfine/releases/download/v1.18.0/hyperfine_1.18.0_amd64.deb
-          sudo dpkg -i hyperfine_1.18.0_amd64.deb
-          
-      - name: Warm up build cache
-        run: cargo check --workspace
-        
-      - name: Benchmark kernel check time
-        run: |
-          echo "## Kernel Check Performance" >> $GITHUB_STEP_SUMMARY
-          hyperfine --warmup 1 --min-runs 3 'cargo check -p raps-kernel' --export-markdown kernel-timing.md
-          cat kernel-timing.md >> $GITHUB_STEP_SUMMARY
-          
-      - name: Benchmark workspace check time
-        run: |
-          echo "## Workspace Check Performance" >> $GITHUB_STEP_SUMMARY
-          hyperfine --warmup 1 --min-runs 3 'cargo check' --export-markdown workspace-timing.md
-          cat workspace-timing.md >> $GITHUB_STEP_SUMMARY
-          
-      - name: Show sccache stats
-        run: |
-          echo "## sccache Stats" >> $GITHUB_STEP_SUMMARY
-          sccache --show-stats >> $GITHUB_STEP_SUMMARY
->>>>>>> master
