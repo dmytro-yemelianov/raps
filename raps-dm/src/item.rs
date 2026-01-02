@@ -3,8 +3,8 @@
 
 //! Item operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Item client for Data Management operations
 pub struct ItemClient {
@@ -28,7 +28,10 @@ impl ItemClient {
     /// Get item details
     pub async fn get_item(&self, project_id: &str, item_id: &str) -> Result<Item> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/projects/{}/items/{}", self.data_url, project_id, item_id);
+        let url = format!(
+            "{}/projects/{}/items/{}",
+            self.data_url, project_id, item_id
+        );
 
         let response = self
             .http
@@ -52,10 +55,8 @@ impl ItemClient {
             });
         }
 
-        let api_response: JsonApiResponse<Item> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Item> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse item response: {}", e),
             })?;
 
@@ -92,10 +93,8 @@ impl ItemClient {
             });
         }
 
-        let api_response: JsonApiResponse<Vec<Version>> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Vec<Version>> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse versions response: {}", e),
             })?;
 
@@ -193,10 +192,8 @@ impl ItemClient {
             });
         }
 
-        let api_response: JsonApiResponse<Item> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Item> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse item response: {}", e),
             })?;
 

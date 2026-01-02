@@ -3,8 +3,8 @@
 
 //! Project operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Project client for Data Management operations
 pub struct ProjectClient {
@@ -52,10 +52,8 @@ impl ProjectClient {
             });
         }
 
-        let api_response: JsonApiResponse<Vec<Project>> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Vec<Project>> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse projects response: {}", e),
             })?;
 
@@ -65,7 +63,10 @@ impl ProjectClient {
     /// Get project details
     pub async fn get_project(&self, hub_id: &str, project_id: &str) -> Result<Project> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}/projects/{}", self.project_url, hub_id, project_id);
+        let url = format!(
+            "{}/hubs/{}/projects/{}",
+            self.project_url, hub_id, project_id
+        );
 
         let response = self
             .http
@@ -89,10 +90,8 @@ impl ProjectClient {
             });
         }
 
-        let api_response: JsonApiResponse<Project> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Project> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse project response: {}", e),
             })?;
 

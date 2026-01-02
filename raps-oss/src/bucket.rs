@@ -3,8 +3,8 @@
 
 //! Bucket operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError, BucketKey};
 use crate::types::*;
+use raps_kernel::{AuthClient, BucketKey, Config, HttpClient, RapsError, Result};
 
 /// Bucket client for OSS operations
 pub struct BucketClient {
@@ -65,12 +65,9 @@ impl BucketClient {
             });
         }
 
-        let bucket: Bucket = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse bucket response: {}", e),
-            })?;
+        let bucket: Bucket = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse bucket response: {}", e),
+        })?;
 
         Ok(bucket)
     }
@@ -127,10 +124,8 @@ impl BucketClient {
                 });
             }
 
-            let buckets_response: BucketsResponse = response
-                .json()
-                .await
-                .map_err(|e| RapsError::Internal {
+            let buckets_response: BucketsResponse =
+                response.json().await.map_err(|e| RapsError::Internal {
                     message: format!("Failed to parse buckets response: {}", e),
                 })?;
 
@@ -172,12 +167,9 @@ impl BucketClient {
             });
         }
 
-        let bucket: Bucket = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse bucket details: {}", e),
-            })?;
+        let bucket: Bucket = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse bucket details: {}", e),
+        })?;
 
         Ok(bucket)
     }

@@ -9,7 +9,7 @@ pub mod retry;
 
 pub use client::{HttpClient, HttpClientConfig};
 pub use middleware::{
-    log_request, log_response, apply_modifiers,
-    ApsHeaders, BearerAuth, RegionHeader, RequestId, RequestModifier,
+    apply_modifiers, log_request, log_response, ApsHeaders, BearerAuth, RegionHeader, RequestId,
+    RequestModifier,
 };
 pub use retry::RetryConfig;

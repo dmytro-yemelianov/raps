@@ -5,7 +5,7 @@
 //!
 //! Provides photogrammetry capabilities for creating 3D models from photos.
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Photoscene information
@@ -39,7 +39,9 @@ impl RealityCaptureClient {
         let token = self.auth.get_token().await?;
         let url = "https://developer.api.autodesk.com/photo-to-3d/v1/photoscene";
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .post(url)
             .bearer_auth(&token)
             .form(&[("scenename", name)])
@@ -71,10 +73,9 @@ impl RealityCaptureClient {
             photosceneid: String,
         }
 
-        let resp: PhotosceneResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse photoscene response: {}", e),
-            })?;
+        let resp: PhotosceneResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse photoscene response: {}", e),
+        })?;
 
         Ok(Photoscene {
             id: resp.photoscene.photosceneid,

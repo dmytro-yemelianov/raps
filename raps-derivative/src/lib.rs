@@ -5,12 +5,12 @@
 //!
 //! This crate provides Model Derivative operations: translation jobs, manifests, downloads.
 
-pub mod translate;
-pub mod manifest;
 pub mod download;
+pub mod manifest;
+pub mod translate;
 pub mod types;
 
-pub use translate::TranslateClient;
-pub use manifest::ManifestClient;
 pub use download::DownloadClient;
+pub use manifest::ManifestClient;
+pub use translate::TranslateClient;
 pub use types::*;

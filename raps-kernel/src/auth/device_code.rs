@@ -13,10 +13,10 @@
 //! 3. Poll for token while user authenticates
 //! 4. Receive tokens when user completes authentication
 
+use super::types::{DeviceCodeResponse, Scopes, TokenResponse};
 use crate::config::Config;
 use crate::error::{ExitCode, RapsError, Result};
 use crate::http::HttpClient;
-use super::types::{TokenResponse, DeviceCodeResponse, Scopes};
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -49,11 +49,15 @@ impl<'a> DeviceCodeAuth<'a> {
 
     /// Request a device code for user authentication
     pub async fn request_device_code(&self) -> Result<DeviceCodeResponse> {
-        self.request_device_code_with_scopes(&Scopes::three_legged_default()).await
+        self.request_device_code_with_scopes(&Scopes::three_legged_default())
+            .await
     }
 
     /// Request a device code with custom scopes
-    pub async fn request_device_code_with_scopes(&self, scopes: &[&str]) -> Result<DeviceCodeResponse> {
+    pub async fn request_device_code_with_scopes(
+        &self,
+        scopes: &[&str],
+    ) -> Result<DeviceCodeResponse> {
         let url = "https://developer.api.autodesk.com/authentication/v2/device/code";
         let scope_string = Scopes::join(scopes);
 
@@ -84,10 +88,8 @@ impl<'a> DeviceCodeAuth<'a> {
             });
         }
 
-        let device_code: DeviceCodeResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let device_code: DeviceCodeResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse device code response: {}", e),
             })?;
 
@@ -177,12 +179,9 @@ impl<'a> DeviceCodeAuth<'a> {
             });
         }
 
-        let token: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse token response: {}", e),
-            })?;
+        let token: TokenResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse token response: {}", e),
+        })?;
 
         Ok(token)
     }

@@ -10,11 +10,11 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
-use crate::api::AccClient;
 use crate::api::acc::{
     CreateAssetRequest, CreateChecklistRequest, CreateSubmittalRequest, UpdateAssetRequest,
     UpdateChecklistRequest, UpdateSubmittalRequest,
 };
+use crate::api::AccClient;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

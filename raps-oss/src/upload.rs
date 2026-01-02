@@ -3,9 +3,9 @@
 
 //! Upload operations with parallel multipart support
 
-use raps_kernel::{HttpClient, Result, RapsError, BucketKey, ObjectKey};
 use crate::types::*;
 use futures_util::stream::{FuturesUnordered, StreamExt};
+use raps_kernel::{BucketKey, HttpClient, ObjectKey, RapsError, Result};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -181,11 +181,15 @@ impl UploadClient {
         let mut uploads = FuturesUnordered::new();
 
         for part_num in 1..=total_parts {
-            let permit = semaphore.clone().acquire_owned().await
-                .map_err(|e| RapsError::Internal {
-                    message: format!("Failed to acquire semaphore permit: {}", e),
-                })?;
-            
+            let permit =
+                semaphore
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .map_err(|e| RapsError::Internal {
+                        message: format!("Failed to acquire semaphore permit: {}", e),
+                    })?;
+
             let part_index = (part_num - 1) as usize;
             let start = (part_num as u64 - 1) * chunk_size;
             let end = std::cmp::min(start + chunk_size, file_size);
@@ -235,7 +239,10 @@ impl UploadClient {
                         .await
                         .unwrap_or_else(|_| "Unknown error".to_string());
                     return Err(RapsError::Api {
-                        message: format!("Failed to upload part {} ({}): {}", part_num, status, error_text),
+                        message: format!(
+                            "Failed to upload part {} ({}): {}",
+                            part_num, status, error_text
+                        ),
                         status: Some(status.as_u16()),
                         source: None,
                     });
@@ -434,6 +441,9 @@ mod tests {
 
         // S3 minimum: 5MB, maximum: 5GB (we cap at 100MB for practicality)
         assert!(min_chunk >= 5 * 1024 * 1024, "Min chunk must be >= 5MB");
-        assert!(max_chunk <= 5 * 1024 * 1024 * 1024, "Max chunk must be <= 5GB");
+        assert!(
+            max_chunk <= 5 * 1024 * 1024 * 1024,
+            "Max chunk must be <= 5GB"
+        );
     }
 }

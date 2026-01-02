@@ -24,8 +24,8 @@ use crate::config::Config;
 
 // Re-export types from raps-oss for backward compatibility
 pub use raps_oss::types::{
-    RetentionPolicy, Region, CreateBucketRequest, Permission, Bucket, BucketItem,
-    ObjectInfo, ObjectItem, SignedS3DownloadResponse, SignedS3UploadResponse,
+    Bucket, BucketItem, CreateBucketRequest, ObjectInfo, ObjectItem, Permission, Region,
+    RetentionPolicy, SignedS3DownloadResponse, SignedS3UploadResponse,
 };
 
 // Re-export MultipartUploadState from raps-oss
@@ -97,8 +97,10 @@ impl OssClient {
                 retry_max_delay: std::time::Duration::from_secs(60),
                 retry_jitter: true,
             };
-            *http = Some(raps_kernel::HttpClient::new(config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?);
+            *http = Some(
+                raps_kernel::HttpClient::new(config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?,
+            );
         }
         Ok(http.as_ref().unwrap().clone())
     }
@@ -108,8 +110,10 @@ impl OssClient {
         let mut auth = self.kernel_auth.lock().await;
         if auth.is_none() {
             let kernel_config = self.get_kernel_config().await?;
-            *auth = Some(raps_kernel::AuthClient::new(kernel_config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?);
+            *auth = Some(
+                raps_kernel::AuthClient::new(kernel_config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?,
+            );
         }
         Ok(auth.as_ref().unwrap().clone())
     }
@@ -125,18 +129,16 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let bucket_client = raps_oss::BucketClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let bucket_client =
+            raps_oss::BucketClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
 
-        bucket_client.create_bucket(&bucket_key_typed, policy, region).await
+        bucket_client
+            .create_bucket(&bucket_key_typed, policy, region)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -163,15 +165,13 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let bucket_client = raps_oss::BucketClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
 
-        bucket_client.list_buckets_in_region(region).await
+        let bucket_client =
+            raps_oss::BucketClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
+
+        bucket_client
+            .list_buckets_in_region(region)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -181,18 +181,16 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let bucket_client = raps_oss::BucketClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let bucket_client =
+            raps_oss::BucketClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
 
-        bucket_client.get_bucket_details(&bucket_key_typed).await
+        bucket_client
+            .get_bucket_details(&bucket_key_typed)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -202,18 +200,16 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let bucket_client = raps_oss::BucketClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let bucket_client =
+            raps_oss::BucketClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
 
-        bucket_client.delete_bucket(&bucket_key_typed).await
+        bucket_client
+            .delete_bucket(&bucket_key_typed)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -701,18 +697,16 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let object_client = raps_oss::ObjectClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let object_client =
+            raps_oss::ObjectClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
 
-        object_client.list_objects(&bucket_key_typed).await
+        object_client
+            .list_objects(&bucket_key_typed)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -722,19 +716,17 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let object_client = raps_oss::ObjectClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let object_client =
+            raps_oss::ObjectClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
         let object_key_typed = raps_kernel::ObjectKey::new(object_key);
 
-        object_client.delete_object(&bucket_key_typed, &object_key_typed).await
+        object_client
+            .delete_object(&bucket_key_typed, &object_key_typed)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -742,11 +734,7 @@ impl OssClient {
     pub fn get_urn(&self, bucket_key: &str, object_key: &str) -> String {
         // Use the same logic as raps-oss ObjectClient::get_urn
         use base64::Engine;
-        let object_id = format!(
-            "urn:adsk.objects:os.object:{}/{}",
-            bucket_key,
-            object_key
-        );
+        let object_id = format!("urn:adsk.objects:os.object:{}/{}", bucket_key, object_key);
         base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(object_id)
     }
 
@@ -761,19 +749,17 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let signed_url_client = raps_oss::SignedUrlClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let signed_url_client =
+            raps_oss::SignedUrlClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
         let object_key_typed = raps_kernel::ObjectKey::new(object_key);
 
-        signed_url_client.get_signed_download_url(&bucket_key_typed, &object_key_typed, minutes).await
+        signed_url_client
+            .get_signed_download_url(&bucket_key_typed, &object_key_typed, minutes)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -789,19 +775,17 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let signed_url_client = raps_oss::SignedUrlClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let signed_url_client =
+            raps_oss::SignedUrlClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
         let object_key_typed = raps_kernel::ObjectKey::new(object_key);
 
-        signed_url_client.get_signed_upload_url(&bucket_key_typed, &object_key_typed, parts, minutes).await
+        signed_url_client
+            .get_signed_upload_url(&bucket_key_typed, &object_key_typed, parts, minutes)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -816,19 +800,17 @@ impl OssClient {
         let kernel_http = self.get_kernel_http().await?;
         let kernel_auth = self.get_kernel_auth().await?;
         let oss_url = kernel_config.oss_url();
-        
-        let signed_url_client = raps_oss::SignedUrlClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            oss_url,
-        );
+
+        let signed_url_client =
+            raps_oss::SignedUrlClient::new(kernel_http, kernel_auth, kernel_config, oss_url);
 
         let bucket_key_typed = raps_kernel::BucketKey::new(bucket_key)
             .map_err(|e| anyhow::anyhow!("Invalid bucket key: {}", e))?;
         let object_key_typed = raps_kernel::ObjectKey::new(object_key);
 
-        signed_url_client.complete_signed_upload(&bucket_key_typed, &object_key_typed, upload_key).await
+        signed_url_client
+            .complete_signed_upload(&bucket_key_typed, &object_key_typed, upload_key)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 }

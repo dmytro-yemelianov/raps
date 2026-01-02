@@ -53,27 +53,22 @@ impl ApsEndpoints {
                 .unwrap_or_else(|_| "https://developer.api.autodesk.com/authentication/v2".into()),
             oss: env::var("APS_OSS_URL")
                 .unwrap_or_else(|_| "https://developer.api.autodesk.com/oss/v2".into()),
-            derivative: env::var("APS_DERIVATIVE_URL").unwrap_or_else(|_| {
-                "https://developer.api.autodesk.com/modelderivative/v2".into()
-            }),
-            data_management: env::var("APS_DM_URL").unwrap_or_else(|_| {
-                "https://developer.api.autodesk.com/data/v1".into()
-            }),
-            webhooks: env::var("APS_WEBHOOKS_URL").unwrap_or_else(|_| {
-                "https://developer.api.autodesk.com/webhooks/v1".into()
-            }),
-            design_automation: env::var("APS_DA_URL").unwrap_or_else(|_| {
-                "https://developer.api.autodesk.com/da/us-east/v3".into()
-            }),
+            derivative: env::var("APS_DERIVATIVE_URL")
+                .unwrap_or_else(|_| "https://developer.api.autodesk.com/modelderivative/v2".into()),
+            data_management: env::var("APS_DM_URL")
+                .unwrap_or_else(|_| "https://developer.api.autodesk.com/data/v1".into()),
+            webhooks: env::var("APS_WEBHOOKS_URL")
+                .unwrap_or_else(|_| "https://developer.api.autodesk.com/webhooks/v1".into()),
+            design_automation: env::var("APS_DA_URL")
+                .unwrap_or_else(|_| "https://developer.api.autodesk.com/da/us-east/v3".into()),
             issues: env::var("APS_ISSUES_URL").unwrap_or_else(|_| {
                 "https://developer.api.autodesk.com/construction/issues/v1".into()
             }),
             rfi: env::var("APS_RFI_URL").unwrap_or_else(|_| {
                 "https://developer.api.autodesk.com/construction/rfis/v1".into()
             }),
-            reality_capture: env::var("APS_REALITY_URL").unwrap_or_else(|_| {
-                "https://developer.api.autodesk.com/photo-to-3d/v1".into()
-            }),
+            reality_capture: env::var("APS_REALITY_URL")
+                .unwrap_or_else(|_| "https://developer.api.autodesk.com/photo-to-3d/v1".into()),
         }
     }
 }

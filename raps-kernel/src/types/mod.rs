@@ -3,10 +3,10 @@
 
 //! Domain types for RAPS Kernel
 
-pub mod urn;
 pub mod bucket;
 pub mod object;
+pub mod urn;
 
-pub use urn::Urn;
 pub use bucket::BucketKey;
 pub use object::ObjectKey;
+pub use urn::Urn;

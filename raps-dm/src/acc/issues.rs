@@ -3,7 +3,7 @@
 
 //! ACC Issues API
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Issue information
@@ -53,7 +53,9 @@ impl IssuesClient {
             project_id
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -78,10 +80,9 @@ impl IssuesClient {
             results: Vec<Issue>,
         }
 
-        let resp: IssuesResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse issues response: {}", e),
-            })?;
+        let resp: IssuesResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse issues response: {}", e),
+        })?;
 
         Ok(resp.results)
     }
@@ -94,7 +95,9 @@ impl IssuesClient {
             project_id, issue_id
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -114,10 +117,9 @@ impl IssuesClient {
             });
         }
 
-        let issue: Issue = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse issue response: {}", e),
-            })?;
+        let issue: Issue = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse issue response: {}", e),
+        })?;
 
         Ok(issue)
     }

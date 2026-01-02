@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::api::DesignAutomationClient;
 use crate::api::design_automation::{ActivityParameter, CreateActivityRequest};
+use crate::api::DesignAutomationClient;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

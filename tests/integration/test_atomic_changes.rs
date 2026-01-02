@@ -61,10 +61,10 @@ fn test_breaking_change_detection() {
     // - CLI uses OSS service
 
     let bucket_key = BucketKey::new("test").expect("Should create valid bucket key");
-    
+
     // Verify the type is used across modules
     assert!(!bucket_key.as_str().is_empty());
-    
+
     // The actual breaking change test would require modifying source files,
     // which we don't do in unit tests. This is better suited for manual
     // testing or CI/CD validation.

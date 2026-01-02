@@ -3,8 +3,8 @@
 
 //! Signed URL operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError, BucketKey, ObjectKey};
 use crate::types::*;
+use raps_kernel::{AuthClient, BucketKey, Config, HttpClient, ObjectKey, RapsError, Result};
 
 /// Signed URL client for OSS operations
 pub struct SignedUrlClient {
@@ -71,10 +71,8 @@ impl SignedUrlClient {
             });
         }
 
-        let signed: SignedS3DownloadResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let signed: SignedS3DownloadResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse signed URL response: {}", e),
             })?;
 
@@ -136,10 +134,8 @@ impl SignedUrlClient {
             });
         }
 
-        let signed: SignedS3UploadResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let signed: SignedS3UploadResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse signed URL response: {}", e),
             })?;
 
@@ -190,12 +186,9 @@ impl SignedUrlClient {
             });
         }
 
-        let object_info: ObjectInfo = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse completion response: {}", e),
-            })?;
+        let object_info: ObjectInfo = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse completion response: {}", e),
+        })?;
 
         Ok(object_info)
     }

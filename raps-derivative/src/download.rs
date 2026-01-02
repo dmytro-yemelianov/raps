@@ -3,10 +3,10 @@
 
 //! Download operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::manifest::ManifestClient;
 use crate::types::*;
 use futures_util::StreamExt;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -43,9 +43,7 @@ impl DownloadClient {
         let encoded_derivative_urn = urlencoding::encode(derivative_urn);
         let url = format!(
             "{}/designdata/{}/manifest/{}",
-            self.base_url,
-            source_urn,
-            encoded_derivative_urn
+            self.base_url, source_urn, encoded_derivative_urn
         );
 
         let response = self

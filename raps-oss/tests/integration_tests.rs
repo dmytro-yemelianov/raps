@@ -5,20 +5,20 @@
 //!
 //! These tests verify OSS service functionality.
 
-use raps_oss::{UploadConfig, MultipartUploadState};
 use raps_kernel::{BucketKey, ObjectKey};
+use raps_oss::{MultipartUploadState, UploadConfig};
 
 #[test]
 fn test_upload_config_defaults() {
     let config = UploadConfig::default();
-    
+
     // Default chunk size should be 5MB
     assert_eq!(config.chunk_size, 5 * 1024 * 1024);
-    
+
     // Default concurrency should be reasonable
     assert!(config.concurrency >= 1);
     assert!(config.concurrency <= 16);
-    
+
     // Resume disabled by default
     assert!(!config.resume);
 }
@@ -30,7 +30,7 @@ fn test_upload_config_custom() {
         concurrency: 8,
         resume: true,
     };
-    
+
     assert_eq!(config.chunk_size, 10 * 1024 * 1024);
     assert_eq!(config.concurrency, 8);
     assert!(config.resume);

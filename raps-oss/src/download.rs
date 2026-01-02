@@ -3,7 +3,7 @@
 
 //! Download operations
 
-use raps_kernel::{HttpClient, Result, RapsError};
+use raps_kernel::{HttpClient, RapsError, Result};
 use std::path::Path;
 
 /// Download client for OSS operations

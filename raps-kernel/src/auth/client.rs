@@ -12,9 +12,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
 // Re-export types for backward compatibility
-pub use super::types::{
-    DeviceCodeResponse, Scopes, StoredToken, TokenResponse, UserInfo,
-};
+pub use super::types::{DeviceCodeResponse, Scopes, StoredToken, TokenResponse, UserInfo};
 
 /// Cached token with expiry tracking (for 2-legged)
 #[derive(Debug, Clone)]
@@ -193,16 +191,17 @@ impl AuthClient {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             return Err(RapsError::Api {
-                message: format!("Authentication failed with status {}: {}", status, error_text),
+                message: format!(
+                    "Authentication failed with status {}: {}",
+                    status, error_text
+                ),
                 status: Some(status.as_u16()),
                 source: None,
             });
         }
 
-        let token_response: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let token_response: TokenResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse token response: {}", e),
             })?;
 
@@ -245,12 +244,9 @@ impl AuthClient {
             });
         }
 
-        let user: UserInfo = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse user info: {}", e),
-            })?;
+        let user: UserInfo = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse user info: {}", e),
+        })?;
 
         Ok(user)
     }
@@ -289,18 +285,16 @@ impl AuthClient {
             let mut cache = self.cached_3leg_token.write().await;
             *cache = None;
             return Err(RapsError::Auth {
-                message: "Token refresh failed. Please login again with 'raps auth login'".to_string(),
+                message: "Token refresh failed. Please login again with 'raps auth login'"
+                    .to_string(),
                 code: crate::error::ExitCode::AuthFailure,
                 source: None,
             });
         }
 
-        let token: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse refresh response: {}", e),
-            })?;
+        let token: TokenResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse refresh response: {}", e),
+        })?;
 
         // Update stored token
         let stored = StoredToken {

@@ -72,8 +72,12 @@ impl PipelineRunner {
     /// Load a pipeline from a file
     pub fn load_from_file(&self, path: &Path) -> anyhow::Result<Pipeline> {
         let content = std::fs::read_to_string(path)?;
-        
-        if path.extension().map(|e| e == "yaml" || e == "yml").unwrap_or(false) {
+
+        if path
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false)
+        {
             Ok(serde_yaml::from_str(&content)?)
         } else {
             Ok(serde_json::from_str(&content)?)

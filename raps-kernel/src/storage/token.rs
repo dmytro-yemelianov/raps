@@ -87,8 +87,8 @@ impl TokenStorage {
             message: format!("Failed to read token file: {}", e),
             source: Some(anyhow::anyhow!("{}", e)),
         })?;
-        let token: StoredToken = serde_json::from_str(&contents)
-            .map_err(|e| RapsError::Internal {
+        let token: StoredToken =
+            serde_json::from_str(&contents).map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse token file: {}", e),
             })?;
         Ok(Some(token))
@@ -118,7 +118,10 @@ impl TokenStorage {
             Ok(e) => e,
             Err(e) => {
                 // If keyring is not available, fall back to file storage
-                tracing::warn!("Keychain not available ({}), falling back to file storage", e);
+                tracing::warn!(
+                    "Keychain not available ({}), falling back to file storage",
+                    e
+                );
                 return self.save_file(token);
             }
         };
@@ -145,8 +148,8 @@ impl TokenStorage {
 
         match entry.get_password() {
             Ok(json) => {
-                let token: StoredToken = serde_json::from_str(&json)
-                    .map_err(|e| RapsError::Internal {
+                let token: StoredToken =
+                    serde_json::from_str(&json).map_err(|e| RapsError::Internal {
                         message: format!("Failed to parse token from keychain: {}", e),
                     })?;
                 Ok(Some(token))

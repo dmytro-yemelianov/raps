@@ -85,8 +85,10 @@ impl DataManagementClient {
                 retry_max_delay: std::time::Duration::from_secs(60),
                 retry_jitter: true,
             };
-            *http = Some(raps_kernel::HttpClient::new(config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?);
+            *http = Some(
+                raps_kernel::HttpClient::new(config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?,
+            );
         }
         Ok(http.as_ref().unwrap().clone())
     }
@@ -96,8 +98,10 @@ impl DataManagementClient {
         let mut auth = self.kernel_auth.lock().await;
         if auth.is_none() {
             let kernel_config = self.get_kernel_config().await?;
-            *auth = Some(raps_kernel::AuthClient::new(kernel_config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?);
+            *auth = Some(
+                raps_kernel::AuthClient::new(kernel_config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?,
+            );
         }
         Ok(auth.as_ref().unwrap().clone())
     }
@@ -109,14 +113,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let project_url = kernel_config.project_url();
 
-        let hub_client = raps_dm::HubClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            project_url,
-        );
+        let hub_client =
+            raps_dm::HubClient::new(kernel_http, kernel_auth, kernel_config, project_url);
 
-        hub_client.list_hubs().await
+        hub_client
+            .list_hubs()
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -127,14 +129,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let project_url = kernel_config.project_url();
 
-        let hub_client = raps_dm::HubClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            project_url,
-        );
+        let hub_client =
+            raps_dm::HubClient::new(kernel_http, kernel_auth, kernel_config, project_url);
 
-        hub_client.get_hub(hub_id).await
+        hub_client
+            .get_hub(hub_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -145,14 +145,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let project_url = kernel_config.project_url();
 
-        let project_client = raps_dm::ProjectClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            project_url,
-        );
+        let project_client =
+            raps_dm::ProjectClient::new(kernel_http, kernel_auth, kernel_config, project_url);
 
-        project_client.list_projects(hub_id).await
+        project_client
+            .list_projects(hub_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -163,14 +161,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let project_url = kernel_config.project_url();
 
-        let project_client = raps_dm::ProjectClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            project_url,
-        );
+        let project_client =
+            raps_dm::ProjectClient::new(kernel_http, kernel_auth, kernel_config, project_url);
 
-        project_client.get_project(hub_id, project_id).await
+        project_client
+            .get_project(hub_id, project_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -190,7 +186,9 @@ impl DataManagementClient {
             data_url,
         );
 
-        folder_client.get_top_folders(hub_id, project_id).await
+        folder_client
+            .get_top_folders(hub_id, project_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -214,7 +212,9 @@ impl DataManagementClient {
             data_url,
         );
 
-        folder_client.list_folder_contents(project_id, folder_id).await
+        folder_client
+            .list_folder_contents(project_id, folder_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -239,7 +239,9 @@ impl DataManagementClient {
             data_url,
         );
 
-        folder_client.create_folder(project_id, parent_folder_id, folder_name).await
+        folder_client
+            .create_folder(project_id, parent_folder_id, folder_name)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -250,14 +252,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let data_url = kernel_config.data_url();
 
-        let item_client = raps_dm::ItemClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            data_url,
-        );
+        let item_client =
+            raps_dm::ItemClient::new(kernel_http, kernel_auth, kernel_config, data_url);
 
-        item_client.get_item(project_id, item_id).await
+        item_client
+            .get_item(project_id, item_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -268,14 +268,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let data_url = kernel_config.data_url();
 
-        let item_client = raps_dm::ItemClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            data_url,
-        );
+        let item_client =
+            raps_dm::ItemClient::new(kernel_http, kernel_auth, kernel_config, data_url);
 
-        item_client.get_item_versions(project_id, item_id).await
+        item_client
+            .get_item_versions(project_id, item_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -292,14 +290,12 @@ impl DataManagementClient {
         let kernel_auth = self.get_kernel_auth().await?;
         let data_url = kernel_config.data_url();
 
-        let item_client = raps_dm::ItemClient::new(
-            kernel_http,
-            kernel_auth,
-            kernel_config,
-            data_url,
-        );
+        let item_client =
+            raps_dm::ItemClient::new(kernel_http, kernel_auth, kernel_config, data_url);
 
-        item_client.create_item_from_storage(project_id, folder_id, filename, storage_id).await
+        item_client
+            .create_item_from_storage(project_id, folder_id, filename, storage_id)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 }

@@ -3,8 +3,8 @@
 
 //! Hub operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Hub client for Data Management operations
 pub struct HubClient {
@@ -52,10 +52,8 @@ impl HubClient {
             });
         }
 
-        let api_response: JsonApiResponse<Vec<Hub>> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Vec<Hub>> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse hubs response: {}", e),
             })?;
 
@@ -89,10 +87,8 @@ impl HubClient {
             });
         }
 
-        let api_response: JsonApiResponse<Hub> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Hub> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse hub response: {}", e),
             })?;
 

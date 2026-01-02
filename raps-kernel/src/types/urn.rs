@@ -63,7 +63,9 @@ mod tests {
     #[test]
     fn test_urn_from_path() {
         let urn = Urn::from_path("my-bucket", "model.dwg");
-        assert!(urn.as_str().starts_with("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6"));
+        assert!(urn
+            .as_str()
+            .starts_with("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6"));
     }
 
     #[test]

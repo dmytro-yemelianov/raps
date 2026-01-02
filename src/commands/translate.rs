@@ -14,7 +14,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use crate::api::{DerivativeClient, derivative::OutputFormat as DerivativeOutputFormat};
+use crate::api::{derivative::OutputFormat as DerivativeOutputFormat, DerivativeClient};
 use crate::interactive;
 use crate::output::OutputFormat;
 

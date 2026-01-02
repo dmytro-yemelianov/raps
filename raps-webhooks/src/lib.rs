@@ -5,7 +5,7 @@
 //!
 //! Manage webhook subscriptions for APS events.
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Webhook subscription
@@ -45,7 +45,9 @@ impl WebhooksClient {
             system, event
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -70,10 +72,9 @@ impl WebhooksClient {
             data: Vec<Webhook>,
         }
 
-        let resp: WebhooksResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse webhooks response: {}", e),
-            })?;
+        let resp: WebhooksResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse webhooks response: {}", e),
+        })?;
 
         Ok(resp.data)
     }

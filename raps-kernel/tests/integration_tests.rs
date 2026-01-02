@@ -16,7 +16,7 @@ fn test_bucket_key_validation() {
 
     // Invalid bucket keys (too short)
     assert!(BucketKey::new("ab").is_err());
-    
+
     // Invalid bucket keys (uppercase)
     assert!(BucketKey::new("MyBucket").is_err());
 }
@@ -26,10 +26,10 @@ fn test_object_key_creation() {
     // ObjectKey accepts any string (no validation)
     let key1 = ObjectKey::new("file.txt");
     assert_eq!(key1.as_str(), "file.txt");
-    
+
     let key2 = ObjectKey::new("path/to/file.dwg");
     assert_eq!(key2.as_str(), "path/to/file.dwg");
-    
+
     let key3 = ObjectKey::new("my-model.rvt");
     assert_eq!(key3.as_str(), "my-model.rvt");
 }
@@ -38,15 +38,18 @@ fn test_object_key_creation() {
 fn test_urn_encoding() {
     // Create URN from bucket/object path (this does base64 encoding)
     let urn = Urn::from_path("mybucket", "myfile.dwg");
-    
+
     // URN should be base64 encoded
     let encoded = urn.as_str();
     assert!(encoded.starts_with("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6"));
-    
+
     // Should be decodable
     let decoded = urn.decode();
     assert!(decoded.is_ok());
-    assert_eq!(decoded.expect("decode"), "urn:adsk.objects:os.object:mybucket/myfile.dwg");
+    assert_eq!(
+        decoded.expect("decode"),
+        "urn:adsk.objects:os.object:mybucket/myfile.dwg"
+    );
 }
 
 #[test]
@@ -59,7 +62,7 @@ fn test_urn_from_string() {
 #[test]
 fn test_http_client_config_defaults() {
     let config = HttpClientConfig::default();
-    
+
     assert!(config.timeout.as_secs() >= 30);
     assert!(config.connect_timeout.as_secs() >= 10);
     assert!(config.max_retries >= 3);
@@ -69,7 +72,7 @@ fn test_http_client_config_defaults() {
 fn test_http_client_creation() {
     let config = HttpClientConfig::default();
     let result = HttpClient::new(config);
-    
+
     assert!(result.is_ok());
 }
 
@@ -82,7 +85,7 @@ fn test_error_types() {
         source: None,
     };
     assert!(api_error.to_string().contains("Not found"));
-    
+
     let not_found = RapsError::NotFound {
         resource: "bucket/object".to_string(),
     };
@@ -99,7 +102,7 @@ fn test_config_struct() {
         callback_url: "http://localhost:8080/callback".to_string(),
         da_nickname: None,
     };
-    
+
     assert_eq!(config.client_id, "test_client_id");
     assert_eq!(config.client_secret, "test_client_secret");
 }
@@ -113,7 +116,7 @@ fn test_config_endpoints() {
         callback_url: "http://localhost:8080/callback".to_string(),
         da_nickname: None,
     };
-    
+
     // auth_url method should return the correct endpoint
     let auth_url = config.auth_url();
     assert!(auth_url.contains("developer.api.autodesk.com"));

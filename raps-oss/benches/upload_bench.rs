@@ -3,8 +3,8 @@
 
 //! Benchmarks for upload operations
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use raps_oss::upload::{UploadConfig, MultipartUploadState};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use raps_oss::upload::{MultipartUploadState, UploadConfig};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -30,7 +30,7 @@ fn bench_upload_config_custom(c: &mut Criterion) {
 
 fn bench_multipart_state_remaining_parts(c: &mut Criterion) {
     let mut group = c.benchmark_group("multipart_state_remaining_parts");
-    
+
     for total_parts in [5, 10, 20, 50, 100].iter() {
         let mut state = MultipartUploadState {
             bucket_key: "test-bucket".to_string(),
@@ -42,10 +42,16 @@ fn bench_multipart_state_remaining_parts(c: &mut Criterion) {
             completed_parts: (1..=*total_parts / 2).collect(), // Half completed
             part_etags: HashMap::new(),
             upload_key: "test-upload-key".to_string(),
-            started_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-            file_mtime: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
+            started_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
+            file_mtime: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs() as i64,
         };
-        
+
         group.bench_with_input(
             BenchmarkId::from_parameter(total_parts),
             total_parts,
@@ -56,7 +62,7 @@ fn bench_multipart_state_remaining_parts(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -77,16 +83,22 @@ fn bench_multipart_state_serialization(c: &mut Criterion) {
             map
         },
         upload_key: "test-upload-key".to_string(),
-        started_at: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-        file_mtime: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
+        started_at: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
+        file_mtime: SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64,
     };
-    
+
     c.bench_function("multipart_state_serialize", |b| {
         b.iter(|| {
             black_box(serde_json::to_string(&state).unwrap());
         });
     });
-    
+
     let json = serde_json::to_string(&state).unwrap();
     c.bench_function("multipart_state_deserialize", |b| {
         b.iter(|| {
@@ -97,11 +109,11 @@ fn bench_multipart_state_serialization(c: &mut Criterion) {
 
 fn bench_chunk_size_calculation(c: &mut Criterion) {
     let mut group = c.benchmark_group("chunk_size_calculation");
-    
+
     for file_size_mb in [10, 50, 100, 500, 1000].iter() {
         let file_size = *file_size_mb * 1024 * 1024;
         let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
-        
+
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}MB", file_size_mb)),
             &file_size,
@@ -113,7 +125,7 @@ fn bench_chunk_size_calculation(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 

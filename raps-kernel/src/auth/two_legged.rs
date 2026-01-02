@@ -7,10 +7,10 @@
 //! interaction is required. The client authenticates using its client ID
 //! and client secret.
 
+use super::types::{Scopes, TokenResponse};
 use crate::config::Config;
 use crate::error::{RapsError, Result};
 use crate::http::HttpClient;
-use super::types::{TokenResponse, Scopes};
 
 /// Two-legged OAuth 2.0 authentication
 ///
@@ -28,7 +28,8 @@ impl<'a> TwoLeggedAuth<'a> {
 
     /// Fetch a new access token using client credentials
     pub async fn get_token(&self) -> Result<TokenResponse> {
-        self.get_token_with_scopes(&Scopes::two_legged_default()).await
+        self.get_token_with_scopes(&Scopes::two_legged_default())
+            .await
     }
 
     /// Fetch a new access token with custom scopes
@@ -58,16 +59,17 @@ impl<'a> TwoLeggedAuth<'a> {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             return Err(RapsError::Api {
-                message: format!("Authentication failed with status {}: {}", status, error_text),
+                message: format!(
+                    "Authentication failed with status {}: {}",
+                    status, error_text
+                ),
                 status: Some(status.as_u16()),
                 source: None,
             });
         }
 
-        let token_response: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let token_response: TokenResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse token response: {}", e),
             })?;
 
@@ -83,7 +85,7 @@ mod tests {
     fn test_scope_string_generation() {
         let scopes = Scopes::two_legged_default();
         let scope_string = Scopes::join(&scopes);
-        
+
         // Should contain all default scopes
         assert!(scope_string.contains("data:read"));
         assert!(scope_string.contains("data:write"));

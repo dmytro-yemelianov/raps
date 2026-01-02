@@ -3,8 +3,8 @@
 
 //! Folder operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Folder client for Data Management operations
 pub struct FolderClient {
@@ -63,10 +63,8 @@ impl FolderClient {
             });
         }
 
-        let api_response: JsonApiResponse<Vec<Folder>> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Vec<Folder>> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse folders response: {}", e),
             })?;
 
@@ -110,10 +108,8 @@ impl FolderClient {
             });
         }
 
-        let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Vec<serde_json::Value>> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse folder contents: {}", e),
             })?;
 
@@ -178,10 +174,8 @@ impl FolderClient {
             });
         }
 
-        let api_response: JsonApiResponse<Folder> = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let api_response: JsonApiResponse<Folder> =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse folder response: {}", e),
             })?;
 

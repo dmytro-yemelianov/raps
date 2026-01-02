@@ -3,8 +3,8 @@
 
 //! Secure credential storage abstraction
 
-pub mod keyring;
 pub mod file;
+pub mod keyring;
 pub mod token;
 
 pub use keyring::StorageBackend;

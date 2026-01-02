@@ -9,7 +9,7 @@
 //! - Activities
 //! - Work Items
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Engine information
@@ -72,7 +72,9 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = "https://developer.api.autodesk.com/da/us-east/v3/engines";
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(url)
             .bearer_auth(&token)
             .send()
@@ -97,11 +99,17 @@ impl DesignAutomationClient {
             data: Vec<String>,
         }
 
-        let resp: EnginesResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse engines response: {}", e),
-            })?;
+        let resp: EnginesResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse engines response: {}", e),
+        })?;
 
-        Ok(resp.data.into_iter().map(|id| Engine { id, description: None }).collect())
+        Ok(resp
+            .data
+            .into_iter()
+            .map(|id| Engine {
+                id,
+                description: None,
+            })
+            .collect())
     }
 }

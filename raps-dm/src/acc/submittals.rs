@@ -3,7 +3,7 @@
 
 //! ACC Submittals API
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// Submittal information
@@ -49,7 +49,9 @@ impl SubmittalsClient {
             project_id
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -74,10 +76,9 @@ impl SubmittalsClient {
             results: Vec<Submittal>,
         }
 
-        let resp: SubmittalsResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse submittals response: {}", e),
-            })?;
+        let resp: SubmittalsResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse submittals response: {}", e),
+        })?;
 
         Ok(resp.results)
     }

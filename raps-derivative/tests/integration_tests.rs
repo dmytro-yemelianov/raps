@@ -25,7 +25,7 @@ fn test_output_format_svf2() {
 #[test]
 fn test_output_format_all() {
     let formats = OutputFormat::all();
-    
+
     // Should have multiple format options
     assert!(formats.len() >= 5);
     assert!(formats.iter().any(|f| matches!(f, OutputFormat::Svf2)));
@@ -35,11 +35,11 @@ fn test_output_format_all() {
 fn test_urn_for_derivative() {
     // Urn::from_path creates properly encoded URN for derivative API calls
     let urn = Urn::from_path("mybucket", "model.rvt");
-    
+
     // Should be valid for derivative API calls
     assert!(!urn.as_str().is_empty());
     assert!(urn.decode().is_ok());
-    
+
     let decoded = urn.decode().unwrap();
     assert!(decoded.contains("mybucket"));
     assert!(decoded.contains("model.rvt"));
@@ -64,7 +64,7 @@ fn test_manifest_filter_by_format() {
             }
         ]
     });
-    
+
     // Parse and filter logic would go here
     assert!(manifest_json["derivatives"].is_array());
 }

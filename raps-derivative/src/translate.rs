@@ -3,8 +3,8 @@
 
 //! Translation operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Translation client for Model Derivative operations
 pub struct TranslateClient {
@@ -81,10 +81,8 @@ impl TranslateClient {
             });
         }
 
-        let translation_response: TranslationResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
+        let translation_response: TranslationResponse =
+            response.json().await.map_err(|e| RapsError::Internal {
                 message: format!("Failed to parse translation response: {}", e),
             })?;
 

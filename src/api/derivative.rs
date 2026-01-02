@@ -93,8 +93,10 @@ impl DerivativeClient {
                 retry_max_delay: std::time::Duration::from_secs(60),
                 retry_jitter: true,
             };
-            *http = Some(raps_kernel::HttpClient::new(config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?);
+            *http = Some(
+                raps_kernel::HttpClient::new(config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel HTTP client: {}", e))?,
+            );
         }
         Ok(http.as_ref().unwrap().clone())
     }
@@ -104,8 +106,10 @@ impl DerivativeClient {
         let mut auth = self.kernel_auth.lock().await;
         if auth.is_none() {
             let kernel_config = self.get_kernel_config().await?;
-            *auth = Some(raps_kernel::AuthClient::new(kernel_config)
-                .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?);
+            *auth = Some(
+                raps_kernel::AuthClient::new(kernel_config)
+                    .map_err(|e| anyhow::anyhow!("Failed to create kernel auth client: {}", e))?,
+            );
         }
         Ok(auth.as_ref().unwrap().clone())
     }
@@ -129,7 +133,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        translate_client.translate(urn, output_format, root_filename).await
+        translate_client
+            .translate(urn, output_format, root_filename)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -147,7 +153,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        manifest_client.get_manifest(urn).await
+        manifest_client
+            .get_manifest(urn)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -165,7 +173,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        manifest_client.delete_manifest(urn).await
+        manifest_client
+            .delete_manifest(urn)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -183,7 +193,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        manifest_client.get_status(urn).await
+        manifest_client
+            .get_status(urn)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -204,7 +216,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        manifest_client.list_downloadable_derivatives(urn).await
+        manifest_client
+            .list_downloadable_derivatives(urn)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -227,7 +241,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        download_client.download_derivative(urn, guid, output_path).await
+        download_client
+            .download_derivative(urn, guid, output_path)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 
@@ -250,7 +266,9 @@ impl DerivativeClient {
             kernel_config.clone(),
             derivative_url.clone(),
         );
-        let downloadables = manifest_client.list_downloadable_derivatives(urn).await
+        let downloadables = manifest_client
+            .list_downloadable_derivatives(urn)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 
         let download_client = raps_derivative::DownloadClient::new(
@@ -260,7 +278,9 @@ impl DerivativeClient {
             derivative_url,
         );
 
-        download_client.download_derivatives_by_format(urn, format, output_dir, &downloadables).await
+        download_client
+            .download_derivatives_by_format(urn, format, output_dir, &downloadables)
+            .await
             .map_err(|e| anyhow::anyhow!("{}", e))
     }
 

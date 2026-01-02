@@ -44,19 +44,20 @@ impl Config {
         let _ = dotenvy::dotenv();
 
         let client_id = env::var("APS_CLIENT_ID").map_err(|_| RapsError::Config {
-            message: "APS_CLIENT_ID not set. Set it via environment variable or profile.".to_string(),
+            message: "APS_CLIENT_ID not set. Set it via environment variable or profile."
+                .to_string(),
         })?;
 
         let client_secret = env::var("APS_CLIENT_SECRET").map_err(|_| RapsError::Config {
-            message: "APS_CLIENT_SECRET not set. Set it via environment variable or profile.".to_string(),
+            message: "APS_CLIENT_SECRET not set. Set it via environment variable or profile."
+                .to_string(),
         })?;
 
         let base_url = env::var("APS_BASE_URL")
             .unwrap_or_else(|_| "https://developer.api.autodesk.com".to_string());
 
-        let callback_url = env::var("APS_CALLBACK_URL").unwrap_or_else(|_| {
-            format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT)
-        });
+        let callback_url = env::var("APS_CALLBACK_URL")
+            .unwrap_or_else(|_| format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT));
 
         let da_nickname = env::var("APS_DA_NICKNAME").ok();
 
@@ -132,19 +133,22 @@ mod tests {
         // Save original values
         let orig_client_id = std::env::var("APS_CLIENT_ID").ok();
         let orig_client_secret = std::env::var("APS_CLIENT_SECRET").ok();
-        
+
         // Clear env vars for this test
         unsafe {
             std::env::remove_var("APS_CLIENT_ID");
             std::env::remove_var("APS_CLIENT_SECRET");
         }
-        
+
         let result = Config::from_env();
-        assert!(result.is_err(), "Expected error when credentials are missing");
+        assert!(
+            result.is_err(),
+            "Expected error when credentials are missing"
+        );
         if let Err(RapsError::Config { message }) = result {
             assert!(message.contains("APS_CLIENT_ID") || message.contains("APS_CLIENT_SECRET"));
         }
-        
+
         // Restore original values
         unsafe {
             if let Some(val) = orig_client_id {
@@ -165,7 +169,7 @@ mod tests {
         let orig_base_url = std::env::var("APS_BASE_URL").ok();
         let orig_callback_url = std::env::var("APS_CALLBACK_URL").ok();
         let orig_da_nickname = std::env::var("APS_DA_NICKNAME").ok();
-        
+
         unsafe {
             std::env::set_var("APS_CLIENT_ID", "test_client_id");
             std::env::set_var("APS_CLIENT_SECRET", "test_client_secret");
@@ -223,7 +227,7 @@ mod tests {
         let orig_base_url = std::env::var("APS_BASE_URL").ok();
         let orig_callback_url = std::env::var("APS_CALLBACK_URL").ok();
         let orig_da_nickname = std::env::var("APS_DA_NICKNAME").ok();
-        
+
         unsafe {
             std::env::set_var("APS_CLIENT_ID", "test_client_id");
             std::env::set_var("APS_CLIENT_SECRET", "test_client_secret");

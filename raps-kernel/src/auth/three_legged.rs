@@ -12,10 +12,10 @@
 //! Note: The actual browser-based login UI is implemented in the CLI layer.
 //! This module provides the core token exchange and refresh logic.
 
+use super::types::{Scopes, StoredToken, TokenResponse};
 use crate::config::Config;
 use crate::error::{ExitCode, RapsError, Result};
 use crate::http::HttpClient;
-use super::types::{TokenResponse, StoredToken, Scopes};
 
 /// Three-legged OAuth 2.0 authentication
 ///
@@ -36,9 +36,9 @@ impl<'a> ThreeLeggedAuth<'a> {
     /// Returns the URL to redirect the user to for authentication.
     pub fn authorization_url(&self, state: Option<&str>) -> String {
         let callback = &self.config.callback_url;
-        
+
         let scopes = Scopes::join(&Scopes::three_legged_default());
-        
+
         let mut url = format!(
             "https://developer.api.autodesk.com/authentication/v2/authorize?\
             response_type=code&\
@@ -90,12 +90,9 @@ impl<'a> ThreeLeggedAuth<'a> {
             });
         }
 
-        let token: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse token response: {}", e),
-            })?;
+        let token: TokenResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse token response: {}", e),
+        })?;
 
         Ok(token)
     }
@@ -132,25 +129,25 @@ impl<'a> ThreeLeggedAuth<'a> {
             });
         }
 
-        let token: TokenResponse = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse refresh response: {}", e),
-            })?;
+        let token: TokenResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse refresh response: {}", e),
+        })?;
 
         Ok(token)
     }
 
     /// Convert a token response to a stored token
-    pub fn to_stored_token(response: &TokenResponse, original_refresh: Option<&str>) -> StoredToken {
+    pub fn to_stored_token(
+        response: &TokenResponse,
+        original_refresh: Option<&str>,
+    ) -> StoredToken {
         let mut stored = StoredToken::from_response(response);
-        
+
         // If no new refresh token was provided, keep the original
         if stored.refresh_token.is_none() {
             stored.refresh_token = original_refresh.map(String::from);
         }
-        
+
         stored
     }
 }

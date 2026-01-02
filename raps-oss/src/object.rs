@@ -3,8 +3,8 @@
 
 //! Object operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError, BucketKey, ObjectKey};
 use crate::types::*;
+use raps_kernel::{AuthClient, BucketKey, Config, HttpClient, ObjectKey, RapsError, Result};
 
 /// Object client for OSS operations
 pub struct ObjectClient {
@@ -59,15 +59,12 @@ impl ObjectClient {
                 });
             }
 
-            let response_text = response
-                .text()
-                .await
-                .map_err(|e| RapsError::Internal {
-                    message: format!("Failed to read objects response: {}", e),
-                })?;
+            let response_text = response.text().await.map_err(|e| RapsError::Internal {
+                message: format!("Failed to read objects response: {}", e),
+            })?;
 
-            let objects_response: ObjectsResponse = serde_json::from_str(&response_text)
-                .map_err(|e| RapsError::Internal {
+            let objects_response: ObjectsResponse =
+                serde_json::from_str(&response_text).map_err(|e| RapsError::Internal {
                     message: format!("Failed to parse objects response: {}", e),
                 })?;
 

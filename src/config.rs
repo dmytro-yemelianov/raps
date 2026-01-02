@@ -268,16 +268,12 @@ mod tests {
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: None,
         };
-        assert!(
-            config
-                .auth_url()
-                .starts_with("https://custom.api.example.com")
-        );
-        assert!(
-            config
-                .oss_url()
-                .starts_with("https://custom.api.example.com")
-        );
+        assert!(config
+            .auth_url()
+            .starts_with("https://custom.api.example.com"));
+        assert!(config
+            .oss_url()
+            .starts_with("https://custom.api.example.com"));
     }
 
     #[test]

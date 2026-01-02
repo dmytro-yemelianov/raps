@@ -3,7 +3,7 @@
 
 //! ACC RFI (Request for Information) API
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 use serde::{Deserialize, Serialize};
 
 /// RFI information
@@ -49,7 +49,9 @@ impl RfiClient {
             project_id
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -74,10 +76,9 @@ impl RfiClient {
             results: Vec<Rfi>,
         }
 
-        let resp: RfiResponse = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse RFI response: {}", e),
-            })?;
+        let resp: RfiResponse = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse RFI response: {}", e),
+        })?;
 
         Ok(resp.results)
     }
@@ -90,7 +91,9 @@ impl RfiClient {
             project_id, rfi_id
         );
 
-        let response = self.http.inner()
+        let response = self
+            .http
+            .inner()
             .get(&url)
             .bearer_auth(&token)
             .send()
@@ -110,10 +113,9 @@ impl RfiClient {
             });
         }
 
-        let rfi: Rfi = response.json().await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse RFI response: {}", e),
-            })?;
+        let rfi: Rfi = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse RFI response: {}", e),
+        })?;
 
         Ok(rfi)
     }

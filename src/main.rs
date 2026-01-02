@@ -45,7 +45,7 @@ mod storage;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{Shell, generate};
+use clap_complete::{generate, Shell};
 use colored::Colorize;
 use std::io;
 
@@ -66,11 +66,17 @@ use output::OutputFormat;
 /// Get the product tier name based on enabled features
 pub const fn tier_name() -> &'static str {
     #[cfg(feature = "pro")]
-    { "Pro" }
+    {
+        "Pro"
+    }
     #[cfg(all(feature = "community", not(feature = "pro")))]
-    { "Community" }
+    {
+        "Community"
+    }
     #[cfg(not(any(feature = "community", feature = "pro")))]
-    { "Core" }
+    {
+        "Core"
+    }
 }
 
 /// Version string with tier (compile-time constant)

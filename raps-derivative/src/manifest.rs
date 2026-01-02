@@ -3,8 +3,8 @@
 
 //! Manifest operations
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
 use crate::types::*;
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// Manifest client for Model Derivative operations
 pub struct ManifestClient {
@@ -52,12 +52,9 @@ impl ManifestClient {
             });
         }
 
-        let manifest: Manifest = response
-            .json()
-            .await
-            .map_err(|e| RapsError::Internal {
-                message: format!("Failed to parse manifest response: {}", e),
-            })?;
+        let manifest: Manifest = response.json().await.map_err(|e| RapsError::Internal {
+            message: format!("Failed to parse manifest response: {}", e),
+        })?;
 
         Ok(manifest)
     }

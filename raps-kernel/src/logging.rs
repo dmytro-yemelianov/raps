@@ -17,9 +17,18 @@ pub fn init_logging(level: Level) {
 /// Redact secrets from log output
 pub fn redact_secrets(text: &str) -> String {
     let patterns = vec![
-        (r"(?i)(client[_-]?secret)\s*[:=]\s*([^\s,}]+)", r"$1=***REDACTED***"),
-        (r"(?i)(access[_-]?token)\s*[:=]\s*([^\s,}]+)", r"$1=***REDACTED***"),
-        (r"(?i)(refresh[_-]?token)\s*[:=]\s*([^\s,}]+)", r"$1=***REDACTED***"),
+        (
+            r"(?i)(client[_-]?secret)\s*[:=]\s*([^\s,}]+)",
+            r"$1=***REDACTED***",
+        ),
+        (
+            r"(?i)(access[_-]?token)\s*[:=]\s*([^\s,}]+)",
+            r"$1=***REDACTED***",
+        ),
+        (
+            r"(?i)(refresh[_-]?token)\s*[:=]\s*([^\s,}]+)",
+            r"$1=***REDACTED***",
+        ),
         (r"Bearer\s+([A-Za-z0-9_-]+)", "Bearer ***REDACTED***"),
     ];
 

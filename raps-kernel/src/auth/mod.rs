@@ -18,9 +18,7 @@ pub mod types;
 pub use client::AuthClient;
 
 // Re-export types
-pub use types::{
-    DeviceCodeResponse, Scopes, StoredToken, TokenResponse, UserInfo,
-};
+pub use types::{DeviceCodeResponse, Scopes, StoredToken, TokenResponse, UserInfo};
 
 // Re-export flow implementations
 pub use device_code::{DeviceCodeAuth, DeviceCodeError};

@@ -22,7 +22,7 @@ pub use issues::*;
 pub use rfi::*;
 pub use submittals::*;
 
-use raps_kernel::{AuthClient, Config, HttpClient, Result, RapsError};
+use raps_kernel::{AuthClient, Config, HttpClient, RapsError, Result};
 
 /// ACC API client - provides access to all ACC modules
 pub struct AccClient {
@@ -39,46 +39,26 @@ impl AccClient {
 
     /// Get issues client
     pub fn issues(&self) -> IssuesClient {
-        IssuesClient::new(
-            self.http.clone(),
-            self.auth.clone(),
-            self.config.clone(),
-        )
+        IssuesClient::new(self.http.clone(), self.auth.clone(), self.config.clone())
     }
 
     /// Get RFI client
     pub fn rfis(&self) -> RfiClient {
-        RfiClient::new(
-            self.http.clone(),
-            self.auth.clone(),
-            self.config.clone(),
-        )
+        RfiClient::new(self.http.clone(), self.auth.clone(), self.config.clone())
     }
 
     /// Get assets client
     pub fn assets(&self) -> AssetsClient {
-        AssetsClient::new(
-            self.http.clone(),
-            self.auth.clone(),
-            self.config.clone(),
-        )
+        AssetsClient::new(self.http.clone(), self.auth.clone(), self.config.clone())
     }
 
     /// Get submittals client
     pub fn submittals(&self) -> SubmittalsClient {
-        SubmittalsClient::new(
-            self.http.clone(),
-            self.auth.clone(),
-            self.config.clone(),
-        )
+        SubmittalsClient::new(self.http.clone(), self.auth.clone(), self.config.clone())
     }
 
     /// Get checklists client
     pub fn checklists(&self) -> ChecklistsClient {
-        ChecklistsClient::new(
-            self.http.clone(),
-            self.auth.clone(),
-            self.config.clone(),
-        )
+        ChecklistsClient::new(self.http.clone(), self.auth.clone(), self.config.clone())
     }
 }

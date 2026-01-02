@@ -18,22 +18,22 @@
 //! The kernel is designed to be minimal (~2000 LOC), auditable, and highly testable.
 //! All higher-level features depend on this core.
 
-pub mod error;
+pub mod auth;
 pub mod config;
+pub mod error;
 pub mod http;
 pub mod storage;
-pub mod auth;
 pub use auth::AuthClient;
-pub mod types;
 pub mod logging;
 pub mod pipeline;
 pub mod plugin;
+pub mod types;
 
 // Re-exports for convenience
-pub use error::{RapsError, Result, ExitCode};
 pub use config::{ApsEndpoints, Config, Profile};
+pub use error::{ExitCode, RapsError, Result};
 pub use http::{HttpClient, HttpClientConfig, RetryConfig};
-pub use storage::{TokenStorage, StorageBackend};
-pub use types::{BucketKey, ObjectKey, Urn};
 pub use pipeline::PipelineRunner;
 pub use plugin::PluginManager;
+pub use storage::{StorageBackend, TokenStorage};
+pub use types::{BucketKey, ObjectKey, Urn};
