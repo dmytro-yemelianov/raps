@@ -136,7 +136,7 @@ impl From<reqwest::Error> for RapsError {
 impl From<serde_json::Error> for RapsError {
     fn from(err: serde_json::Error) -> Self {
         RapsError::Internal {
-            message: format!("JSON parsing error: {}", err),
+            message: format!("JSON parsing error: {err}"),
         }
     }
 }
@@ -144,7 +144,7 @@ impl From<serde_json::Error> for RapsError {
 impl From<std::io::Error> for RapsError {
     fn from(err: std::io::Error) -> Self {
         RapsError::Internal {
-            message: format!("I/O error: {}", err),
+            message: format!("I/O error: {err}"),
         }
     }
 }

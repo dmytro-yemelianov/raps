@@ -32,7 +32,7 @@ fn test_atomic_change_workflow() {
     // Verify workspace can build
     let output = Command::new("cargo")
         .args(&["check", "--workspace", "--quiet"])
-        .current_dir("../../")
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("Failed to run cargo check");
 
@@ -75,7 +75,7 @@ fn test_breaking_change_detection() {
 fn test_workspace_check_validates_all() {
     let output = Command::new("cargo")
         .args(&["check", "--workspace", "--message-format", "short"])
-        .current_dir("../../")
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
         .output()
         .expect("Failed to run cargo check");
 
@@ -91,8 +91,9 @@ fn test_workspace_check_validates_all() {
         "raps-derivative",
         "raps-dm",
         "raps-ssa",
-        "raps-community",
-        "raps-pro",
+        "raps-webhooks",
+        "raps-da",
+        "raps-reality",
         "raps",
     ];
     let crate_count = crate_names
