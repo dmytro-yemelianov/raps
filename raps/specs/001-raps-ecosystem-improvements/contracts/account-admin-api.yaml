@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: RAPS Account Admin API
+  version: 1.0.0
+  description: |
+    API contract for Account Administration operations in RAPS.
+    Implements APS Account Admin API endpoints for project, user, and company management.
+  
+paths:
+  /construction/admin/v1/accounts/{accountId}/projects:
+    get:
+      summary: List all projects in an account
+      operationId: admin_projects_list
+      tags:
+        - Account Admin
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+            description: ACC account ID
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Project'
+    
+    post:
+      summary: Create a new project
+      operationId: admin_projects_create
+      tags:
+        - Account Admin
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  example: "New Project"
+      responses:
+        '201':
+          description: Project created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+  
+  /construction/admin/v1/projects/{projectId}/users:
+    get:
+      summary: List users in a project
+      operationId: admin_users_list
+      tags:
+        - Account Admin
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+    
+    post:
+      summary: Assign user to project
+      operationId: admin_users_assign
+      tags:
+        - Account Admin
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  type: string
+                  enum: [admin, project_admin, member, viewer]
+      responses:
+        '201':
+          description: User assigned successfully
+  
+  /hq/v1/accounts/{account_id}/companies:
+    get:
+      summary: List companies in an account
+      operationId: admin_companies_list
+      tags:
+        - Account Admin
+      parameters:
+        - name: account_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Company'
+
+components:
+  schemas:
+    Project:
+      type: object
+      required:
+        - id
+        - name
+        - status
+      properties:
+        id:
+          type: string
+          example: "b.12345678-1234-1234-1234-123456789abc"
+        name:
+          type: string
+          example: "New Project"
+        status:
+          type: string
+          enum: [active, archived]
+        created_at:
+          type: string
+          format: date-time
+    
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - role
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, project_admin, member, viewer]
+        name:
+          type: string
+    
+    Company:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        domain:
+          type: string

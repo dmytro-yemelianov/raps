@@ -1,0 +1,16 @@
+# Default owners for the entire repository
+* @autodesk-platform-services/aps-cli-maintainers
+
+# Documentation
+*.md @autodesk-platform-services/aps-cli-maintainers
+README.md @autodesk-platform-services/aps-cli-maintainers
+CONTRIBUTING.md @autodesk-platform-services/aps-cli-maintainers
+SECURITY.md @autodesk-platform-services/aps-cli-maintainers
+
+# GitHub workflows
+.github/workflows/ @autodesk-platform-services/aps-cli-maintainers
+
+# Cargo configuration
+Cargo.toml @autodesk-platform-services/aps-cli-maintainers
+Cargo.lock @autodesk-platform-services/aps-cli-maintainers
+
