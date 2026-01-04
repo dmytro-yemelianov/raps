@@ -21,10 +21,10 @@ fn config_profile_list_succeeds_without_credentials() {
 }
 
 #[test]
-fn bucket_create_missing_args_returns_usage_error() {
+fn bucket_info_missing_args_returns_usage_error() {
     Command::cargo_bin("raps")
         .expect("binary should build")
-        .args(["bucket", "create"])
+        .args(["bucket", "info"])
         .assert()
         .failure()
         .code(2);

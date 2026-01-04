@@ -7,7 +7,7 @@ use tiny_http::{Response, Server, StatusCode};
 fn start_mock_server(status: u16, body: &'static str) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind localhost");
     let addr = listener.local_addr().expect("read addr");
-    let server = Server::from_tcp(listener).expect("start server");
+    let server = Server::from_listener(listener, None).expect("start server");
 
     thread::spawn(move || {
         if let Some(request) = server.incoming_requests().next() {
