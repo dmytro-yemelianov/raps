@@ -172,10 +172,10 @@ impl AuthClient {
         // Check if we have a valid cached token
         {
             let cache = self.cached_2leg_token.read().await;
-            if let Some(ref token) = *cache {
-                if token.is_valid() {
-                    return Ok(token.access_token.clone());
-                }
+            if let Some(ref token) = *cache
+                && token.is_valid()
+            {
+                return Ok(token.access_token.clone());
             }
         }
 

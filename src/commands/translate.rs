@@ -11,8 +11,8 @@ use colored::Colorize;
 use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
-use std::path::PathBuf;
 use std::time::Duration;
+use std::{path::PathBuf, str::FromStr};
 
 use crate::api::{DerivativeClient, derivative::OutputFormat as DerivativeOutputFormat};
 use crate::interactive;
@@ -883,7 +883,7 @@ fn create_preset(
     output_format: OutputFormat,
 ) -> Result<()> {
     // Validate format
-    if DerivativeOutputFormat::from_str(format).is_none() {
+    if DerivativeOutputFormat::from_str(format).is_err() {
         anyhow::bail!(
             "Invalid format '{}'. Valid formats: svf2, svf, obj, stl, step, iges, ifc, thumbnail",
             format
@@ -972,7 +972,7 @@ async fn use_preset(
         .ok_or_else(|| anyhow::anyhow!("Preset '{}' not found", preset_name))?;
 
     let format = DerivativeOutputFormat::from_str(&preset.format)
-        .ok_or_else(|| anyhow::anyhow!("Invalid format in preset: {}", preset.format))?;
+        .map_err(|_| anyhow::anyhow!("Invalid format in preset: {}", preset.format))?;
 
     if output_format.supports_colors() {
         println!(

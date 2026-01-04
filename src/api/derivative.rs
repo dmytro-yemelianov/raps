@@ -13,7 +13,7 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{path::Path, str::FromStr};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
@@ -90,18 +90,30 @@ impl OutputFormat {
             OutputFormat::Ifc => "ifc",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for OutputFormat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "svf2" => Some(Self::Svf2),
-            "svf" => Some(Self::Svf),
-            "thumbnail" => Some(Self::Thumbnail),
-            "obj" => Some(Self::Obj),
-            "stl" => Some(Self::Stl),
-            "step" => Some(Self::Step),
-            "iges" => Some(Self::Iges),
-            "ifc" => Some(Self::Ifc),
-            _ => None,
+            "svf2" => Ok(Self::Svf2),
+            "svf" => Ok(Self::Svf),
+            "thumbnail" => Ok(Self::Thumbnail),
+            "obj" => Ok(Self::Obj),
+            "stl" => Ok(Self::Stl),
+            "step" => Ok(Self::Step),
+            "iges" => Ok(Self::Iges),
+            "ifc" => Ok(Self::Ifc),
+            _ => Err(format!(
+                "Invalid output format: {}. Use: {}",
+                s,
+                Self::all()
+                    .iter()
+                    .map(OutputFormat::type_name)
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )),
         }
     }
 }

@@ -565,12 +565,12 @@ async fn get_signed_url(
                 println!("{}", url.cyan());
             }
 
-            if let Some(ref urls) = output.urls {
-                if !urls.is_empty() {
-                    println!("\n{} ({} parts):", "Download URLs".bold(), urls.len());
-                    for (i, url) in urls.iter().enumerate() {
-                        println!("  {} Part {}: {}", "•".cyan(), i + 1, url);
-                    }
+            if let Some(ref urls) = output.urls
+                && !urls.is_empty()
+            {
+                println!("\n{} ({} parts):", "Download URLs".bold(), urls.len());
+                for (i, url) in urls.iter().enumerate() {
+                    println!("  {} Part {}: {}", "•".cyan(), i + 1, url);
                 }
             }
 

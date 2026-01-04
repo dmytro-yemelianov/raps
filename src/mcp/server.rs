@@ -7,7 +7,7 @@
 
 use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
 use serde_json::{Map, Value, json};
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 use tokio::sync::RwLock;
 
 use crate::api::derivative::OutputFormat;
@@ -326,8 +326,8 @@ impl RapsServer {
         let client = self.get_derivative_client().await;
 
         let output_format = match OutputFormat::from_str(&format) {
-            Some(format) => format,
-            None => {
+            Ok(format) => format,
+            Err(_) => {
                 return "❌ Invalid output format. Supported: svf2, svf, thumbnail, obj, stl, step, iges, ifc.".to_string();
             }
         };

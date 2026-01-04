@@ -10,6 +10,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::fs;
@@ -732,12 +733,11 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
     while let Some(entry) = entries.next_entry().await? {
         let path = entry.path();
-        if path.is_file() {
-            if let Some(ext) = path.extension() {
-                if supported_extensions.contains(&ext.to_string_lossy().to_lowercase().as_str()) {
-                    files.push(path);
-                }
-            }
+        if path.is_file()
+            && let Some(ext) = path.extension()
+            && supported_extensions.contains(&ext.to_string_lossy().to_lowercase().as_str())
+        {
+            files.push(path);
         }
     }
 
@@ -901,16 +901,16 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
         let mut failed = 0;
 
         for job in &mut jobs {
-            if job.status == "submitted" {
-                if let Ok(manifest) = derivative.get_manifest(&job.urn).await {
-                    let status = manifest.status.to_lowercase();
-                    if status.contains("success") || status.contains("complete") {
-                        job.status = "complete".to_string();
-                        job.end_time = Some(Instant::now());
-                    } else if status.contains("failed") {
-                        job.status = "failed".to_string();
-                        job.end_time = Some(Instant::now());
-                    }
+            if job.status == "submitted"
+                && let Ok(manifest) = derivative.get_manifest(&job.urn).await
+            {
+                let status = manifest.status.to_lowercase();
+                if status.contains("success") || status.contains("complete") {
+                    job.status = "complete".to_string();
+                    job.end_time = Some(Instant::now());
+                } else if status.contains("failed") {
+                    job.status = "failed".to_string();
+                    job.end_time = Some(Instant::now());
                 }
             }
 

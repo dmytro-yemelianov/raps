@@ -10,6 +10,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Confirm, Input, Select};
 use serde::Serialize;
+use std::str::FromStr;
 
 use crate::api::{
     OssClient,
@@ -192,7 +193,7 @@ async fn create_bucket(
 
     // Get retention policy interactively if not provided
     let selected_policy = match policy {
-        Some(p) => RetentionPolicy::from_str(&p).ok_or_else(|| {
+        Some(p) => RetentionPolicy::from_str(&p).map_err(|_| {
             anyhow::anyhow!("Invalid policy. Use transient, temporary, or persistent.")
         })?,
         None => {

@@ -1,10 +1,9 @@
-use assert_cmd::Command;
+use assert_cmd::cargo::cargo_bin_cmd;
 use predicates::str::contains;
 
 #[test]
 fn help_command_runs() {
-    Command::cargo_bin("raps")
-        .expect("binary should build")
+    cargo_bin_cmd!("raps")
         .arg("--help")
         .assert()
         .success()
@@ -13,8 +12,7 @@ fn help_command_runs() {
 
 #[test]
 fn config_profile_list_succeeds_without_credentials() {
-    Command::cargo_bin("raps")
-        .expect("binary should build")
+    cargo_bin_cmd!("raps")
         .args(["config", "profile", "list", "--output", "json"])
         .assert()
         .success();
@@ -22,8 +20,7 @@ fn config_profile_list_succeeds_without_credentials() {
 
 #[test]
 fn bucket_info_missing_args_returns_usage_error() {
-    Command::cargo_bin("raps")
-        .expect("binary should build")
+    cargo_bin_cmd!("raps")
         .args(["bucket", "info"])
         .assert()
         .failure()

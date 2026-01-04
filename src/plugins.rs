@@ -277,14 +277,14 @@ impl PluginManager {
 
         // Add configured plugins that weren't discovered
         for (name, entry) in &self.config.plugins {
-            if !all_plugins.iter().any(|p| &p.name == name) {
-                if let Some(ref path) = entry.path {
-                    all_plugins.push(DiscoveredPlugin {
-                        name: name.clone(),
-                        path: PathBuf::from(path),
-                        enabled: entry.enabled,
-                    });
-                }
+            if !all_plugins.iter().any(|p| &p.name == name)
+                && let Some(ref path) = entry.path
+            {
+                all_plugins.push(DiscoveredPlugin {
+                    name: name.clone(),
+                    path: PathBuf::from(path),
+                    enabled: entry.enabled,
+                });
             }
         }
 
