@@ -53,10 +53,10 @@ impl OutputFormat {
         }
 
         // Check environment variable
-        if let Ok(env_format) = std::env::var("RAPS_OUTPUT_FORMAT") {
-            if let Ok(format) = OutputFormat::from_str(&env_format) {
-                return format;
-            }
+        if let Ok(env_format) = std::env::var("RAPS_OUTPUT_FORMAT")
+            && let Ok(format) = OutputFormat::from_str(&env_format)
+        {
+            return format;
         }
 
         // Auto-detect: if not a TTY, use JSON

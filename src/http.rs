@@ -110,22 +110,22 @@ fn should_retry_error(err: &anyhow::Error, attempt: u32, max_retries: u32) -> bo
 
     // Check if it's a reqwest error with status code
     if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
-        if reqwest_err.is_status() {
-            if let Some(status) = reqwest_err.status() {
-                // Retry on rate limiting (429)
-                if status.as_u16() == 429 {
-                    return true;
-                }
+        if reqwest_err.is_status()
+            && let Some(status) = reqwest_err.status()
+        {
+            // Retry on rate limiting (429)
+            if status.as_u16() == 429 {
+                return true;
+            }
 
-                // Retry on server errors (5xx)
-                if status.is_server_error() {
-                    return true;
-                }
+            // Retry on server errors (5xx)
+            if status.is_server_error() {
+                return true;
+            }
 
-                // Don't retry on client errors (4xx except 429)
-                if status.is_client_error() {
-                    return false;
-                }
+            // Don't retry on client errors (4xx except 429)
+            if status.is_client_error() {
+                return false;
             }
         }
 

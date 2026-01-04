@@ -14,6 +14,7 @@ use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 
@@ -46,13 +47,17 @@ impl RetentionPolicy {
     pub fn all() -> Vec<Self> {
         vec![Self::Transient, Self::Temporary, Self::Persistent]
     }
+}
 
-    pub fn from_str(s: &str) -> Option<Self> {
+impl FromStr for RetentionPolicy {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "transient" => Some(Self::Transient),
-            "temporary" => Some(Self::Temporary),
-            "persistent" => Some(Self::Persistent),
-            _ => None,
+            "transient" => Ok(Self::Transient),
+            "temporary" => Ok(Self::Temporary),
+            "persistent" => Ok(Self::Persistent),
+            _ => Err("Invalid retention policy".to_string()),
         }
     }
 }
@@ -1295,30 +1300,30 @@ mod tests {
     fn test_retention_policy_from_str() {
         assert_eq!(
             RetentionPolicy::from_str("transient"),
-            Some(RetentionPolicy::Transient)
+            Ok(RetentionPolicy::Transient)
         );
         assert_eq!(
             RetentionPolicy::from_str("TRANSIENT"),
-            Some(RetentionPolicy::Transient)
+            Ok(RetentionPolicy::Transient)
         );
         assert_eq!(
             RetentionPolicy::from_str("temporary"),
-            Some(RetentionPolicy::Temporary)
+            Ok(RetentionPolicy::Temporary)
         );
         assert_eq!(
             RetentionPolicy::from_str("TEMPORARY"),
-            Some(RetentionPolicy::Temporary)
+            Ok(RetentionPolicy::Temporary)
         );
         assert_eq!(
             RetentionPolicy::from_str("persistent"),
-            Some(RetentionPolicy::Persistent)
+            Ok(RetentionPolicy::Persistent)
         );
         assert_eq!(
             RetentionPolicy::from_str("PERSISTENT"),
-            Some(RetentionPolicy::Persistent)
+            Ok(RetentionPolicy::Persistent)
         );
-        assert_eq!(RetentionPolicy::from_str("invalid"), None);
-        assert_eq!(RetentionPolicy::from_str(""), None);
+        assert!(RetentionPolicy::from_str("invalid").is_err());
+        assert!(RetentionPolicy::from_str("").is_err());
     }
 
     #[test]

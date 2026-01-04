@@ -44,7 +44,7 @@ mod plugins;
 mod storage;
 
 use anyhow::Result;
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
 use std::io;
@@ -72,39 +72,39 @@ use output::OutputFormat;
 #[command(propagate_version = true)]
 struct Cli {
     /// Output format: table, json, yaml, csv, or plain (default: auto-detect)
-    #[arg(long, value_name = "FORMAT")]
+    #[arg(long, value_name = "FORMAT", global = true)]
     output: Option<String>,
 
     /// Disable colored output
-    #[arg(long)]
+    #[arg(long, global = true)]
     no_color: bool,
 
     /// Print only the result payload (useful with JSON output)
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     quiet: bool,
 
     /// Show verbose output (request summaries)
-    #[arg(short, long)]
+    #[arg(short, long, global = true)]
     verbose: bool,
 
     /// Show debug output (full trace, secrets redacted)
-    #[arg(long)]
+    #[arg(long, global = true)]
     debug: bool,
 
     /// Non-interactive mode: fail if prompts would be required
-    #[arg(long)]
+    #[arg(long, global = true)]
     non_interactive: bool,
 
     /// Auto-confirm destructive actions
-    #[arg(long)]
+    #[arg(long, global = true)]
     yes: bool,
 
     /// HTTP request timeout in seconds (default: 120)
-    #[arg(long, value_name = "SECONDS")]
+    #[arg(long, value_name = "SECONDS", global = true)]
     timeout: Option<u64>,
 
     /// Maximum concurrent operations for bulk commands (default: 5)
-    #[arg(long, value_name = "N")]
+    #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
 
     #[command(subcommand)]
@@ -205,8 +205,13 @@ async fn main() {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(e) => {
+            let exit_code = match e.kind() {
+                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => 0,
+                _ => 2,
+            };
+
             e.print().unwrap();
-            std::process::exit(2); // Invalid arguments
+            std::process::exit(exit_code);
         }
     };
 
