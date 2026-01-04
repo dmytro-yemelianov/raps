@@ -178,6 +178,12 @@ Before requesting review, ensure:
   cargo test --all-features
   ```
 
+## Logging conventions
+
+- Use `crate::logging::log_request` and `log_response` for HTTP calls that leave the process so that method/URL pairs and status codes are consistently captured across clients (auth, OSS, derivative, data management).
+- Reserve `log_verbose` for supplemental context (retry notices, cache hits, configuration choices) that is not tied to a specific HTTP exchange.
+- Keep sensitive values (tokens, secrets, signed URLs) out of logs; redact or avoid logging bodies unless they are already public.
+
 ## API Changes
 
 If you're adding new API endpoints or modifying existing ones:

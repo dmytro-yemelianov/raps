@@ -14,6 +14,7 @@ use tiny_http::{Response, Server};
 use tokio::sync::RwLock;
 
 use crate::config::Config;
+use crate::logging;
 use crate::storage::{StorageBackend, TokenStorage};
 
 /// User profile information from /userinfo endpoint
@@ -494,7 +495,7 @@ impl AuthClient {
         // Try to bind to a port
         let mut server = None;
         let mut actual_port = preferred_port;
-        
+
         for &port in &fallback_ports {
             match Server::http(format!("127.0.0.1:{}", port)) {
                 Ok(s) => {
@@ -529,7 +530,10 @@ impl AuthClient {
 
         println!("Callback server started on port {}", actual_port);
         if actual_port != preferred_port {
-            println!("  (Using fallback port {} - preferred port {} was unavailable)", actual_port, preferred_port);
+            println!(
+                "  (Using fallback port {} - preferred port {} was unavailable)",
+                actual_port, preferred_port
+            );
         }
 
         // Build callback URL with the actual port we bound to
