@@ -3,11 +3,11 @@
 
 //! Integration tests for raps-community
 //!
-//! These tests verify Community tier features.
+//! These tests verify integrated extended features.
 
-use raps_community::{AccClient, DesignAutomationClient, RealityCaptureClient, WebhooksClient};
 use raps_community::pipeline::{Pipeline, PipelineRunner, PipelineStep};
-use raps_community::plugin::{PluginManager, Alias};
+use raps_community::plugin::{Alias, PluginManager};
+use raps_community::{AccClient, DesignAutomationClient, RealityCaptureClient, WebhooksClient};
 
 #[test]
 fn test_pipeline_structure() {
@@ -29,7 +29,7 @@ fn test_pipeline_structure() {
             },
         ],
     };
-    
+
     assert_eq!(pipeline.name, "test-pipeline");
     assert_eq!(pipeline.steps.len(), 2);
     assert!(pipeline.steps[1].continue_on_error);
@@ -45,16 +45,16 @@ fn test_pipeline_runner_creation() {
 #[test]
 fn test_plugin_manager_creation() {
     let mut manager = PluginManager::new();
-    
+
     // Initially no plugins
     assert!(manager.list_plugins().is_empty());
-    
+
     // Add alias
     manager.add_alias("lb".to_string(), "bucket list".to_string());
-    
+
     // Should have one alias
     assert_eq!(manager.list_aliases().len(), 1);
-    
+
     // Resolve alias
     let resolved = manager.resolve_alias("lb");
     assert_eq!(resolved, Some("bucket list"));
@@ -63,10 +63,10 @@ fn test_plugin_manager_creation() {
 #[test]
 fn test_plugin_alias_removal() {
     let mut manager = PluginManager::new();
-    
+
     manager.add_alias("test".to_string(), "command".to_string());
     assert!(manager.resolve_alias("test").is_some());
-    
+
     let removed = manager.remove_alias("test");
     assert!(removed);
     assert!(manager.resolve_alias("test").is_none());
@@ -83,10 +83,10 @@ steps:
     args: []
     continue_on_error: false
 "#;
-    
+
     let pipeline: Result<Pipeline, _> = serde_yaml::from_str(yaml);
     assert!(pipeline.is_ok());
-    
+
     let p = pipeline.unwrap();
     assert_eq!(p.name, "test-pipeline");
     assert_eq!(p.steps.len(), 1);
@@ -106,7 +106,7 @@ fn test_pipeline_json_parsing() {
             }
         ]
     }"#;
-    
+
     let pipeline: Result<Pipeline, _> = serde_json::from_str(json);
     assert!(pipeline.is_ok());
 }

@@ -99,12 +99,13 @@
 ### Clarification Session 2025-12-30
 - **Q1**: FR numbering → Use unique prefixes (FR-MCP-*, FR-ACT-*, FR-DOC-*, FR-TUI-*, FR-PRO-*)
 - **Q2**: MCP API coverage → Expose SSA and DM tools; Account Admin via CLI only
-- **Q3**: Pro tier scope → Define now with complete user stories (US-13 to US-17) and 25 functional requirements
-- Added 5 Pro tier user stories: Analytics, Audit, Compliance, Multi-tenant, SSO
-- Added 25 Pro tier functional requirements (FR-PRO-ANA-*, FR-PRO-AUD-*, FR-PRO-CMP-*, FR-PRO-MTN-*, FR-PRO-SSO-*)
-- Added 5 Pro tier success criteria (SC-PRO-001 to SC-PRO-005)
+- **Q3**: Enterprise Features scope → Define now with complete user stories (US-13 to US-17) and 25 functional requirements
+- Added 5 Enterprise Features user stories: Analytics, Audit, Compliance, Multi-tenant, SSO
+- Added 25 Enterprise Features functional requirements (FR-PRO-ANA-*, FR-PRO-AUD-*, FR-PRO-CMP-*, FR-PRO-MTN-*, FR-PRO-SSO-*)
+- Added 5 Enterprise Features success criteria (SC-PRO-001 to SC-PRO-005)
 - Added MCP tools for SSA and Data Management (FR-MCP-005, FR-MCP-006)
 
 ## Validation Result
 
 ✅ **PASSED** - Specification is fully defined with all tiers and ready for `/speckit.plan`
+

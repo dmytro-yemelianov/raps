@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
-//! RAPS Community Tier - Extended features
+//! RAPS Extended features
 //!
-//! This crate provides Community tier features on top of the Core tier:
+//! This crate provides extended features:
 //!
 //! ## Modules
 //!

@@ -188,7 +188,7 @@ raps/ (monorepo workspace root)
 │   │   └── jwt.rs                 # JWT assertion exchange
 │   └── tests/
 │
-├── raps-community/               # Community tier features crate
+├── raps-community/               # Extended Features features crate
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs
@@ -198,7 +198,7 @@ raps/ (monorepo workspace root)
 │   │   └── reality_capture.rs    # Reality Capture API
 │   └── tests/
 │
-├── raps-pro/                     # Pro tier features crate
+├── raps-enterprise/                     # Enterprise Features features crate
 │   ├── Cargo.toml
 │   ├── src/
 │   │   ├── lib.rs
@@ -275,10 +275,10 @@ Service crates (`raps-oss`, `raps-derivative`, `raps-dm`, `raps-ssa`) follow the
 
 ### Tier Crate Design
 
-Tier crates (`raps-community`, `raps-pro`) aggregate features:
+Tier crates (`raps-community`, `raps-enterprise`) aggregate features:
 
 1. **Feature Aggregation**: Combine multiple service APIs into cohesive features
-2. **Tier Boundaries**: Community tier depends on kernel + services; Pro tier adds enterprise features
+2. **Tier Boundaries**: Extended Features depends on kernel + services; Enterprise Features adds enterprise features
 3. **Feature Flags**: Use Cargo features to enable/disable tiers
 
 ---
@@ -368,7 +368,7 @@ members = [
     "raps-dm",
     "raps-ssa",
     "raps-community",
-    "raps-pro",
+    "raps-enterprise",
     "raps",
 ]
 
@@ -580,3 +580,5 @@ The monorepo structure enables:
 3. **Phase 2 Tasks**: Generate detailed task list from user stories and requirements
 
 **Ready for**: `/speckit.tasks` command to generate implementation tasks
+
+

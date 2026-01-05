@@ -42,7 +42,6 @@ mod mcp;
 mod output;
 mod plugins;
 mod storage;
-pub mod tier;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand};
@@ -64,34 +63,14 @@ use config::Config;
 use error::ExitCode;
 use output::OutputFormat;
 
-/// Get the product tier name based on enabled features
-pub const fn tier_name() -> &'static str {
-    #[cfg(feature = "pro")]
-    { "Pro" }
-    #[cfg(all(feature = "community", not(feature = "pro")))]
-    { "Community" }
-    #[cfg(not(any(feature = "community", feature = "pro")))]
-    { "Core" }
-}
-
-/// Version string with tier (compile-time constant)
-#[cfg(feature = "pro")]
-const VERSION_WITH_TIER: &str = concat!(env!("CARGO_PKG_VERSION"), " Pro");
-#[cfg(all(feature = "community", not(feature = "pro")))]
-const VERSION_WITH_TIER: &str = concat!(env!("CARGO_PKG_VERSION"), " Community");
-#[cfg(not(any(feature = "community", feature = "pro")))]
-const VERSION_WITH_TIER: &str = concat!(env!("CARGO_PKG_VERSION"), " Core");
-
-/// Get version string with tier
-pub fn version_string() -> &'static str {
-    VERSION_WITH_TIER
-}
+/// Version string with attribution
+const VERSION_WITH_ATTRIBUTION: &str = concat!("3.6.0", " (© Dmytro Yemelianov)");
 
 /// 🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI
 #[derive(Parser)]
 #[command(name = "raps")]
 #[command(author = "Dmytro Yemelianov <https://rapscli.xyz>")]
-#[command(version = VERSION_WITH_TIER)]
+#[command(version = VERSION_WITH_ATTRIBUTION)]
 #[command(about = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
 struct Cli {

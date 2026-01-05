@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-01-05
+
+### Added
+- **Unified Open Source Version**: Consolidated all product tiers into a single, comprehensive Apache-2.0 version.
+- **Enterprise Features Unlocked**: Integrated `raps-enterprise` (formerly `raps-pro`) as a core component, making advanced features like Audit, Compliance, and Analytics available to everyone.
+- **Microkernel Architecture Finalization**: Completed the transition to a microkernel design with unified dependency tracking.
+
+### Changed
+- **Renamed Component**: `raps-pro` crate renamed to `raps-enterprise` to better reflect its role in the unified version.
+- **Simplified Branding**: Removed "Community" and "Pro" terminology across all documentation, tests, and metadata.
+- **Updated Attribution**: Version strings now include prominent author attribution: `3.6.0 (© Dmytro Yemelianov)`.
+
+### Removed
+- **Tier Gating**: Removed the `Tier` enum and all related gating logic from the codebase.
+- **Commercial Licensing**: All proprietary license checks and commercial notices have been eliminated.
+
 ## [3.3.0] - 2026-01-01
 
 ### Added
@@ -47,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `raps-derivative` - Model Derivative API client
   - `raps-dm` - Data Management API client
   - `raps-ssa` - Secure Service Accounts client
-  - `raps-community` - Community tier features (ACC, DA, Reality, Webhooks, etc.)
+  - `raps-community` - Extended features (ACC, DA, Reality, Webhooks, etc.)
   - `raps-pro` - Enterprise tier features (stubs)
 
 #### Tiered Product Strategy

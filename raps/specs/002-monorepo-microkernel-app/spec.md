@@ -29,8 +29,8 @@ raps/ (monorepo workspace)
 ├── raps-derivative/      # Model Derivative Service crate
 ├── raps-dm/              # Data Management Service crate
 ├── raps-ssa/             # Secure Service Accounts crate
-├── raps-community/       # Community tier features crate
-├── raps-pro/             # Pro tier features crate
+├── raps-community/       # Extended Features features crate
+├── raps-enterprise/             # Enterprise Features features crate
 └── raps/                 # CLI binary crate (depends on all above)
 ```
 
@@ -141,7 +141,7 @@ As a developer, I need all crates in the workspace to use identical dependency v
 - **FR-009**: `raps-kernel` crate MUST contain only: Auth, HTTP client, Config, Storage, Types, Error, Logging
 - **FR-010**: `raps-kernel` MUST have zero dependencies on service crates (`raps-oss`, `raps-derivative`, `raps-dm`, `raps-ssa`)
 - **FR-011**: Service crates (`raps-oss`, `raps-derivative`, `raps-dm`, `raps-ssa`) MUST depend only on `raps-kernel`, not on each other
-- **FR-012**: `raps-community` and `raps-pro` crates MUST depend only on kernel and service crates, not on each other
+- **FR-012**: `raps-community` and `raps-enterprise` crates MUST depend only on kernel and service crates, not on each other
 - **FR-013**: `raps` CLI binary crate MUST depend on kernel, service crates, and tier crates as needed
 - **FR-014**: Kernel MUST compile with `#![deny(warnings)]`, `#![deny(unsafe_code)]`, `#![deny(clippy::unwrap_used)]`
 - **FR-015**: Kernel LOC MUST be <3000 lines (excluding tests); target ~2000 LOC
@@ -182,7 +182,7 @@ As a developer, I need all crates in the workspace to use identical dependency v
 - **Workspace**: The root `raps` repository containing all crates in a single Rust workspace
 - **Kernel Crate** (`raps-kernel`): Minimal trusted foundation providing core services (auth, HTTP, config, storage, types, error, logging)
 - **Service Crate**: Independent module implementing a specific APS API (OSS, Derivative, DM, SSA)
-- **Tier Crate**: Feature collection implementing tier-specific functionality (`raps-community`, `raps-pro`)
+- **Tier Crate**: Feature collection implementing tier-specific functionality (`raps-community`, `raps-enterprise`)
 - **CLI Binary Crate** (`raps`): Main application binary that depends on kernel, services, and tiers
 - **Workspace Dependencies**: Shared dependencies defined in workspace `Cargo.toml` and referenced by all crates
 
@@ -227,7 +227,7 @@ As a developer, I need all crates in the workspace to use identical dependency v
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
 ┌───────▼────────┐   ┌────────▼────────┐   ┌────────▼────────┐
-│ raps-community │   │   raps-pro      │   │  (other tiers)  │
+│ raps-community │   │   raps-enterprise      │   │  (other tiers)  │
 │ (Community)    │   │   (Enterprise)   │   │                 │
 └───────┬────────┘   └────────┬────────┘   └────────┬────────┘
         │                     │                     │
@@ -273,7 +273,7 @@ members = [
     "raps-dm",
     "raps-ssa",
     "raps-community",
-    "raps-pro",
+    "raps-enterprise",
     "raps",
 ]
 
@@ -325,3 +325,5 @@ serde.workspace = true
 - Constitution: `.specify/memory/constitution.md` (Principle II, VII, Monorepo Architecture section)
 - Rust Workspace Documentation: https://doc.rust-lang.org/cargo/reference/workspaces.html
 - Microkernel Architecture: `specs/001-raps-ecosystem-improvements/spec.md`
+
+

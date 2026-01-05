@@ -8,7 +8,7 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 rust-version.workspace = true
-description = "RAPS Community Tier - Extended features (ACC, DA, Reality, etc.)"
+description = "RAPS Extended Features (ACC, DA, Reality, etc.)"
 
 [dependencies]
 raps-kernel = { path = "../raps-kernel" }

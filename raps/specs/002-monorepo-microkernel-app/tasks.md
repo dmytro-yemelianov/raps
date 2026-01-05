@@ -16,7 +16,7 @@
 ## Path Conventions
 
 - **Monorepo workspace**: `raps/` (repository root)
-- **Crates**: `raps-kernel/`, `raps-oss/`, `raps-derivative/`, `raps-dm/`, `raps-ssa/`, `raps-community/`, `raps-pro/`, `raps/`
+- **Crates**: `raps-kernel/`, `raps-oss/`, `raps-derivative/`, `raps-dm/`, `raps-ssa/`, `raps-community/`, `raps-enterprise/`, `raps/`
 - **Tests**: `tests/` directory in each crate
 
 ---
@@ -28,7 +28,7 @@
 - [ ] T001 Create workspace root directory structure in `raps/`
 - [ ] T002 [P] Create `raps/Cargo.toml` with workspace configuration (members, dependencies, profiles)
 - [ ] T003 [P] Create `.cargo/config.toml` with linker configuration (lld-link for Windows, mold for Linux)
-- [ ] T004 [P] Create directory structure for all 8 crates: `raps-kernel/`, `raps-oss/`, `raps-derivative/`, `raps-dm/`, `raps-ssa/`, `raps-community/`, `raps-pro/`, `raps/`
+- [ ] T004 [P] Create directory structure for all 8 crates: `raps-kernel/`, `raps-oss/`, `raps-derivative/`, `raps-dm/`, `raps-ssa/`, `raps-community/`, `raps-enterprise/`, `raps/`
 - [ ] T005 [P] Initialize git repository in `raps/` if not already initialized
 - [ ] T006 [P] Create `.gitignore` with Rust patterns (target/, Cargo.lock, etc.)
 - [ ] T007 [P] Create `README.md` documenting monorepo structure and workspace commands
@@ -80,9 +80,9 @@
 ### Tier Crate Foundations
 
 - [ ] T033 [P] Create `raps-community/Cargo.toml` with dependencies on kernel and service crates
-- [ ] T034 [P] Create `raps-pro/Cargo.toml` with dependencies on kernel and service crates
+- [ ] T034 [P] Create `raps-enterprise/Cargo.toml` with dependencies on kernel and service crates
 - [ ] T035 [P] Create `raps-community/src/lib.rs` with basic module structure
-- [ ] T036 [P] Create `raps-pro/src/lib.rs` with basic module structure
+- [ ] T036 [P] Create `raps-enterprise/src/lib.rs` with basic module structure
 
 ### CLI Binary Foundation
 
@@ -203,7 +203,7 @@
 - [ ] T082 [US4] Verify `raps-dm/Cargo.toml` references workspace dependencies correctly
 - [ ] T083 [US4] Verify `raps-ssa/Cargo.toml` references workspace dependencies correctly
 - [ ] T084 [US4] Verify `raps-community/Cargo.toml` references workspace dependencies correctly
-- [ ] T085 [US4] Verify `raps-pro/Cargo.toml` references workspace dependencies correctly
+- [ ] T085 [US4] Verify `raps-enterprise/Cargo.toml` references workspace dependencies correctly
 - [ ] T086 [US4] Verify `raps/Cargo.toml` references workspace dependencies correctly
 - [ ] T087 [US4] Run `cargo update` and verify `Cargo.lock` shows single version per dependency
 - [ ] T088 [US4] Run `cargo tree` and verify no duplicate dependencies in final binary
@@ -358,3 +358,4 @@ With multiple developers:
 - Kernel must compile with `deny(unsafe_code)`, `deny(warnings)`, `deny(clippy::unwrap_used)`
 - All workspace dependencies must use `{ workspace = true }` syntax
 - Performance targets: kernel check <5s, workspace check <30s (incremental)
+

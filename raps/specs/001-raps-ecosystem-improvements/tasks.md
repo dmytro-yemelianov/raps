@@ -25,8 +25,8 @@
   - `raps-oss/` - OSS service
   - `raps-derivative/` - Model Derivative service
   - `raps-dm/` - Data Management service
-  - `raps-community/` - Community tier features
-  - `raps-pro/` - Enterprise features (stub)
+  - `raps-community/` - Extended Features features
+  - `raps-enterprise/` - Enterprise features (stub)
 - [x] T003 [P] [US8] Configure workspace dependencies in root `Cargo.toml` ✅
 - [x] T004 [P] [US8] Create/update `.cargo/config.toml`: ✅
   - Configure `lld-link` for Windows targets (`x86_64-pc-windows-msvc`)
@@ -177,7 +177,7 @@
 
 ---
 
-## Phase 2: Community Tier (Week 5-6)
+## Phase 2: Extended Features (Week 5-6)
 
 **Purpose**: Package community features into dedicated crate with feature flag
 
@@ -218,7 +218,7 @@
   ```
 - [ ] T046 [US4] Write MCP parity tests
 
-**Checkpoint**: ✅ Community tier structure complete; MCP integration pending (T044-T046)
+**Checkpoint**: ✅ Extended Features structure complete; MCP integration pending (T044-T046)
 
 ---
 
@@ -234,7 +234,7 @@
   default = ["community"]
   core = ["raps-kernel", "raps-oss", "raps-derivative", "raps-dm"]
   community = ["core", "raps-community"]
-  pro = ["community", "raps-pro"]
+  pro = ["community", "raps-enterprise"]
   ```
 - [ ] T048 [US9] Refactor command handlers to dispatch to services
 - [x] T049 [US9] Implement tier-gated command handling: ✅
@@ -270,8 +270,8 @@
   - [ ] T058a `object_upload`
   - [ ] T058b `translate_download`
   - [ ] T058c `folder_list`
-  - [ ] T058d `issue_list` (community tier)
-  - [ ] T058e `webhook_list` (community tier)
+  - [ ] T058d `issue_list` (Extended Features)
+  - [ ] T058e `webhook_list` (Extended Features)
 - [ ] T059 [US4] Add `tool_call_id` to all responses
 - [ ] T060 [US4] Implement request queuing with backpressure
 - [ ] T061 [US4] Write MCP stress tests:
@@ -322,13 +322,13 @@
 
 ---
 
-## Phase 6: Pro Tier Foundation (Week 13-14)
+## Phase 6: Enterprise Features Foundation (Week 13-14)
 
-**Purpose**: Establish Pro tier infrastructure (proprietary)
+**Purpose**: Establish Enterprise Features infrastructure (proprietary)
 
 ### Pro Crate Setup
 
-- [x] T079 [US9] Create `raps-pro/Cargo.toml` (consider separate private repo) ✅
+- [x] T079 [US9] Create `raps-enterprise/Cargo.toml` (consider separate private repo) ✅
 - [x] T080 [US9] Define Pro module structure: ✅
   - `analytics/` - Usage analytics
   - `audit/` - Audit logging
@@ -346,7 +346,7 @@
   - Server validation (stub)
   - Feature gating
 
-**Checkpoint**: Pro tier builds, license validation works (stub)
+**Checkpoint**: Enterprise Features builds, license validation works (stub)
 
 ---
 
@@ -455,5 +455,7 @@ Phase 7 (Polish) ─────────────────────
 - [P] tasks = different files, no dependencies
 - [Story] label maps to user story for traceability
 - Phase 0 is critical path - invest in solid foundation
-- Pro tier may move to separate private repository
+- Enterprise Features may move to separate private repository
 - Version after refactor: 3.2.0 (breaking internal changes)
+
+

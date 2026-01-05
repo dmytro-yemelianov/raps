@@ -2125,6 +2125,7 @@ dependencies = [
  "raps-community",
  "raps-derivative",
  "raps-dm",
+ "raps-enterprise",
  "raps-kernel",
  "raps-oss",
  "raps-ssa",
@@ -2190,6 +2191,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "raps-enterprise"
+version = "3.3.3"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "directories",
+ "raps-derivative",
+ "raps-dm",
+ "raps-kernel",
+ "raps-oss",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "raps-kernel"
 version = "3.3.3"
 dependencies = [
@@ -2234,24 +2253,6 @@ dependencies = [
  "tokio",
  "tokio-test",
  "urlencoding",
-]
-
-[[package]]
-name = "raps-pro"
-version = "3.3.3"
-dependencies = [
- "anyhow",
- "chrono",
- "directories",
- "raps-derivative",
- "raps-dm",
- "raps-kernel",
- "raps-oss",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "uuid",
 ]
 
 [[package]]

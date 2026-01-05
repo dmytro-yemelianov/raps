@@ -181,7 +181,7 @@ cargo build --release
 
 ## Architecture
 
-RAPS follows a **microkernel architecture** with three product tiers, enabling a sustainable open-source model while providing enterprise features.
+RAPS follows a **microkernel architecture**, separating core functionality into a minimal trusted kernel (`raps-kernel`) with independent service crates.
 
 ### Microkernel Design
 
@@ -194,24 +194,9 @@ Inspired by Unix OS principles, RAPS separates core functionality into a minimal
 └─────────────────────────────────────────────────────────────┘
                           │
 ┌─────────────────────────┼─────────────────────────────────────┐
-│                    Product Tiers                              │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │         raps-pro (Enterprise)                        │   │
-│  │  Analytics • Audit • Compliance • Multi-tenant • SSO │   │
-│  └─────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │         raps-community (Free)                       │   │
-│  │  ACC • DA • Reality • Webhooks • Pipelines • Plugins│   │
-│  └─────────────────────────────────────────────────────┘   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │         raps-kernel (Core)                           │   │
-│  │  Auth • HTTP • Config • Storage • Types • Error      │   │
-│  └─────────────────────────────────────────────────────┘   │
-└─────────────────────────┼─────────────────────────────────────┘
-                          │
-┌─────────────────────────┼─────────────────────────────────────┐
 │                    Service Crates                              │
-│  raps-oss • raps-derivative • raps-dm • raps-ssa            │
+│  raps-kernel • raps-oss • raps-derivative • raps-dm         │
+│  raps-community • raps-enterprise • raps-ssa                │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -220,45 +205,6 @@ Inspired by Unix OS principles, RAPS separates core functionality into a minimal
 - **Service Independence**: Service crates depend only on kernel, not each other
 - **Failure Isolation**: Bugs in services don't crash kernel functionality
 - **Security**: Kernel compiles with `#![deny(unsafe_code)]` and `#![deny(clippy::unwrap_used)]`
-
-### Tiered Product Strategy
-
-RAPS offers three tiers with different feature sets:
-
-| Tier | Description | License | Build Command |
-|------|-------------|---------|---------------|
-| **Core** | Minimal foundation: Auth, SSA, OSS, Derivative, Data Management | Apache 2.0 | `cargo build --no-default-features --features core` |
-| **Community** | Extended features: Account Admin, ACC, DA, Reality, Webhooks, MCP, TUI | Apache 2.0 | `cargo build` (default) |
-| **Pro** | Enterprise features: Analytics, Audit, Compliance, Multi-tenant, SSO | Commercial | `cargo build --features pro` |
-
-**Feature Matrix:**
-
-| Feature | Core | Community | Pro |
-|---------|:----:|:---------:|:---:|
-| Authentication (2LO/3LO/SSA) | ✅ | ✅ | ✅ |
-| OSS (Buckets, Objects, Uploads) | ✅ | ✅ | ✅ |
-| Model Derivative | ✅ | ✅ | ✅ |
-| Data Management | ✅ | ✅ | ✅ |
-| Account Admin | ❌ | ✅ | ✅ |
-| ACC Modules (Issues, RFIs, etc.) | ❌ | ✅ | ✅ |
-| Design Automation | ❌ | ✅ | ✅ |
-| Reality Capture | ❌ | ✅ | ✅ |
-| Webhooks | ❌ | ✅ | ✅ |
-| MCP Server | ❌ | ✅ | ✅ |
-| TUI | ❌ | ✅ | ✅ |
-| Analytics Dashboard | ❌ | ❌ | ✅ |
-| Audit Logging | ❌ | ❌ | ✅ |
-| Compliance Policies | ❌ | ❌ | ✅ |
-| Multi-tenant Management | ❌ | ❌ | ✅ |
-| Enterprise SSO | ❌ | ❌ | ✅ |
-
-**Version Output:**
-```bash
-$ raps --version
-raps 3.2.0 Community
-```
-
-The tier name is included in version output to clearly indicate which tier is active.
 
 ### Build Performance
 

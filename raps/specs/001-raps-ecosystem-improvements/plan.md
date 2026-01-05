@@ -9,7 +9,7 @@
 Comprehensive improvements to the RAPS (Rust Autodesk Platform Services) ecosystem addressing:
 - **Microkernel Architecture**: Refactor to Unix-like kernel design for performance, security, and testability
 - **Tiered Product Strategy**: Core → Community → Pro evolution path
-- **APS API Alignment**: SSA, Account Admin, Data Management navigation, Pro tier features
+- **APS API Alignment**: SSA, Account Admin, Data Management navigation, Enterprise Features features
 - Performance bottlenecks (parallel uploads, async blocking, pagination)
 - Architecture consistency (unified retry, config-based URLs, output schemas)
 - Cross-interface parity (CLI ↔ MCP ↔ GitHub Action ↔ Docker)
@@ -86,7 +86,7 @@ Inspired by Unix OS design principles, RAPS will adopt a **microkernel architect
 ├───────────────────────────────────┼──────────────────────────────────────────┤
 │                           PRODUCT TIERS                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                         raps-pro (Enterprise)                        │    │
+│  │                         raps-enterprise (Enterprise)                        │    │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │    │
 │  │  │ Analytics   │ │ Compliance  │ │ Multi-Tenant│ │ Priority    │   │    │
 │  │  │ Dashboard   │ │ Reporting   │ │ Management  │ │ Support API │   │    │
@@ -377,7 +377,7 @@ raps-dm/                             # ★ Data Management Service (enhanced)
 │   └── storage.rs                   # Storage creation for uploads
 └── tests/
 
-raps-community/                      # ★ Community tier features
+raps-community/                      # ★ Extended Features features
 ├── Cargo.toml                       # Depends on raps-kernel, raps-oss, etc.
 ├── src/
 │   ├── lib.rs
@@ -394,7 +394,7 @@ raps-community/                      # ★ Community tier features
 │   └── plugin/
 └── tests/
 
-raps-admin/                          # ★ Account Admin Service (Community tier)
+raps-admin/                          # ★ Account Admin Service (Extended Features)
 ├── Cargo.toml                       # Depends on raps-kernel
 ├── src/
 │   ├── lib.rs
@@ -404,7 +404,7 @@ raps-admin/                          # ★ Account Admin Service (Community tier
 │   └── business_unit.rs             # Business units structure
 └── tests/
 
-raps-pro/                            # ★ Enterprise tier (proprietary)
+raps-enterprise/                            # ★ Enterprise tier (proprietary)
 ├── Cargo.toml                       # Depends on raps-community
 ├── src/
 │   ├── lib.rs
@@ -461,9 +461,9 @@ members = [
     "raps-oss",
     "raps-derivative",
     "raps-dm",
-    "raps-admin",         # NEW: Account Admin (Community tier)
+    "raps-admin",         # NEW: Account Admin (Extended Features)
     "raps-community",
-    "raps-pro",
+    "raps-enterprise",
     "raps",
     "aps-tui",
 ]
@@ -487,7 +487,7 @@ tracing = "0.1"
 jsonwebtoken = "9.3"          # For JWT assertion generation (RS256)
 sha2 = "0.10"                 # For audit log integrity hashing
 chrono = { version = "0.4", features = ["serde"] }
-# SSO dependencies (Pro tier)
+# SSO dependencies (Enterprise Features)
 openidconnect = "5.0"          # For OIDC SSO support
 ```
 
@@ -502,7 +502,7 @@ name = "raps"
 default = ["community"]
 core = ["raps-kernel", "raps-ssa", "raps-oss", "raps-derivative", "raps-dm"]
 community = ["core", "raps-admin", "raps-community"]
-pro = ["community", "raps-pro"]
+pro = ["community", "raps-enterprise"]
 
 [dependencies]
 raps-kernel = { path = "../raps-kernel" }
@@ -512,7 +512,7 @@ raps-derivative = { path = "../raps-derivative" }
 raps-dm = { path = "../raps-dm" }
 raps-admin = { path = "../raps-admin", optional = true }  # NEW: Account Admin (Community)
 raps-community = { path = "../raps-community", optional = true }
-raps-pro = { path = "../raps-pro", optional = true }
+raps-enterprise = { path = "../raps-enterprise", optional = true }
 ```
 
 **Build commands by tier:**
@@ -565,7 +565,7 @@ mkdir -p raps-oss/src
 mkdir -p raps-derivative/src
 mkdir -p raps-dm/src
 mkdir -p raps-community/src/{acc,da,reality,webhooks,pipeline,plugin}
-mkdir -p raps-pro/src/{analytics,audit,compliance,multitenant,sso}
+mkdir -p raps-enterprise/src/{analytics,audit,compliance,multitenant,sso}
 ```
 
 #### 0.2 Extract Kernel Components
@@ -899,7 +899,7 @@ pub async fn handle_dm_tip_version(client: &DataManagementClient, project_id: St
 
 ---
 
-## Phase 2: Community Tier (Week 5-6)
+## Phase 2: Extended Features (Week 5-6)
 
 ### Objective
 Package community features into dedicated crate.
@@ -985,7 +985,7 @@ pub async fn handle_admin_companies_list(client: &AccountAdminClient, account_id
 #### 2.4 Extract Account Admin Service (`raps-admin`)
 
 ```rust
-// raps-admin/src/lib.rs (Community tier)
+// raps-admin/src/lib.rs (Extended Features)
 use raps_kernel::{HttpClient, Result};
 
 pub struct AccountAdminClient {
@@ -1151,17 +1151,17 @@ pub struct ResponseMeta {
 
 ---
 
-## Phase 4: Pro Tier Foundation (Week 9-12)
+## Phase 4: Enterprise Features Foundation (Week 9-12)
 
 ### Objective
-Establish Pro tier infrastructure with complete feature implementation (Analytics, Audit, Compliance, Multi-tenant, SSO).
+Establish Enterprise Features infrastructure with complete feature implementation (Analytics, Audit, Compliance, Multi-tenant, SSO).
 
 ### Tasks
 
 #### 4.1 Create Pro Crate Structure
 
 ```rust
-// raps-pro/src/lib.rs
+// raps-enterprise/src/lib.rs
 //! RAPS Pro - Enterprise features for production deployments.
 //! 
 //! License: Commercial (requires subscription)
@@ -1177,7 +1177,7 @@ pub mod license;
 #### 4.2 Usage Analytics (FR-PRO-ANA-*)
 
 ```rust
-// raps-pro/src/analytics/mod.rs
+// raps-enterprise/src/analytics/mod.rs
 use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
@@ -1210,7 +1210,7 @@ impl AnalyticsClient {
 #### 4.3 Audit Logging (FR-PRO-AUD-*)
 
 ```rust
-// raps-pro/src/audit/mod.rs
+// raps-enterprise/src/audit/mod.rs
 use sha2::{Sha256, Digest};
 
 pub struct AuditLog {
@@ -1261,7 +1261,7 @@ impl AuditLog {
 #### 4.4 Compliance Policies (FR-PRO-CMP-*)
 
 ```rust
-// raps-pro/src/compliance/mod.rs
+// raps-enterprise/src/compliance/mod.rs
 use std::collections::HashMap;
 
 pub struct ComplianceManager {
@@ -1316,7 +1316,7 @@ impl ComplianceManager {
 #### 4.5 Multi-Tenant Management (FR-PRO-MTN-*)
 
 ```rust
-// raps-pro/src/multitenant/mod.rs
+// raps-enterprise/src/multitenant/mod.rs
 use std::collections::HashMap;
 
 pub struct TenantManager {
@@ -1375,7 +1375,7 @@ impl TenantManager {
 #### 4.6 Enterprise SSO Integration (FR-PRO-SSO-*)
 
 ```rust
-// raps-pro/src/sso/mod.rs
+// raps-enterprise/src/sso/mod.rs
 use openidconnect::{ClientId, ClientSecret, IssuerUrl, RedirectUrl};
 use openidconnect::core::{CoreClient, CoreProviderMetadata, CoreResponseType};
 use openidconnect::{AuthorizationCode, CsrfToken, PkceCodeChallenge, Scope};
@@ -1448,7 +1448,7 @@ impl SsoClient {
 #### 4.7 License Enforcement
 
 ```rust
-// raps-pro/src/license.rs
+// raps-enterprise/src/license.rs
 pub struct LicenseManager {
     license: Option<License>,
     server: LicenseServer,
@@ -1645,7 +1645,7 @@ Phase 4 (Pro) ──────────────────────
 | Performance regression | Benchmark suite, CI performance tests |
 | License confusion | Clear feature flag documentation |
 | Dependency conflicts | Workspace-level dependency management |
-| Pro feature leakage | Separate private repository for raps-pro |
+| Pro feature leakage | Separate private repository for raps-enterprise |
 
 ---
 
@@ -1689,7 +1689,7 @@ Phase 4 (Pro) ──────────────────────
    - JWT assertion generation (RS256)
    - Token exchange for 3LO access tokens
 
-2. **raps-admin** (Community tier) - Account Administration
+2. **raps-admin** (Extended Features) - Account Administration
    - Project management (list, create, get)
    - User assignment and management
    - Company directory operations
@@ -1703,7 +1703,7 @@ Phase 4 (Pro) ──────────────────────
    - Storage creation for uploads
    - Derivatives URN extraction
 
-4. **Enhanced raps-pro** - Complete Pro tier implementation
+4. **Enhanced raps-enterprise** - Complete Enterprise Features implementation
    - Analytics dashboard and reporting (FR-PRO-ANA-*)
    - Audit logging with integrity verification (FR-PRO-AUD-*)
    - Compliance policy enforcement (FR-PRO-CMP-*)
@@ -1720,10 +1720,11 @@ Phase 4 (Pro) ──────────────────────
 
 - **Phase 1**: Added 1.4 (SSA extraction) and 1.5 (CLI updates)
 - **Phase 2**: Added 2.4 (Account Admin), 2.5 (MCP SSA+DM), 2.6 (CLI commands)
-- **Phase 4**: Expanded from 4 tasks to 7 tasks covering all Pro tier features
+- **Phase 4**: Expanded from 4 tasks to 7 tasks covering all Enterprise Features features
 
 ### Dependencies Added
 
 - `jsonwebtoken` v9.3 - For SSA JWT assertion generation
 - `sha2` v0.10 - For audit log integrity hashing
-- `openidconnect` v5.0 - For Pro tier SSO support
+- `openidconnect` v5.0 - For Enterprise Features SSO support
+

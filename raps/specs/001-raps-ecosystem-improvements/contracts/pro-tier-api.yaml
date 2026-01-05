@@ -1,10 +1,10 @@
 openapi: 3.0.3
 info:
-  title: RAPS Pro Tier API
+  title: RAPS Enterprise Features API
   version: 1.0.0
   description: |
-    API contract for Pro tier (Enterprise) features in RAPS.
-    Requires valid Pro tier license.
+    API contract for Enterprise Features (Enterprise) features in RAPS.
+    Requires valid Enterprise Features license.
   
 paths:
   /analytics/dashboard:
@@ -28,7 +28,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AnalyticsDashboard'
         '402':
-          description: Pro tier license required
+          description: Enterprise Features license required
           content:
             application/json:
               schema:
@@ -267,4 +267,5 @@ components:
           example: "PRO_TIER_REQUIRED"
         message:
           type: string
-          example: "This feature requires a Pro tier license"
+          example: "This feature requires a Enterprise Features license"
+

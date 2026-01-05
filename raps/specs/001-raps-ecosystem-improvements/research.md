@@ -23,8 +23,8 @@ Autodesk APS/
 ├── raps-oss/                # ★ OSS Service - NEW
 ├── raps-derivative/         # ★ Model Derivative Service - NEW
 ├── raps-dm/                 # ★ Data Management Service - NEW
-├── raps-community/          # ★ Community Tier Features - NEW
-├── raps-pro/                # ★ Enterprise Tier (stubs) - NEW
+├── raps-community/          # ★ Extended Features Features - NEW
+├── raps-enterprise/                # ★ Enterprise Tier (stubs) - NEW
 ├── raps/                    # Core CLI (Rust) - v3.2.0
 │   ├── src/
 │   │   ├── api/            # API adapters (wrapping service crates)
@@ -445,3 +445,5 @@ Expected improvement: **6x faster** for large files.
 - [Issues Directory](../raps/issues/)
 - [APS OpenAPI Specs](../aps-sdk-openapi/)
 - [Constitution](../.specify/memory/constitution.md)
+
+

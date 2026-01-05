@@ -1,21 +1,21 @@
 [package]
-name = "raps-pro"
+name = "raps-enterprise"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
-license = "Commercial"  # Note: Commercial license, not Apache-2.0
+license.workspace = true
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 rust-version.workspace = true
-description = "RAPS Pro Tier - Enterprise features (Analytics, Audit, Compliance, etc.)"
+description = "RAPS Enterprise functionality (Analytics, Audit, Compliance, etc.)"
 
 [dependencies]
 raps-kernel = { path = "../raps-kernel" }
 raps-oss = { path = "../raps-oss" }
 raps-derivative = { path = "../raps-derivative" }
 raps-dm = { path = "../raps-dm" }
-# Note: raps-pro depends on kernel and services, not on raps-community
+# Note: raps-enterprise depends on kernel and services, not on raps-community
 # This maintains architectural boundaries per microkernel design
 tokio = { workspace = true }
 serde = { workspace = true }

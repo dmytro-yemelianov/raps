@@ -7,12 +7,12 @@ members = [
     "raps-dm",
     "raps-ssa",
     "raps-community",
-    "raps-pro",
+    "raps-enterprise",
     ".",
 ]
 
 [workspace.package]
-version = "3.3.3"
+version = "3.6.0"
 edition = "2021"
 authors = ["RAPS Contributors"]
 license = "Apache-2.0"
@@ -120,7 +120,7 @@ codegen-units = 1
 
 [package]
 name = "raps"
-version = "3.3.3"
+version = "3.6.0"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -146,29 +146,6 @@ exclude = [
 name = "raps"
 path = "src/main.rs"
 
-# =============================================================================
-# Product Tier Feature Flags
-# =============================================================================
-# Build commands:
-#   Core only:     cargo build --no-default-features --features core
-#   Community:     cargo build  (default)
-#   Pro:           cargo build --features pro
-# =============================================================================
-
-[features]
-default = ["community"]
-
-# Core tier: Essential foundation (Auth, OSS, Derivative, DM)
-core = []
-
-# Community tier: Extended features (ACC, DA, Reality, Webhooks, Pipelines, Plugins)
-community = ["core", "dep:raps-community"]
-
-# Pro tier: Enterprise features (Analytics, Audit, Compliance, SSO)
-# Note: raps-pro is in a separate private repository
-# pro = ["community", "dep:raps-pro"]  # Uncomment when raps-pro is available
-pro = ["community"]  # Placeholder - raps-pro must be added separately
-
 [dependencies]
 # Service crates (microkernel architecture) - always included
 raps-kernel = { path = "./raps-kernel" }
@@ -176,10 +153,8 @@ raps-oss = { path = "./raps-oss" }
 raps-derivative = { path = "./raps-derivative" }
 raps-dm = { path = "./raps-dm" }
 raps-ssa = { path = "./raps-ssa" }
-
-# Tiered feature crates (optional)
-raps-community = { path = "./raps-community", optional = true }
-# raps-pro = { path = "./raps-pro", optional = true }  # Commercial - separate private repo
+raps-community = { path = "./raps-community" }
+raps-enterprise = { path = "./raps-enterprise" }
 
 # CLI framework
 clap = { version = "4.4", features = ["derive"] }

@@ -4,7 +4,7 @@
 **Created**: 2025-12-29  
 **Updated**: 2025-12-30  
 **Status**: In Progress (~45% Complete)  
-**Input**: User description: "Build and improve the solution that is implementing command-line interface for the Autodesk Platform Services (APS). CLI, MCP, GitHub Actions, Docker container, etc. modes. Refactor to microkernel architecture with Core → Community → Pro tiers."
+**Input**: User description: "Build and improve the solution that is implementing command-line interface for the Autodesk Platform Services (APS). CLI, MCP, GitHub Actions, Docker container, etc. modes. Refactor to microkernel architecture with Core → Community → Enterprise Featuress."
 
 ## Executive Summary
 
@@ -183,8 +183,8 @@ As a product manager, I need to build different product tiers (Core, Community, 
 
 **Acceptance Scenarios**:
 
-1. **Given** `cargo build --features core`, **When** I run `raps acc issue list`, **Then** command fails with "Feature requires Community tier".
-2. **Given** `cargo build --features community`, **When** I run `raps analytics dashboard`, **Then** command fails with "Feature requires Pro tier".
+1. **Given** `cargo build --features core`, **When** I run `raps acc issue list`, **Then** command fails with "Feature requires Extended Features".
+2. **Given** `cargo build --features community`, **When** I run `raps analytics dashboard`, **Then** command fails with "Feature requires Enterprise Features".
 3. **Given** `cargo build --features pro`, **When** I run any command, **Then** all features are available.
 4. **Given** Community build, **When** I check `raps --version`, **Then** output shows "RAPS Community v3.2.0".
 
@@ -243,24 +243,24 @@ As a developer integrating with ACC/BIM 360, I need to navigate hubs, projects, 
 
 ---
 
-### User Story 13 - Usage Analytics Dashboard (Priority: P3) 🏢 PRO TIER
+### User Story 13 - Usage Analytics Dashboard (Priority: P3) 🏢 Enterprise Features
 
 As an enterprise administrator, I need visibility into API usage patterns across my organization so that I can optimize costs, identify bottlenecks, and plan capacity.
 
-**Why this priority**: Analytics is a key differentiator for Pro tier; enables data-driven decisions for enterprise customers.
+**Why this priority**: Analytics is a key differentiator for Enterprise Features; enables data-driven decisions for enterprise customers.
 
 **Independent Test**: Generate usage report for past 30 days; verify metrics accuracy against APS logs.
 
 **Acceptance Scenarios**:
 
-1. **Given** Pro tier license, **When** I run `raps analytics dashboard`, **Then** a summary of API calls by endpoint, user, and time period is displayed.
+1. **Given** Enterprise Features license, **When** I run `raps analytics dashboard`, **Then** a summary of API calls by endpoint, user, and time period is displayed.
 2. **Given** usage data for past month, **When** I run `raps analytics report --period 30d --format csv`, **Then** detailed usage report is exported.
 3. **Given** real-time mode, **When** I run `raps analytics watch`, **Then** live API call metrics are streamed to terminal.
 4. **Given** cost thresholds configured, **When** usage exceeds threshold, **Then** alert is generated via configured webhook.
 
 ---
 
-### User Story 14 - Audit Logging (Priority: P3) 🏢 PRO TIER
+### User Story 14 - Audit Logging (Priority: P3) 🏢 Enterprise Features
 
 As a compliance officer, I need immutable audit logs of all RAPS operations so that I can meet regulatory requirements and investigate security incidents.
 
@@ -277,7 +277,7 @@ As a compliance officer, I need immutable audit logs of all RAPS operations so t
 
 ---
 
-### User Story 15 - Compliance Policies (Priority: P3) 🏢 PRO TIER
+### User Story 15 - Compliance Policies (Priority: P3) 🏢 Enterprise Features
 
 As a security administrator, I need to enforce organizational policies on RAPS usage so that users cannot perform unauthorized operations.
 
@@ -294,7 +294,7 @@ As a security administrator, I need to enforce organizational policies on RAPS u
 
 ---
 
-### User Story 16 - Multi-Tenant Management (Priority: P4) 🏢 PRO TIER
+### User Story 16 - Multi-Tenant Management (Priority: P4) 🏢 Enterprise Features
 
 As an MSP (Managed Service Provider), I need to manage multiple customer ACC accounts from a single RAPS installation so that I can efficiently serve multiple clients.
 
@@ -311,7 +311,7 @@ As an MSP (Managed Service Provider), I need to manage multiple customer ACC acc
 
 ---
 
-### User Story 17 - Enterprise SSO Integration (Priority: P4) 🏢 PRO TIER
+### User Story 17 - Enterprise SSO Integration (Priority: P4) 🏢 Enterprise Features
 
 As an IT administrator, I need RAPS to authenticate via our corporate identity provider so that users don't need separate APS credentials.
 
@@ -334,7 +334,7 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
 - How does system handle token expiry mid-operation? → Auto-refresh if possible; prompt re-auth if refresh fails.
 - What if user provides conflicting flags (`--json` and `--table`)? → Last flag wins with warning; document precedence.
 - How does parallel upload handle partial failure? → Retry failed chunks; report partial success with list of failed chunks.
-- What if Pro license expires? → Gracefully degrade to Community tier with warning; no data loss.
+- What if Pro license expires? → Gracefully degrade to Extended Features with warning; no data loss.
 - How do tier-gated commands behave? → Clear error message indicating required tier; suggest upgrade path.
 - What if SSA private key is compromised? → Support `raps ssa key disable` and immediate rotation without account deletion.
 - How does SSA JWT expiry work? → JWT assertion valid for max 5 minutes; token valid for 60 minutes; refresh token valid for 15 days.
@@ -343,13 +343,13 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
 - What if Data Management item has no derivatives? → Tip version derivatives URN is null; must trigger translation first.
 - How are region headers handled? → Support both `x-ads-region` header and `region` query param; header takes precedence.
 
-**Pro Tier Edge Cases:**
+**Enterprise Features Edge Cases:**
 - What if analytics storage fills up? → Rotate oldest data; alert admin before reaching capacity.
 - How are audit logs backed up? → Support configurable backup to S3/Azure Blob; encrypt at rest.
 - What if policy file has syntax errors? → Fail-safe to deny-all; log detailed error for admin.
 - How does multi-tenant handle orphaned tenants? → `raps tenant prune` removes tenants unused for configurable period.
 - What if SSO provider is down? → Fall back to cached tokens if valid; prompt for alternative auth if expired.
-- How are Pro tier license keys validated? → Offline validation with periodic online refresh; grace period for network issues.
+- How are Enterprise Features license keys validated? → Offline validation with periodic online refresh; grace period for network issues.
 
 ---
 
@@ -376,18 +376,18 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
   - **Model Derivative** - Translations, manifests, thumbnails, metadata
   - **Data Management** - Hubs, projects, folders, items, versions
   - Config, Completions
-- **FR-009**: Community tier MUST include Core + the following APS APIs:
+- **FR-009**: Extended Features MUST include Core + the following APS APIs:
   - **Account Admin** - Projects, users, companies, business units
   - **Construction.Issues** (ACC Issues) - Issues, comments, types, attributes
   - **Design Automation** - AppBundles, activities, work items
   - **Reality Capture** - Photo scenes, photogrammetry
   - **Webhooks** - Event subscriptions and notifications
   - Pipelines, Plugins, MCP, TUI
-- **FR-010**: Pro tier MUST include Community + Analytics, Audit, Compliance, Multi-tenant, SSO
+- **FR-010**: Enterprise Features MUST include Community + Analytics, Audit, Compliance, Multi-tenant, SSO
 - **FR-011**: Tier-gated commands MUST fail gracefully with clear upgrade guidance
 - **FR-012**: Version output MUST include tier name (e.g., "RAPS Community v3.2.0")
 
-#### Pro Tier Features — Analytics, Audit, Compliance, Multi-tenant, SSO
+#### Enterprise Features Features — Analytics, Audit, Compliance, Multi-tenant, SSO
 
 ##### Analytics (FR-PRO-ANA-*)
 - **FR-PRO-ANA-001**: System MUST track API call metrics: endpoint, latency, status, user, timestamp
@@ -531,7 +531,7 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
 - **Issue**: ACC issue with type, subtype, status, assignee (Construction.Issues API)
 - **Webhook**: Event subscription with callback URL and filter criteria
 
-#### Pro Tier Entities
+#### Enterprise Features Entities
 
 - **UsageMetrics**: API call statistics with endpoint, latency, user, timestamp
 - **AuditEntry**: Immutable log record with command, parameters, user, outcome, hash
@@ -555,7 +555,7 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
 
 - Q: How should FR numbers be organized to avoid conflicts across sections? → A: Use unique prefixes per component (FR-MCP-*, FR-ACT-*, FR-DOC-*, FR-TUI-*)
 - Q: Should MCP server expose tools for SSA, Account Admin, and Data Management? → A: Expose SSA and Data Management tools; Account Admin via CLI only (less frequent operations)
-- Q: Should Pro tier features be defined now or deferred? → A: Define now with complete user stories (US-13 to US-17) and functional requirements (FR-PRO-*)
+- Q: Should Enterprise Features features be defined now or deferred? → A: Define now with complete user stories (US-13 to US-17) and functional requirements (FR-PRO-*)
 
 ---
 
@@ -574,7 +574,7 @@ As an IT administrator, I need RAPS to authenticate via our corporate identity p
 - **SC-009**: `cargo check -p raps-kernel` completes in <5s (incremental build)
 - **SC-010**: `cargo check` for full workspace completes in <30s (incremental build)
 
-#### Pro Tier Success Criteria
+#### Enterprise Features Success Criteria
 - **SC-PRO-001**: Analytics dashboard renders usage summary in <2s for 30-day period
 - **SC-PRO-002**: Audit log queries return results in <1s for 10,000+ entries
 - **SC-PRO-003**: Policy enforcement adds <10ms latency to command execution
@@ -727,3 +727,4 @@ This specification aligns with the RAPS Ecosystem Constitution v1.0.0:
 - [SSA Getting Started](https://developer.doc.autodesk.com/bPlouYTd/cloud-platform-ssa-docs-main-460369/)
 - [Model Derivative API](https://aps.autodesk.com/en/docs/model-derivative/v2/developers_guide/overview/)
 - [Data Management API](https://aps.autodesk.com/en/docs/data/v2/developers_guide/overview/)
+
