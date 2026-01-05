@@ -2357,7 +2357,7 @@ Before you call this operation:
 
 #### Responses
 - **200**: Success.
-- **202**: Request accepted but processing not complete. Call this operation again, until you recieve 200 OK.
+- **202**: Request accepted but processing not complete. Call this operation again, until you receive 200 OK.
 
 ---
 
@@ -2497,7 +2497,7 @@ Deletes the manifest of the specified source design. It also deletes all derivat
 **Operation ID:** `start-job`
 
 #### Description
-Creates a job to translate the specified source design to another format, generating derivatives of the source design. You can optionaly:
+Creates a job to translate the specified source design to another format, generating derivatives of the source design. You can optionally:
 
 - Extract selected parts of a design and export the set of geometries in OBJ format.
 - Generate different-sized thumbnails.

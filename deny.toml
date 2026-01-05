@@ -2,7 +2,7 @@
 
 [advisories]
 vulnerability = "deny"
-unmaintained = "warn"
+unmaintained = "none"
 yanked = "deny"
 notice = "warn"
 ignore = []
