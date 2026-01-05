@@ -1,0 +1,62 @@
+[files]
+extend-exclude = [
+    "Cargo.lock",
+    "target/",
+    ".git/",
+    "*.svg",
+    "*.webp",
+    "*.png",
+    "*.jpg",
+    "*.glb",
+    "*.json",
+]
+
+[default.extend-words]
+# Add words to ignore here
+ACC = "ACC"
+APS = "APS"
+RAPS = "RAPS"
+SSA = "SSA"
+OSS = "OSS"
+DM = "DM"
+DA = "DA"
+TUI = "TUI"
+MCP = "MCP"
+rapscli = "rapscli"
+dmytro = "dmytro"
+yemelianov = "yemelianov"
+automet = "automet"
+autodesk = "autodesk"
+darling = "darling"
+dtolnay = "dtolnay"
+swatinem = "swatinem"
+softprops = "softprops"
+embarkstudios = "embarkstudios"
+fossas = "fossas"
+fossabot = "fossabot"
+codecov = "codecov"
+gitleaks = "gitleaks"
+llvm = "llvm"
+sccache = "sccache"
+nextest = "nextest"
+clippy = "clippy"
+rustfmt = "rustfmt"
+cargo-dist = "cargo-dist"
+cargo-release = "cargo-release"
+cargo-deny = "cargo-deny"
+cargo-audit = "cargo-audit"
+rustsec = "rustsec"
+peter-evans = "peter-evans"
+taiki-e = "taiki-e"
+dtolnay/rust-toolchain = "dtolnay/rust-toolchain"
+Swatinem/rust-cache = "Swatinem/rust-cache"
+taiki-e/install-action = "taiki-e/install-action"
+codecov/codecov-action = "codecov/codecov-action"
+fossas/fossa-action = "fossas/fossa-action"
+rustsec/audit-check = "rustsec/audit-check"
+EmbarkStudios/cargo-deny-action = "EmbarkStudios/cargo-deny-action"
+gitleaks/gitleaks-action = "gitleaks/gitleaks-action"
+peter-evans/repository-dispatch = "peter-evans/repository-dispatch"
+mozilla-actions/sccache-action = "mozilla-actions/sccache-action"
+softprops/action-gh-release = "softprops/action-gh-release"
+github/codeql-action = "github/codeql-action"

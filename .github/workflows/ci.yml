@@ -111,11 +111,53 @@ jobs:
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
 
+  audit:
+    name: audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deny:
+    name: deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  typos:
+    name: typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typos Check
+        uses: crate-ci/typos@master
+
   # This job ensures all checks pass before allowing merge
   all-checks-pass:
     name: all-checks-pass
     runs-on: ubuntu-latest
-    needs: [check, test, fmt, clippy, docs, license-scan]
+    needs: [check, test, fmt, clippy, docs, license-scan, audit, deny, secrets, typos]
     if: github.event_name == 'pull_request'
     steps:
       - run: echo "All CI checks passed successfully!"
