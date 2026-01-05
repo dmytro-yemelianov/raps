@@ -13,6 +13,7 @@
   [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
   [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
   [![Build Status](https://github.com/dmytro-yemelianov/raps/workflows/CI/badge.svg)](https://github.com/dmytro-yemelianov/raps/actions)
+  [![Codecov](https://codecov.io/gh/dmytro-yemelianov/raps/graph/badge.svg)](https://codecov.io/gh/dmytro-yemelianov/raps)
 
 </div>
 
@@ -582,9 +583,6 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 - Development setup
 - Code style guidelines
 - Pull request process
-- Branch protection policy
-
-**Important**: The `main` branch is protected. All changes must be made through Pull Requests. See [Branch Protection Setup](docs/BRANCH_PROTECTION.md) for details.
 
 ## License
 
