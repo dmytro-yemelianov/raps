@@ -278,7 +278,7 @@ impl DerivativeClient {
         root_filename: Option<&str>,
     ) -> Result<TranslationResponse> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/designdata/job", self.config.derivative_url());
+        let job_url = format!("{}/designdata/job", self.config.derivative_url());
 
         let request = TranslationRequest {
             input: TranslationInput {
@@ -302,13 +302,13 @@ impl DerivativeClient {
         };
 
         // Log request in verbose/debug mode
-        crate::logging::log_request("POST", &url);
+        crate::logging::log_request("POST", &job_url);
 
         // Use retry logic for translation requests
         let http_config = crate::http::HttpClientConfig::default();
         let response = crate::http::execute_with_retry(&http_config, || {
             let client = self.http_client.clone();
-            let url = url.clone();
+            let url = job_url.clone();
             let token = token.clone();
             let request_json = serde_json::to_value(&request).ok();
             Box::pin(async move {
@@ -326,7 +326,7 @@ impl DerivativeClient {
         .await?;
 
         // Log response in verbose/debug mode
-        crate::logging::log_response(response.status().as_u16(), &url);
+        crate::logging::log_response(response.status().as_u16(), &job_url);
 
         if !response.status().is_success() {
             let status = response.status();
@@ -345,7 +345,7 @@ impl DerivativeClient {
     /// Get the manifest (translation status and available derivatives)
     pub async fn get_manifest(&self, urn: &str) -> Result<Manifest> {
         let token = self.auth.get_token().await?;
-        let url = format!(
+        let manifest_url = format!(
             "{}/designdata/{}/manifest",
             self.config.derivative_url(),
             urn
@@ -353,7 +353,7 @@ impl DerivativeClient {
 
         let response = self
             .http_client
-            .get(&url)
+            .get(&manifest_url)
             .bearer_auth(&token)
             .send()
             .await
@@ -377,7 +377,7 @@ impl DerivativeClient {
     #[allow(dead_code)]
     pub async fn delete_manifest(&self, urn: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!(
+        let manifest_url = format!(
             "{}/designdata/{}/manifest",
             self.config.derivative_url(),
             urn
@@ -385,7 +385,7 @@ impl DerivativeClient {
 
         let response = self
             .http_client
-            .delete(&url)
+            .delete(&manifest_url)
             .bearer_auth(&token)
             .send()
             .await
@@ -499,24 +499,24 @@ impl DerivativeClient {
 
         // The derivative URN needs to be URL-encoded
         let encoded_derivative_urn = urlencoding::encode(derivative_urn);
-        let url = format!(
+        let download_url = format!(
             "{}/designdata/{}/manifest/{}",
             self.config.derivative_url(),
             source_urn,
             encoded_derivative_urn
         );
 
-        crate::logging::log_request("GET", &url);
+        crate::logging::log_request("GET", &download_url);
 
         let response = self
             .http_client
-            .get(&url)
+            .get(&download_url)
             .bearer_auth(&token)
             .send()
             .await
             .context("Failed to download derivative")?;
 
-        crate::logging::log_response(response.status().as_u16(), &url);
+        crate::logging::log_response(response.status().as_u16(), &download_url);
 
         if !response.status().is_success() {
             let status = response.status();

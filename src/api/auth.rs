@@ -387,25 +387,27 @@ impl AuthClient {
                 }
 
                 return Ok(stored);
-            } else {
-                // Check error response
-                let error_text = poll_response.text().await.unwrap_or_default();
-                if error_text.contains("authorization_pending") {
-                    // Still waiting, continue polling
-                    print!(".");
-                    use std::io::Write;
-                    std::io::stdout().flush().ok();
-                    continue;
-                } else if error_text.contains("slow_down") {
-                    // Slow down polling
-                    tokio::time::sleep(poll_interval * 2).await;
-                    continue;
-                } else if error_text.contains("expired_token") {
-                    anyhow::bail!("Device code expired. Please try again.");
-                } else {
-                    anyhow::bail!("Token polling failed: {}", error_text);
-                }
             }
+
+            // Check error response
+            let error_text = poll_response.text().await.unwrap_or_default();
+            if error_text.contains("authorization_pending") {
+                // Still waiting, continue polling
+                print!(".");
+                use std::io::Write;
+                std::io::stdout().flush().ok();
+                continue;
+            }
+            if error_text.contains("slow_down") {
+                // Slow down polling
+                tokio::time::sleep(poll_interval * 2).await;
+                continue;
+            }
+            if error_text.contains("expired_token") {
+                anyhow::bail!("Device code expired. Please try again.");
+            }
+
+            anyhow::bail!("Token polling failed: {}", error_text);
         }
     }
 

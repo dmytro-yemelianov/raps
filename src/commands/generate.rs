@@ -52,7 +52,7 @@ async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow
         "complex" => ComplexitySettings {
             vertices: 200,
             elements: 1000,
-            points: 100000,
+            points: 100_000,
         },
         _ => ComplexitySettings {
             vertices: 50,
