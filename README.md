@@ -7,6 +7,7 @@
   <p><strong>R</strong>ust <strong>A</strong>utodesk <strong>P</strong>latform <strong>S</strong>ervices CLI</p>
 
   [![Crates.io](https://img.shields.io/crates/v/raps.svg)](https://crates.io/crates/raps)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps?ref=badge_shield)
   [![Downloads](https://img.shields.io/crates/d/raps.svg)](https://crates.io/crates/raps)
   [![Documentation](https://img.shields.io/badge/docs-rapscli.xyz-blue.svg)](https://rapscli.xyz)
   [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -16,6 +17,9 @@
 </div>
 
 **🌼 RAPS** (rapeseed) — **R**ust **A**utodesk **P**latform **S**ervices CLI. A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps?ref=badge_large)
 
 ## Features
 
