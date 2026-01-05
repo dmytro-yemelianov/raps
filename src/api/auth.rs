@@ -14,7 +14,6 @@ use tiny_http::{Response, Server};
 use tokio::sync::RwLock;
 
 use crate::config::Config;
-use crate::logging;
 use crate::storage::{StorageBackend, TokenStorage};
 
 /// User profile information from /userinfo endpoint
@@ -504,7 +503,7 @@ impl AuthClient {
                     break;
                 }
                 Err(e) => {
-                    if logging::debug() {
+                    if crate::logging::debug() {
                         println!("Port {} unavailable: {}", port, e);
                     }
                     continue;
