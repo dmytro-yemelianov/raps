@@ -100,11 +100,21 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+  license-scan:
+    name: license-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: FOSSA Scan
+        uses: fossas/fossa-action@v1
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+
   # This job ensures all checks pass before allowing merge
   all-checks-pass:
     name: all-checks-pass
     runs-on: ubuntu-latest
-    needs: [check, test, fmt, clippy, docs]
+    needs: [check, test, fmt, clippy, docs, license-scan]
     if: github.event_name == 'pull_request'
     steps:
       - run: echo "All CI checks passed successfully!"
