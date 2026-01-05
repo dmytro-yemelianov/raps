@@ -1,6 +1,6 @@
 [package]
 name = "raps"
-version = "3.4.0"
+version = "3.5.0"
 edition = "2024"
 description = "🌼 RAPS (rapeseed) — Rust Autodesk Platform Services CLI"
 authors = ["Dmytro Yemelianov"]
