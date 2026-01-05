@@ -324,7 +324,7 @@
 
 ## Phase 6: Enterprise Features Foundation (Week 13-14)
 
-**Purpose**: Establish Enterprise Features infrastructure (proprietary)
+**Purpose**: Establish Enterprise Features infrastructure (unified)
 
 ### Pro Crate Setup
 

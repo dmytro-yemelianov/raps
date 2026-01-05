@@ -70,7 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Three-Tier Architecture**: Core → Community → Pro product tiers
   - Core: Essential foundation (Auth, SSA, OSS, Derivative, DM) - Apache 2.0
   - Community: Extended features (Account Admin, ACC, DA, Reality, Webhooks, MCP, TUI) - Apache 2.0
-  - Pro: Enterprise features (Analytics, Audit, Compliance, Multi-tenant, SSO) - Commercial
+  - Pro: Enterprise features (Analytics, Audit, Compliance, Multi-tenant, SSO) - Apache-2.0
 - **Feature Flags**: Tier enforcement via Cargo feature flags (`core`, `community`, `pro`)
 - **Tier-Gated Commands**: Commands requiring higher tiers fail gracefully with upgrade guidance
 - **Version Output**: `raps --version` now includes tier name (e.g., "raps 3.2.0 Community")

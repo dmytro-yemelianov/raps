@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Commercial
+// SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
 //! Audit Logging
@@ -40,7 +40,13 @@ impl AuditLog {
     }
 
     /// Log an action
-    pub fn log(&self, action: &str, user: &str, resource: &str, result: &str) -> anyhow::Result<()> {
+    pub fn log(
+        &self,
+        action: &str,
+        user: &str,
+        resource: &str,
+        result: &str,
+    ) -> anyhow::Result<()> {
         let entry = AuditEntry {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),

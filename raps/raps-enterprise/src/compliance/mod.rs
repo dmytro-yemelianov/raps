@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Commercial
+// SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
 //! Compliance Reporting
@@ -77,7 +77,12 @@ impl ComplianceReporter {
     }
 
     /// Generate a compliance report
-    pub fn generate(&self, _report_type: ComplianceType, _from: &str, _to: &str) -> anyhow::Result<ComplianceReport> {
+    pub fn generate(
+        &self,
+        _report_type: ComplianceType,
+        _from: &str,
+        _to: &str,
+    ) -> anyhow::Result<ComplianceReport> {
         // TODO: Implement compliance report generation
         anyhow::bail!("Compliance reporting not yet implemented")
     }

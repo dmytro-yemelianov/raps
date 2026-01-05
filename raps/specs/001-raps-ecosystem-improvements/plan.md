@@ -25,7 +25,7 @@ Comprehensive improvements to the RAPS (Rust Autodesk Platform Services) ecosyst
 **Project Type**: Multi-crate workspace (microkernel architecture)  
 **Performance Goals**: 100MB upload <30s, CLI startup <100ms, MCP memory <100MB, kernel check <5s, workspace check <30s  
 **Build Tooling**: lld-link (Windows), mold (Linux CI), sccache, cargo-nextest  
-**Constraints**: MSRV 1.88, Apache 2.0 license (Core/Community), proprietary (Pro)  
+**Constraints**: MSRV 1.88, Apache 2.0 license (Unified)
 **Scale/Scope**: 9 repositories, 50+ CLI commands, 14 MCP tools, 3 product tiers
 
 ---
@@ -166,7 +166,7 @@ The microkernel (`raps-kernel`) provides these guarantees:
 │   │  • Dedicated Support SLA                                    │    │
 │   │  • On-premise Deployment Option                             │    │
 │   │                                                              │    │
-│   │  License: Commercial (Subscription)                         │    │
+│   │  License: Apache-2.0 (Unified)                              │    │
 │   └─────────────────────────────────────────────────────────────┘    │
 │                              ▲                                        │
 │                              │                                        │
@@ -404,7 +404,7 @@ raps-admin/                          # ★ Account Admin Service (Extended Featu
 │   └── business_unit.rs             # Business units structure
 └── tests/
 
-raps-enterprise/                            # ★ Enterprise tier (proprietary)
+raps-enterprise/                            # ★ Enterprise tier (unified)
 ├── Cargo.toml                       # Depends on raps-community
 ├── src/
 │   ├── lib.rs
@@ -1164,7 +1164,7 @@ Establish Enterprise Features infrastructure with complete feature implementatio
 // raps-enterprise/src/lib.rs
 //! RAPS Pro - Enterprise features for production deployments.
 //! 
-//! License: Commercial (requires subscription)
+//! License: Apache-2.0
 
 pub mod analytics;
 pub mod audit;

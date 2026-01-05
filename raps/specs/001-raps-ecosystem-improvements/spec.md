@@ -18,7 +18,7 @@ RAPS will evolve into a **Unix-like microkernel architecture** with three produc
 |------|-------------|---------|
 | **Core (Kernel)** | Minimal trusted foundation: Auth, SSA, OSS, Derivative, Data Management | Apache 2.0 |
 | **Community** | Extended features: Account Admin, ACC, DA, Reality, Webhooks, Pipelines, Plugins, MCP, TUI | Apache 2.0 |
-| **Pro (Enterprise)** | Advanced features: Analytics, Audit, Compliance, Multi-tenant, SSO | Commercial |
+| **Pro (Enterprise)** | Advanced features: Analytics, Audit, Compliance, Multi-tenant, SSO | Apache-2.0 |
 
 ### Repository Taxonomy
 
@@ -175,7 +175,7 @@ As a maintainer, I need the codebase refactored into a microkernel architecture 
 
 ### User Story 9 - Tiered Product Builds (Priority: P1)
 
-As a product manager, I need to build different product tiers (Core, Community, Pro) from the same codebase so that we can offer free and commercial versions.
+As a product manager, I need to build advanced features while maintaining a single open-source codebase so that we can offer a comprehensive, unified tool.
 
 **Why this priority**: Enables sustainable business model while keeping core functionality open source.
 
