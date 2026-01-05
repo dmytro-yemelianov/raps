@@ -1,17 +1,13 @@
 # cargo-deny configuration
 
 [advisories]
-version = 2
 vulnerability = "deny"
 unmaintained = "warn"
 yanked = "deny"
 notice = "warn"
-ignore = [
-    # Add dependency-specific advisory IDs to ignore here
-]
+ignore = []
 
 [licenses]
-version = 2
 unlicensed = "deny"
 allow = [
     "Apache-2.0",
@@ -33,20 +29,14 @@ allow-osi-fsf-free = "either"
 confidence-threshold = 0.8
 
 [bans]
-version = 2
 multiple-versions = "warn"
 highlight = "all"
-allow = [
-    # { name = "crate-name", version = "<=0.1.0" }
-]
-deny = [
-    # { name = "crate-name", version = ">=0.1.0" }
-]
+allow = []
+deny = []
 skip = []
 skip-tree = []
 
 [sources]
-version = 2
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]

@@ -1,15 +1,10 @@
-<<<<<<< HEAD
 # Rust
 /target
 **/*.rs.bk
 *.pdb
-# Note: Cargo.lock should be committed for binaries/applications
-=======
-# Build artifacts
-target/
-**/*.rs.bk
-Cargo.lock
->>>>>>> master
+
+# Commit Cargo.lock for applications
+# !Cargo.lock
 
 # IDE
 .vscode/
@@ -17,20 +12,17 @@ Cargo.lock
 *.swp
 *.swo
 *~
-<<<<<<< HEAD
 *.sublime-project
 *.sublime-workspace
-=======
 
 # OS
 .DS_Store
 Thumbs.db
->>>>>>> master
+desktop.ini
 
 # Environment
 .env
 .env.local
-<<<<<<< HEAD
 .env.*.local
 
 # Build artifacts
@@ -45,14 +37,11 @@ Thumbs.db
 tarpaulin-report.html
 coverage/
 *.profraw
+*.gcda
+*.gcno
 
 # Generated files
 generated-files/
-
-# OS
-Thumbs.db
-.DS_Store
-desktop.ini
 
 # Rust-analyzer
 .rust-analyzer/
@@ -67,25 +56,22 @@ logs/
 *.tmp
 *.temp
 *.cache
+*.bak
+*.backup
+*_backup
 .cache/
 tmp/
 temp/
 
-# CI/CD artifacts (if any are generated locally)
+# CI/CD artifacts
 .ci/
 ci-artifacts/
 
-# Release artifacts (should be generated, not committed)
+# Release artifacts
 *.zip
 *.tar.gz
 *.tar.bz2
 checksums.txt
-
-# Editor backups
-*~
-*.bak
-*.backup
-*_backup
 
 # macOS
 .AppleDouble
@@ -99,33 +85,17 @@ $RECYCLE.BIN/
 *.dSYM/
 *.su
 *.idb
-*.pdb
-
-site/
-
-# Development
-.dev/
-=======
-*.pem
-*.key
-
-# Commercial/Private components (keep separate)
-# Note: raps-pro is now in monorepo workspace but has Commercial license
-
-# Archive directory
-archive/
-
-# Temporary files
-*.tmp
-*.log
-*.bak
-
-# Test coverage
-coverage/
-*.gcda
-*.gcno
 
 # Documentation builds
 site/
 docs/_build/
->>>>>>> master
+
+# Development
+.dev/
+
+# Security
+*.pem
+*.key
+
+# Archive directory
+archive/
