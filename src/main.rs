@@ -47,6 +47,8 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
+use rustyline::error::ReadlineError;
+use rustyline::DefaultEditor;
 use std::io;
 
 use api::{
@@ -195,6 +197,9 @@ enum Commands {
         shell: Shell,
     },
 
+    /// Start an interactive shell session
+    Shell,
+
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 }
@@ -291,6 +296,103 @@ async fn run(cli: Cli) -> Result<()> {
     // Create HTTP client with shared config
     let http_config = http::HttpClientConfig::from_cli_and_env(cli.timeout);
 
+    if let Commands::Shell = cli.command {
+        println!("{}", "Welcome to the RAPS interactive shell!".bold());
+        println!("Type 'help' for a list of commands, and 'exit' to quit.");
+
+        let mut rl = DefaultEditor::new()?;
+        let history_path = ".raps_history";
+        let _ = rl.load_history(history_path);
+
+        loop {
+            let readline = rl.readline("raps> ");
+            match readline {
+                Ok(line) => {
+                    let _ = rl.add_history_entry(line.as_str());
+                    let line = line.trim();
+
+                    if line.is_empty() {
+                        continue;
+                    }
+
+                    if line == "exit" || line == "quit" {
+                        break;
+                    }
+
+                    let mut args = shlex::split(line).unwrap_or_default();
+                    args.insert(0, "raps".to_string());
+
+                    let sub_cli = match Cli::try_parse_from(&args) {
+                        Ok(c) => c,
+                        Err(e) => {
+                            e.print().unwrap();
+                            continue;
+                        }
+                    };
+
+                    let sub_output_format = if let Some(format_str) = &sub_cli.output {
+                        Some(format_str.parse()?)
+                    } else {
+                        None
+                    };
+                    let sub_output_format = OutputFormat::determine(sub_output_format);
+                    let sub_http_config =
+                        http::HttpClientConfig::from_cli_and_env(sub_cli.timeout);
+
+                    if let Err(err) = execute_command(
+                        sub_cli.command,
+                        &config,
+                        &sub_http_config,
+                        sub_output_format,
+                        sub_cli.concurrency.unwrap_or(5),
+                    )
+                    .await
+                    {
+                        eprintln!("{} {}", "Error:".red().bold(), err);
+                        let mut source = err.source();
+                        while let Some(cause) = source {
+                            eprintln!("  {} {}", "Caused by:".dimmed(), cause);
+                            source = cause.source();
+                        }
+                    }
+                }
+                Err(ReadlineError::Interrupted) => {
+                    println!("CTRL-C");
+                    break;
+                }
+                Err(ReadlineError::Eof) => {
+                    println!("CTRL-D");
+                    break;
+                }
+                Err(err) => {
+                    println!("Error: {:?}", err);
+                    break;
+                }
+            }
+        }
+        rl.save_history(history_path).unwrap();
+        return Ok(());
+    }
+
+    execute_command(
+        cli.command,
+        &config,
+        &http_config,
+        output_format,
+        cli.concurrency.unwrap_or(5),
+    )
+    .await?;
+
+    Ok(())
+}
+
+async fn execute_command(
+    command: Commands,
+    config: &Config,
+    http_config: &http::HttpClientConfig,
+    output_format: OutputFormat,
+    concurrency: usize,
+) -> Result<()> {
     // Helper closure to create clients on demand
     let get_auth_client =
         || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };
@@ -330,7 +432,7 @@ async fn run(cli: Cli) -> Result<()> {
         RealityCaptureClient::new_with_http_config(config.clone(), auth, http_config.clone())
     };
 
-    match cli.command {
+    match command {
         Commands::Auth(cmd) => {
             cmd.execute(&get_auth_client(), output_format).await?;
         }
@@ -401,24 +503,24 @@ async fn run(cli: Cli) -> Result<()> {
         }
 
         Commands::Demo(cmd) => {
-            let concurrency = cli.concurrency.unwrap_or(5);
             cmd.execute(concurrency).await?;
         }
 
         Commands::Config(_) => {
-            // Already handled above
             unreachable!()
         }
 
         Commands::Pipeline(cmd) => cmd.execute(output_format).await?,
 
         Commands::Completions { .. } => {
-            // Already handled above
+            unreachable!()
+        }
+        
+        Commands::Shell { .. } => {
             unreachable!()
         }
 
         Commands::Serve => {
-            // Already handled above
             unreachable!()
         }
     }
