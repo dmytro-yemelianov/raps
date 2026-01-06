@@ -41,14 +41,16 @@ mod logging;
 mod mcp;
 mod output;
 mod plugins;
+mod shell;
 mod storage;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
-use rustyline::DefaultEditor;
+use rustyline::Editor;
 use rustyline::error::ReadlineError;
+use rustyline::history::DefaultHistory;
 use std::io;
 
 use api::{
@@ -298,14 +300,27 @@ async fn run(cli: Cli) -> Result<()> {
 
     if let Commands::Shell = cli.command {
         println!("{}", "Welcome to the RAPS interactive shell!".bold());
-        println!("Type 'help' for a list of commands, and 'exit' to quit.");
+        println!("Type 'help' for a list of commands, 'exit' to quit.");
+        println!(
+            "{}",
+            "Use TAB for command completion, hints show required parameters.".dimmed()
+        );
+        println!();
 
-        let mut rl = DefaultEditor::new()?;
+        // Create editor with custom helper for completions and hints
+        let helper = shell::RapsHelper::new();
+        let mut rl: Editor<shell::RapsHelper, DefaultHistory> = Editor::new()?;
+        rl.set_helper(Some(helper));
+
         let history_path = ".raps_history";
         let _ = rl.load_history(history_path);
 
+        // Use colored prompt
+        let prompt = "raps> ";
+        let colored_prompt = format!("\x1b[1;33m{}\x1b[0m", prompt);
+
         loop {
-            let readline = rl.readline("raps> ");
+            let readline = rl.readline(&colored_prompt);
             match readline {
                 Ok(line) => {
                     let _ = rl.add_history_entry(line.as_str());
@@ -317,6 +332,78 @@ async fn run(cli: Cli) -> Result<()> {
 
                     if line == "exit" || line == "quit" {
                         break;
+                    }
+
+                    // Handle help command specially for shell context
+                    if line == "help" || line == "?" {
+                        println!("{}", "Available commands:".bold());
+                        println!(
+                            "  {:<16} {}",
+                            "auth".cyan(),
+                            "Authentication (login, logout, status, test, whoami)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "bucket".cyan(),
+                            "Bucket operations (list, create, get, delete)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "object".cyan(),
+                            "Object operations (list, upload, download, delete)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "translate".cyan(),
+                            "Model Derivative (start, status, manifest, metadata)"
+                        );
+                        println!("  {:<16} {}", "hub".cyan(), "Hub operations (list, get)");
+                        println!(
+                            "  {:<16} {}",
+                            "project".cyan(),
+                            "Project operations (list, get)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "folder".cyan(),
+                            "Folder operations (list, get, create)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "item".cyan(),
+                            "Item operations (get, versions)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "webhook".cyan(),
+                            "Webhook management (list, create, get, delete)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "da".cyan(),
+                            "Design Automation (engines, appbundles, activities)"
+                        );
+                        println!(
+                            "  {:<16} {}",
+                            "issue".cyan(),
+                            "ACC/BIM 360 Issues (list, get, create)"
+                        );
+                        println!("  {:<16} {}", "rfi".cyan(), "ACC RFIs (list, get)");
+                        println!("  {:<16} {}", "config".cyan(), "Configuration management");
+                        println!("  {:<16} {}", "exit".cyan(), "Exit the shell");
+                        println!();
+                        println!("{}", "Tips:".bold());
+                        println!("  • Press {} for command completion", "TAB".green());
+                        println!(
+                            "  • {} hints show required parameters",
+                            "Gray text".dimmed()
+                        );
+                        println!(
+                            "  • Use {} or {} for command help",
+                            "<command> --help".green(),
+                            "<command> -h".green()
+                        );
+                        continue;
                     }
 
                     let mut args = shlex::split(line).unwrap_or_default();
