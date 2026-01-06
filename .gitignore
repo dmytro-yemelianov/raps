@@ -99,3 +99,6 @@ docs/_build/
 
 # Archive directory
 archive/
+
+# RAPS history
+.raps_history
