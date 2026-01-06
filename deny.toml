@@ -4,7 +4,7 @@ ignore = []
 
 [licenses]
 version = 2
-allow-licensed = [
+allow = [
     "Apache-2.0",
     "MIT",
     "BSD-2-Clause",
