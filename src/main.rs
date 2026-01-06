@@ -47,8 +47,8 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
-use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+use rustyline::error::ReadlineError;
 use std::io;
 
 use api::{
@@ -336,8 +336,7 @@ async fn run(cli: Cli) -> Result<()> {
                         None
                     };
                     let sub_output_format = OutputFormat::determine(sub_output_format);
-                    let sub_http_config =
-                        http::HttpClientConfig::from_cli_and_env(sub_cli.timeout);
+                    let sub_http_config = http::HttpClientConfig::from_cli_and_env(sub_cli.timeout);
 
                     if let Err(err) = execute_command(
                         sub_cli.command,
@@ -515,8 +514,8 @@ async fn execute_command(
         Commands::Completions { .. } => {
             unreachable!()
         }
-        
-        Commands::Shell { .. } => {
+
+        Commands::Shell => {
             unreachable!()
         }
 
