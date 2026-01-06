@@ -1,10 +1,12 @@
-use std::process::{Command, Stdio};
 use std::io::Write;
+use std::process::{Command, Stdio};
 
 #[test]
+#[ignore = "Requires binary to be built and doesn't work well with cargo nextest/llvm-cov"]
 fn test_interactive_shell_welcome_message() {
     let mut cmd = Command::new("cargo");
-    let mut child = cmd.args(&["run", "--bin", "raps", "--", "shell"])
+    let mut child = cmd
+        .args(&["run", "--bin", "raps", "--", "shell"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
