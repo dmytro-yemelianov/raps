@@ -715,15 +715,14 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
         "da_nickname" => profile.da_nickname = Some(value.to_string()),
         "use_keychain" => {
             // Store keychain preference in profile configuration
-            let use_keychain = matches!(
-                value.to_lowercase().as_str(),
-                "true" | "1" | "yes" | "on"
-            );
+            let use_keychain = matches!(value.to_lowercase().as_str(), "true" | "1" | "yes" | "on");
             profile.use_keychain = Some(use_keychain);
-            
+
             // Provide immediate feedback about security implications
             if !use_keychain {
-                eprintln!("⚠️  WARNING: Disabling keychain storage will store tokens in plaintext.");
+                eprintln!(
+                    "⚠️  WARNING: Disabling keychain storage will store tokens in plaintext."
+                );
                 eprintln!("⚠️  This is less secure than using the OS keychain.");
             } else {
                 println!("✅ Keychain storage enabled for secure token management.");

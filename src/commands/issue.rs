@@ -194,7 +194,9 @@ async fn list_issues(
             OutputFormat::Table => println!("{}", "No issues found.".yellow()),
             OutputFormat::Json => println!("[]"),
             OutputFormat::Yaml => println!("[]"),
-            OutputFormat::Csv => println!("id,display_id,title,status,assigned_to,created_at,updated_at"),
+            OutputFormat::Csv => {
+                println!("id,display_id,title,status,assigned_to,created_at,updated_at")
+            }
             OutputFormat::Plain => println!("No issues found"),
         }
         return Ok(());
@@ -252,13 +254,13 @@ async fn list_issues(
                     .display_id
                     .map(|n| n.to_string())
                     .unwrap_or_else(|| "".to_string());
-                
+
                 let assigned = issue.assigned_to.as_deref().unwrap_or("");
-                
+
                 // Properly escape CSV fields that might contain commas or quotes
                 let title = format!("\"{}\"", issue.title.replace("\"", "\"\""));
                 let assigned = format!("\"{}\"", assigned.replace("\"", "\"\""));
-                
+
                 println!(
                     "{},{},{},{},{},{},{}",
                     issue.id,
@@ -277,10 +279,13 @@ async fn list_issues(
                     .display_id
                     .map(|n| format!("#{}", n))
                     .unwrap_or_else(|| "-".to_string());
-                
+
                 let assigned = issue.assigned_to.as_deref().unwrap_or("-");
-                
-                println!("{} {} {} {}", display_id, issue.status, issue.title, assigned);
+
+                println!(
+                    "{} {} {} {}",
+                    display_id, issue.status, issue.title, assigned
+                );
             }
         }
     }

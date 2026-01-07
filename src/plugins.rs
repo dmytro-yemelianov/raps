@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn test_parse_hook_command_basic() {
         let manager = PluginManager::default();
-        
+
         // Test basic command parsing
         let result = manager.parse_hook_command("echo hello").unwrap();
         assert_eq!(result, vec!["echo", "hello"]);
@@ -466,20 +466,22 @@ mod tests {
     #[test]
     fn test_parse_hook_command_with_quotes() {
         let manager = PluginManager::default();
-        
+
         // Test quoted arguments
         let result = manager.parse_hook_command("echo \"hello world\"").unwrap();
         assert_eq!(result, vec!["echo", "hello world"]);
-        
+
         // Test mixed quotes
-        let result = manager.parse_hook_command("notify-send \"Build Complete\" success").unwrap();
+        let result = manager
+            .parse_hook_command("notify-send \"Build Complete\" success")
+            .unwrap();
         assert_eq!(result, vec!["notify-send", "Build Complete", "success"]);
     }
 
     #[test]
     fn test_parse_hook_command_unclosed_quote() {
         let manager = PluginManager::default();
-        
+
         // Test unclosed quote error
         let result = manager.parse_hook_command("echo \"unclosed quote");
         assert!(result.is_err());
@@ -489,7 +491,7 @@ mod tests {
     #[test]
     fn test_validate_hook_command_allowed() {
         let manager = PluginManager::default();
-        
+
         // Test allowed commands
         assert!(manager.validate_hook_command("echo").is_ok());
         assert!(manager.validate_hook_command("curl").is_ok());
@@ -501,15 +503,20 @@ mod tests {
     #[test]
     fn test_validate_hook_command_denied() {
         let manager = PluginManager::default();
-        
+
         // Test denied commands
         let result = manager.validate_hook_command("rm");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not in the allowed list"));
-        
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("not in the allowed list")
+        );
+
         let result = manager.validate_hook_command("sudo");
         assert!(result.is_err());
-        
+
         let result = manager.validate_hook_command("sh");
         assert!(result.is_err());
     }
@@ -517,20 +524,24 @@ mod tests {
     #[test]
     fn test_validate_hook_command_absolute_path() {
         let manager = PluginManager::default();
-        
+
         // Test absolute paths (should be allowed with warning)
         assert!(manager.validate_hook_command("/usr/bin/echo").is_ok());
-        assert!(manager.validate_hook_command("C:\\Windows\\System32\\cmd.exe").is_ok());
+        assert!(
+            manager
+                .validate_hook_command("C:\\Windows\\System32\\cmd.exe")
+                .is_ok()
+        );
     }
 
     #[test]
     fn test_parse_hook_command_empty() {
         let manager = PluginManager::default();
-        
+
         // Test empty command
         let result = manager.parse_hook_command("").unwrap();
         assert!(result.is_empty());
-        
+
         // Test whitespace only
         let result = manager.parse_hook_command("   ").unwrap();
         assert!(result.is_empty());
@@ -539,9 +550,21 @@ mod tests {
     #[test]
     fn test_parse_hook_command_complex() {
         let manager = PluginManager::default();
-        
+
         // Test complex command with multiple quoted sections
-        let result = manager.parse_hook_command("raps object upload \"my file.txt\" --bucket \"test bucket\"").unwrap();
-        assert_eq!(result, vec!["raps", "object", "upload", "my file.txt", "--bucket", "test bucket"]);
+        let result = manager
+            .parse_hook_command("raps object upload \"my file.txt\" --bucket \"test bucket\"")
+            .unwrap();
+        assert_eq!(
+            result,
+            vec![
+                "raps",
+                "object",
+                "upload",
+                "my file.txt",
+                "--bucket",
+                "test bucket"
+            ]
+        );
     }
 }
