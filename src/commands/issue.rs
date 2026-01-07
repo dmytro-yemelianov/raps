@@ -180,54 +180,111 @@ async fn list_issues(
     client: &IssuesClient,
     project_id: &str,
     status: Option<String>,
-    _output_format: OutputFormat,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    println!("{}", "Fetching issues...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching issues...".dimmed());
+    }
 
     let filter = status.as_ref().map(|s| format!("status={}", s));
     let issues = client.list_issues(project_id, filter.as_deref()).await?;
 
     if issues.is_empty() {
-        println!("{}", "No issues found.".yellow());
+        match output_format {
+            OutputFormat::Table => println!("{}", "No issues found.".yellow()),
+            OutputFormat::Json => println!("[]"),
+            OutputFormat::Yaml => println!("[]"),
+            OutputFormat::Csv => println!("id,display_id,title,status,assigned_to,created_at,updated_at"),
+            OutputFormat::Plain => println!("No issues found"),
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Issues:".bold());
-    println!("{}", "─".repeat(90));
-    println!(
-        "{:<8} {:<12} {:<40} {}",
-        "ID".bold(),
-        "Status".bold(),
-        "Title".bold(),
-        "Assigned To".bold()
-    );
-    println!("{}", "─".repeat(90));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Issues:".bold());
+            println!("{}", "─".repeat(90));
+            println!(
+                "{:<8} {:<12} {:<40} {}",
+                "ID".bold(),
+                "Status".bold(),
+                "Title".bold(),
+                "Assigned To".bold()
+            );
+            println!("{}", "─".repeat(90));
 
-    for issue in issues {
-        let display_id = issue
-            .display_id
-            .map(|n| format!("#{}", n))
-            .unwrap_or_else(|| "-".to_string());
+            for issue in &issues {
+                let display_id = issue
+                    .display_id
+                    .map(|n| format!("#{}", n))
+                    .unwrap_or_else(|| "-".to_string());
 
-        let status_colored = match issue.status.as_str() {
-            "open" => issue.status.yellow(),
-            "closed" => issue.status.green(),
-            "answered" => issue.status.cyan(),
-            _ => issue.status.normal(),
-        };
+                let status_colored = match issue.status.as_str() {
+                    "open" => issue.status.yellow(),
+                    "closed" => issue.status.green(),
+                    "answered" => issue.status.cyan(),
+                    _ => issue.status.normal(),
+                };
 
-        let assigned = issue.assigned_to.as_deref().unwrap_or("-");
+                let assigned = issue.assigned_to.as_deref().unwrap_or("-");
 
-        println!(
-            "{:<8} {:<12} {:<40} {}",
-            display_id.cyan(),
-            status_colored,
-            truncate_str(&issue.title, 40),
-            assigned.dimmed()
-        );
+                println!(
+                    "{:<8} {:<12} {:<40} {}",
+                    display_id.cyan(),
+                    status_colored,
+                    truncate_str(&issue.title, 40),
+                    assigned.dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(90));
+        }
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&issues)?);
+        }
+        OutputFormat::Yaml => {
+            println!("{}", serde_yaml::to_string(&issues)?);
+        }
+        OutputFormat::Csv => {
+            println!("id,display_id,title,status,assigned_to,created_at,updated_at");
+            for issue in &issues {
+                let display_id = issue
+                    .display_id
+                    .map(|n| n.to_string())
+                    .unwrap_or_else(|| "".to_string());
+                
+                let assigned = issue.assigned_to.as_deref().unwrap_or("");
+                
+                // Properly escape CSV fields that might contain commas or quotes
+                let title = format!("\"{}\"", issue.title.replace("\"", "\"\""));
+                let assigned = format!("\"{}\"", assigned.replace("\"", "\"\""));
+                
+                println!(
+                    "{},{},{},{},{},{},{}",
+                    issue.id,
+                    display_id,
+                    title,
+                    issue.status,
+                    assigned,
+                    issue.created_at.clone().unwrap_or_default(),
+                    issue.updated_at.clone().unwrap_or_default()
+                );
+            }
+        }
+        OutputFormat::Plain => {
+            for issue in &issues {
+                let display_id = issue
+                    .display_id
+                    .map(|n| format!("#{}", n))
+                    .unwrap_or_else(|| "-".to_string());
+                
+                let assigned = issue.assigned_to.as_deref().unwrap_or("-");
+                
+                println!("{} {} {} {}", display_id, issue.status, issue.title, assigned);
+            }
+        }
     }
 
-    println!("{}", "─".repeat(90));
     Ok(())
 }
 

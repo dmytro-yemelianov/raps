@@ -16,7 +16,7 @@ use super::AuthClient;
 use crate::config::Config;
 
 /// Issue information
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Issue {
     pub id: String,
