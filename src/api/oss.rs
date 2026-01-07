@@ -437,7 +437,8 @@ impl OssClient {
                         .await
                         .context("Failed to list buckets")
                 })
-            }).await?;
+            })
+            .await?;
 
             if !response.status().is_success() {
                 let status = response.status();
@@ -595,17 +596,17 @@ impl OssClient {
         let s3_url = &signed.urls[0];
 
         // Create a streaming body that reads the file in chunks
-        use tokio_util::codec::{BytesCodec, FramedRead};
         use futures_util::stream::TryStreamExt;
-        
+        use tokio_util::codec::{BytesCodec, FramedRead};
+
         // Reset file position to start
         file.seek(std::io::SeekFrom::Start(0)).await?;
-        
+
         // Create a stream that reads the file in chunks
         let file_stream = FramedRead::new(file, BytesCodec::new())
             .map_ok(|bytes| bytes.freeze())
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
-            
+            .map_err(std::io::Error::other);
+
         let body = reqwest::Body::wrap_stream(file_stream);
 
         let response = self
@@ -833,17 +834,17 @@ impl OssClient {
         // File will be opened individually for each part in the parallel tasks
 
         // Upload remaining parts in parallel with bounded concurrency
-        use futures_util::stream::{StreamExt, FuturesUnordered};
+        use futures_util::stream::{FuturesUnordered, StreamExt};
         use std::sync::Arc;
         use tokio::sync::{Mutex, Semaphore};
-        
+
         const MAX_CONCURRENT_UPLOADS: usize = 5; // Configurable concurrency limit
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
         let upload_key = state.upload_key.clone(); // Save before moving state to mutex
         let state_mutex = Arc::new(Mutex::new(&mut state));
         let pb_arc = Arc::new(Mutex::new(pb));
         let file_path_clone = file_path.to_path_buf(); // Clone for use in async closures
-        
+
         // Create upload tasks
         let upload_tasks: FuturesUnordered<_> = remaining_parts
             .into_iter()
@@ -859,28 +860,30 @@ impl OssClient {
                 let pb_arc = pb_arc.clone();
                 let object_key = object_key.to_string();
                 let file_path = file_path_clone.clone();
-                
+
                 async move {
                     // Acquire semaphore permit to limit concurrency
                     let _permit = semaphore.acquire().await.unwrap();
-                    
+
                     // Read file chunk
                     let buffer = {
-                        let mut file = tokio::fs::File::open(&file_path).await
-                            .with_context(|| format!("Failed to open file for part {}", part_num))?;
+                        let mut file =
+                            tokio::fs::File::open(&file_path).await.with_context(|| {
+                                format!("Failed to open file for part {}", part_num)
+                            })?;
                         file.seek(SeekFrom::Start(start)).await?;
                         let mut buffer = vec![0u8; part_size as usize];
                         file.read_exact(&mut buffer).await?;
                         buffer
                     };
-                    
+
                     // Upload part with retry logic
                     let mut attempts = 0;
                     const MAX_RETRIES: usize = 3;
-                    
+
                     loop {
                         attempts += 1;
-                        
+
                         let response = client
                             .put(&s3_url)
                             .header("Content-Type", "application/octet-stream")
@@ -888,7 +891,7 @@ impl OssClient {
                             .body(buffer.clone())
                             .send()
                             .await;
-                            
+
                         match response {
                             Ok(resp) if resp.status().is_success() => {
                                 // Get ETag from response
@@ -898,7 +901,7 @@ impl OssClient {
                                     .and_then(|v| v.to_str().ok())
                                     .map(|s| s.trim_matches('"').to_string())
                                     .unwrap_or_default();
-                                
+
                                 // Update state atomically
                                 {
                                     let mut state_guard = state_mutex.lock().await;
@@ -908,18 +911,17 @@ impl OssClient {
                                         eprintln!("Warning: Failed to save upload state: {}", e);
                                     }
                                 }
-                                
+
                                 // Update progress bar
                                 {
                                     let pb_guard = pb_arc.lock().await;
                                     pb_guard.set_position(end);
                                     pb_guard.set_message(format!(
                                         "Uploading {} ({} parts completed)",
-                                        object_key,
-                                        part_num
+                                        object_key, part_num
                                     ));
                                 }
-                                
+
                                 return Ok::<_, anyhow::Error>(part_num);
                             }
                             Ok(resp) => {
@@ -935,7 +937,8 @@ impl OssClient {
                                     );
                                 }
                                 // Wait before retry with exponential backoff
-                                let delay = std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
+                                let delay =
+                                    std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
                                 tokio::time::sleep(delay).await;
                             }
                             Err(e) => {
@@ -948,7 +951,8 @@ impl OssClient {
                                     );
                                 }
                                 // Wait before retry
-                                let delay = std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
+                                let delay =
+                                    std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
                                 tokio::time::sleep(delay).await;
                             }
                         }
@@ -956,11 +960,11 @@ impl OssClient {
                 }
             })
             .collect();
-        
+
         // Execute all upload tasks concurrently
         let mut upload_results = Vec::new();
         let mut upload_stream = upload_tasks;
-        
+
         while let Some(result) = upload_stream.next().await {
             match result {
                 Ok(part_num) => {
@@ -971,7 +975,7 @@ impl OssClient {
                 }
             }
         }
-        
+
         // Get the progress bar back from the Arc<Mutex<>>
         let pb = Arc::try_unwrap(pb_arc).unwrap().into_inner();
 
@@ -1016,7 +1020,8 @@ impl OssClient {
                     .await
                     .context("Failed to download from S3")
             })
-        }).await?;
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1083,7 +1088,8 @@ impl OssClient {
                         .await
                         .context("Failed to list objects")
                 })
-            }).await?;
+            })
+            .await?;
 
             if !response.status().is_success() {
                 let status = response.status();

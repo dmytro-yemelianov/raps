@@ -23,11 +23,13 @@ impl StorageBackend {
     pub fn from_env() -> Self {
         // First check profile configuration
         if is_keychain_disabled_in_profile() {
-            eprintln!("⚠️  WARNING: File-based token storage enabled in profile. Tokens will be stored in plaintext.");
+            eprintln!(
+                "⚠️  WARNING: File-based token storage enabled in profile. Tokens will be stored in plaintext."
+            );
             eprintln!("⚠️  Consider enabling keychain storage: raps config set use_keychain true");
             return StorageBackend::File;
         }
-        
+
         // Fall back to environment variable for backward compatibility
         let use_file = std::env::var("RAPS_USE_FILE_STORAGE")
             .ok()
@@ -35,8 +37,12 @@ impl StorageBackend {
             .unwrap_or(false);
 
         if use_file {
-            eprintln!("⚠️  WARNING: Using file-based token storage. Tokens will be stored in plaintext.");
-            eprintln!("⚠️  Consider using keychain storage for better security (remove RAPS_USE_FILE_STORAGE env var).");
+            eprintln!(
+                "⚠️  WARNING: Using file-based token storage. Tokens will be stored in plaintext."
+            );
+            eprintln!(
+                "⚠️  Consider using keychain storage for better security (remove RAPS_USE_FILE_STORAGE env var)."
+            );
             StorageBackend::File
         } else {
             // Default to keychain for security
@@ -52,28 +58,26 @@ fn is_keychain_disabled_in_profile() -> bool {
         Some(dirs) => dirs,
         None => return false,
     };
-    
+
     let profiles_path = proj_dirs.config_dir().join("profiles.json");
     if !profiles_path.exists() {
         return false;
     }
-    
+
     let content = match std::fs::read_to_string(&profiles_path) {
         Ok(c) => c,
         Err(_) => return false,
     };
-    
+
     // Parse JSON to check use_keychain setting
-    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content) {
-        if let Some(active) = data["active_profile"].as_str() {
-            if let Some(profile) = data["profiles"][active].as_object() {
-                if let Some(use_keychain) = profile.get("use_keychain") {
-                    return use_keychain.as_bool() == Some(false);
-                }
-            }
-        }
+    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&content)
+        && let Some(active) = data["active_profile"].as_str()
+        && let Some(profile) = data["profiles"][active].as_object()
+        && let Some(use_keychain) = profile.get("use_keychain")
+    {
+        return use_keychain.as_bool() == Some(false);
     }
-    
+
     false
 }
 
@@ -133,7 +137,7 @@ impl TokenStorage {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        
+
         // Add a warning to the file itself
         let _token_with_warning = token.clone();
         let json = serde_json::json!({
@@ -143,10 +147,10 @@ impl TokenStorage {
             "expires_at": token.expires_at,
             "scopes": token.scopes,
         });
-        
+
         let json_string = serde_json::to_string_pretty(&json)?;
         std::fs::write(&path, json_string)?;
-        
+
         // Set restrictive permissions on Unix-like systems
         #[cfg(unix)]
         {
@@ -155,7 +159,7 @@ impl TokenStorage {
             perms.set_mode(0o600); // Read/write for owner only
             std::fs::set_permissions(&path, perms)?;
         }
-        
+
         Ok(())
     }
 
@@ -165,11 +169,11 @@ impl TokenStorage {
         if !path.exists() {
             return Ok(None);
         }
-        
+
         eprintln!("⚠️  Loading token from plaintext file. Consider migrating to keychain storage.");
-        
+
         let contents = std::fs::read_to_string(&path)?;
-        
+
         // Try to parse as our new format with warning field
         if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&contents) {
             // Extract the token fields, ignoring the _warning field
@@ -178,12 +182,8 @@ impl TokenStorage {
                     .as_str()
                     .ok_or_else(|| anyhow::anyhow!("Missing access_token"))?
                     .to_string(),
-                refresh_token: json_value["refresh_token"]
-                    .as_str()
-                    .map(|s| s.to_string()),
-                expires_at: json_value["expires_at"]
-                    .as_i64()
-                    .unwrap_or(0),
+                refresh_token: json_value["refresh_token"].as_str().map(|s| s.to_string()),
+                expires_at: json_value["expires_at"].as_i64().unwrap_or(0),
                 scopes: json_value["scopes"]
                     .as_array()
                     .and_then(|arr| {
@@ -195,7 +195,7 @@ impl TokenStorage {
             };
             return Ok(Some(token));
         }
-        
+
         // Fall back to parsing as the old format
         let token: StoredToken =
             serde_json::from_str(&contents).context("Failed to parse token file")?;
@@ -296,9 +296,10 @@ impl TokenStorage {
     }
 
     /// Migrate tokens from file storage to keychain storage
+    #[allow(dead_code)]
     pub fn migrate_to_keychain() -> Result<()> {
         println!("🔐 Migrating tokens from file storage to secure keychain storage...");
-        
+
         // First, try to load from file storage
         let file_storage = TokenStorage::new(StorageBackend::File);
         let token = match file_storage.load()? {
@@ -308,16 +309,16 @@ impl TokenStorage {
                 return Ok(());
             }
         };
-        
+
         // Save to keychain
         let keychain_storage = TokenStorage::new(StorageBackend::Keychain);
         keychain_storage.save(&token)?;
         println!("✅ Token successfully migrated to keychain storage.");
-        
+
         // Delete the file storage
         file_storage.delete_file()?;
         println!("✅ Removed plaintext token file.");
-        
+
         println!("🎉 Migration complete! Your tokens are now securely stored in the OS keychain.");
         Ok(())
     }
@@ -333,13 +334,13 @@ mod tests {
         // These tests should be run with --test-threads=1 for safety.
         // However, since we're only modifying test-specific variables,
         // the risk is minimal in practice.
-        
+
         // Helper to temporarily set environment variables for testing
         struct EnvGuard {
             key: String,
             original: Option<String>,
         }
-        
+
         impl EnvGuard {
             fn new(key: &str, value: Option<&str>) -> Self {
                 let original = std::env::var(key).ok();
@@ -353,7 +354,7 @@ mod tests {
                 }
             }
         }
-        
+
         impl Drop for EnvGuard {
             fn drop(&mut self) {
                 match &self.original {
@@ -362,7 +363,7 @@ mod tests {
                 }
             }
         }
-        
+
         // Test default (now keychain for security)
         {
             let _guard = EnvGuard::new("RAPS_USE_FILE_STORAGE", None);
