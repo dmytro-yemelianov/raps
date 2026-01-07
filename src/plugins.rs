@@ -244,13 +244,18 @@ impl PluginManager {
     fn run_hooks(&self, key: &str) -> Result<()> {
         if let Some(hooks) = self.config.hooks.get(key) {
             for hook_cmd in hooks {
-                let status = if cfg!(windows) {
-                    Command::new("cmd").args(["/C", hook_cmd]).status()
-                } else {
-                    Command::new("sh").args(["-c", hook_cmd]).status()
-                };
+                // Parse the command to prevent shell injection
+                let parsed = self.parse_hook_command(hook_cmd)?;
+                if parsed.is_empty() {
+                    continue;
+                }
 
-                match status {
+                let mut cmd = Command::new(&parsed[0]);
+                if parsed.len() > 1 {
+                    cmd.args(&parsed[1..]);
+                }
+
+                match cmd.status() {
                     Ok(s) if !s.success() => {
                         crate::logging::log_verbose(&format!(
                             "Hook '{}' failed with exit code {:?}",
@@ -269,6 +274,88 @@ impl PluginManager {
             }
         }
         Ok(())
+    }
+
+    /// Parse a hook command safely, preventing shell injection
+    fn parse_hook_command(&self, cmd: &str) -> Result<Vec<String>> {
+        // Simple command parsing without shell interpretation
+        // This prevents command injection by not allowing shell metacharacters
+        let mut args = Vec::new();
+        let mut current = String::new();
+        let mut in_quotes = false;
+        let mut escape_next = false;
+
+        for ch in cmd.chars() {
+            if escape_next {
+                current.push(ch);
+                escape_next = false;
+            } else if ch == '\\' && in_quotes {
+                escape_next = true;
+            } else if ch == '"' {
+                in_quotes = !in_quotes;
+            } else if ch.is_whitespace() && !in_quotes {
+                if !current.is_empty() {
+                    args.push(current.clone());
+                    current.clear();
+                }
+            } else {
+                current.push(ch);
+            }
+        }
+
+        if !current.is_empty() {
+            args.push(current);
+        }
+
+        if in_quotes {
+            anyhow::bail!("Unclosed quote in hook command: {}", cmd);
+        }
+
+        // Validate that the command is allowed (whitelist approach)
+        if !args.is_empty() {
+            self.validate_hook_command(&args[0])?;
+        }
+
+        Ok(args)
+    }
+
+    /// Validate that a hook command is allowed
+    fn validate_hook_command(&self, command: &str) -> Result<()> {
+        // Define allowed commands - this should be configurable
+        const ALLOWED_COMMANDS: &[&str] = &[
+            "echo",
+            "notify-send",
+            "curl",
+            "wget",
+            "git",
+            "npm",
+            "cargo",
+            "python",
+            "node",
+            "raps",
+        ];
+
+        // Check if command is in the allowed list or is a raps plugin
+        let cmd_name = Path::new(command)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(command);
+
+        if ALLOWED_COMMANDS.contains(&cmd_name) || cmd_name.starts_with("raps-") {
+            Ok(())
+        } else if command.contains('/') || command.contains('\\') {
+            // Allow absolute paths but warn about them
+            crate::logging::log_verbose(&format!(
+                "Warning: Hook uses absolute path: {}. Consider adding to allowed commands.",
+                command
+            ));
+            Ok(())
+        } else {
+            anyhow::bail!(
+                "Command '{}' is not in the allowed list. Add it to ALLOWED_COMMANDS if needed.",
+                command
+            )
+        }
     }
 
     /// List all discovered and configured plugins
@@ -365,5 +452,96 @@ mod tests {
         let manager = PluginManager::default();
         // Should not panic
         assert!(manager.config.plugins.is_empty());
+    }
+
+    #[test]
+    fn test_parse_hook_command_basic() {
+        let manager = PluginManager::default();
+        
+        // Test basic command parsing
+        let result = manager.parse_hook_command("echo hello").unwrap();
+        assert_eq!(result, vec!["echo", "hello"]);
+    }
+
+    #[test]
+    fn test_parse_hook_command_with_quotes() {
+        let manager = PluginManager::default();
+        
+        // Test quoted arguments
+        let result = manager.parse_hook_command("echo \"hello world\"").unwrap();
+        assert_eq!(result, vec!["echo", "hello world"]);
+        
+        // Test mixed quotes
+        let result = manager.parse_hook_command("notify-send \"Build Complete\" success").unwrap();
+        assert_eq!(result, vec!["notify-send", "Build Complete", "success"]);
+    }
+
+    #[test]
+    fn test_parse_hook_command_unclosed_quote() {
+        let manager = PluginManager::default();
+        
+        // Test unclosed quote error
+        let result = manager.parse_hook_command("echo \"unclosed quote");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unclosed quote"));
+    }
+
+    #[test]
+    fn test_validate_hook_command_allowed() {
+        let manager = PluginManager::default();
+        
+        // Test allowed commands
+        assert!(manager.validate_hook_command("echo").is_ok());
+        assert!(manager.validate_hook_command("curl").is_ok());
+        assert!(manager.validate_hook_command("git").is_ok());
+        assert!(manager.validate_hook_command("raps").is_ok());
+        assert!(manager.validate_hook_command("raps-plugin").is_ok()); // raps- prefix
+    }
+
+    #[test]
+    fn test_validate_hook_command_denied() {
+        let manager = PluginManager::default();
+        
+        // Test denied commands
+        let result = manager.validate_hook_command("rm");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not in the allowed list"));
+        
+        let result = manager.validate_hook_command("sudo");
+        assert!(result.is_err());
+        
+        let result = manager.validate_hook_command("sh");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_hook_command_absolute_path() {
+        let manager = PluginManager::default();
+        
+        // Test absolute paths (should be allowed with warning)
+        assert!(manager.validate_hook_command("/usr/bin/echo").is_ok());
+        assert!(manager.validate_hook_command("C:\\Windows\\System32\\cmd.exe").is_ok());
+    }
+
+    #[test]
+    fn test_parse_hook_command_empty() {
+        let manager = PluginManager::default();
+        
+        // Test empty command
+        let result = manager.parse_hook_command("").unwrap();
+        assert!(result.is_empty());
+        
+        // Test whitespace only
+        let result = manager.parse_hook_command("   ").unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_parse_hook_command_complex() {
+        let manager = PluginManager::default();
+        
+        // Test complex command with multiple quoted sections
+        let result = manager.parse_hook_command("raps object upload \"my file.txt\" --bucket \"test bucket\"").unwrap();
+        assert_eq!(result, vec!["raps", "object", "upload", "my file.txt", "--bucket", "test bucket"]);
     }
 }

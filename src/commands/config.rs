@@ -136,6 +136,7 @@ pub struct ProfileConfig {
     pub base_url: Option<String>,
     pub callback_url: Option<String>,
     pub da_nickname: Option<String>,
+    pub use_keychain: Option<bool>,
 }
 
 /// Profiles storage structure
@@ -203,6 +204,7 @@ async fn create_profile(name: &str, output_format: OutputFormat) -> Result<()> {
             base_url: None,
             callback_url: None,
             da_nickname: None,
+            use_keychain: None,
         },
     );
 
@@ -712,13 +714,19 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
         "callback_url" => profile.callback_url = Some(value.to_string()),
         "da_nickname" => profile.da_nickname = Some(value.to_string()),
         "use_keychain" => {
-            // Set environment variable for keychain usage
-            if value.to_lowercase() == "true" || value == "1" || value.to_lowercase() == "yes" {
-                // TODO: Audit that the environment access only happens in single-threaded code.
-                unsafe { std::env::set_var("RAPS_USE_KEYCHAIN", "true") };
+            // Store keychain preference in profile configuration
+            let use_keychain = matches!(
+                value.to_lowercase().as_str(),
+                "true" | "1" | "yes" | "on"
+            );
+            profile.use_keychain = Some(use_keychain);
+            
+            // Provide immediate feedback about security implications
+            if !use_keychain {
+                eprintln!("⚠️  WARNING: Disabling keychain storage will store tokens in plaintext.");
+                eprintln!("⚠️  This is less secure than using the OS keychain.");
             } else {
-                // TODO: Audit that the environment access only happens in single-threaded code.
-                unsafe { std::env::remove_var("RAPS_USE_KEYCHAIN") };
+                println!("✅ Keychain storage enabled for secure token management.");
             }
         }
         _ => {
