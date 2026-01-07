@@ -26,6 +26,7 @@ fn test_config(base_url: &str) -> Config {
         base_url: base_url.to_string(),
         callback_url: format!("{}/callback", base_url),
         da_nickname: None,
+        http_config: raps::http::HttpClientConfig::default(),
     }
 }
 

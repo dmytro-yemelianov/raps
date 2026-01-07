@@ -423,14 +423,21 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = self
-                .http_client
-                .get(&url)
-                .bearer_auth(&token)
-                .header("x-ads-region", region.to_string())
-                .send()
-                .await
-                .context("Failed to list buckets")?;
+            let response = crate::http::execute_with_retry(&self.config.http_config, || {
+                let client = self.http_client.clone();
+                let url = url.clone();
+                let token = token.clone();
+                let region = region.to_string();
+                Box::pin(async move {
+                    client
+                        .get(&url)
+                        .bearer_auth(&token)
+                        .header("x-ads-region", region)
+                        .send()
+                        .await
+                        .context("Failed to list buckets")
+                })
+            }).await?;
 
             if !response.status().is_success() {
                 let status = response.status();
@@ -573,12 +580,6 @@ impl OssClient {
         );
         pb.set_message(format!("Uploading {}", object_key));
 
-        // Read file contents
-        let mut buffer = Vec::with_capacity(file_size as usize);
-        file.read_to_end(&mut buffer)
-            .await
-            .context("Failed to read file")?;
-
         // Step 1: Get signed S3 upload URL
         pb.set_message(format!("Getting upload URL for {}", object_key));
         let signed = self
@@ -589,16 +590,30 @@ impl OssClient {
             anyhow::bail!("No upload URLs returned from signed upload request");
         }
 
-        // Step 2: Upload directly to S3
+        // Step 2: Stream upload directly to S3 instead of loading into memory
         pb.set_message(format!("Uploading {} to S3", object_key));
         let s3_url = &signed.urls[0];
+
+        // Create a streaming body that reads the file in chunks
+        use tokio_util::codec::{BytesCodec, FramedRead};
+        use futures_util::stream::TryStreamExt;
+        
+        // Reset file position to start
+        file.seek(std::io::SeekFrom::Start(0)).await?;
+        
+        // Create a stream that reads the file in chunks
+        let file_stream = FramedRead::new(file, BytesCodec::new())
+            .map_ok(|bytes| bytes.freeze())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            
+        let body = reqwest::Body::wrap_stream(file_stream);
 
         let response = self
             .http_client
             .put(s3_url)
             .header("Content-Type", "application/octet-stream")
             .header("Content-Length", file_size.to_string())
-            .body(buffer)
+            .body(body)
             .send()
             .await
             .context("Failed to upload to S3")?;
@@ -815,74 +830,155 @@ impl OssClient {
             signed.urls
         };
 
-        // Open file for reading
-        let mut file = File::open(file_path)
-            .await
-            .context("Failed to open file for upload")?;
+        // File will be opened individually for each part in the parallel tasks
 
-        // Upload remaining parts
-        for part_num in remaining_parts {
-            let part_index = (part_num - 1) as usize;
-            let start = (part_num as u64 - 1) * chunk_size;
-            let end = std::cmp::min(start + chunk_size, file_size);
-            let part_size = end - start;
-
-            // Seek to part start
-            file.seek(SeekFrom::Start(start)).await?;
-
-            // Read part data
-            let mut buffer = vec![0u8; part_size as usize];
-            file.read_exact(&mut buffer).await?;
-
-            // Upload part
-            let s3_url = &urls[part_index];
-            let response = self
-                .http_client
-                .put(s3_url)
-                .header("Content-Type", "application/octet-stream")
-                .header("Content-Length", part_size.to_string())
-                .body(buffer)
-                .send()
-                .await
-                .with_context(|| format!("Failed to upload part {}", part_num))?;
-
-            if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!(
-                    "Failed to upload part {} ({}): {}",
-                    part_num,
-                    status,
-                    error_text
-                );
+        // Upload remaining parts in parallel with bounded concurrency
+        use futures_util::stream::{StreamExt, FuturesUnordered};
+        use std::sync::Arc;
+        use tokio::sync::{Mutex, Semaphore};
+        
+        const MAX_CONCURRENT_UPLOADS: usize = 5; // Configurable concurrency limit
+        let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
+        let upload_key = state.upload_key.clone(); // Save before moving state to mutex
+        let state_mutex = Arc::new(Mutex::new(&mut state));
+        let pb_arc = Arc::new(Mutex::new(pb));
+        let file_path_clone = file_path.to_path_buf(); // Clone for use in async closures
+        
+        // Create upload tasks
+        let upload_tasks: FuturesUnordered<_> = remaining_parts
+            .into_iter()
+            .map(|part_num| {
+                let part_index = (part_num - 1) as usize;
+                let start = (part_num as u64 - 1) * chunk_size;
+                let end = std::cmp::min(start + chunk_size, file_size);
+                let part_size = end - start;
+                let s3_url = urls[part_index].clone();
+                let client = self.http_client.clone();
+                let semaphore = semaphore.clone();
+                let state_mutex = state_mutex.clone();
+                let pb_arc = pb_arc.clone();
+                let object_key = object_key.to_string();
+                let file_path = file_path_clone.clone();
+                
+                async move {
+                    // Acquire semaphore permit to limit concurrency
+                    let _permit = semaphore.acquire().await.unwrap();
+                    
+                    // Read file chunk
+                    let buffer = {
+                        let mut file = tokio::fs::File::open(&file_path).await
+                            .with_context(|| format!("Failed to open file for part {}", part_num))?;
+                        file.seek(SeekFrom::Start(start)).await?;
+                        let mut buffer = vec![0u8; part_size as usize];
+                        file.read_exact(&mut buffer).await?;
+                        buffer
+                    };
+                    
+                    // Upload part with retry logic
+                    let mut attempts = 0;
+                    const MAX_RETRIES: usize = 3;
+                    
+                    loop {
+                        attempts += 1;
+                        
+                        let response = client
+                            .put(&s3_url)
+                            .header("Content-Type", "application/octet-stream")
+                            .header("Content-Length", part_size.to_string())
+                            .body(buffer.clone())
+                            .send()
+                            .await;
+                            
+                        match response {
+                            Ok(resp) if resp.status().is_success() => {
+                                // Get ETag from response
+                                let etag = resp
+                                    .headers()
+                                    .get("etag")
+                                    .and_then(|v| v.to_str().ok())
+                                    .map(|s| s.trim_matches('"').to_string())
+                                    .unwrap_or_default();
+                                
+                                // Update state atomically
+                                {
+                                    let mut state_guard = state_mutex.lock().await;
+                                    state_guard.completed_parts.push(part_num);
+                                    state_guard.part_etags.insert(part_num, etag);
+                                    if let Err(e) = state_guard.save() {
+                                        eprintln!("Warning: Failed to save upload state: {}", e);
+                                    }
+                                }
+                                
+                                // Update progress bar
+                                {
+                                    let pb_guard = pb_arc.lock().await;
+                                    pb_guard.set_position(end);
+                                    pb_guard.set_message(format!(
+                                        "Uploading {} ({} parts completed)",
+                                        object_key,
+                                        part_num
+                                    ));
+                                }
+                                
+                                return Ok::<_, anyhow::Error>(part_num);
+                            }
+                            Ok(resp) => {
+                                let status = resp.status();
+                                let error_text = resp.text().await.unwrap_or_default();
+                                if attempts >= MAX_RETRIES {
+                                    anyhow::bail!(
+                                        "Failed to upload part {} after {} attempts ({}): {}",
+                                        part_num,
+                                        attempts,
+                                        status,
+                                        error_text
+                                    );
+                                }
+                                // Wait before retry with exponential backoff
+                                let delay = std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
+                                tokio::time::sleep(delay).await;
+                            }
+                            Err(e) => {
+                                if attempts >= MAX_RETRIES {
+                                    anyhow::bail!(
+                                        "Failed to upload part {} after {} attempts: {}",
+                                        part_num,
+                                        attempts,
+                                        e
+                                    );
+                                }
+                                // Wait before retry
+                                let delay = std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
+                                tokio::time::sleep(delay).await;
+                            }
+                        }
+                    }
+                }
+            })
+            .collect();
+        
+        // Execute all upload tasks concurrently
+        let mut upload_results = Vec::new();
+        let mut upload_stream = upload_tasks;
+        
+        while let Some(result) = upload_stream.next().await {
+            match result {
+                Ok(part_num) => {
+                    upload_results.push(part_num);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
             }
-
-            // Get ETag from response
-            let etag = response
-                .headers()
-                .get("etag")
-                .and_then(|v| v.to_str().ok())
-                .map(|s| s.trim_matches('"').to_string())
-                .unwrap_or_default();
-
-            // Update state
-            state.completed_parts.push(part_num);
-            state.part_etags.insert(part_num, etag);
-            state.save()?;
-
-            pb.set_position(end);
-            pb.set_message(format!(
-                "Uploading {} ({}/{})",
-                object_key,
-                state.completed_parts.len(),
-                total_parts
-            ));
         }
+        
+        // Get the progress bar back from the Arc<Mutex<>>
+        let pb = Arc::try_unwrap(pb_arc).unwrap().into_inner();
 
         // Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
         let object_info = self
-            .complete_signed_upload(bucket_key, object_key, &state.upload_key)
+            .complete_signed_upload(bucket_key, object_key, &upload_key)
             .await?;
 
         // Clean up state file
@@ -909,13 +1005,18 @@ impl OssClient {
             .url
             .ok_or_else(|| anyhow::anyhow!("No download URL returned"))?;
 
-        // Step 2: Download from S3
-        let response = self
-            .http_client
-            .get(&download_url)
-            .send()
-            .await
-            .context("Failed to download from S3")?;
+        // Step 2: Download from S3 with retry logic
+        let response = crate::http::execute_with_retry(&self.config.http_config, || {
+            let client = self.http_client.clone();
+            let url = download_url.clone();
+            Box::pin(async move {
+                client
+                    .get(&url)
+                    .send()
+                    .await
+                    .context("Failed to download from S3")
+            })
+        }).await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -970,13 +1071,19 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = self
-                .http_client
-                .get(&url)
-                .bearer_auth(&token)
-                .send()
-                .await
-                .context("Failed to list objects")?;
+            let response = crate::http::execute_with_retry(&self.config.http_config, || {
+                let client = self.http_client.clone();
+                let url = url.clone();
+                let token = token.clone();
+                Box::pin(async move {
+                    client
+                        .get(&url)
+                        .bearer_auth(&token)
+                        .send()
+                        .await
+                        .context("Failed to list objects")
+                })
+            }).await?;
 
             if !response.status().is_success() {
                 let status = response.status();
@@ -1210,6 +1317,7 @@ mod tests {
             base_url: "https://developer.api.autodesk.com".to_string(),
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: None,
+            http_config: crate::http::HttpClientConfig::default(),
         };
         let auth = AuthClient::new(config.clone());
         OssClient::new(config, auth)

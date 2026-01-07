@@ -25,6 +25,8 @@ pub struct Config {
     /// Design Automation nickname (optional)
     #[allow(dead_code)]
     pub da_nickname: Option<String>,
+    /// HTTP client configuration
+    pub http_config: crate::http::HttpClientConfig,
 }
 
 impl Config {
@@ -94,6 +96,7 @@ impl Config {
             base_url,
             callback_url,
             da_nickname,
+            http_config: crate::http::HttpClientConfig::default(),
         })
     }
 
@@ -177,6 +180,7 @@ mod tests {
             base_url: "https://developer.api.autodesk.com".to_string(),
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: None,
+            http_config: crate::http::HttpClientConfig::default(),
         }
     }
 
@@ -267,6 +271,7 @@ mod tests {
             base_url: "https://custom.api.example.com".to_string(),
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: None,
+            http_config: crate::http::HttpClientConfig::default(),
         };
         assert!(
             config
@@ -288,6 +293,7 @@ mod tests {
             base_url: "https://developer.api.autodesk.com".to_string(),
             callback_url: "http://localhost:8080/callback".to_string(),
             da_nickname: Some("my-nickname".to_string()),
+            http_config: crate::http::HttpClientConfig::default(),
         };
         assert_eq!(config.da_nickname, Some("my-nickname".to_string()));
     }
