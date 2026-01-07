@@ -49,6 +49,7 @@ use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
 use rustyline::Editor;
+use rustyline::config::{CompletionType, Config as EditorConfig, EditMode};
 use rustyline::error::ReadlineError;
 use rustyline::history::DefaultHistory;
 use std::io;
@@ -308,8 +309,15 @@ async fn run(cli: Cli) -> Result<()> {
         println!();
 
         // Create editor with custom helper for completions and hints
+        let editor_config = EditorConfig::builder()
+            .completion_type(CompletionType::List)
+            .edit_mode(EditMode::Emacs)
+            .auto_add_history(true)
+            .tab_stop(4)
+            .build();
+
         let helper = shell::RapsHelper::new();
-        let mut rl: Editor<shell::RapsHelper, DefaultHistory> = Editor::new()?;
+        let mut rl: Editor<shell::RapsHelper, DefaultHistory> = Editor::with_config(editor_config)?;
         rl.set_helper(Some(helper));
 
         let history_path = ".raps_history";
@@ -338,59 +346,43 @@ async fn run(cli: Cli) -> Result<()> {
                     if line == "help" || line == "?" {
                         println!("{}", "Available commands:".bold());
                         println!(
-                            "  {:<16} {}",
-                            "auth".cyan(),
-                            "Authentication (login, logout, status, test, whoami)"
+                            "  {:<16} Authentication (login, logout, status, test, whoami)",
+                            "auth".cyan()
                         );
                         println!(
-                            "  {:<16} {}",
-                            "bucket".cyan(),
-                            "Bucket operations (list, create, get, delete)"
+                            "  {:<16} Bucket operations (list, create, get, delete)",
+                            "bucket".cyan()
                         );
                         println!(
-                            "  {:<16} {}",
-                            "object".cyan(),
-                            "Object operations (list, upload, download, delete)"
+                            "  {:<16} Object operations (list, upload, download, delete)",
+                            "object".cyan()
                         );
                         println!(
-                            "  {:<16} {}",
-                            "translate".cyan(),
-                            "Model Derivative (start, status, manifest, metadata)"
+                            "  {:<16} Model Derivative (start, status, manifest, metadata)",
+                            "translate".cyan()
                         );
-                        println!("  {:<16} {}", "hub".cyan(), "Hub operations (list, get)");
+                        println!("  {:<16} Hub operations (list, get)", "hub".cyan());
+                        println!("  {:<16} Project operations (list, get)", "project".cyan());
                         println!(
-                            "  {:<16} {}",
-                            "project".cyan(),
-                            "Project operations (list, get)"
+                            "  {:<16} Folder operations (list, get, create)",
+                            "folder".cyan()
                         );
+                        println!("  {:<16} Item operations (get, versions)", "item".cyan());
                         println!(
-                            "  {:<16} {}",
-                            "folder".cyan(),
-                            "Folder operations (list, get, create)"
-                        );
-                        println!(
-                            "  {:<16} {}",
-                            "item".cyan(),
-                            "Item operations (get, versions)"
+                            "  {:<16} Webhook management (list, create, get, delete)",
+                            "webhook".cyan()
                         );
                         println!(
-                            "  {:<16} {}",
-                            "webhook".cyan(),
-                            "Webhook management (list, create, get, delete)"
+                            "  {:<16} Design Automation (engines, appbundles, activities)",
+                            "da".cyan()
                         );
                         println!(
-                            "  {:<16} {}",
-                            "da".cyan(),
-                            "Design Automation (engines, appbundles, activities)"
+                            "  {:<16} ACC/BIM 360 Issues (list, get, create)",
+                            "issue".cyan()
                         );
-                        println!(
-                            "  {:<16} {}",
-                            "issue".cyan(),
-                            "ACC/BIM 360 Issues (list, get, create)"
-                        );
-                        println!("  {:<16} {}", "rfi".cyan(), "ACC RFIs (list, get)");
-                        println!("  {:<16} {}", "config".cyan(), "Configuration management");
-                        println!("  {:<16} {}", "exit".cyan(), "Exit the shell");
+                        println!("  {:<16} ACC RFIs (list, get)", "rfi".cyan());
+                        println!("  {:<16} Configuration management", "config".cyan());
+                        println!("  {:<16} Exit the shell", "exit".cyan());
                         println!();
                         println!("{}", "Tips:".bold());
                         println!("  • Press {} for command completion", "TAB".green());
