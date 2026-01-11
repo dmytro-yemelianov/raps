@@ -1981,7 +1981,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "raps"
+name = "raps-acc"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "raps-cli"
 version = "3.8.0"
 dependencies = [
  "anyhow",
@@ -1992,16 +2005,19 @@ dependencies = [
  "clap_complete",
  "colored",
  "console 0.15.11",
- "csv",
  "dialoguer",
  "directories",
- "dotenvy",
  "futures-util",
  "indicatif",
- "keyring",
  "predicates",
- "rand",
- "regex",
+ "raps-acc",
+ "raps-da",
+ "raps-derivative",
+ "raps-dm",
+ "raps-kernel",
+ "raps-oss",
+ "raps-reality",
+ "raps-webhooks",
  "reqwest",
  "rmcp",
  "rustyline",
@@ -2011,8 +2027,6 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "shlex",
- "thiserror 1.0.69",
- "tiny_http",
  "tokio",
  "tokio-util",
  "tracing",
@@ -2020,7 +2034,122 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "raps-da"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures-util",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "raps-derivative"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "futures-util",
+ "indicatif",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "urlencoding",
+]
+
+[[package]]
+name = "raps-dm"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "raps-kernel"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "base64 0.21.7",
+ "chrono",
+ "colored",
+ "console 0.15.11",
+ "csv",
+ "directories",
+ "dotenvy",
+ "keyring",
+ "rand",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror 1.0.69",
+ "tiny_http",
+ "tokio",
+ "url",
+ "urlencoding",
+ "uuid",
  "webbrowser",
+]
+
+[[package]]
+name = "raps-oss"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "futures-util",
+ "indicatif",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "urlencoding",
+]
+
+[[package]]
+name = "raps-reality"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "futures-util",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "raps-webhooks"
+version = "3.8.0"
+dependencies = [
+ "anyhow",
+ "raps-kernel",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
