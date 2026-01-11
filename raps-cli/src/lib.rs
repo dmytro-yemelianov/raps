@@ -1,5 +1,13 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2024-2025 Dmytro Yemelianov
+
 //! RAPS CLI library
 //!
 //! This is the main CLI crate that ties together all service crates.
+//! The CLI is primarily a binary, but this library module exports
+//! components that may be useful for testing or programmatic usage.
 
-// Placeholder - the actual CLI code will be moved here
+pub mod commands;
+pub mod mcp;
+pub mod plugins;
+pub mod shell;

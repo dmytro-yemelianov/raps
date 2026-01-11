@@ -87,6 +87,12 @@ futures-util.workspace = true
 # Directories
 directories.workspace = true
 
+# Random number generation
+rand.workspace = true
+
+# CSV output
+csv.workspace = true
+
 [dev-dependencies]
 assert_cmd.workspace = true
 predicates.workspace = true
