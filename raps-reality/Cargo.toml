@@ -1,0 +1,29 @@
+[package]
+name = "raps-reality"
+description = "Reality Capture client for RAPS"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+raps-kernel.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# File handling
+tokio-util.workspace = true
+futures-util.workspace = true

@@ -1,0 +1,62 @@
+[package]
+name = "raps-kernel"
+description = "Core kernel for RAPS - authentication, configuration, HTTP, storage"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+csv.workspace = true
+
+# HTTP client
+reqwest.workspace = true
+
+# Async runtime
+tokio.workspace = true
+
+# Environment loading
+dotenvy.workspace = true
+
+# Terminal colors
+colored.workspace = true
+console.workspace = true
+
+# Secure token storage
+directories.workspace = true
+keyring.workspace = true
+
+# Date/time handling
+chrono.workspace = true
+
+# Random number generation
+rand.workspace = true
+
+# URL parsing
+url.workspace = true
+
+# Regex for secret redaction
+regex.workspace = true
+
+# OAuth browser flow
+webbrowser.workspace = true
+tiny_http.workspace = true
+
+# Base64 encoding
+base64.workspace = true
+
+# UUID generation
+uuid.workspace = true
+
+# URL encoding
+urlencoding.workspace = true
