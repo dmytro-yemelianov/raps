@@ -8,7 +8,26 @@
       "Bash(scoop install:*)",
       "Bash(vhs:*)",
       "Bash(timeout /t 60 vhs auth-demo.tape)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(wc:*)",
+      "Bash(cargo build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo test:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(cargo llvm-cov:*)",
+      "Bash(cargo install:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(ls:*)",
+      "Bash(cargo run:*)",
+      "Bash(du:*)",
+      "Bash(git gc:*)"
     ]
   }
 }
