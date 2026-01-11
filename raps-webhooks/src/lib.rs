@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::uninlined_format_args)]
 // Copyright 2024-2025 Dmytro Yemelianov
 
 //! Webhooks API module
