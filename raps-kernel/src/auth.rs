@@ -463,14 +463,7 @@ impl AuthClient {
         };
 
         // Fallback ports (RAPS in leet speak + common alternatives)
-        let fallback_ports: Vec<u16> = vec![
-            preferred_port,
-            12495,
-            7495,
-            9247,
-            3000,
-            5000,
-        ];
+        let fallback_ports: Vec<u16> = vec![preferred_port, 12495, 7495, 9247, 3000, 5000];
 
         // Try to bind to a port
         let mut server = None;

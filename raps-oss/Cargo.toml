@@ -36,3 +36,9 @@ urlencoding.workspace = true
 
 # Date/time handling
 chrono.workspace = true
+
+# Base64 encoding
+base64.workspace = true
+
+# Project directories
+directories.workspace = true

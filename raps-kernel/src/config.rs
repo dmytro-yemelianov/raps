@@ -181,11 +181,11 @@ pub fn load_profiles() -> Result<ProfilesData> {
         return Ok(ProfilesData::default());
     }
 
-    let content = std::fs::read_to_string(&profiles_path)
-        .context("Failed to read profiles file")?;
+    let content =
+        std::fs::read_to_string(&profiles_path).context("Failed to read profiles file")?;
 
-    let data: ProfilesData = serde_json::from_str(&content)
-        .context("Failed to parse profiles file")?;
+    let data: ProfilesData =
+        serde_json::from_str(&content).context("Failed to parse profiles file")?;
 
     Ok(data)
 }
