@@ -5,8 +5,8 @@
 //!
 //! Exposes APS API functionality as MCP tools for AI assistants.
 
-use rmcp::{model::*, transport::stdio, ServerHandler, ServiceExt};
-use serde_json::{json, Map, Value};
+use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
+use serde_json::{Map, Value, json};
 use std::{str::FromStr, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -147,9 +147,7 @@ impl RapsServer {
     async fn auth_test(&self) -> String {
         let auth = self.get_auth_client().await;
         match auth.get_token().await {
-            Ok(_) => {
-                "Authentication successful! 2-legged OAuth credentials are valid.".to_string()
-            }
+            Ok(_) => "Authentication successful! 2-legged OAuth credentials are valid.".to_string(),
             Err(e) => format!("Authentication failed: {}", e),
         }
     }

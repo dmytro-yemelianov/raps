@@ -37,13 +37,13 @@ mod plugins;
 mod shell;
 
 use anyhow::Result;
-use clap::{error::ErrorKind, CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
+use clap_complete::{Shell, generate};
 use colored::Colorize;
+use rustyline::Editor;
 use rustyline::config::{CompletionType, Config as EditorConfig, EditMode};
 use rustyline::error::ReadlineError;
 use rustyline::history::DefaultHistory;
-use rustyline::Editor;
 use std::io;
 
 use commands::{

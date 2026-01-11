@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use raps_kernel::interactive;
 use raps_kernel::output::OutputFormat;
-use raps_webhooks::{WebhooksClient, WEBHOOK_EVENTS};
+use raps_webhooks::{WEBHOOK_EVENTS, WebhooksClient};
 
 #[derive(Debug, Subcommand)]
 pub enum WebhookCommands {

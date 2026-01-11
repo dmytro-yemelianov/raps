@@ -418,7 +418,6 @@ impl RealityCaptureClient {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -453,8 +452,14 @@ mod tests {
 
     #[test]
     fn test_scene_type_serialization() {
-        assert_eq!(serde_json::to_string(&SceneType::Aerial).unwrap(), "\"aerial\"");
-        assert_eq!(serde_json::to_string(&SceneType::Object).unwrap(), "\"object\"");
+        assert_eq!(
+            serde_json::to_string(&SceneType::Aerial).unwrap(),
+            "\"aerial\""
+        );
+        assert_eq!(
+            serde_json::to_string(&SceneType::Object).unwrap(),
+            "\"object\""
+        );
     }
 
     #[test]

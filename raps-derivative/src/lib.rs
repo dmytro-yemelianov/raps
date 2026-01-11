@@ -604,9 +604,18 @@ mod tests {
 
     #[test]
     fn test_output_format_serialization() {
-        assert_eq!(serde_json::to_string(&OutputFormat::Svf2).unwrap(), "\"svf2\"");
-        assert_eq!(serde_json::to_string(&OutputFormat::Obj).unwrap(), "\"obj\"");
-        assert_eq!(serde_json::to_string(&OutputFormat::Ifc).unwrap(), "\"ifc\"");
+        assert_eq!(
+            serde_json::to_string(&OutputFormat::Svf2).unwrap(),
+            "\"svf2\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OutputFormat::Obj).unwrap(),
+            "\"obj\""
+        );
+        assert_eq!(
+            serde_json::to_string(&OutputFormat::Ifc).unwrap(),
+            "\"ifc\""
+        );
     }
 
     #[test]
@@ -627,9 +636,18 @@ mod tests {
 
     #[test]
     fn test_output_format_from_str() {
-        assert!(matches!(OutputFormat::from_str("svf2"), Ok(OutputFormat::Svf2)));
-        assert!(matches!(OutputFormat::from_str("SVF2"), Ok(OutputFormat::Svf2)));
-        assert!(matches!(OutputFormat::from_str("obj"), Ok(OutputFormat::Obj)));
+        assert!(matches!(
+            OutputFormat::from_str("svf2"),
+            Ok(OutputFormat::Svf2)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("SVF2"),
+            Ok(OutputFormat::Svf2)
+        ));
+        assert!(matches!(
+            OutputFormat::from_str("obj"),
+            Ok(OutputFormat::Obj)
+        ));
         assert!(OutputFormat::from_str("invalid").is_err());
     }
 
@@ -674,17 +692,15 @@ mod tests {
 
     #[test]
     fn test_filter_by_guid() {
-        let derivatives = vec![
-            DownloadableDerivative {
-                guid: "guid1".to_string(),
-                name: "model.obj".to_string(),
-                output_type: "obj".to_string(),
-                role: "3d".to_string(),
-                urn: "urn1".to_string(),
-                mime: None,
-                size: None,
-            },
-        ];
+        let derivatives = vec![DownloadableDerivative {
+            guid: "guid1".to_string(),
+            name: "model.obj".to_string(),
+            output_type: "obj".to_string(),
+            role: "3d".to_string(),
+            urn: "urn1".to_string(),
+            mime: None,
+            size: None,
+        }];
 
         let found = DerivativeClient::filter_by_guid(&derivatives, "guid1");
         assert!(found.is_some());
@@ -703,7 +719,9 @@ mod tests {
                 root_filename: Some("model.rvt".to_string()),
             },
             output: TranslationOutput {
-                destination: OutputDestination { region: "us".to_string() },
+                destination: OutputDestination {
+                    region: "us".to_string(),
+                },
                 formats: vec![OutputFormatSpec {
                     format_type: "svf2".to_string(),
                     views: Some(vec!["2d".to_string(), "3d".to_string()]),

@@ -653,7 +653,6 @@ impl DataManagementClient {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

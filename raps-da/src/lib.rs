@@ -443,7 +443,6 @@ impl DesignAutomationClient {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -534,13 +533,16 @@ mod tests {
     #[test]
     fn test_create_activity_request_serialization() {
         let mut parameters = std::collections::HashMap::new();
-        parameters.insert("input".to_string(), ActivityParameter {
-            verb: "get".to_string(),
-            local_name: Some("input.rvt".to_string()),
-            description: None,
-            required: Some(true),
-            zip: None,
-        });
+        parameters.insert(
+            "input".to_string(),
+            ActivityParameter {
+                verb: "get".to_string(),
+                local_name: Some("input.rvt".to_string()),
+                description: None,
+                required: Some(true),
+                zip: None,
+            },
+        );
 
         let request = CreateActivityRequest {
             id: "MyActivity".to_string(),
@@ -559,11 +561,14 @@ mod tests {
     #[test]
     fn test_create_workitem_request_serialization() {
         let mut arguments = std::collections::HashMap::new();
-        arguments.insert("input".to_string(), WorkItemArgument {
-            url: "https://example.com/input.rvt".to_string(),
-            verb: Some("get".to_string()),
-            headers: None,
-        });
+        arguments.insert(
+            "input".to_string(),
+            WorkItemArgument {
+                url: "https://example.com/input.rvt".to_string(),
+                verb: Some("get".to_string()),
+                headers: None,
+            },
+        );
 
         let request = CreateWorkItemRequest {
             activity_id: "myapp.MyActivity+dev".to_string(),
@@ -585,7 +590,10 @@ mod tests {
         }"#;
 
         let response: PaginatedResponse<AppBundle> = serde_json::from_str(json).unwrap();
-        assert_eq!(response.pagination_token, Some("next-page-token".to_string()));
+        assert_eq!(
+            response.pagination_token,
+            Some("next-page-token".to_string())
+        );
         assert_eq!(response.data.len(), 2);
     }
 }

@@ -15,9 +15,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use raps_da::{
-    ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument,
-};
+use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument};
 use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

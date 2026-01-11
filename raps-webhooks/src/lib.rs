@@ -285,7 +285,7 @@ mod tests {
     fn test_webhook_events_constant() {
         assert!(!WEBHOOK_EVENTS.is_empty());
         assert!(WEBHOOK_EVENTS.len() >= 10);
-        
+
         // Check some expected events exist
         let events: Vec<&str> = WEBHOOK_EVENTS.iter().map(|(e, _)| *e).collect();
         assert!(events.contains(&"dm.version.added"));

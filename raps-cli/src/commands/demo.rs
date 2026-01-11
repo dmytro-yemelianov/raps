@@ -149,8 +149,7 @@ async fn bucket_lifecycle(args: &BucketLifecycleArgs) -> Result<()> {
             _ => Region::US,
         };
 
-        let policy_enum =
-            RetentionPolicy::from_str(policy).unwrap_or(RetentionPolicy::Transient);
+        let policy_enum = RetentionPolicy::from_str(policy).unwrap_or(RetentionPolicy::Transient);
 
         match oss.create_bucket(name, policy_enum, region_enum).await {
             Ok(_) => {
