@@ -597,3 +597,140 @@ impl DerivativeClient {
         Ok(results)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_output_format_serialization() {
+        assert_eq!(serde_json::to_string(&OutputFormat::Svf2).unwrap(), "\"svf2\"");
+        assert_eq!(serde_json::to_string(&OutputFormat::Obj).unwrap(), "\"obj\"");
+        assert_eq!(serde_json::to_string(&OutputFormat::Ifc).unwrap(), "\"ifc\"");
+    }
+
+    #[test]
+    fn test_output_format_display() {
+        assert_eq!(OutputFormat::Svf2.to_string(), "SVF2 (Viewer)");
+        assert_eq!(OutputFormat::Svf.to_string(), "SVF (Legacy Viewer)");
+        assert_eq!(OutputFormat::Obj.to_string(), "OBJ (Mesh)");
+        assert_eq!(OutputFormat::Stl.to_string(), "STL (3D Print)");
+        assert_eq!(OutputFormat::Ifc.to_string(), "IFC (BIM)");
+    }
+
+    #[test]
+    fn test_output_format_type_name() {
+        assert_eq!(OutputFormat::Svf2.type_name(), "svf2");
+        assert_eq!(OutputFormat::Obj.type_name(), "obj");
+        assert_eq!(OutputFormat::Ifc.type_name(), "ifc");
+    }
+
+    #[test]
+    fn test_output_format_from_str() {
+        assert!(matches!(OutputFormat::from_str("svf2"), Ok(OutputFormat::Svf2)));
+        assert!(matches!(OutputFormat::from_str("SVF2"), Ok(OutputFormat::Svf2)));
+        assert!(matches!(OutputFormat::from_str("obj"), Ok(OutputFormat::Obj)));
+        assert!(OutputFormat::from_str("invalid").is_err());
+    }
+
+    #[test]
+    fn test_output_format_all() {
+        let all = OutputFormat::all();
+        assert_eq!(all.len(), 8);
+    }
+
+    #[test]
+    fn test_filter_by_format() {
+        let derivatives = vec![
+            DownloadableDerivative {
+                guid: "guid1".to_string(),
+                name: "model.obj".to_string(),
+                output_type: "obj".to_string(),
+                role: "3d".to_string(),
+                urn: "urn1".to_string(),
+                mime: None,
+                size: Some(1024),
+            },
+            DownloadableDerivative {
+                guid: "guid2".to_string(),
+                name: "model.stl".to_string(),
+                output_type: "stl".to_string(),
+                role: "3d".to_string(),
+                urn: "urn2".to_string(),
+                mime: None,
+                size: None,
+            },
+        ];
+
+        let filtered = DerivativeClient::filter_by_format(&derivatives, "obj");
+        assert_eq!(filtered.len(), 1);
+
+        let filtered = DerivativeClient::filter_by_format(&derivatives, "OBJ");
+        assert_eq!(filtered.len(), 1);
+
+        let filtered = DerivativeClient::filter_by_format(&derivatives, "ifc");
+        assert_eq!(filtered.len(), 0);
+    }
+
+    #[test]
+    fn test_filter_by_guid() {
+        let derivatives = vec![
+            DownloadableDerivative {
+                guid: "guid1".to_string(),
+                name: "model.obj".to_string(),
+                output_type: "obj".to_string(),
+                role: "3d".to_string(),
+                urn: "urn1".to_string(),
+                mime: None,
+                size: None,
+            },
+        ];
+
+        let found = DerivativeClient::filter_by_guid(&derivatives, "guid1");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "model.obj");
+
+        let not_found = DerivativeClient::filter_by_guid(&derivatives, "nonexistent");
+        assert!(not_found.is_none());
+    }
+
+    #[test]
+    fn test_translation_request_serialization() {
+        let request = TranslationRequest {
+            input: TranslationInput {
+                urn: "test-urn".to_string(),
+                compressed_urn: None,
+                root_filename: Some("model.rvt".to_string()),
+            },
+            output: TranslationOutput {
+                destination: OutputDestination { region: "us".to_string() },
+                formats: vec![OutputFormatSpec {
+                    format_type: "svf2".to_string(),
+                    views: Some(vec!["2d".to_string(), "3d".to_string()]),
+                }],
+            },
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["input"]["rootFilename"], "model.rvt");
+        assert_eq!(json["output"]["destination"]["region"], "us");
+    }
+
+    #[test]
+    fn test_manifest_deserialization() {
+        let json = r#"{
+            "type": "manifest",
+            "hasThumbnail": "true",
+            "status": "success",
+            "progress": "complete",
+            "region": "US",
+            "urn": "test-urn",
+            "derivatives": []
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.status, "success");
+        assert_eq!(manifest.progress, "complete");
+        assert!(manifest.derivatives.is_empty());
+    }
+}

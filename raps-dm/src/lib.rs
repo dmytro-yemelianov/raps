@@ -652,3 +652,120 @@ impl DataManagementClient {
         Ok(api_response.data)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hub_deserialization() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.hub-id",
+            "attributes": {
+                "name": "Test Hub",
+                "region": "US"
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        assert_eq!(hub.hub_type, "hubs");
+        assert_eq!(hub.id, "b.hub-id");
+        assert_eq!(hub.attributes.name, "Test Hub");
+    }
+
+    #[test]
+    fn test_project_deserialization() {
+        let json = r#"{
+            "type": "projects",
+            "id": "b.project-id",
+            "attributes": {
+                "name": "Test Project"
+            }
+        }"#;
+
+        let project: Project = serde_json::from_str(json).unwrap();
+        assert_eq!(project.project_type, "projects");
+        assert_eq!(project.attributes.name, "Test Project");
+    }
+
+    #[test]
+    fn test_folder_deserialization() {
+        let json = r#"{
+            "type": "folders",
+            "id": "urn:adsk.wipprod:folder.id",
+            "attributes": {
+                "name": "Project Files"
+            }
+        }"#;
+
+        let folder: Folder = serde_json::from_str(json).unwrap();
+        assert_eq!(folder.folder_type, "folders");
+        assert_eq!(folder.attributes.name, "Project Files");
+    }
+
+    #[test]
+    fn test_item_deserialization() {
+        let json = r#"{
+            "type": "items",
+            "id": "urn:adsk.wipprod:dm.lineage:item-id",
+            "attributes": {
+                "displayName": "model.rvt"
+            }
+        }"#;
+
+        let item: Item = serde_json::from_str(json).unwrap();
+        assert_eq!(item.item_type, "items");
+        assert_eq!(item.attributes.display_name, "model.rvt");
+    }
+
+    #[test]
+    fn test_version_deserialization() {
+        let json = r#"{
+            "type": "versions",
+            "id": "urn:adsk.wipprod:fs.file:version-id",
+            "attributes": {
+                "name": "model.rvt",
+                "displayName": "model.rvt",
+                "versionNumber": 1
+            }
+        }"#;
+
+        let version: Version = serde_json::from_str(json).unwrap();
+        assert_eq!(version.version_type, "versions");
+        assert_eq!(version.attributes.version_number, Some(1));
+    }
+
+    #[test]
+    fn test_create_folder_request_serialization() {
+        let request = CreateFolderRequest {
+            jsonapi: JsonApiVersion {
+                version: "1.0".to_string(),
+            },
+            data: CreateFolderData {
+                data_type: "folders".to_string(),
+                attributes: CreateFolderAttributes {
+                    name: "New Folder".to_string(),
+                    extension: CreateFolderExtension {
+                        ext_type: "folders:autodesk.bim360:Folder".to_string(),
+                        version: "1.0".to_string(),
+                    },
+                },
+                relationships: CreateFolderRelationships {
+                    parent: CreateFolderParent {
+                        data: CreateFolderParentData {
+                            data_type: "folders".to_string(),
+                            id: "parent-folder-id".to_string(),
+                        },
+                    },
+                },
+            },
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["jsonapi"]["version"], "1.0");
+        assert_eq!(json["data"]["type"], "folders");
+        assert_eq!(json["data"]["attributes"]["name"], "New Folder");
+    }
+}

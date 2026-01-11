@@ -442,3 +442,150 @@ impl DesignAutomationClient {
         Ok(workitem)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_engine_deserialization() {
+        let json = r#"{
+            "id": "Autodesk.Revit+2024",
+            "description": "Revit 2024 Engine",
+            "productVersion": "2024"
+        }"#;
+
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.id, "Autodesk.Revit+2024");
+        assert_eq!(engine.description, Some("Revit 2024 Engine".to_string()));
+    }
+
+    #[test]
+    fn test_appbundle_deserialization() {
+        let json = r#"{
+            "id": "myapp.MyBundle+dev",
+            "engine": "Autodesk.Revit+2024",
+            "description": "My custom bundle",
+            "version": 1
+        }"#;
+
+        let bundle: AppBundle = serde_json::from_str(json).unwrap();
+        assert_eq!(bundle.id, "myapp.MyBundle+dev");
+        assert_eq!(bundle.engine, "Autodesk.Revit+2024");
+    }
+
+    #[test]
+    fn test_activity_deserialization() {
+        let json = r#"{
+            "id": "myapp.MyActivity+dev",
+            "engine": "Autodesk.Revit+2024",
+            "description": "My activity",
+            "version": 1
+        }"#;
+
+        let activity: Activity = serde_json::from_str(json).unwrap();
+        assert_eq!(activity.id, "myapp.MyActivity+dev");
+    }
+
+    #[test]
+    fn test_workitem_deserialization() {
+        let json = r#"{
+            "id": "workitem-id-123",
+            "status": "pending",
+            "progress": "0%"
+        }"#;
+
+        let workitem: WorkItem = serde_json::from_str(json).unwrap();
+        assert_eq!(workitem.id, "workitem-id-123");
+        assert_eq!(workitem.status, "pending");
+    }
+
+    #[test]
+    fn test_workitem_stats_deserialization() {
+        let json = r#"{
+            "id": "workitem-id-123",
+            "status": "success",
+            "stats": {
+                "bytesDownloaded": 1024,
+                "bytesUploaded": 2048
+            }
+        }"#;
+
+        let workitem: WorkItem = serde_json::from_str(json).unwrap();
+        assert!(workitem.stats.is_some());
+        let stats = workitem.stats.unwrap();
+        assert_eq!(stats.bytes_downloaded, Some(1024));
+    }
+
+    #[test]
+    fn test_create_appbundle_request_serialization() {
+        let request = CreateAppBundleRequest {
+            id: "MyBundle".to_string(),
+            engine: "Autodesk.Revit+2024".to_string(),
+            description: Some("Test bundle".to_string()),
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["id"], "MyBundle");
+        assert_eq!(json["engine"], "Autodesk.Revit+2024");
+    }
+
+    #[test]
+    fn test_create_activity_request_serialization() {
+        let mut parameters = std::collections::HashMap::new();
+        parameters.insert("input".to_string(), ActivityParameter {
+            verb: "get".to_string(),
+            local_name: Some("input.rvt".to_string()),
+            description: None,
+            required: Some(true),
+            zip: None,
+        });
+
+        let request = CreateActivityRequest {
+            id: "MyActivity".to_string(),
+            engine: "Autodesk.Revit+2024".to_string(),
+            command_line: vec!["$(engine.path)\\revitcoreconsole.exe".to_string()],
+            app_bundles: vec!["myapp.MyBundle+dev".to_string()],
+            description: Some("Test activity".to_string()),
+            parameters,
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["id"], "MyActivity");
+        assert!(json["commandLine"].is_array());
+    }
+
+    #[test]
+    fn test_create_workitem_request_serialization() {
+        let mut arguments = std::collections::HashMap::new();
+        arguments.insert("input".to_string(), WorkItemArgument {
+            url: "https://example.com/input.rvt".to_string(),
+            verb: Some("get".to_string()),
+            headers: None,
+        });
+
+        let request = CreateWorkItemRequest {
+            activity_id: "myapp.MyActivity+dev".to_string(),
+            arguments,
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["activityId"], "myapp.MyActivity+dev");
+    }
+
+    #[test]
+    fn test_paginated_response_deserialization() {
+        let json = r#"{
+            "paginationToken": "next-page-token",
+            "data": [
+                {"id": "item1", "engine": "engine1"},
+                {"id": "item2", "engine": "engine2"}
+            ]
+        }"#;
+
+        let response: PaginatedResponse<AppBundle> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.pagination_token, Some("next-page-token".to_string()));
+        assert_eq!(response.data.len(), 2);
+    }
+}

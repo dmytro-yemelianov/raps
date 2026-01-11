@@ -276,3 +276,128 @@ impl WebhooksClient {
         WEBHOOK_EVENTS
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_webhook_events_constant() {
+        assert!(!WEBHOOK_EVENTS.is_empty());
+        assert!(WEBHOOK_EVENTS.len() >= 10);
+        
+        // Check some expected events exist
+        let events: Vec<&str> = WEBHOOK_EVENTS.iter().map(|(e, _)| *e).collect();
+        assert!(events.contains(&"dm.version.added"));
+        assert!(events.contains(&"dm.folder.added"));
+        assert!(events.contains(&"extraction.finished"));
+    }
+
+    #[test]
+    fn test_webhook_deserialization() {
+        let json = r#"{
+            "hookId": "hook-123",
+            "callbackUrl": "https://example.com/webhook",
+            "event": "dm.version.added",
+            "system": "data",
+            "status": "active"
+        }"#;
+
+        let webhook: Webhook = serde_json::from_str(json).unwrap();
+        assert_eq!(webhook.hook_id, "hook-123");
+        assert_eq!(webhook.callback_url, "https://example.com/webhook");
+        assert_eq!(webhook.event, "dm.version.added");
+        assert_eq!(webhook.status, "active");
+    }
+
+    #[test]
+    fn test_webhook_with_scope_deserialization() {
+        let json = r#"{
+            "hookId": "hook-456",
+            "callbackUrl": "https://example.com/webhook",
+            "event": "dm.version.added",
+            "system": "data",
+            "status": "active",
+            "scope": {
+                "folder": "urn:adsk.wipprod:fs.folder:folder-id"
+            }
+        }"#;
+
+        let webhook: Webhook = serde_json::from_str(json).unwrap();
+        assert!(webhook.scope.is_some());
+        let scope = webhook.scope.unwrap();
+        assert!(scope.folder.is_some());
+    }
+
+    #[test]
+    fn test_create_webhook_request_serialization() {
+        let request = CreateWebhookRequest {
+            callback_url: "https://example.com/callback".to_string(),
+            scope: CreateWebhookScope {
+                folder: Some("folder-urn".to_string()),
+                workflow: None,
+            },
+            hook_attribute: None,
+            filter: None,
+            hub_id: None,
+            project_id: None,
+            auto_reactivate_hook: Some(true),
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["callbackUrl"], "https://example.com/callback");
+        assert_eq!(json["scope"]["folder"], "folder-urn");
+        assert_eq!(json["autoReactivateHook"], true);
+    }
+
+    #[test]
+    fn test_create_webhook_request_skips_none_fields() {
+        let request = CreateWebhookRequest {
+            callback_url: "https://example.com/callback".to_string(),
+            scope: CreateWebhookScope {
+                folder: None,
+                workflow: None,
+            },
+            hook_attribute: None,
+            filter: None,
+            hub_id: None,
+            project_id: None,
+            auto_reactivate_hook: None,
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert!(json.get("hookAttribute").is_none());
+        assert!(json.get("filter").is_none());
+        assert!(json.get("hubId").is_none());
+    }
+
+    #[test]
+    fn test_webhooks_response_deserialization() {
+        let json = r#"{
+            "data": [
+                {
+                    "hookId": "hook-1",
+                    "callbackUrl": "https://example.com/1",
+                    "event": "dm.version.added",
+                    "system": "data",
+                    "status": "active"
+                },
+                {
+                    "hookId": "hook-2",
+                    "callbackUrl": "https://example.com/2",
+                    "event": "dm.folder.added",
+                    "system": "data",
+                    "status": "inactive"
+                }
+            ],
+            "links": {
+                "next": "https://api.example.com/webhooks?page=2"
+            }
+        }"#;
+
+        let response: WebhooksResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 2);
+        assert!(response.links.is_some());
+        assert!(response.links.unwrap().next.is_some());
+    }
+}

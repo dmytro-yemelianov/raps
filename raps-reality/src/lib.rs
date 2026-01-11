@@ -417,3 +417,100 @@ impl RealityCaptureClient {
         OutputFormat::all()
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_output_format_all() {
+        let formats = OutputFormat::all();
+        assert_eq!(formats.len(), 5);
+    }
+
+    #[test]
+    fn test_output_format_display() {
+        assert_eq!(OutputFormat::Rcm.to_string(), "rcm");
+        assert_eq!(OutputFormat::Rcs.to_string(), "rcs");
+        assert_eq!(OutputFormat::Obj.to_string(), "obj");
+        assert_eq!(OutputFormat::Fbx.to_string(), "fbx");
+        assert_eq!(OutputFormat::Ortho.to_string(), "ortho");
+    }
+
+    #[test]
+    fn test_output_format_description() {
+        assert!(!OutputFormat::Rcm.description().is_empty());
+        assert!(OutputFormat::Rcm.description().contains("ReCap"));
+        assert!(OutputFormat::Obj.description().contains("OBJ"));
+    }
+
+    #[test]
+    fn test_scene_type_display() {
+        assert_eq!(SceneType::Aerial.to_string(), "aerial");
+        assert_eq!(SceneType::Object.to_string(), "object");
+    }
+
+    #[test]
+    fn test_scene_type_serialization() {
+        assert_eq!(serde_json::to_string(&SceneType::Aerial).unwrap(), "\"aerial\"");
+        assert_eq!(serde_json::to_string(&SceneType::Object).unwrap(), "\"object\"");
+    }
+
+    #[test]
+    fn test_photoscene_deserialization() {
+        let json = r#"{
+            "photosceneid": "scene-123",
+            "name": "Test Scene",
+            "scenetype": "object",
+            "convertformat": "rcm",
+            "status": "Created",
+            "progress": "0"
+        }"#;
+
+        let scene: Photoscene = serde_json::from_str(json).unwrap();
+        assert_eq!(scene.photoscene_id, "scene-123");
+        assert_eq!(scene.name, Some("Test Scene".to_string()));
+    }
+
+    #[test]
+    fn test_photoscene_progress_deserialization() {
+        let json = r#"{
+            "photosceneid": "scene-123",
+            "progress": "50",
+            "progressmsg": "Processing images"
+        }"#;
+
+        let progress: PhotosceneProgress = serde_json::from_str(json).unwrap();
+        assert_eq!(progress.photoscene_id, "scene-123");
+        assert_eq!(progress.progress, "50");
+    }
+
+    #[test]
+    fn test_photoscene_result_deserialization() {
+        let json = r#"{
+            "photosceneid": "scene-123",
+            "progress": "100",
+            "progressmsg": "Complete",
+            "filesize": "5242880",
+            "scenelink": "https://example.com/download/scene.rcm"
+        }"#;
+
+        let result: PhotosceneResult = serde_json::from_str(json).unwrap();
+        assert_eq!(result.photoscene_id, "scene-123");
+        assert!(result.scene_link.is_some());
+    }
+
+    #[test]
+    fn test_create_photoscene_response_deserialization() {
+        let json = r#"{
+            "Photoscene": {
+                "photosceneid": "new-scene-456",
+                "name": "New Scene"
+            }
+        }"#;
+
+        let response: CreatePhotosceneResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.photoscene.photoscene_id, "new-scene-456");
+    }
+}
