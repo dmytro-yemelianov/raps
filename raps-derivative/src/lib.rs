@@ -333,7 +333,7 @@ impl DerivativeClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to start translation ({}): {}", status, error_text);
+            anyhow::bail!("Failed to start translation ({status}): {error_text}");
         }
 
         let translation_response: TranslationResponse = response
@@ -364,7 +364,7 @@ impl DerivativeClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get manifest ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get manifest ({status}): {error_text}");
         }
 
         let manifest: Manifest = response
@@ -396,7 +396,7 @@ impl DerivativeClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete manifest ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete manifest ({status}): {error_text}");
         }
 
         Ok(())
@@ -523,7 +523,7 @@ impl DerivativeClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download derivative ({}): {}", status, error_text);
+            anyhow::bail!("Failed to download derivative ({status}): {error_text}");
         }
 
         let total_size = response.content_length().unwrap_or(0);
@@ -581,7 +581,7 @@ impl DerivativeClient {
         let filtered = Self::filter_by_format(&downloadables, format);
 
         if filtered.is_empty() {
-            anyhow::bail!("No derivatives found with format '{}'", format);
+            anyhow::bail!("No derivatives found with format '{format}'");
         }
 
         let mut results = Vec::new();

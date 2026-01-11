@@ -262,7 +262,7 @@ async fn download_object(
         None => {
             let objects = client.list_objects(&bucket_key).await?;
             if objects.is_empty() {
-                anyhow::bail!("No objects found in bucket '{}'", bucket_key);
+                anyhow::bail!("No objects found in bucket '{bucket_key}'");
             }
 
             let object_keys: Vec<String> = objects

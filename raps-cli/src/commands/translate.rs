@@ -609,12 +609,12 @@ async fn download_derivatives(
     let to_download: Vec<_> = if let Some(ref guid) = guid_filter {
         match DerivativeClient::filter_by_guid(&derivatives, guid) {
             Some(d) => vec![d],
-            None => anyhow::bail!("No derivative found with GUID '{}'", guid),
+            None => anyhow::bail!("No derivative found with GUID '{guid}'"),
         }
     } else if let Some(ref format) = format_filter {
         let filtered = DerivativeClient::filter_by_format(&derivatives, format);
         if filtered.is_empty() {
-            anyhow::bail!("No derivatives found with format '{}'", format);
+            anyhow::bail!("No derivatives found with format '{format}'");
         }
         filtered
     } else {
@@ -898,7 +898,7 @@ fn create_preset(
         .iter()
         .any(|p| p.name.eq_ignore_ascii_case(name))
     {
-        anyhow::bail!("Preset '{}' already exists", name);
+        anyhow::bail!("Preset '{name}' already exists");
     }
 
     let preset = TranslationPreset {
@@ -929,7 +929,7 @@ fn delete_preset(name: &str, output_format: OutputFormat) -> Result<()> {
     store.presets.retain(|p| !p.name.eq_ignore_ascii_case(name));
 
     if store.presets.len() == initial_len {
-        anyhow::bail!("Preset '{}' not found", name);
+        anyhow::bail!("Preset '{name}' not found");
     }
 
     store.save()?;

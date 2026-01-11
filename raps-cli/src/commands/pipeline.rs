@@ -198,7 +198,7 @@ async fn run_pipeline(
                 failed += 1;
 
                 if !step.continue_on_error && !global_continue_on_error {
-                    anyhow::bail!("Pipeline aborted at step '{}': {}", step.name, e);
+                    anyhow::bail!("Pipeline aborted at step '{}': {e}", step.name);
                 }
             }
         }
@@ -239,7 +239,7 @@ async fn run_pipeline(
     }
 
     if failed > 0 {
-        anyhow::bail!("Pipeline completed with {} failed step(s)", failed);
+        anyhow::bail!("Pipeline completed with {failed} failed step(s)");
     }
 
     Ok(())

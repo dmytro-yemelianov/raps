@@ -218,7 +218,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create photoscene ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create photoscene ({status}): {error_text}");
         }
 
         let create_response: CreatePhotosceneResponse = response
@@ -277,7 +277,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload photos ({}): {}", status, error_text);
+            anyhow::bail!("Failed to upload photos ({status}): {error_text}");
         }
 
         let upload_response: UploadResponse = response
@@ -313,7 +313,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to start processing ({}): {}", status, error_text);
+            anyhow::bail!("Failed to start processing ({status}): {error_text}");
         }
 
         Ok(())
@@ -339,7 +339,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get progress ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get progress ({status}): {error_text}");
         }
 
         let progress_response: ProgressResponse = response
@@ -375,7 +375,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get result ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get result ({status}): {error_text}");
         }
 
         let result_response: ResultResponse = response
@@ -406,7 +406,7 @@ impl RealityCaptureClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete photoscene ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete photoscene ({status}): {error_text}");
         }
 
         Ok(())

@@ -199,7 +199,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list engines ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list engines ({status}): {error_text}");
         }
 
         let paginated: PaginatedResponse<Engine> = response
@@ -226,7 +226,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list appbundles ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list appbundles ({status}): {error_text}");
         }
 
         let paginated: PaginatedResponse<String> = response
@@ -266,7 +266,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create appbundle ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create appbundle ({status}): {error_text}");
         }
 
         let appbundle: AppBundleDetails = response
@@ -293,7 +293,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete appbundle ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete appbundle ({status}): {error_text}");
         }
 
         Ok(())
@@ -315,7 +315,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list activities ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list activities ({status}): {error_text}");
         }
 
         let paginated: PaginatedResponse<String> = response
@@ -344,7 +344,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create activity ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create activity ({status}): {error_text}");
         }
 
         let activity: Activity = response
@@ -371,7 +371,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete activity ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete activity ({status}): {error_text}");
         }
 
         Ok(())
@@ -404,7 +404,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create workitem ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create workitem ({status}): {error_text}");
         }
 
         let workitem: WorkItem = response
@@ -431,7 +431,7 @@ impl DesignAutomationClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get workitem status ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get workitem status ({status}): {error_text}");
         }
 
         let workitem: WorkItem = response

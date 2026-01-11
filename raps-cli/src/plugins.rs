@@ -204,7 +204,7 @@ impl PluginManager {
         // Check configured plugins first
         if let Some(entry) = self.config.plugins.get(name) {
             if !entry.enabled {
-                anyhow::bail!("Plugin '{}' is disabled", name);
+                anyhow::bail!("Plugin '{name}' is disabled");
             }
             if let Some(ref path) = entry.path {
                 return self.run_plugin(path, args);
@@ -217,7 +217,7 @@ impl PluginManager {
             return self.run_plugin(&plugin.path.to_string_lossy(), args);
         }
 
-        anyhow::bail!("Plugin '{}' not found", name)
+        anyhow::bail!("Plugin '{name}' not found")
     }
 
     /// Run a plugin executable
@@ -310,7 +310,7 @@ impl PluginManager {
         }
 
         if in_quotes {
-            anyhow::bail!("Unclosed quote in hook command: {}", cmd);
+            anyhow::bail!("Unclosed quote in hook command: {cmd}");
         }
 
         // Validate that the command is allowed (whitelist approach)

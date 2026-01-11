@@ -271,7 +271,7 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Device code request failed ({}): {}", status, error_text);
+            anyhow::bail!("Device code request failed ({status}): {error_text}");
         }
 
         let device_response: DeviceCodeResponse = response
@@ -389,7 +389,7 @@ impl AuthClient {
                 anyhow::bail!("Device code expired. Please try again.");
             }
 
-            anyhow::bail!("Token polling failed: {}", error_text);
+            anyhow::bail!("Token polling failed: {error_text}");
         }
     }
 
@@ -443,7 +443,7 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to validate token ({}): {}", status, error_text);
+            anyhow::bail!("Failed to validate token ({status}): {error_text}");
         }
 
         let user: UserInfo = response.json().await.context("Failed to parse user info")?;
@@ -637,7 +637,7 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Token exchange failed ({}): {}", status, error_text);
+            anyhow::bail!("Token exchange failed ({status}): {error_text}");
         }
 
         let token: TokenResponse = response

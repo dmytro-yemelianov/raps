@@ -44,7 +44,7 @@ pub fn require_value<T>(value: Option<T>, name: &str) -> Result<T, anyhow::Error
                 );
             }
             // In interactive mode, return None wrapped in error to trigger prompt
-            anyhow::bail!("{} is required", name);
+            anyhow::bail!("{name} is required");
         }
     }
 }

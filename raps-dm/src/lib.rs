@@ -269,7 +269,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list hubs ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list hubs ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Vec<Hub>> = response
@@ -296,7 +296,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get hub ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get hub ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Hub> = response
@@ -323,7 +323,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list projects ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Vec<Project>> = response
@@ -355,7 +355,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get project ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Project> = response
@@ -387,7 +387,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get top folders ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get top folders ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Vec<Folder>> = response
@@ -485,7 +485,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create folder ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create folder ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Folder> = response
@@ -517,7 +517,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get item ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Item> = response
@@ -549,7 +549,7 @@ impl DataManagementClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item versions ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get item versions ({status}): {error_text}");
         }
 
         let api_response: JsonApiResponse<Vec<Version>> = response

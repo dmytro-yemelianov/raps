@@ -385,7 +385,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create bucket ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create bucket ({status}): {error_text}");
         }
 
         let bucket: Bucket = response
@@ -445,7 +445,7 @@ impl OssClient {
             if !response.status().is_success() {
                 let status = response.status();
                 let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list buckets ({}): {}", status, error_text);
+                anyhow::bail!("Failed to list buckets ({status}): {error_text}");
             }
 
             let buckets_response: BucketsResponse = response
@@ -486,7 +486,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get bucket details ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get bucket details ({status}): {error_text}");
         }
 
         let bucket: Bucket = response
@@ -513,7 +513,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete bucket ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete bucket ({status}): {error_text}");
         }
 
         Ok(())
@@ -624,7 +624,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload to S3 ({}): {}", status, error_text);
+            anyhow::bail!("Failed to upload to S3 ({status}): {error_text}");
         }
 
         pb.set_position(file_size);
@@ -1010,7 +1010,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download from S3 ({}): {}", status, error_text);
+            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
         }
 
         let total_size = signed
@@ -1078,7 +1078,7 @@ impl OssClient {
             if !response.status().is_success() {
                 let status = response.status();
                 let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list objects ({}): {}", status, error_text);
+                anyhow::bail!("Failed to list objects ({status}): {error_text}");
             }
 
             let response_text = response
@@ -1121,7 +1121,7 @@ impl OssClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete object ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete object ({status}): {error_text}");
         }
 
         Ok(())

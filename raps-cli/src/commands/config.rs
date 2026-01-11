@@ -327,7 +327,7 @@ async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
     let mut data = load_profiles()?;
 
     if !data.profiles.contains_key(name) {
-        anyhow::bail!("Profile '{}' does not exist", name);
+        anyhow::bail!("Profile '{name}' does not exist");
     }
 
     // If deleting active profile, clear it
@@ -413,7 +413,7 @@ async fn export_profiles(
         if let Some(profile) = data.profiles.get(name) {
             filtered.profiles.insert(name.clone(), profile.clone());
         } else {
-            anyhow::bail!("Profile '{}' not found", name);
+            anyhow::bail!("Profile '{name}' not found");
         }
         filtered
     } else {

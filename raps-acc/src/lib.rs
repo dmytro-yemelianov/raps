@@ -221,7 +221,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list issues ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list issues ({status}): {error_text}");
         }
 
         let issues_response: IssuesResponse = response
@@ -253,7 +253,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get issue ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get issue ({status}): {error_text}");
         }
 
         let issue: Issue = response
@@ -290,7 +290,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create issue ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create issue ({status}): {error_text}");
         }
 
         let issue: Issue = response
@@ -329,7 +329,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update issue ({}): {}", status, error_text);
+            anyhow::bail!("Failed to update issue ({status}): {error_text}");
         }
 
         let issue: Issue = response
@@ -360,7 +360,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list issue types ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list issue types ({status}): {error_text}");
         }
 
         let types_response: IssueTypesResponse = response
@@ -398,7 +398,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list comments ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list comments ({status}): {error_text}");
         }
 
         let comments_response: CommentsResponse = response
@@ -441,7 +441,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to add comment ({}): {}", status, error_text);
+            anyhow::bail!("Failed to add comment ({status}): {error_text}");
         }
 
         let comment: IssueComment = response
@@ -479,7 +479,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete comment ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete comment ({status}): {error_text}");
         }
 
         Ok(())
@@ -512,7 +512,7 @@ impl IssuesClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list attachments ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list attachments ({status}): {error_text}");
         }
 
         let attachments_response: AttachmentsResponse = response
@@ -718,7 +718,7 @@ impl RfiClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list RFIs ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list RFIs ({status}): {error_text}");
         }
 
         let rfis_response: RfisResponse = response
@@ -748,7 +748,7 @@ impl RfiClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get RFI ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get RFI ({status}): {error_text}");
         }
 
         let rfi: Rfi = response
@@ -778,7 +778,7 @@ impl RfiClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create RFI ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create RFI ({status}): {error_text}");
         }
 
         let rfi: Rfi = response
@@ -813,7 +813,7 @@ impl RfiClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update RFI ({}): {}", status, error_text);
+            anyhow::bail!("Failed to update RFI ({status}): {error_text}");
         }
 
         let rfi: Rfi = response
@@ -962,7 +962,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list assets ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list assets ({status}): {error_text}");
         }
 
         let assets_response: AssetsResponse = response
@@ -992,7 +992,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get asset ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get asset ({status}): {error_text}");
         }
 
         let asset: Asset = response
@@ -1026,7 +1026,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create asset ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create asset ({status}): {error_text}");
         }
 
         let asset: Asset = response
@@ -1061,7 +1061,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update asset ({}): {}", status, error_text);
+            anyhow::bail!("Failed to update asset ({status}): {error_text}");
         }
 
         let asset: Asset = response
@@ -1092,7 +1092,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list submittals ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list submittals ({status}): {error_text}");
         }
 
         let submittals_response: SubmittalsResponse = response
@@ -1122,7 +1122,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get submittal ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get submittal ({status}): {error_text}");
         }
 
         let submittal: Submittal = response
@@ -1156,7 +1156,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create submittal ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create submittal ({status}): {error_text}");
         }
 
         let submittal: Submittal = response
@@ -1191,7 +1191,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update submittal ({}): {}", status, error_text);
+            anyhow::bail!("Failed to update submittal ({status}): {error_text}");
         }
 
         let submittal: Submittal = response
@@ -1222,7 +1222,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list checklists ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list checklists ({status}): {error_text}");
         }
 
         let checklists_response: ChecklistsResponse = response
@@ -1294,7 +1294,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get checklist ({}): {}", status, error_text);
+            anyhow::bail!("Failed to get checklist ({status}): {error_text}");
         }
 
         let checklist: Checklist = response
@@ -1328,7 +1328,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create checklist ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create checklist ({status}): {error_text}");
         }
 
         let checklist: Checklist = response
@@ -1363,7 +1363,7 @@ impl AccClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update checklist ({}): {}", status, error_text);
+            anyhow::bail!("Failed to update checklist ({status}): {error_text}");
         }
 
         let checklist: Checklist = response
