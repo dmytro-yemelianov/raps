@@ -152,7 +152,7 @@ impl WebhooksClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list webhooks ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list webhooks ({status}): {error_text}");
         }
 
         let webhooks_response: WebhooksResponse = response
@@ -179,7 +179,7 @@ impl WebhooksClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list webhooks ({}): {}", status, error_text);
+            anyhow::bail!("Failed to list webhooks ({status}): {error_text}");
         }
 
         let webhooks_response: WebhooksResponse = response
@@ -232,7 +232,7 @@ impl WebhooksClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create webhook ({}): {}", status, error_text);
+            anyhow::bail!("Failed to create webhook ({status}): {error_text}");
         }
 
         let webhook: Webhook = response
@@ -265,7 +265,7 @@ impl WebhooksClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete webhook ({}): {}", status, error_text);
+            anyhow::bail!("Failed to delete webhook ({status}): {error_text}");
         }
 
         Ok(())

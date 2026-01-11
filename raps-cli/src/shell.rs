@@ -22,7 +22,7 @@ pub struct CommandInfo {
     pub name: &'static str,
     /// Short description
     pub description: &'static str,
-    /// Required parameters with placeholders (e.g., "<bucket-key>")
+    /// Required parameters with placeholders (e.g., `<bucket-key>`)
     pub params: &'static [&'static str],
     /// Optional flags
     pub flags: &'static [&'static str],
