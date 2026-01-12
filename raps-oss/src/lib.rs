@@ -1472,4 +1472,598 @@ mod tests {
                 .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
         );
     }
+
+    #[test]
+    fn test_bucket_deserialization() {
+        let json = r#"{
+            "bucketKey": "test-bucket",
+            "bucketOwner": "test-owner",
+            "createdDate": 1609459200000,
+            "permissions": [{"authId": "test-auth", "access": "full"}],
+            "policyKey": "transient"
+        }"#;
+
+        let bucket: Bucket = serde_json::from_str(json).unwrap();
+        assert_eq!(bucket.bucket_key, "test-bucket");
+        assert_eq!(bucket.bucket_owner, "test-owner");
+        assert_eq!(bucket.policy_key, "transient");
+        assert_eq!(bucket.permissions.len(), 1);
+    }
+
+    #[test]
+    fn test_buckets_response_deserialization() {
+        let json = r#"{
+            "items": [
+                {"bucketKey": "bucket1", "createdDate": 1609459200000, "policyKey": "transient"},
+                {"bucketKey": "bucket2", "createdDate": 1609459200000, "policyKey": "persistent"}
+            ],
+            "next": "bucket3"
+        }"#;
+
+        let response: BucketsResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.items.len(), 2);
+        assert_eq!(response.items[0].bucket_key, "bucket1");
+        assert_eq!(response.next, Some("bucket3".to_string()));
+    }
+
+    #[test]
+    fn test_buckets_response_no_next() {
+        let json = r#"{
+            "items": [
+                {"bucketKey": "bucket1", "createdDate": 1609459200000, "policyKey": "transient"}
+            ]
+        }"#;
+
+        let response: BucketsResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.items.len(), 1);
+        assert!(response.next.is_none());
+    }
+
+    #[test]
+    fn test_object_info_deserialization() {
+        let json = r#"{
+            "bucketKey": "test-bucket",
+            "objectKey": "test-object.dwg",
+            "objectId": "urn:adsk.objects:os.object:test-bucket/test-object.dwg",
+            "sha1": "abc123",
+            "size": 1024,
+            "location": "https://example.com/object"
+        }"#;
+
+        let object: ObjectInfo = serde_json::from_str(json).unwrap();
+        assert_eq!(object.bucket_key, "test-bucket");
+        assert_eq!(object.object_key, "test-object.dwg");
+        assert_eq!(object.size, 1024);
+    }
+
+    #[test]
+    fn test_objects_response_deserialization() {
+        let json = r#"{
+            "items": [
+                {"bucketKey": "bucket", "objectKey": "file1.dwg", "objectId": "urn:1", "size": 100},
+                {"bucketKey": "bucket", "objectKey": "file2.rvt", "objectId": "urn:2", "size": 200}
+            ],
+            "next": "file3.dwg"
+        }"#;
+
+        let response: ObjectsResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.items.len(), 2);
+        assert_eq!(response.items[0].object_key, "file1.dwg");
+        assert_eq!(response.items[1].size, 200);
+    }
+
+    #[test]
+    fn test_signed_s3_download_response_deserialization() {
+        let json = r#"{
+            "url": "https://s3.amazonaws.com/signed-url",
+            "size": 1048576,
+            "sha1": "abc123"
+        }"#;
+
+        let response: SignedS3DownloadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            response.url,
+            Some("https://s3.amazonaws.com/signed-url".to_string())
+        );
+        assert_eq!(response.size, Some(1048576));
+    }
+
+    #[test]
+    fn test_signed_s3_upload_response_deserialization() {
+        let json = r#"{
+            "uploadKey": "upload-key-123",
+            "urls": ["https://s3.amazonaws.com/part1", "https://s3.amazonaws.com/part2"],
+            "uploadExpiration": "2024-01-15T12:00:00Z"
+        }"#;
+
+        let response: SignedS3UploadResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.upload_key, "upload-key-123");
+        assert_eq!(response.urls.len(), 2);
+    }
+
+    #[test]
+    fn test_get_urn_special_characters() {
+        let client = create_test_oss_client();
+        let urn = client.get_urn("bucket-with-dash", "object with spaces.dwg");
+        // URN should handle special characters
+        assert!(!urn.is_empty());
+        assert!(
+            urn.chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
+    }
+
+    #[test]
+    fn test_get_urn_unicode() {
+        let client = create_test_oss_client();
+        let urn = client.get_urn("test-bucket", "файл.dwg"); // Cyrillic filename
+        assert!(!urn.is_empty());
+    }
+
+    #[test]
+    fn test_retention_policy_serialization() {
+        let policy = RetentionPolicy::Persistent;
+        let json = serde_json::to_value(&policy).unwrap();
+        assert_eq!(json, "persistent");
+    }
+
+    #[test]
+    fn test_region_serialization() {
+        let region = Region::EMEA;
+        let json = serde_json::to_value(&region).unwrap();
+        assert_eq!(json, "EMEA");
+    }
+}
+
+/// Integration tests using wiremock
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use raps_kernel::auth::AuthClient;
+    use raps_kernel::config::Config;
+    use wiremock::matchers::{header, method, path, path_regex};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    /// Create an OSS client configured to use the mock server
+    fn create_mock_oss_client(mock_url: &str) -> OssClient {
+        let config = Config {
+            client_id: "test-client-id".to_string(),
+            client_secret: "test-client-secret".to_string(),
+            base_url: mock_url.to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        let auth = AuthClient::new(config.clone());
+        OssClient::new(config, auth)
+    }
+
+    /// Setup mock for 2-legged auth token
+    async fn setup_auth_mock(server: &MockServer) {
+        Mock::given(method("POST"))
+            .and(path("/authentication/v2/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "test-token-12345",
+                "token_type": "Bearer",
+                "expires_in": 3600
+            })))
+            .mount(server)
+            .await;
+    }
+
+    // ==================== Bucket Operations ====================
+
+    #[tokio::test]
+    async fn test_create_bucket_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/oss/v2/buckets"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "bucketKey": "new-bucket",
+                "bucketOwner": "test-owner",
+                "createdDate": 1609459200000_i64,
+                "permissions": [{"authId": "test-auth", "access": "full"}],
+                "policyKey": "transient"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .create_bucket("new-bucket", RetentionPolicy::Transient, Region::US)
+            .await;
+
+        assert!(result.is_ok());
+        let bucket = result.unwrap();
+        assert_eq!(bucket.bucket_key, "new-bucket");
+        assert_eq!(bucket.policy_key, "transient");
+    }
+
+    #[tokio::test]
+    async fn test_create_bucket_conflict() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/oss/v2/buckets"))
+            .respond_with(ResponseTemplate::new(409).set_body_json(serde_json::json!({
+                "reason": "Bucket already exists"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .create_bucket("existing-bucket", RetentionPolicy::Transient, Region::US)
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("409"));
+    }
+
+    #[tokio::test]
+    async fn test_get_bucket_details_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/test-bucket/details"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "bucketKey": "test-bucket",
+                "bucketOwner": "owner-id",
+                "createdDate": 1609459200000_i64,
+                "permissions": [{"authId": "owner-id", "access": "full"}],
+                "policyKey": "persistent"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.get_bucket_details("test-bucket").await;
+
+        assert!(result.is_ok());
+        let bucket = result.unwrap();
+        assert_eq!(bucket.bucket_key, "test-bucket");
+        assert_eq!(bucket.policy_key, "persistent");
+    }
+
+    #[tokio::test]
+    async fn test_get_bucket_details_not_found() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/nonexistent/details"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "reason": "Bucket not found"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.get_bucket_details("nonexistent").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("404"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_bucket_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/oss/v2/buckets/bucket-to-delete"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.delete_bucket("bucket-to-delete").await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_bucket_not_empty() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/oss/v2/buckets/non-empty-bucket"))
+            .respond_with(ResponseTemplate::new(409).set_body_json(serde_json::json!({
+                "reason": "Bucket is not empty"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.delete_bucket("non-empty-bucket").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("409"));
+    }
+
+    // ==================== Object Operations ====================
+
+    #[tokio::test]
+    async fn test_list_objects_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/test-bucket/objects"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [
+                    {
+                        "bucketKey": "test-bucket",
+                        "objectKey": "file1.dwg",
+                        "objectId": "urn:adsk.objects:os.object:test-bucket/file1.dwg",
+                        "size": 1024
+                    },
+                    {
+                        "bucketKey": "test-bucket",
+                        "objectKey": "file2.rvt",
+                        "objectId": "urn:adsk.objects:os.object:test-bucket/file2.rvt",
+                        "size": 2048
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.list_objects("test-bucket").await;
+
+        assert!(result.is_ok());
+        let objects = result.unwrap();
+        assert_eq!(objects.len(), 2);
+        assert_eq!(objects[0].object_key, "file1.dwg");
+        assert_eq!(objects[1].size, 2048);
+    }
+
+    #[tokio::test]
+    async fn test_list_objects_empty() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/empty-bucket/objects"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": []
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.list_objects("empty-bucket").await;
+
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delete_object_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/oss/v2/buckets/test-bucket/objects/test-object.dwg"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.delete_object("test-bucket", "test-object.dwg").await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_object_not_found() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path("/oss/v2/buckets/test-bucket/objects/nonexistent.dwg"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "reason": "Object not found"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.delete_object("test-bucket", "nonexistent.dwg").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("404"));
+    }
+
+    // ==================== Signed URL Operations ====================
+
+    #[tokio::test]
+    async fn test_get_signed_download_url_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(
+                r"/oss/v2/buckets/test-bucket/objects/.*/signeds3download",
+            ))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "url": "https://s3.amazonaws.com/signed-download-url",
+                "size": 1048576,
+                "sha1": "abc123def456"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .get_signed_download_url("test-bucket", "test-file.dwg", None)
+            .await;
+
+        assert!(result.is_ok());
+        let signed = result.unwrap();
+        assert!(signed.url.is_some());
+        assert_eq!(signed.size, Some(1048576));
+    }
+
+    #[tokio::test]
+    async fn test_get_signed_upload_url_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(
+                r"/oss/v2/buckets/test-bucket/objects/.*/signeds3upload",
+            ))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "uploadKey": "test-upload-key",
+                "urls": ["https://s3.amazonaws.com/upload-url-1"],
+                "uploadExpiration": "2024-01-15T12:00:00Z"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .get_signed_upload_url("test-bucket", "new-file.dwg", None, None)
+            .await;
+
+        assert!(result.is_ok());
+        let signed = result.unwrap();
+        assert_eq!(signed.upload_key, "test-upload-key");
+        assert_eq!(signed.urls.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_signed_upload_url_multipart() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(
+                r"/oss/v2/buckets/test-bucket/objects/.*/signeds3upload",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "uploadKey": "multipart-upload-key",
+                "urls": [
+                    "https://s3.amazonaws.com/part1",
+                    "https://s3.amazonaws.com/part2",
+                    "https://s3.amazonaws.com/part3"
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .get_signed_upload_url("test-bucket", "large-file.dwg", Some(3), None)
+            .await;
+
+        assert!(result.is_ok());
+        let signed = result.unwrap();
+        assert_eq!(signed.urls.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_complete_signed_upload_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path_regex(
+                r"/oss/v2/buckets/test-bucket/objects/.*/signeds3upload",
+            ))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "bucketKey": "test-bucket",
+                "objectKey": "uploaded-file.dwg",
+                "objectId": "urn:adsk.objects:os.object:test-bucket/uploaded-file.dwg",
+                "size": 5242880
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client
+            .complete_signed_upload("test-bucket", "uploaded-file.dwg", "test-upload-key")
+            .await;
+
+        assert!(result.is_ok());
+        let object = result.unwrap();
+        assert_eq!(object.object_key, "uploaded-file.dwg");
+    }
+
+    // ==================== Error Handling ====================
+
+    #[tokio::test]
+    async fn test_handle_401_unauthorized() {
+        let server = MockServer::start().await;
+
+        // Auth endpoint returns 401
+        Mock::given(method("POST"))
+            .and(path("/authentication/v2/token"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "developerMessage": "Invalid client credentials"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.list_objects("test-bucket").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("401"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_403_forbidden() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/forbidden-bucket/objects"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({
+                "reason": "Access denied"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.list_objects("forbidden-bucket").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("403"));
+    }
+
+    #[tokio::test]
+    async fn test_handle_500_server_error() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path("/oss/v2/buckets/error-bucket/details"))
+            .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+                "reason": "Internal server error"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_oss_client(&server.uri());
+        let result = client.get_bucket_details("error-bucket").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("500"));
+    }
 }

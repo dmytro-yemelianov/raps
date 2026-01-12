@@ -859,4 +859,531 @@ mod tests {
         assert_eq!(version.attributes.storage_size, Some(1048576));
         assert_eq!(version.attributes.version_number, Some(2));
     }
+
+    #[test]
+    fn test_json_api_response_hubs_deserialization() {
+        let json = r#"{
+            "data": [{
+                "type": "hubs",
+                "id": "b.hub-123",
+                "attributes": {
+                    "name": "Test Hub",
+                    "region": "US"
+                }
+            }],
+            "included": [],
+            "links": {
+                "self": {"href": "https://api.example.com/hubs"}
+            }
+        }"#;
+
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 1);
+        assert_eq!(response.data[0].id, "b.hub-123");
+    }
+
+    #[test]
+    fn test_json_api_response_single_hub() {
+        let json = r#"{
+            "data": {
+                "type": "hubs",
+                "id": "b.hub-456",
+                "attributes": {
+                    "name": "Single Hub"
+                }
+            },
+            "included": []
+        }"#;
+
+        let response: JsonApiResponse<Hub> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.id, "b.hub-456");
+    }
+
+    #[test]
+    fn test_json_api_links_simple() {
+        let json = r#"{
+            "data": [],
+            "links": {
+                "self": "https://api.example.com/simple"
+            }
+        }"#;
+
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        assert!(response.links.is_some());
+    }
+
+    #[test]
+    fn test_json_api_links_complex() {
+        let json = r#"{
+            "data": [],
+            "links": {
+                "self": {"href": "https://api.example.com/complex"},
+                "next": {"href": "https://api.example.com/complex?page=2"}
+            }
+        }"#;
+
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        let links = response.links.unwrap();
+        assert!(links.next.is_some());
+    }
+
+    #[test]
+    fn test_hub_extension_deserialization() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.hub-789",
+            "attributes": {
+                "name": "Hub with Extension",
+                "extension": {
+                    "type": "hubs:autodesk.bim360:Account"
+                }
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        assert!(hub.attributes.extension.is_some());
+        let ext = hub.attributes.extension.unwrap();
+        assert_eq!(
+            ext.extension_type,
+            Some("hubs:autodesk.bim360:Account".to_string())
+        );
+    }
+
+    #[test]
+    fn test_folder_content_folder_variant() {
+        let json = r#"{
+            "type": "folders",
+            "id": "folder-id",
+            "attributes": {
+                "name": "Test Folder"
+            }
+        }"#;
+
+        let content: FolderContent = serde_json::from_str(json).unwrap();
+        match content {
+            FolderContent::Folder(f) => assert_eq!(f.attributes.name, "Test Folder"),
+            FolderContent::Item(_) => panic!("Expected folder"),
+        }
+    }
+
+    #[test]
+    fn test_folder_content_item_variant() {
+        let json = r#"{
+            "type": "items",
+            "id": "item-id",
+            "attributes": {
+                "displayName": "model.rvt"
+            }
+        }"#;
+
+        let content: FolderContent = serde_json::from_str(json).unwrap();
+        match content {
+            FolderContent::Item(i) => assert_eq!(i.attributes.display_name, "model.rvt"),
+            FolderContent::Folder(_) => panic!("Expected item"),
+        }
+    }
+
+    #[test]
+    fn test_folder_with_timestamps() {
+        let json = r#"{
+            "type": "folders",
+            "id": "folder-id",
+            "attributes": {
+                "name": "Timestamped Folder",
+                "createTime": "2024-01-15T10:00:00Z",
+                "lastModifiedTime": "2024-01-16T15:30:00Z"
+            }
+        }"#;
+
+        let folder: Folder = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            folder.attributes.create_time,
+            Some("2024-01-15T10:00:00Z".to_string())
+        );
+        assert_eq!(
+            folder.attributes.last_modified_time,
+            Some("2024-01-16T15:30:00Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_item_with_timestamps() {
+        let json = r#"{
+            "type": "items",
+            "id": "item-id",
+            "attributes": {
+                "displayName": "model.rvt",
+                "createTime": "2024-01-10T08:00:00Z",
+                "lastModifiedTime": "2024-01-12T12:00:00Z"
+            }
+        }"#;
+
+        let item: Item = serde_json::from_str(json).unwrap();
+        assert!(item.attributes.create_time.is_some());
+        assert!(item.attributes.last_modified_time.is_some());
+    }
+
+    #[test]
+    fn test_version_with_create_time() {
+        let json = r#"{
+            "type": "versions",
+            "id": "version-id",
+            "attributes": {
+                "name": "v1",
+                "createTime": "2024-01-15T10:00:00Z"
+            }
+        }"#;
+
+        let version: Version = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            version.attributes.create_time,
+            Some("2024-01-15T10:00:00Z".to_string())
+        );
+    }
+}
+
+/// Integration tests for DataManagementClient
+/// Note: DM API requires 3-legged auth which needs user interaction
+/// These tests focus on response parsing and error handling
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    // Note: DM tests require 3-legged auth which we cannot easily mock without
+    // modifying the cached token. These tests verify the response parsing logic.
+
+    #[test]
+    fn test_hub_list_response_parsing() {
+        let json = r#"{
+            "jsonapi": {"version": "1.0"},
+            "data": [
+                {
+                    "type": "hubs",
+                    "id": "b.12345678-1234-1234-1234-123456789012",
+                    "attributes": {
+                        "name": "Acme Construction",
+                        "region": "US",
+                        "extension": {
+                            "type": "hubs:autodesk.bim360:Account"
+                        }
+                    }
+                },
+                {
+                    "type": "hubs",
+                    "id": "b.87654321-4321-4321-4321-210987654321",
+                    "attributes": {
+                        "name": "Test Organization",
+                        "region": "EMEA"
+                    }
+                }
+            ]
+        }"#;
+
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].attributes.name, "Acme Construction");
+        assert_eq!(response.data[1].attributes.region, Some("EMEA".to_string()));
+    }
+
+    #[test]
+    fn test_project_list_response_parsing() {
+        let json = r#"{
+            "jsonapi": {"version": "1.0"},
+            "data": [
+                {
+                    "type": "projects",
+                    "id": "b.project-001",
+                    "attributes": {
+                        "name": "Main Office Building",
+                        "scopes": ["docs:read", "docs:write", "data:read"]
+                    }
+                },
+                {
+                    "type": "projects",
+                    "id": "b.project-002",
+                    "attributes": {
+                        "name": "Residential Complex"
+                    }
+                }
+            ]
+        }"#;
+
+        let response: JsonApiResponse<Vec<Project>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].attributes.name, "Main Office Building");
+
+        let scopes = response.data[0].attributes.scopes.as_ref().unwrap();
+        assert_eq!(scopes.len(), 3);
+        assert!(scopes.contains(&"docs:read".to_string()));
+    }
+
+    #[test]
+    fn test_folder_list_response_parsing() {
+        let json = r#"{
+            "jsonapi": {"version": "1.0"},
+            "data": [
+                {
+                    "type": "folders",
+                    "id": "urn:adsk.wipprod:fs.folder:root-folder-001",
+                    "attributes": {
+                        "name": "Project Files",
+                        "displayName": "Project Files"
+                    }
+                },
+                {
+                    "type": "folders",
+                    "id": "urn:adsk.wipprod:fs.folder:root-folder-002",
+                    "attributes": {
+                        "name": "Plans",
+                        "displayName": "Plans"
+                    }
+                }
+            ]
+        }"#;
+
+        let response: JsonApiResponse<Vec<Folder>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].attributes.name, "Project Files");
+    }
+
+    #[test]
+    fn test_item_response_parsing() {
+        let json = r#"{
+            "jsonapi": {"version": "1.0"},
+            "data": {
+                "type": "items",
+                "id": "urn:adsk.wipprod:dm.lineage:item-123",
+                "attributes": {
+                    "displayName": "architectural-model.rvt",
+                    "createTime": "2024-01-15T10:00:00Z",
+                    "lastModifiedTime": "2024-01-20T14:30:00Z",
+                    "extension": {
+                        "type": "items:autodesk.bim360:File",
+                        "version": "1.0"
+                    }
+                }
+            }
+        }"#;
+
+        let response: JsonApiResponse<Item> = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            response.data.attributes.display_name,
+            "architectural-model.rvt"
+        );
+        assert!(response.data.attributes.extension.is_some());
+    }
+
+    #[test]
+    fn test_versions_response_parsing() {
+        let json = r#"{
+            "jsonapi": {"version": "1.0"},
+            "data": [
+                {
+                    "type": "versions",
+                    "id": "urn:adsk.wipprod:fs.file:vf.version-1",
+                    "attributes": {
+                        "name": "model.rvt",
+                        "displayName": "model.rvt",
+                        "versionNumber": 1,
+                        "storageSize": 52428800
+                    }
+                },
+                {
+                    "type": "versions",
+                    "id": "urn:adsk.wipprod:fs.file:vf.version-2",
+                    "attributes": {
+                        "name": "model.rvt",
+                        "displayName": "model.rvt",
+                        "versionNumber": 2,
+                        "storageSize": 55574528
+                    }
+                }
+            ]
+        }"#;
+
+        let response: JsonApiResponse<Vec<Version>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].attributes.version_number, Some(1));
+        assert_eq!(response.data[1].attributes.storage_size, Some(55574528));
+    }
+
+    #[test]
+    fn test_create_folder_request_serialization_full() {
+        let request = CreateFolderRequest {
+            jsonapi: JsonApiVersion {
+                version: "1.0".to_string(),
+            },
+            data: CreateFolderData {
+                data_type: "folders".to_string(),
+                attributes: CreateFolderAttributes {
+                    name: "New Design Folder".to_string(),
+                    extension: CreateFolderExtension {
+                        ext_type: "folders:autodesk.core:Folder".to_string(),
+                        version: "1.0".to_string(),
+                    },
+                },
+                relationships: CreateFolderRelationships {
+                    parent: CreateFolderParent {
+                        data: CreateFolderParentData {
+                            data_type: "folders".to_string(),
+                            id: "urn:adsk.wipprod:fs.folder:parent-id".to_string(),
+                        },
+                    },
+                },
+            },
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+
+        assert_eq!(json["jsonapi"]["version"], "1.0");
+        assert_eq!(json["data"]["type"], "folders");
+        assert_eq!(json["data"]["attributes"]["name"], "New Design Folder");
+        assert_eq!(
+            json["data"]["attributes"]["extension"]["type"],
+            "folders:autodesk.core:Folder"
+        );
+        assert_eq!(
+            json["data"]["relationships"]["parent"]["data"]["id"],
+            "urn:adsk.wipprod:fs.folder:parent-id"
+        );
+    }
+
+    #[test]
+    fn test_mixed_folder_contents_parsing() {
+        // Test that we can parse a mix of folders and items
+        let folder_json = r#"{"type": "folders", "id": "f1", "attributes": {"name": "Folder"}}"#;
+        let item_json =
+            r#"{"type": "items", "id": "i1", "attributes": {"displayName": "file.dwg"}}"#;
+
+        let folder: FolderContent = serde_json::from_str(folder_json).unwrap();
+        let item: FolderContent = serde_json::from_str(item_json).unwrap();
+
+        match folder {
+            FolderContent::Folder(f) => assert_eq!(f.id, "f1"),
+            _ => panic!("Expected folder"),
+        }
+
+        match item {
+            FolderContent::Item(i) => assert_eq!(i.id, "i1"),
+            _ => panic!("Expected item"),
+        }
+    }
+
+    #[test]
+    fn test_hub_without_extension() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.simple-hub",
+            "attributes": {
+                "name": "Simple Hub"
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        assert_eq!(hub.id, "b.simple-hub");
+        assert!(hub.attributes.extension.is_none());
+        assert!(hub.attributes.region.is_none());
+    }
+
+    #[test]
+    fn test_project_without_scopes() {
+        let json = r#"{
+            "type": "projects",
+            "id": "b.no-scopes",
+            "attributes": {
+                "name": "Project Without Scopes"
+            }
+        }"#;
+
+        let project: Project = serde_json::from_str(json).unwrap();
+        assert!(project.attributes.scopes.is_none());
+    }
+
+    #[test]
+    fn test_version_minimal() {
+        let json = r#"{
+            "type": "versions",
+            "id": "v.minimal",
+            "attributes": {
+                "name": "file.dwg"
+            }
+        }"#;
+
+        let version: Version = serde_json::from_str(json).unwrap();
+        assert_eq!(version.attributes.name, "file.dwg");
+        assert!(version.attributes.version_number.is_none());
+        assert!(version.attributes.storage_size.is_none());
+        assert!(version.attributes.display_name.is_none());
+    }
+
+    #[test]
+    fn test_json_api_response_with_included() {
+        let json = r#"{
+            "data": [],
+            "included": [
+                {"type": "users", "id": "user-1"},
+                {"type": "folders", "id": "folder-1"}
+            ]
+        }"#;
+
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.included.len(), 2);
+    }
+
+    #[test]
+    fn test_json_api_version_serialization() {
+        let version = JsonApiVersion {
+            version: "1.0".to_string(),
+        };
+
+        let json = serde_json::to_value(&version).unwrap();
+        assert_eq!(json["version"], "1.0");
+    }
+
+    #[test]
+    fn test_bim360_hub_type() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.bim360-hub",
+            "attributes": {
+                "name": "BIM 360 Hub",
+                "region": "US",
+                "extension": {
+                    "type": "hubs:autodesk.bim360:Account",
+                    "version": "1.0"
+                }
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        let ext = hub.attributes.extension.unwrap();
+        assert!(
+            ext.extension_type
+                .unwrap()
+                .contains("hubs:autodesk.bim360:Account")
+        );
+    }
+
+    #[test]
+    fn test_acc_hub_type() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.acc-hub",
+            "attributes": {
+                "name": "ACC Hub",
+                "region": "US",
+                "extension": {
+                    "type": "hubs:autodesk.core:Hub"
+                }
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        let ext = hub.attributes.extension.unwrap();
+        assert!(
+            ext.extension_type
+                .unwrap()
+                .contains("hubs:autodesk.core:Hub")
+        );
+    }
 }
