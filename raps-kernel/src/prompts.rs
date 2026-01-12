@@ -183,6 +183,172 @@ pub fn confirm_destructive<S: Into<String>>(prompt: S) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    // Note: Interactive tests are difficult to unit test
-    // These would need integration tests with a pseudo-terminal
+    use super::*;
+
+    // Helper to reset interactive state between tests
+    fn reset_state() {
+        interactive::init(false, false);
+    }
+
+    fn set_non_interactive() {
+        interactive::init(true, false);
+    }
+
+    fn set_yes_mode() {
+        interactive::init(false, true);
+    }
+
+    fn set_non_interactive_with_yes() {
+        interactive::init(true, true);
+    }
+
+    // ==================== Input Tests (Non-Interactive Mode) ====================
+
+    #[test]
+    fn test_input_non_interactive_with_default() {
+        set_non_interactive();
+        let result = input("Enter name:", Some("default_value"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "default_value");
+        reset_state();
+    }
+
+    #[test]
+    fn test_input_non_interactive_without_default() {
+        set_non_interactive();
+        let result = input("Enter name:", None);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("required"));
+        assert!(err.contains("non-interactive"));
+        reset_state();
+    }
+
+    #[test]
+    fn test_input_validated_non_interactive_with_default() {
+        set_non_interactive();
+        let result = input_validated("Enter email:", Some("test@example.com"), |_| Ok(()));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "test@example.com");
+        reset_state();
+    }
+
+    #[test]
+    fn test_input_validated_non_interactive_without_default() {
+        set_non_interactive();
+        let result = input_validated::<_, fn(&String) -> Result<(), &'static str>>(
+            "Enter email:",
+            None,
+            |_| Ok(()),
+        );
+        assert!(result.is_err());
+        reset_state();
+    }
+
+    // ==================== Select Tests (Non-Interactive Mode) ====================
+
+    #[test]
+    fn test_select_non_interactive_fails() {
+        set_non_interactive();
+        let items = vec!["Option 1".to_string(), "Option 2".to_string()];
+        let result = select("Choose:", &items);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("non-interactive"));
+        reset_state();
+    }
+
+    #[test]
+    fn test_select_with_default_non_interactive() {
+        set_non_interactive();
+        let items = vec!["Option 1".to_string(), "Option 2".to_string()];
+        let result = select_with_default("Choose:", &items, 1);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 1);
+        reset_state();
+    }
+
+    // ==================== MultiSelect Tests (Non-Interactive Mode) ====================
+
+    #[test]
+    fn test_multi_select_non_interactive_fails() {
+        set_non_interactive();
+        let items = vec!["Option 1".to_string(), "Option 2".to_string()];
+        let result = multi_select("Choose multiple:", &items);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("non-interactive"));
+        reset_state();
+    }
+
+    // ==================== Confirm Tests ====================
+
+    #[test]
+    fn test_confirm_yes_mode() {
+        set_yes_mode();
+        let result = confirm("Proceed?", false);
+        assert!(result.is_ok());
+        assert!(result.unwrap()); // --yes flag auto-confirms
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_non_interactive_no_yes() {
+        set_non_interactive();
+        let result = confirm("Proceed?", true);
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // Returns false without --yes
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_non_interactive_with_yes() {
+        set_non_interactive_with_yes();
+        let result = confirm("Proceed?", false);
+        assert!(result.is_ok());
+        assert!(result.unwrap()); // --yes takes precedence
+        reset_state();
+    }
+
+    // ==================== Confirm Destructive Tests ====================
+
+    #[test]
+    fn test_confirm_destructive_yes_mode() {
+        set_yes_mode();
+        let result = confirm_destructive("Delete all?");
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_destructive_non_interactive_no_yes() {
+        set_non_interactive();
+        let result = confirm_destructive("Delete all?");
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // Fails safe - returns false
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_destructive_non_interactive_with_yes() {
+        set_non_interactive_with_yes();
+        let result = confirm_destructive("Delete all?");
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+        reset_state();
+    }
+
+    // ==================== Prompt String Trimming Tests ====================
+
+    #[test]
+    fn test_input_trims_colon_in_error() {
+        set_non_interactive();
+        let result = input("Enter name:", None);
+        let err = result.unwrap_err().to_string();
+        // Should say "Enter name is required" not "Enter name: is required"
+        assert!(err.contains("Enter name"));
+        assert!(!err.contains("Enter name:"));
+        reset_state();
+    }
 }

@@ -2139,6 +2139,7 @@ dependencies = [
  "csv",
  "dialoguer",
  "directories",
+ "dotenvy",
  "futures-util",
  "indicatif",
  "predicates",

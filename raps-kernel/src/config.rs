@@ -168,6 +168,26 @@ impl Config {
     pub fn reality_capture_url(&self) -> String {
         format!("{}/photo-to-3d/v1", self.base_url)
     }
+
+    /// Get the RFI API base URL
+    pub fn rfi_url(&self) -> String {
+        format!("{}/construction/rfis/v2", self.base_url)
+    }
+
+    /// Get the Assets API base URL
+    pub fn assets_url(&self) -> String {
+        format!("{}/construction/assets/v1", self.base_url)
+    }
+
+    /// Get the Submittals API base URL
+    pub fn submittals_url(&self) -> String {
+        format!("{}/construction/submittals/v1", self.base_url)
+    }
+
+    /// Get the Checklists API base URL
+    pub fn checklists_url(&self) -> String {
+        format!("{}/construction/checklists/v1", self.base_url)
+    }
 }
 
 /// Load profiles from disk
@@ -349,5 +369,61 @@ mod tests {
         assert!(config.da_url().starts_with(base));
         assert!(config.issues_url().starts_with(base));
         assert!(config.reality_capture_url().starts_with(base));
+        assert!(config.rfi_url().starts_with(base));
+        assert!(config.assets_url().starts_with(base));
+        assert!(config.submittals_url().starts_with(base));
+        assert!(config.checklists_url().starts_with(base));
+    }
+
+    #[test]
+    fn test_rfi_url() {
+        let config = create_test_config();
+        let url = config.rfi_url();
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/construction/rfis/v2"
+        );
+    }
+
+    #[test]
+    fn test_assets_url() {
+        let config = create_test_config();
+        let url = config.assets_url();
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/construction/assets/v1"
+        );
+    }
+
+    #[test]
+    fn test_submittals_url() {
+        let config = create_test_config();
+        let url = config.submittals_url();
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/construction/submittals/v1"
+        );
+    }
+
+    #[test]
+    fn test_checklists_url() {
+        let config = create_test_config();
+        let url = config.checklists_url();
+        assert_eq!(
+            url,
+            "https://developer.api.autodesk.com/construction/checklists/v1"
+        );
+    }
+
+    #[test]
+    fn test_default_callback_port() {
+        assert_eq!(DEFAULT_CALLBACK_PORT, 8080);
+    }
+
+    #[test]
+    fn test_default_callback_url_format() {
+        let config = create_test_config();
+        assert!(config.callback_url.contains("localhost"));
+        assert!(config.callback_url.contains("callback"));
     }
 }

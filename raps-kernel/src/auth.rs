@@ -734,6 +734,14 @@ impl AuthClient {
         let cache = self.cached_3leg_token.read().await;
         cache.as_ref().map(|t| t.expires_at)
     }
+
+    /// Set a 3-legged token for testing purposes
+    /// This allows integration tests to simulate a logged-in state
+    #[cfg(any(test, feature = "test-utils"))]
+    pub async fn set_3leg_token_for_testing(&self, token: StoredToken) {
+        let mut cache = self.cached_3leg_token.write().await;
+        *cache = Some(token);
+    }
 }
 
 #[cfg(test)]

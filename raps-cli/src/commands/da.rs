@@ -240,9 +240,9 @@ async fn list_engines(client: &DesignAutomationClient, output_format: OutputForm
     let engine_outputs: Vec<EngineOutput> = engines
         .iter()
         .map(|e| EngineOutput {
-            id: e.id.clone(),
-            description: e.description.clone(),
-            product_version: e.product_version.clone(),
+            id: e.clone(),
+            description: None,
+            product_version: None,
         })
         .collect();
 
@@ -269,13 +269,13 @@ async fn list_engines(client: &DesignAutomationClient, output_format: OutputForm
             let mut other_engines = Vec::new();
 
             for engine in &engines {
-                if engine.id.contains("AutoCAD") {
+                if engine.contains("AutoCAD") {
                     autocad_engines.push(engine);
-                } else if engine.id.contains("Revit") {
+                } else if engine.contains("Revit") {
                     revit_engines.push(engine);
-                } else if engine.id.contains("Inventor") {
+                } else if engine.contains("Inventor") {
                     inventor_engines.push(engine);
-                } else if engine.id.contains("3dsMax") {
+                } else if engine.contains("3dsMax") {
                     max_engines.push(engine);
                 } else {
                     other_engines.push(engine);
@@ -285,35 +285,35 @@ async fn list_engines(client: &DesignAutomationClient, output_format: OutputForm
             if !autocad_engines.is_empty() {
                 println!("\n{}", "AutoCAD:".cyan().bold());
                 for engine in autocad_engines {
-                    println!("  {} {}", "-".dimmed(), engine.id);
+                    println!("  {} {}", "-".dimmed(), engine);
                 }
             }
 
             if !revit_engines.is_empty() {
                 println!("\n{}", "Revit:".cyan().bold());
                 for engine in revit_engines {
-                    println!("  {} {}", "-".dimmed(), engine.id);
+                    println!("  {} {}", "-".dimmed(), engine);
                 }
             }
 
             if !inventor_engines.is_empty() {
                 println!("\n{}", "Inventor:".cyan().bold());
                 for engine in inventor_engines {
-                    println!("  {} {}", "-".dimmed(), engine.id);
+                    println!("  {} {}", "-".dimmed(), engine);
                 }
             }
 
             if !max_engines.is_empty() {
                 println!("\n{}", "3ds Max:".cyan().bold());
                 for engine in max_engines {
-                    println!("  {} {}", "-".dimmed(), engine.id);
+                    println!("  {} {}", "-".dimmed(), engine);
                 }
             }
 
             if !other_engines.is_empty() {
                 println!("\n{}", "Other:".cyan().bold());
                 for engine in other_engines {
-                    println!("  {} {}", "-".dimmed(), engine.id);
+                    println!("  {} {}", "-".dimmed(), engine);
                 }
             }
 
@@ -364,10 +364,8 @@ async fn create_appbundle(
             println!("{}", "Fetching engines...".dimmed());
             let engines = client.list_engines().await?;
 
-            let engine_ids: Vec<String> = engines.iter().map(|e| e.id.clone()).collect();
-
-            let selection = prompts::select("Select engine", &engine_ids)?;
-            engines[selection].id.clone()
+            let selection = prompts::select("Select engine", &engines)?;
+            engines[selection].clone()
         }
     };
 

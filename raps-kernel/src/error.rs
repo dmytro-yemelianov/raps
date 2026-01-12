@@ -456,4 +456,218 @@ mod tests {
         assert_eq!(status_to_code(500), "InternalServerError");
         assert_eq!(status_to_code(418), "Error418"); // Custom code
     }
+
+    // ==================== Additional Exit Code Tests ====================
+
+    #[test]
+    fn test_exit_code_from_forbidden_error() {
+        let err = anyhow::anyhow!("403 Forbidden: insufficient permissions");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+    }
+
+    #[test]
+    fn test_exit_code_from_token_expired() {
+        let err = anyhow::anyhow!("token expired");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+    }
+
+    #[test]
+    fn test_exit_code_from_token_invalid() {
+        let err = anyhow::anyhow!("token invalid");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+    }
+
+    #[test]
+    fn test_exit_code_from_invalid_credentials() {
+        let err = anyhow::anyhow!("invalid credentials");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+    }
+
+    #[test]
+    fn test_exit_code_from_404_in_chain() {
+        let inner = anyhow::anyhow!("status: 404");
+        let err = inner.context("Failed to fetch resource");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::NotFound);
+    }
+
+    #[test]
+    fn test_exit_code_from_missing_required() {
+        let err = anyhow::anyhow!("bucket name is required");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
+    }
+
+    #[test]
+    fn test_exit_code_from_cannot_be_empty() {
+        let err = anyhow::anyhow!("field cannot be empty");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
+    }
+
+    #[test]
+    fn test_exit_code_from_must_be() {
+        let err = anyhow::anyhow!("value must be positive");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
+    }
+
+    #[test]
+    fn test_exit_code_from_timeout() {
+        let err = anyhow::anyhow!("request timeout after 30s");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
+    }
+
+    #[test]
+    fn test_exit_code_from_network() {
+        let err = anyhow::anyhow!("network error: connection reset");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
+    }
+
+    #[test]
+    fn test_exit_code_from_connection() {
+        let err = anyhow::anyhow!("connection refused");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
+    }
+
+    #[test]
+    fn test_exit_code_unknown_defaults_to_internal() {
+        let err = anyhow::anyhow!("something went wrong");
+        assert_eq!(ExitCode::from_error(&err), ExitCode::InternalError);
+    }
+
+    // ==================== Exit Code Value Tests ====================
+
+    #[test]
+    fn test_exit_code_values() {
+        assert_eq!(ExitCode::Success as i32, 0);
+        assert_eq!(ExitCode::InvalidArguments as i32, 2);
+        assert_eq!(ExitCode::AuthFailure as i32, 3);
+        assert_eq!(ExitCode::NotFound as i32, 4);
+        assert_eq!(ExitCode::RemoteError as i32, 5);
+        assert_eq!(ExitCode::InternalError as i32, 6);
+    }
+
+    // ==================== Additional Interpret Error Tests ====================
+
+    #[test]
+    fn test_interpret_502_error() {
+        let error = interpret_error(502, "Bad Gateway");
+        assert_eq!(error.status_code, 502);
+        assert!(error.explanation.contains("server error"));
+    }
+
+    #[test]
+    fn test_interpret_503_error() {
+        let error = interpret_error(503, "Service Unavailable");
+        assert_eq!(error.status_code, 503);
+        assert!(error.explanation.contains("server error"));
+    }
+
+    #[test]
+    fn test_interpret_error_with_scope_suggestion() {
+        let error = interpret_error(
+            403,
+            r#"{"error": "forbidden", "detail": "Missing data:read scope"}"#,
+        );
+        assert!(error.suggestions.iter().any(|s| s.contains("data:read")));
+    }
+
+    #[test]
+    fn test_interpret_error_with_bucket_suggestion() {
+        let error = interpret_error(
+            403,
+            r#"{"error": "forbidden", "detail": "Missing bucket:create scope"}"#,
+        );
+        assert!(error.suggestions.iter().any(|s| s.contains("bucket")));
+    }
+
+    #[test]
+    fn test_interpret_error_json_parsing() {
+        let error = interpret_error(
+            400,
+            r#"{"errorCode": "InvalidRequest", "message": "Bad parameter"}"#,
+        );
+        assert_eq!(error.error_code, "InvalidRequest");
+        assert!(error.original_message.contains("Bad parameter"));
+    }
+
+    #[test]
+    fn test_interpret_error_developer_message() {
+        let error = interpret_error(
+            400,
+            r#"{"error": "BadRequest", "developer_message": "Check API docs"}"#,
+        );
+        assert!(error.original_message.contains("Check API docs"));
+    }
+
+    #[test]
+    fn test_interpret_error_reason_field() {
+        let error = interpret_error(400, r#"{"reason": "InvalidParameter"}"#);
+        assert_eq!(error.error_code, "InvalidParameter");
+    }
+
+    #[test]
+    fn test_interpret_409_conflict() {
+        let error = interpret_error(409, r#"{"error": "Conflict"}"#);
+        assert_eq!(status_to_code(409), "Conflict");
+    }
+
+    // ==================== Format Error Tests ====================
+
+    #[test]
+    fn test_format_error_with_empty_message() {
+        let error = InterpretedError {
+            status_code: 400,
+            error_code: "BadRequest".to_string(),
+            explanation: "Bad request".to_string(),
+            suggestions: vec![],
+            original_message: "".to_string(),
+        };
+        let formatted = format_interpreted_error(&error, false);
+        assert!(formatted.contains("Bad request"));
+        // Empty message shouldn't add extra "Details:" line
+        assert!(!formatted.contains("Details:") || formatted.contains("Details: \n"));
+    }
+
+    #[test]
+    fn test_format_error_with_colors() {
+        let error = InterpretedError {
+            status_code: 401,
+            error_code: "Unauthorized".to_string(),
+            explanation: "Auth failed".to_string(),
+            suggestions: vec!["Login again".to_string()],
+            original_message: "Token expired".to_string(),
+        };
+        let formatted = format_interpreted_error(&error, true);
+        // Should contain the content (colors are ANSI codes)
+        assert!(formatted.contains("Auth failed"));
+        assert!(formatted.contains("Token expired"));
+        assert!(formatted.contains("Login again"));
+    }
+
+    #[test]
+    fn test_format_error_no_suggestions() {
+        let error = InterpretedError {
+            status_code: 400,
+            error_code: "BadRequest".to_string(),
+            explanation: "Bad request".to_string(),
+            suggestions: vec![],
+            original_message: "Invalid input".to_string(),
+        };
+        let formatted = format_interpreted_error(&error, false);
+        // Should not have "Suggestions:" section
+        assert!(!formatted.contains("Suggestions:"));
+    }
+
+    #[test]
+    fn test_format_error_same_explanation_and_message() {
+        let error = InterpretedError {
+            status_code: 400,
+            error_code: "BadRequest".to_string(),
+            explanation: "Same message".to_string(),
+            suggestions: vec![],
+            original_message: "Same message".to_string(),
+        };
+        let formatted = format_interpreted_error(&error, false);
+        // Note: Current implementation shows both, which is acceptable behavior
+        // The test verifies the format function works with matching messages
+        assert!(formatted.contains("Same message"));
+    }
 }

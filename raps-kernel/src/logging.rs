@@ -105,3 +105,129 @@ pub fn redact_secrets(text: &str) -> String {
 
     redacted
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Note: Flag tests are not reliable due to global state and parallel test execution.
+    // The init() function modifies global AtomicBool values which can race with other tests.
+    // Testing redact_secrets is more valuable and deterministic.
+
+    // ==================== Redact Secrets Tests ====================
+
+    #[test]
+    fn test_redact_client_secret() {
+        let text = "client_secret: abc123xyz";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("abc123xyz"));
+    }
+
+    #[test]
+    fn test_redact_client_secret_underscore() {
+        let text = "client_secret=my_super_secret_value";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("my_super_secret_value"));
+    }
+
+    #[test]
+    fn test_redact_api_key() {
+        let text = "api_key: supersecretapikey123";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("supersecretapikey123"));
+    }
+
+    #[test]
+    fn test_redact_api_key_dash() {
+        let text = "api-key=myapikey456";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("myapikey456"));
+    }
+
+    #[test]
+    fn test_redact_secret_key() {
+        let text = "secret_key: topsecret";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("topsecret"));
+    }
+
+    #[test]
+    fn test_redact_access_token() {
+        let text = "access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"));
+    }
+
+    #[test]
+    fn test_redact_refresh_token() {
+        let text = "refresh_token=abcdefghijklmnopqrstuvwxyz";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("abcdefghijklmnopqrstuvwxyz"));
+    }
+
+    #[test]
+    fn test_redact_bearer_token() {
+        let text = "bearer: ABCDEFGHIJKLMNOPQRSTUVWXYZ123456";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"));
+    }
+
+    #[test]
+    fn test_redact_case_insensitive() {
+        let text1 = "CLIENT_SECRET: secret1";
+        let text2 = "Client_Secret: secret2";
+        let text3 = "client_SECRET: secret3";
+
+        assert!(redact_secrets(text1).contains("[REDACTED]"));
+        assert!(redact_secrets(text2).contains("[REDACTED]"));
+        assert!(redact_secrets(text3).contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_redact_preserves_non_secret_text() {
+        let text = "This is a normal message without secrets";
+        let redacted = redact_secrets(text);
+        assert_eq!(text, redacted);
+    }
+
+    #[test]
+    fn test_redact_multiple_secrets() {
+        let text = "client_secret: secret1 api_key: key123";
+        let redacted = redact_secrets(text);
+        assert!(!redacted.contains("secret1"));
+        assert!(!redacted.contains("key123"));
+        assert!(redacted.matches("[REDACTED]").count() >= 2);
+    }
+
+    #[test]
+    fn test_redact_mixed_content() {
+        let text = "Logging in with client_secret: mysecret for user john";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("Logging in"));
+        assert!(redacted.contains("for user john"));
+        assert!(!redacted.contains("mysecret"));
+    }
+
+    #[test]
+    fn test_redact_short_token_not_redacted() {
+        // Tokens shorter than 20 chars should not be redacted (not a real token)
+        let text = "token: short";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("short"));
+    }
+
+    #[test]
+    fn test_redact_empty_string() {
+        let text = "";
+        let redacted = redact_secrets(text);
+        assert_eq!(redacted, "");
+    }
+}

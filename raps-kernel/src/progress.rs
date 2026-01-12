@@ -137,26 +137,108 @@ impl std::ops::Deref for ProgressGuard {
 mod tests {
     use super::*;
 
+    fn reset_interactive_state() {
+        interactive::init(false, false);
+    }
+
+    fn set_non_interactive() {
+        interactive::init(true, false);
+    }
+
+    // ==================== File Progress Tests ====================
+
     #[test]
     fn test_file_progress_creation() {
+        reset_interactive_state();
         let pb = file_progress(1000, "Uploading");
         assert_eq!(pb.length(), Some(1000));
     }
 
     #[test]
+    fn test_file_progress_zero_size() {
+        reset_interactive_state();
+        let pb = file_progress(0, "Uploading empty file");
+        assert_eq!(pb.length(), Some(0));
+    }
+
+    #[test]
+    fn test_file_progress_large_size() {
+        reset_interactive_state();
+        let pb = file_progress(u64::MAX, "Uploading huge file");
+        assert_eq!(pb.length(), Some(u64::MAX));
+    }
+
+    #[test]
+    fn test_file_progress_non_interactive() {
+        set_non_interactive();
+        let pb = file_progress(1000, "Uploading");
+        // In non-interactive mode, progress bar is hidden
+        // Hidden progress bars return None for length
+        assert!(pb.length().is_none());
+        reset_interactive_state();
+    }
+
+    // ==================== Spinner Tests ====================
+
+    #[test]
     fn test_spinner_creation() {
+        reset_interactive_state();
         let pb = spinner("Processing...");
         assert!(pb.length().is_none()); // Spinners have no length
     }
 
     #[test]
+    fn test_spinner_non_interactive() {
+        set_non_interactive();
+        let pb = spinner("Processing...");
+        assert!(pb.length().is_none());
+        reset_interactive_state();
+    }
+
+    #[test]
+    fn test_spinner_empty_message() {
+        reset_interactive_state();
+        let pb = spinner("");
+        assert!(pb.length().is_none());
+    }
+
+    // ==================== Item Progress Tests ====================
+
+    #[test]
     fn test_item_progress_creation() {
+        reset_interactive_state();
         let pb = item_progress(10, "Processing items");
         assert_eq!(pb.length(), Some(10));
     }
 
     #[test]
+    fn test_item_progress_single_item() {
+        reset_interactive_state();
+        let pb = item_progress(1, "Processing item");
+        assert_eq!(pb.length(), Some(1));
+    }
+
+    #[test]
+    fn test_item_progress_zero_items() {
+        reset_interactive_state();
+        let pb = item_progress(0, "No items");
+        assert_eq!(pb.length(), Some(0));
+    }
+
+    #[test]
+    fn test_item_progress_non_interactive() {
+        set_non_interactive();
+        let pb = item_progress(10, "Processing items");
+        // Hidden progress bars return None for length
+        assert!(pb.length().is_none());
+        reset_interactive_state();
+    }
+
+    // ==================== Progress Guard Tests ====================
+
+    #[test]
     fn test_progress_guard_finish() {
+        reset_interactive_state();
         let pb = file_progress(100, "Test");
         let guard = ProgressGuard::new(pb);
         guard.finish("Done");
@@ -165,8 +247,64 @@ mod tests {
 
     #[test]
     fn test_progress_guard_abandon_on_drop() {
+        reset_interactive_state();
         let pb = file_progress(100, "Test");
         let _guard = ProgressGuard::new(pb);
         // Guard will abandon on drop - this shouldn't panic
+    }
+
+    #[test]
+    fn test_progress_guard_deref() {
+        reset_interactive_state();
+        let pb = file_progress(100, "Test");
+        let guard = ProgressGuard::new(pb);
+        // Can use deref to access progress bar methods
+        assert_eq!(guard.length(), Some(100));
+    }
+
+    #[test]
+    fn test_progress_guard_progress_method() {
+        reset_interactive_state();
+        let pb = file_progress(100, "Test");
+        let guard = ProgressGuard::new(pb);
+        // Can access underlying progress bar
+        assert_eq!(guard.progress().length(), Some(100));
+    }
+
+    #[test]
+    fn test_progress_guard_increment() {
+        reset_interactive_state();
+        let pb = file_progress(100, "Test");
+        let guard = ProgressGuard::new(pb);
+        guard.inc(50);
+        assert_eq!(guard.position(), 50);
+    }
+
+    #[test]
+    fn test_progress_guard_set_position() {
+        reset_interactive_state();
+        let pb = file_progress(100, "Test");
+        let guard = ProgressGuard::new(pb);
+        guard.set_position(75);
+        assert_eq!(guard.position(), 75);
+    }
+
+    // ==================== Constants Tests ====================
+
+    #[test]
+    fn test_progress_chars_length() {
+        // "█▓░" - 3 UTF-8 characters, 9 bytes total (3 bytes each)
+        assert_eq!(PROGRESS_CHARS.len(), 9);
+        assert_eq!(PROGRESS_CHARS.chars().count(), 3);
+    }
+
+    #[test]
+    fn test_file_template_contains_bar() {
+        assert!(FILE_PROGRESS_TEMPLATE.contains("{bar:"));
+    }
+
+    #[test]
+    fn test_spinner_template_contains_spinner() {
+        assert!(SPINNER_TEMPLATE.contains("{spinner"));
     }
 }

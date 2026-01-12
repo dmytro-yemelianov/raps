@@ -520,3 +520,428 @@ mod tests {
         assert_eq!(response.photoscene.photoscene_id, "new-scene-456");
     }
 }
+
+/// Integration tests using wiremock
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use raps_kernel::auth::AuthClient;
+    use raps_kernel::config::Config;
+    use wiremock::matchers::{header, method, path, path_regex};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    /// Create a Reality Capture client configured to use the mock server
+    fn create_mock_reality_client(mock_url: &str) -> RealityCaptureClient {
+        let config = Config {
+            client_id: "test-client-id".to_string(),
+            client_secret: "test-client-secret".to_string(),
+            base_url: mock_url.to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        let auth = AuthClient::new(config.clone());
+        RealityCaptureClient::new(config, auth)
+    }
+
+    /// Setup mock for 2-legged auth token
+    async fn setup_auth_mock(server: &MockServer) {
+        Mock::given(method("POST"))
+            .and(path("/authentication/v2/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "test-token-12345",
+                "token_type": "Bearer",
+                "expires_in": 3600
+            })))
+            .mount(server)
+            .await;
+    }
+
+    // ==================== Create Photoscene ====================
+
+    #[tokio::test]
+    async fn test_create_photoscene_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/photo-to-3d/v1/photoscene"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "name": "Test Scene",
+                    "scenetype": "object",
+                    "convertformat": "rcm"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client
+            .create_photoscene("Test Scene", SceneType::Object, OutputFormat::Rcm)
+            .await;
+
+        assert!(result.is_ok());
+        let scene = result.unwrap();
+        assert_eq!(scene.photoscene_id, "scene-123");
+        assert_eq!(scene.name, Some("Test Scene".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_create_photoscene_aerial() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/photo-to-3d/v1/photoscene"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "aerial-scene-456",
+                    "name": "Aerial Scene",
+                    "scenetype": "aerial",
+                    "convertformat": "obj"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client
+            .create_photoscene("Aerial Scene", SceneType::Aerial, OutputFormat::Obj)
+            .await;
+
+        assert!(result.is_ok());
+        let scene = result.unwrap();
+        assert_eq!(scene.photoscene_id, "aerial-scene-456");
+    }
+
+    #[tokio::test]
+    async fn test_create_photoscene_unauthorized() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/photo-to-3d/v1/photoscene"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "Unauthorized",
+                    "msg": "Invalid token"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client
+            .create_photoscene("Test", SceneType::Object, OutputFormat::Rcm)
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("401"));
+    }
+
+    // ==================== Start Processing ====================
+
+    #[tokio::test]
+    async fn test_start_processing_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "status": "Processing"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.start_processing("scene-123").await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_start_processing_not_found() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "NotFound",
+                    "msg": "Photoscene not found"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.start_processing("nonexistent").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("404"));
+    }
+
+    #[tokio::test]
+    async fn test_start_processing_no_photos() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "BadRequest",
+                    "msg": "No photos uploaded to photoscene"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.start_processing("empty-scene").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("400"));
+    }
+
+    // ==================== Get Progress ====================
+
+    #[tokio::test]
+    async fn test_get_progress_processing() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+/progress"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "progress": "50",
+                    "progressmsg": "Processing images",
+                    "status": "Processing"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_progress("scene-123").await;
+
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert_eq!(progress.photoscene_id, "scene-123");
+        assert_eq!(progress.progress, "50");
+    }
+
+    #[tokio::test]
+    async fn test_get_progress_complete() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+/progress"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "progress": "100",
+                    "progressmsg": "Complete",
+                    "status": "Done"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_progress("scene-123").await;
+
+        assert!(result.is_ok());
+        let progress = result.unwrap();
+        assert_eq!(progress.progress, "100");
+    }
+
+    #[tokio::test]
+    async fn test_get_progress_not_found() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+/progress"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "NotFound",
+                    "msg": "Photoscene not found"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_progress("nonexistent").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("404"));
+    }
+
+    // ==================== Get Result ====================
+
+    #[tokio::test]
+    async fn test_get_result_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "progress": "100",
+                    "progressmsg": "Complete",
+                    "scenelink": "https://example.com/download/scene.rcm",
+                    "filesize": "5242880"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_result("scene-123", OutputFormat::Rcm).await;
+
+        assert!(result.is_ok());
+        let scene_result = result.unwrap();
+        assert_eq!(scene_result.photoscene_id, "scene-123");
+        assert!(scene_result.scene_link.is_some());
+        assert!(scene_result.file_size.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_get_result_still_processing() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "Photoscene": {
+                    "photosceneid": "scene-123",
+                    "progress": "75",
+                    "progressmsg": "Still processing"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_result("scene-123", OutputFormat::Rcm).await;
+
+        assert!(result.is_ok());
+        let scene_result = result.unwrap();
+        // No download link while still processing
+        assert!(scene_result.scene_link.is_none());
+    }
+
+    // ==================== Delete Photoscene ====================
+
+    #[tokio::test]
+    async fn test_delete_photoscene_success() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .and(header("Authorization", "Bearer test-token-12345"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "msg": "Photoscene deleted"
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.delete_photoscene("scene-123").await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_photoscene_not_found() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("DELETE"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+"))
+            .respond_with(ResponseTemplate::new(404).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "NotFound",
+                    "msg": "Photoscene not found"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.delete_photoscene("nonexistent").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("404"));
+    }
+
+    // ==================== Error Handling ====================
+
+    #[tokio::test]
+    async fn test_server_error() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("POST"))
+            .and(path("/photo-to-3d/v1/photoscene"))
+            .respond_with(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "InternalError",
+                    "msg": "Internal server error"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client
+            .create_photoscene("Test", SceneType::Object, OutputFormat::Rcm)
+            .await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("500"));
+    }
+
+    #[tokio::test]
+    async fn test_rate_limit() {
+        let server = MockServer::start().await;
+        setup_auth_mock(&server).await;
+
+        Mock::given(method("GET"))
+            .and(path_regex(r"/photo-to-3d/v1/photoscene/.+/progress"))
+            .respond_with(ResponseTemplate::new(429).set_body_json(serde_json::json!({
+                "Error": {
+                    "code": "RateLimited",
+                    "msg": "Too many requests"
+                }
+            })))
+            .mount(&server)
+            .await;
+
+        let client = create_mock_reality_client(&server.uri());
+        let result = client.get_progress("scene-123").await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("429"));
+    }
+}
