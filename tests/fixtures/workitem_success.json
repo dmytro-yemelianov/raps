@@ -1,0 +1,15 @@
+{
+  "id": "workitem-12345678",
+  "status": "success",
+  "progress": "100%",
+  "reportUrl": "https://developer.api.autodesk.com/da/us-east/v3/workitems/workitem-12345678/report.txt",
+  "stats": {
+    "timeQueued": "2024-01-15T10:00:00Z",
+    "timeDownloadStarted": "2024-01-15T10:00:05Z",
+    "timeInstructionsStarted": "2024-01-15T10:00:10Z",
+    "timeInstructionsEnded": "2024-01-15T10:01:30Z",
+    "timeUploadEnded": "2024-01-15T10:01:45Z",
+    "bytesDownloaded": 15728640,
+    "bytesUploaded": 2097152
+  }
+}

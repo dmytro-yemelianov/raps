@@ -66,3 +66,8 @@ indicatif.workspace = true
 
 # Interactive prompts
 dialoguer.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+tokio-test.workspace = true
+tempfile.workspace = true

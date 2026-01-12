@@ -1,0 +1,5 @@
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test-token-payload",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}

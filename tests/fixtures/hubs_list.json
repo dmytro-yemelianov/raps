@@ -1,0 +1,56 @@
+{
+  "jsonapi": {
+    "version": "1.0"
+  },
+  "links": {
+    "self": {
+      "href": "https://developer.api.autodesk.com/project/v1/hubs"
+    }
+  },
+  "data": [
+    {
+      "type": "hubs",
+      "id": "b.12345678-1234-1234-1234-123456789012",
+      "attributes": {
+        "name": "Acme Construction",
+        "region": "US",
+        "extension": {
+          "type": "hubs:autodesk.bim360:Account",
+          "version": "1.0",
+          "data": {}
+        }
+      },
+      "relationships": {
+        "projects": {
+          "links": {
+            "related": {
+              "href": "https://developer.api.autodesk.com/project/v1/hubs/b.12345678-1234-1234-1234-123456789012/projects"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "hubs",
+      "id": "b.87654321-4321-4321-4321-210987654321",
+      "attributes": {
+        "name": "Test Organization",
+        "region": "EMEA",
+        "extension": {
+          "type": "hubs:autodesk.bim360:Account",
+          "version": "1.0",
+          "data": {}
+        }
+      },
+      "relationships": {
+        "projects": {
+          "links": {
+            "related": {
+              "href": "https://developer.api.autodesk.com/project/v1/hubs/b.87654321-4321-4321-4321-210987654321/projects"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

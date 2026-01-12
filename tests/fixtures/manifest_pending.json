@@ -1,0 +1,16 @@
+{
+  "type": "manifest",
+  "hasThumbnail": "false",
+  "status": "inprogress",
+  "progress": "50%",
+  "region": "US",
+  "urn": "dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6dGVzdC1idWNrZXQvbW9kZWwucnZ0",
+  "derivatives": [
+    {
+      "status": "inprogress",
+      "progress": "50%",
+      "outputType": "svf2",
+      "children": []
+    }
+  ]
+}

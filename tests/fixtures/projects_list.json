@@ -1,0 +1,56 @@
+{
+  "jsonapi": {
+    "version": "1.0"
+  },
+  "links": {
+    "self": {
+      "href": "https://developer.api.autodesk.com/project/v1/hubs/b.12345678-1234-1234-1234-123456789012/projects"
+    }
+  },
+  "data": [
+    {
+      "type": "projects",
+      "id": "b.project-001",
+      "attributes": {
+        "name": "Main Office Building",
+        "scopes": ["docs:read", "docs:write", "data:read", "data:write"]
+      },
+      "relationships": {
+        "hub": {
+          "data": {
+            "type": "hubs",
+            "id": "b.12345678-1234-1234-1234-123456789012"
+          }
+        },
+        "rootFolder": {
+          "data": {
+            "type": "folders",
+            "id": "urn:adsk.wipprod:fs.folder:root-folder-001"
+          }
+        }
+      }
+    },
+    {
+      "type": "projects",
+      "id": "b.project-002",
+      "attributes": {
+        "name": "Residential Complex",
+        "scopes": ["docs:read", "data:read"]
+      },
+      "relationships": {
+        "hub": {
+          "data": {
+            "type": "hubs",
+            "id": "b.12345678-1234-1234-1234-123456789012"
+          }
+        },
+        "rootFolder": {
+          "data": {
+            "type": "folders",
+            "id": "urn:adsk.wipprod:fs.folder:root-folder-002"
+          }
+        }
+      }
+    }
+  ]
+}

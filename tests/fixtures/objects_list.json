@@ -1,0 +1,31 @@
+{
+  "items": [
+    {
+      "bucketKey": "test-bucket",
+      "objectKey": "model.rvt",
+      "objectId": "urn:adsk.objects:os.object:test-bucket/model.rvt",
+      "sha1": "abc123def456789",
+      "size": 15728640,
+      "contentType": "application/octet-stream",
+      "location": "https://developer.api.autodesk.com/oss/v2/buckets/test-bucket/objects/model.rvt"
+    },
+    {
+      "bucketKey": "test-bucket",
+      "objectKey": "drawing.dwg",
+      "objectId": "urn:adsk.objects:os.object:test-bucket/drawing.dwg",
+      "sha1": "def789abc123456",
+      "size": 2097152,
+      "contentType": "application/octet-stream",
+      "location": "https://developer.api.autodesk.com/oss/v2/buckets/test-bucket/objects/drawing.dwg"
+    },
+    {
+      "bucketKey": "test-bucket",
+      "objectKey": "site-plan.ifc",
+      "objectId": "urn:adsk.objects:os.object:test-bucket/site-plan.ifc",
+      "sha1": "789def123abc456",
+      "size": 5242880,
+      "contentType": "application/octet-stream",
+      "location": "https://developer.api.autodesk.com/oss/v2/buckets/test-bucket/objects/site-plan.ifc"
+    }
+  ]
+}

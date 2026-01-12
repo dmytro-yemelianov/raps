@@ -1,0 +1,5 @@
+{
+  "reason": "Rate limit exceeded. Please wait before making more requests.",
+  "errorCode": "RATE-001",
+  "retryAfter": 60
+}

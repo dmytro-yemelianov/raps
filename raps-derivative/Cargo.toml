@@ -36,3 +36,8 @@ urlencoding.workspace = true
 
 # Base64 encoding for URNs
 base64.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+tokio-test.workspace = true
+tempfile.workspace = true

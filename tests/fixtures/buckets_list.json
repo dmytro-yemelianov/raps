@@ -1,0 +1,19 @@
+{
+  "items": [
+    {
+      "bucketKey": "test-bucket-1",
+      "createdDate": 1609459200000,
+      "policyKey": "transient"
+    },
+    {
+      "bucketKey": "test-bucket-2",
+      "createdDate": 1609545600000,
+      "policyKey": "temporary"
+    },
+    {
+      "bucketKey": "production-models",
+      "createdDate": 1609632000000,
+      "policyKey": "persistent"
+    }
+  ]
+}

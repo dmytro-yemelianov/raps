@@ -1,0 +1,32 @@
+{
+  "type": "manifest",
+  "hasThumbnail": "true",
+  "status": "success",
+  "progress": "complete",
+  "region": "US",
+  "urn": "dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6dGVzdC1idWNrZXQvbW9kZWwucnZ0",
+  "version": "1.0",
+  "derivatives": [
+    {
+      "status": "success",
+      "progress": "complete",
+      "name": "model.rvt",
+      "hasThumbnail": "true",
+      "outputType": "svf2",
+      "children": [
+        {
+          "guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          "type": "resource",
+          "role": "graphics",
+          "mime": "application/autodesk-svf2"
+        },
+        {
+          "guid": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+          "type": "resource",
+          "role": "thumbnail",
+          "mime": "image/png"
+        }
+      ]
+    }
+  ]
+}

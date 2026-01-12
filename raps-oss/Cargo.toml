@@ -42,3 +42,8 @@ base64.workspace = true
 
 # Project directories
 directories.workspace = true
+
+[dev-dependencies]
+wiremock.workspace = true
+tokio-test.workspace = true
+tempfile.workspace = true

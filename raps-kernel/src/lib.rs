@@ -24,6 +24,11 @@ pub mod prompts;
 pub mod storage;
 pub mod types;
 
+/// Test utilities for mocking API responses
+/// Only available when running tests
+#[cfg(test)]
+pub mod test_utils;
+
 // Re-export commonly used types
 pub use auth::AuthClient;
 pub use config::Config;
