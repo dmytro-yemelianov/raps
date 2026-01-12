@@ -273,7 +273,10 @@ mod tests {
     #[test]
     fn test_output_format_from_str_case_insensitive() {
         assert_eq!(OutputFormat::from_str("JSON").unwrap(), OutputFormat::Json);
-        assert_eq!(OutputFormat::from_str("Table").unwrap(), OutputFormat::Table);
+        assert_eq!(
+            OutputFormat::from_str("Table").unwrap(),
+            OutputFormat::Table
+        );
         assert_eq!(OutputFormat::from_str("YAML").unwrap(), OutputFormat::Yaml);
     }
 

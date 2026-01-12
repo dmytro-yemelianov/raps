@@ -27,7 +27,11 @@
       "Bash(ls:*)",
       "Bash(cargo run:*)",
       "Bash(du:*)",
-      "Bash(git gc:*)"
+      "Bash(git gc:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh workflow run:*)"
     ]
   }
 }

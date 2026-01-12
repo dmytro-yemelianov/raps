@@ -194,17 +194,15 @@ async fn start_translation(
     // Get URN interactively if not provided
     let source_urn = match urn {
         Some(u) => u,
-        None => prompts::input_validated(
-            "Enter the base64-encoded URN",
-            None,
-            |input: &String| {
+        None => {
+            prompts::input_validated("Enter the base64-encoded URN", None, |input: &String| {
                 if input.is_empty() {
                     Err("URN cannot be empty")
                 } else {
                     Ok(())
                 }
-            },
-        )?,
+            })?
+        }
     };
 
     // Select output format interactively if not provided

@@ -138,8 +138,16 @@ async fn create_bucket(
                         Err("Bucket key must be at least 3 characters")
                     } else if input.len() > 128 {
                         Err("Bucket key must be at most 128 characters")
-                    } else if !input.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_' || c == '.') {
-                        Err("Bucket key can only contain lowercase letters, numbers, hyphens, underscores, and dots")
+                    } else if !input.chars().all(|c| {
+                        c.is_ascii_lowercase()
+                            || c.is_ascii_digit()
+                            || c == '-'
+                            || c == '_'
+                            || c == '.'
+                    }) {
+                        Err(
+                            "Bucket key can only contain lowercase letters, numbers, hyphens, underscores, and dots",
+                        )
                     } else {
                         Ok(())
                     }
@@ -186,19 +194,14 @@ async fn create_bucket(
             let policy_labels: Vec<String> = policies
                 .iter()
                 .map(|p| match p {
-                    RetentionPolicy::Transient => {
-                        "transient (deleted after 24 hours)".to_string()
-                    }
-                    RetentionPolicy::Temporary => {
-                        "temporary (deleted after 30 days)".to_string()
-                    }
-                    RetentionPolicy::Persistent => {
-                        "persistent (kept until deleted)".to_string()
-                    }
+                    RetentionPolicy::Transient => "transient (deleted after 24 hours)".to_string(),
+                    RetentionPolicy::Temporary => "temporary (deleted after 30 days)".to_string(),
+                    RetentionPolicy::Persistent => "persistent (kept until deleted)".to_string(),
                 })
                 .collect();
 
-            let selection = prompts::select_with_default("Select retention policy", &policy_labels, 0)?;
+            let selection =
+                prompts::select_with_default("Select retention policy", &policy_labels, 0)?;
             policies[selection]
         }
     };

@@ -302,7 +302,10 @@ async fn run(cli: Cli) -> Result<()> {
     if let Commands::Shell = cli.command {
         println!("{}", "Welcome to the RAPS interactive shell!".bold());
         println!("Type 'help' for a list of commands, 'exit' to quit.");
-        println!("Use TAB for completion, {} hints show required parameters.", "cyan".cyan());
+        println!(
+            "Use TAB for completion, {} hints show required parameters.",
+            "cyan".cyan()
+        );
         println!();
 
         // Create editor with custom helper for completions and hints
@@ -389,10 +392,7 @@ async fn run(cli: Cli) -> Result<()> {
                         println!("  {}     Exit shell", "Ctrl-D".green());
                         println!();
                         println!("{}", "Tips:".bold());
-                        println!(
-                            "  * {} hints show required parameters",
-                            "Cyan text".cyan()
-                        );
+                        println!("  * {} hints show required parameters", "Cyan text".cyan());
                         println!(
                             "  * Use {} or {} for command help",
                             "<command> --help".green(),

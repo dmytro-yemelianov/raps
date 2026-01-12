@@ -836,7 +836,10 @@ mod tests {
         let item: Item = serde_json::from_str(json).unwrap();
         assert!(item.attributes.extension.is_some());
         let ext = item.attributes.extension.unwrap();
-        assert_eq!(ext.extension_type, Some("items:autodesk.bim360:File".to_string()));
+        assert_eq!(
+            ext.extension_type,
+            Some("items:autodesk.bim360:File".to_string())
+        );
     }
 
     #[test]

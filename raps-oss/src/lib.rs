@@ -1467,6 +1467,9 @@ mod tests {
         let client = create_test_oss_client();
         let urn = client.get_urn("bucket", "object.dwg");
         // URN should be base64 encoded
-        assert!(urn.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+        assert!(
+            urn.chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+        );
     }
 }

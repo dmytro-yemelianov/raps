@@ -186,17 +186,13 @@ async fn create_webhook(
     // Get callback URL
     let url = match callback_url {
         Some(u) => u,
-        None => prompts::input_validated(
-            "Enter callback URL",
-            None,
-            |input: &String| {
-                if input.starts_with("http://") || input.starts_with("https://") {
-                    Ok(())
-                } else {
-                    Err("URL must start with http:// or https://")
-                }
-            },
-        )?,
+        None => prompts::input_validated("Enter callback URL", None, |input: &String| {
+            if input.starts_with("http://") || input.starts_with("https://") {
+                Ok(())
+            } else {
+                Err("URL must start with http:// or https://")
+            }
+        })?,
     };
 
     // Get event type

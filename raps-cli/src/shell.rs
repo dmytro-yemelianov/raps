@@ -767,7 +767,8 @@ impl RapsHelper {
                     // Command is complete, suggest subcommands
                     if let Some(cmd) = self.commands.iter().find(|c| c.name == partial) {
                         for subcmd in cmd.subcommands {
-                            completions.push(Self::format_completion(subcmd.name, subcmd.description));
+                            completions
+                                .push(Self::format_completion(subcmd.name, subcmd.description));
                         }
                     }
                 } else {
@@ -801,7 +802,8 @@ impl RapsHelper {
                         // Partial subcommand - filter matching subcommands
                         for subcmd in cmd.subcommands {
                             if subcmd.name.starts_with(&partial) {
-                                completions.push(Self::format_completion(subcmd.name, subcmd.description));
+                                completions
+                                    .push(Self::format_completion(subcmd.name, subcmd.description));
                             }
                         }
                     }

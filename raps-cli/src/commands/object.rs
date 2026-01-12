@@ -277,7 +277,10 @@ async fn download_object(
     // Check if output file exists (respects --yes flag)
     if output_path.exists() {
         let overwrite = prompts::confirm(
-            format!("File '{}' already exists. Overwrite?", output_path.display()),
+            format!(
+                "File '{}' already exists. Overwrite?",
+                output_path.display()
+            ),
             false,
         )?;
 
