@@ -302,10 +302,7 @@ async fn run(cli: Cli) -> Result<()> {
     if let Commands::Shell = cli.command {
         println!("{}", "Welcome to the RAPS interactive shell!".bold());
         println!("Type 'help' for a list of commands, 'exit' to quit.");
-        println!(
-            "{}",
-            "Use TAB for command completion, hints show required parameters.".dimmed()
-        );
+        println!("Use TAB for completion, {} hints show required parameters.", "cyan".cyan());
         println!();
 
         // Create editor with custom helper for completions and hints
@@ -313,7 +310,7 @@ async fn run(cli: Cli) -> Result<()> {
             .completion_type(CompletionType::List)
             .edit_mode(EditMode::Emacs)
             .auto_add_history(true)
-            .tab_stop(4)
+            .completion_prompt_limit(50) // Show up to 50 completions before prompting
             .build();
 
         let helper = shell::RapsHelper::new();
@@ -384,11 +381,17 @@ async fn run(cli: Cli) -> Result<()> {
                         println!("  {:<16} Configuration management", "config".cyan());
                         println!("  {:<16} Exit the shell", "exit".cyan());
                         println!();
+                        println!("{}", "Key bindings:".bold());
+                        println!("  {}        Show completions", "TAB".green());
+                        println!("  {}      Accept hint completion", "Right".green());
+                        println!("  {}     History navigation", "Up/Down".green());
+                        println!("  {}     Cancel current line", "Ctrl-C".green());
+                        println!("  {}     Exit shell", "Ctrl-D".green());
+                        println!();
                         println!("{}", "Tips:".bold());
-                        println!("  * Press {} for command completion", "TAB".green());
                         println!(
                             "  * {} hints show required parameters",
-                            "Gray text".dimmed()
+                            "Cyan text".cyan()
                         );
                         println!(
                             "  * Use {} or {} for command help",

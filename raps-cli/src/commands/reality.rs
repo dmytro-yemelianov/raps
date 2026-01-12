@@ -10,6 +10,8 @@ use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
 use indicatif::{ProgressBar, ProgressStyle};
+#[allow(unused_imports)]
+use raps_kernel::{progress, prompts};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;

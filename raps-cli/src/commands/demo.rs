@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
+use raps_kernel::progress;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -415,12 +415,7 @@ f 5//6 1//6 4//6 8//6
     let start_time = Instant::now();
     let max_wait = Duration::from_secs(600); // 10 minutes
 
-    let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::default_spinner()
-            .template("{spinner:.cyan} {msg}")
-            .unwrap(),
-    );
+    let pb = progress::spinner("Waiting for translation...");
 
     loop {
         if start_time.elapsed() > max_wait {

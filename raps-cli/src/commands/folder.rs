@@ -9,6 +9,8 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::Input;
+#[allow(unused_imports)]
+use raps_kernel::prompts;
 use serde::Serialize;
 
 use raps_dm::DataManagementClient;

@@ -8,8 +8,6 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::{Input, Select};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -17,6 +15,7 @@ use std::time::Duration;
 
 use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument};
 use raps_kernel::output::OutputFormat;
+use raps_kernel::{progress, prompts};
 
 #[derive(Debug, Subcommand)]
 pub enum DaCommands {
@@ -365,13 +364,9 @@ async fn create_appbundle(
             println!("{}", "Fetching engines...".dimmed());
             let engines = client.list_engines().await?;
 
-            let engine_ids: Vec<&str> = engines.iter().map(|e| e.id.as_str()).collect();
+            let engine_ids: Vec<String> = engines.iter().map(|e| e.id.clone()).collect();
 
-            let selection = Select::new()
-                .with_prompt("Select engine")
-                .items(&engine_ids)
-                .interact()?;
-
+            let selection = prompts::select("Select engine", &engine_ids)?;
             engines[selection].id.clone()
         }
     };
@@ -379,9 +374,7 @@ async fn create_appbundle(
     // Get bundle ID
     let bundle_id = match id {
         Some(i) => i,
-        None => Input::new()
-            .with_prompt("Enter app bundle ID")
-            .interact_text()?,
+        None => prompts::input("Enter app bundle ID", None)?,
     };
 
     println!("{}", "Creating app bundle...".dimmed());
@@ -687,13 +680,8 @@ async fn check_status(
     _output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap(),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
+        // Spinner hidden in non-interactive mode
+        let spinner = progress::spinner("Checking work item status...");
 
         loop {
             let workitem = client.get_workitem_status(workitem_id).await?;

@@ -7,6 +7,8 @@
 //! - Configuration management
 //! - Token storage abstraction
 //! - OAuth authentication
+//! - Progress bar utilities
+//! - Interactive prompt utilities
 
 #![allow(clippy::uninlined_format_args)]
 
@@ -17,6 +19,8 @@ pub mod http;
 pub mod interactive;
 pub mod logging;
 pub mod output;
+pub mod progress;
+pub mod prompts;
 pub mod storage;
 pub mod types;
 

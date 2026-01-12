@@ -60,3 +60,9 @@ uuid.workspace = true
 
 # URL encoding
 urlencoding.workspace = true
+
+# Progress bars
+indicatif.workspace = true
+
+# Interactive prompts
+dialoguer.workspace = true

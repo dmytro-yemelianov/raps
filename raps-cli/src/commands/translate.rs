@@ -8,15 +8,13 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::{Input, Select};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use std::time::Duration;
 use std::{path::PathBuf, str::FromStr};
 
 use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
-use raps_kernel::interactive;
 use raps_kernel::output::OutputFormat;
+use raps_kernel::{progress, prompts};
 
 #[derive(Debug, Subcommand)]
 pub enum TranslateCommands {
@@ -196,26 +194,17 @@ async fn start_translation(
     // Get URN interactively if not provided
     let source_urn = match urn {
         Some(u) => u,
-        None => {
-            // In non-interactive mode, require the URN
-            if interactive::is_non_interactive() {
-                anyhow::bail!(
-                    "URN is required in non-interactive mode. Use --urn flag or provide as argument."
-                );
-            }
-
-            // Interactive mode: prompt for URN
-            Input::new()
-                .with_prompt("Enter the base64-encoded URN")
-                .validate_with(|input: &String| -> Result<(), &str> {
-                    if input.is_empty() {
-                        Err("URN cannot be empty")
-                    } else {
-                        Ok(())
-                    }
-                })
-                .interact_text()?
-        }
+        None => prompts::input_validated(
+            "Enter the base64-encoded URN",
+            None,
+            |input: &String| {
+                if input.is_empty() {
+                    Err("URN cannot be empty")
+                } else {
+                    Ok(())
+                }
+            },
+        )?,
     };
 
     // Select output format interactively if not provided
@@ -234,23 +223,11 @@ async fn start_translation(
             ),
         },
         None => {
-            // In non-interactive mode, require the format
-            if interactive::is_non_interactive() {
-                anyhow::bail!(
-                    "--format is required in non-interactive mode. Use: svf2, svf, thumbnail, obj, stl, step, iges, ifc"
-                );
-            }
-
             // Interactive mode: prompt for format
             let formats = DerivativeOutputFormat::all();
             let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
 
-            let selection = Select::new()
-                .with_prompt("Select output format")
-                .items(&format_labels)
-                .default(0)
-                .interact()?;
-
+            let selection = prompts::select("Select output format", &format_labels)?;
             formats[selection]
         }
     };
@@ -327,14 +304,8 @@ async fn check_status(
     output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
-        // Poll until complete
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap(),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
+        // Poll until complete (spinner hidden in non-interactive mode)
+        let spinner = progress::spinner("Checking translation status...");
 
         loop {
             let (status, progress) = client.get_status(urn).await?;

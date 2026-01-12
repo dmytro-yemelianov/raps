@@ -8,7 +8,6 @@
 use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::{Confirm, Select};
 use futures_util::future;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -16,6 +15,7 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 
 use raps_kernel::output::OutputFormat;
+use raps_kernel::prompts;
 use raps_oss::OssClient;
 
 #[derive(Debug, Subcommand)]
@@ -142,11 +142,7 @@ async fn select_bucket(client: &OssClient, provided: Option<String>) -> Result<S
 
             let bucket_keys: Vec<String> = buckets.iter().map(|b| b.bucket_key.clone()).collect();
 
-            let selection = Select::new()
-                .with_prompt("Select bucket")
-                .items(&bucket_keys)
-                .interact()?;
-
+            let selection = prompts::select("Select bucket", &bucket_keys)?;
             Ok(bucket_keys[selection].clone())
         }
     }
@@ -270,11 +266,7 @@ async fn download_object(
                 .map(|o| format!("{} ({})", o.object_key, format_size(o.size)))
                 .collect();
 
-            let selection = Select::new()
-                .with_prompt("Select object to download")
-                .items(&object_keys)
-                .interact()?;
-
+            let selection = prompts::select("Select object to download", &object_keys)?;
             objects[selection].object_key.clone()
         }
     };
@@ -282,15 +274,12 @@ async fn download_object(
     // Determine output path
     let output_path = output.unwrap_or_else(|| PathBuf::from(&object_key));
 
-    // Check if output file exists
+    // Check if output file exists (respects --yes flag)
     if output_path.exists() {
-        let overwrite = Confirm::new()
-            .with_prompt(format!(
-                "File '{}' already exists. Overwrite?",
-                output_path.display()
-            ))
-            .default(false)
-            .interact()?;
+        let overwrite = prompts::confirm(
+            format!("File '{}' already exists. Overwrite?", output_path.display()),
+            false,
+        )?;
 
         if !overwrite {
             println!("{}", "Download cancelled.".yellow());
@@ -443,25 +432,18 @@ async fn delete_object(
 
             let object_keys: Vec<String> = objects.iter().map(|o| o.object_key.clone()).collect();
 
-            let selection = Select::new()
-                .with_prompt("Select object to delete")
-                .items(&object_keys)
-                .interact()?;
-
+            let selection = prompts::select("Select object to delete", &object_keys)?;
             object_keys[selection].clone()
         }
     };
 
-    // Confirm deletion
+    // Confirm deletion (respects --yes flag)
     if !skip_confirm {
-        let confirmed = Confirm::new()
-            .with_prompt(format!(
-                "Are you sure you want to delete '{}/{}'?",
-                bucket_key,
-                object_key.red()
-            ))
-            .default(false)
-            .interact()?;
+        let confirmed = prompts::confirm_destructive(format!(
+            "Are you sure you want to delete '{}/{}'?",
+            bucket_key,
+            object_key.red()
+        ))?;
 
         if !confirmed {
             println!("{}", "Deletion cancelled.".yellow());

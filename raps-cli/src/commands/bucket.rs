@@ -8,12 +8,11 @@
 use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::{Confirm, Input, Select};
 use serde::Serialize;
 use std::str::FromStr;
 
-use raps_kernel::interactive;
 use raps_kernel::output::OutputFormat;
+use raps_kernel::prompts;
 use raps_oss::{OssClient, Region, RetentionPolicy};
 
 #[derive(Debug, Subcommand)]
@@ -118,11 +117,6 @@ async fn create_bucket(
     let bucket_key = match key {
         Some(k) => k,
         None => {
-            // In non-interactive mode, require the key
-            if interactive::is_non_interactive() {
-                anyhow::bail!("Bucket key is required in non-interactive mode. Use --key flag.");
-            }
-
             println!(
                 "{}",
                 "Note: Bucket keys must be globally unique across all APS applications.".yellow()
@@ -136,10 +130,10 @@ async fn create_bucket(
                 .dimmed()
             );
 
-            Input::new()
-                .with_prompt("Enter bucket key")
-                .with_initial_text(&suggested_prefix)
-                .validate_with(|input: &String| -> Result<(), &str> {
+            prompts::input_validated(
+                "Enter bucket key",
+                Some(&suggested_prefix),
+                |input: &String| {
                     if input.len() < 3 {
                         Err("Bucket key must be at least 3 characters")
                     } else if input.len() > 128 {
@@ -149,8 +143,8 @@ async fn create_bucket(
                     } else {
                         Ok(())
                     }
-                })
-                .interact_text()?
+                },
+            )?
         }
     };
 
@@ -173,18 +167,11 @@ async fn create_bucket(
                 })?
         }
         None => {
-            // In non-interactive mode, default to US
-            if interactive::is_non_interactive() {
-                Region::US
-            } else {
-                let regions = Region::all();
-                let selection = Select::new()
-                    .with_prompt("Select region")
-                    .items(&regions)
-                    .default(0)
-                    .interact()?;
-                regions[selection]
-            }
+            // Default to US, or prompt if interactive
+            let regions = Region::all();
+            let region_labels: Vec<String> = regions.iter().map(|r| r.to_string()).collect();
+            let selection = prompts::select_with_default("Select region", &region_labels, 0)?;
+            regions[selection]
         }
     };
 
@@ -194,33 +181,25 @@ async fn create_bucket(
             anyhow::anyhow!("Invalid policy. Use transient, temporary, or persistent.")
         })?,
         None => {
-            // In non-interactive mode, default to transient
-            if interactive::is_non_interactive() {
-                RetentionPolicy::Transient
-            } else {
-                let policies = RetentionPolicy::all();
-                let policy_labels: Vec<String> = policies
-                    .iter()
-                    .map(|p| match p {
-                        RetentionPolicy::Transient => {
-                            "transient (deleted after 24 hours)".to_string()
-                        }
-                        RetentionPolicy::Temporary => {
-                            "temporary (deleted after 30 days)".to_string()
-                        }
-                        RetentionPolicy::Persistent => {
-                            "persistent (kept until deleted)".to_string()
-                        }
-                    })
-                    .collect();
+            // Default to transient, or prompt if interactive
+            let policies = RetentionPolicy::all();
+            let policy_labels: Vec<String> = policies
+                .iter()
+                .map(|p| match p {
+                    RetentionPolicy::Transient => {
+                        "transient (deleted after 24 hours)".to_string()
+                    }
+                    RetentionPolicy::Temporary => {
+                        "temporary (deleted after 30 days)".to_string()
+                    }
+                    RetentionPolicy::Persistent => {
+                        "persistent (kept until deleted)".to_string()
+                    }
+                })
+                .collect();
 
-                let selection = Select::new()
-                    .with_prompt("Select retention policy")
-                    .items(&policy_labels)
-                    .default(0)
-                    .interact()?;
-                policies[selection]
-            }
+            let selection = prompts::select_with_default("Select retention policy", &policy_labels, 0)?;
+            policies[selection]
         }
     };
 
@@ -407,24 +386,17 @@ async fn delete_bucket(
 
             let bucket_keys: Vec<String> = buckets.iter().map(|b| b.bucket_key.clone()).collect();
 
-            let selection = Select::new()
-                .with_prompt("Select bucket to delete")
-                .items(&bucket_keys)
-                .interact()?;
-
+            let selection = prompts::select("Select bucket to delete", &bucket_keys)?;
             bucket_keys[selection].clone()
         }
     };
 
-    // Confirm deletion
+    // Confirm deletion (respects --yes flag in non-interactive mode)
     if !skip_confirm {
-        let confirmed = Confirm::new()
-            .with_prompt(format!(
-                "Are you sure you want to delete bucket '{}'?",
-                key.red()
-            ))
-            .default(false)
-            .interact()?;
+        let confirmed = prompts::confirm_destructive(format!(
+            "Are you sure you want to delete bucket '{}'?",
+            key.red()
+        ))?;
 
         if !confirmed {
             println!("{}", "Deletion cancelled.".yellow());

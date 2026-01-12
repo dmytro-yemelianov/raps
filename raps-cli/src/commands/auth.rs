@@ -8,7 +8,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::MultiSelect;
+use raps_kernel::prompts;
 use serde::Serialize;
 
 use raps_kernel::auth::AuthClient;
@@ -232,16 +232,7 @@ async fn login(
             .collect();
 
         // Find default selections
-        let defaults: Vec<bool> = AVAILABLE_SCOPES
-            .iter()
-            .map(|(scope, _)| DEFAULT_SCOPES.contains(scope))
-            .collect();
-
-        let selections = MultiSelect::new()
-            .with_prompt("Select OAuth scopes")
-            .items(&scope_labels)
-            .defaults(&defaults)
-            .interact()?;
+        let selections = prompts::multi_select("Select OAuth scopes", &scope_labels)?;
 
         if selections.is_empty() {
             anyhow::bail!("At least one scope must be selected");

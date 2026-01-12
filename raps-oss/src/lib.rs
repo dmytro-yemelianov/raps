@@ -12,7 +12,6 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -23,6 +22,7 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 use raps_kernel::logging;
+use raps_kernel::progress;
 
 /// Bucket retention policy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -574,15 +574,8 @@ impl OssClient {
             .context("Failed to get file metadata")?;
         let file_size = metadata.len();
 
-        // Create progress bar
-        let pb = ProgressBar::new(file_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
-                .progress_chars("█▓░"),
-        );
-        pb.set_message(format!("Uploading {}", object_key));
+        // Create progress bar (hidden in non-interactive mode)
+        let pb = progress::file_progress(file_size, &format!("Uploading {}", object_key));
 
         // Step 1: Get signed S3 upload URL
         pb.set_message(format!("Getting upload URL for {}", object_key));
@@ -766,14 +759,8 @@ impl OssClient {
             (new_state, Some(signed.urls))
         };
 
-        // Create progress bar
-        let pb = ProgressBar::new(file_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
-                .progress_chars("█▓░"),
-        );
+        // Create progress bar (hidden in non-interactive mode)
+        let pb = progress::file_progress(file_size, &format!("Uploading {}", object_key));
 
         // Update progress if resuming
         if !state.completed_parts.is_empty() {
@@ -1018,15 +1005,8 @@ impl OssClient {
             .size
             .unwrap_or(response.content_length().unwrap_or(0));
 
-        // Create progress bar
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
-                .progress_chars("█▓░"),
-        );
-        pb.set_message(format!("Downloading {}", object_key));
+        // Create progress bar (hidden in non-interactive mode)
+        let pb = progress::file_progress(total_size, &format!("Downloading {}", object_key));
 
         // Stream download
         let mut file = File::create(output_path)

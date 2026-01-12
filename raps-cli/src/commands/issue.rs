@@ -10,6 +10,8 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
+#[allow(unused_imports)]
+use raps_kernel::prompts;
 use serde::Serialize;
 
 use raps_acc::{CreateIssueRequest, IssuesClient, UpdateIssueRequest};

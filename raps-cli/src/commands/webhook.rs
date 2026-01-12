@@ -8,10 +8,9 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::{Input, Select};
+use raps_kernel::prompts;
 use serde::Serialize;
 
-use raps_kernel::interactive;
 use raps_kernel::output::OutputFormat;
 use raps_webhooks::{WEBHOOK_EVENTS, WebhooksClient};
 
@@ -187,42 +186,29 @@ async fn create_webhook(
     // Get callback URL
     let url = match callback_url {
         Some(u) => u,
-        None => {
-            // In non-interactive mode, require the URL
-            if interactive::is_non_interactive() {
-                anyhow::bail!("Callback URL is required in non-interactive mode. Use --url flag.");
-            }
-            Input::new()
-                .with_prompt("Enter callback URL")
-                .validate_with(|input: &String| -> Result<(), &str> {
-                    if input.starts_with("http://") || input.starts_with("https://") {
-                        Ok(())
-                    } else {
-                        Err("URL must start with http:// or https://")
-                    }
-                })
-                .interact_text()?
-        }
+        None => prompts::input_validated(
+            "Enter callback URL",
+            None,
+            |input: &String| {
+                if input.starts_with("http://") || input.starts_with("https://") {
+                    Ok(())
+                } else {
+                    Err("URL must start with http:// or https://")
+                }
+            },
+        )?,
     };
 
     // Get event type
     let event_type = match event {
         Some(e) => e,
         None => {
-            // In non-interactive mode, require the event
-            if interactive::is_non_interactive() {
-                anyhow::bail!("Event type is required in non-interactive mode. Use --event flag.");
-            }
             let event_labels: Vec<String> = WEBHOOK_EVENTS
                 .iter()
                 .map(|(e, d)| format!("{} - {}", e, d))
                 .collect();
 
-            let selection = Select::new()
-                .with_prompt("Select event type")
-                .items(&event_labels)
-                .interact()?;
-
+            let selection = prompts::select("Select event type", &event_labels)?;
             WEBHOOK_EVENTS[selection].0.to_string()
         }
     };

@@ -737,6 +737,16 @@ impl RapsHelper {
         map
     }
 
+    /// Format a completion pair with consistent alignment
+    fn format_completion(name: &str, description: &str) -> Pair {
+        // Use 14-character width for command names (covers longest: "completions")
+        // followed by a separator for clear visual distinction
+        Pair {
+            display: format!("{:<14}  -- {}", name, description),
+            replacement: name.to_string(),
+        }
+    }
+
     /// Get completions for the current input
     fn get_completions(&self, line: &str) -> Vec<Pair> {
         let parts: Vec<&str> = line.split_whitespace().collect();
@@ -746,10 +756,7 @@ impl RapsHelper {
             0 => {
                 // Empty line - suggest all top-level commands
                 for cmd in &self.commands {
-                    completions.push(Pair {
-                        display: format!("{:<16} {}", cmd.name, cmd.description),
-                        replacement: cmd.name.to_string(),
-                    });
+                    completions.push(Self::format_completion(cmd.name, cmd.description));
                 }
             }
             1 => {
@@ -760,20 +767,14 @@ impl RapsHelper {
                     // Command is complete, suggest subcommands
                     if let Some(cmd) = self.commands.iter().find(|c| c.name == partial) {
                         for subcmd in cmd.subcommands {
-                            completions.push(Pair {
-                                display: format!("{:<16} {}", subcmd.name, subcmd.description),
-                                replacement: subcmd.name.to_string(),
-                            });
+                            completions.push(Self::format_completion(subcmd.name, subcmd.description));
                         }
                     }
                 } else {
                     // Partial command - filter matching commands
                     for cmd in &self.commands {
                         if cmd.name.starts_with(&partial) {
-                            completions.push(Pair {
-                                display: format!("{:<16} {}", cmd.name, cmd.description),
-                                replacement: cmd.name.to_string(),
-                            });
+                            completions.push(Self::format_completion(cmd.name, cmd.description));
                         }
                     }
                 }
@@ -788,9 +789,11 @@ impl RapsHelper {
                         // Subcommand is complete, suggest parameters/flags
                         if let Some(subcmd) = cmd.subcommands.iter().find(|s| s.name == partial) {
                             for flag in subcmd.flags {
+                                // Extract flag name for display
+                                let flag_name = flag.split_whitespace().next().unwrap_or(flag);
                                 completions.push(Pair {
-                                    display: flag.to_string(),
-                                    replacement: flag.to_string(),
+                                    display: format!("{:<20}  (optional)", flag_name),
+                                    replacement: flag_name.to_string(),
                                 });
                             }
                         }
@@ -798,10 +801,7 @@ impl RapsHelper {
                         // Partial subcommand - filter matching subcommands
                         for subcmd in cmd.subcommands {
                             if subcmd.name.starts_with(&partial) {
-                                completions.push(Pair {
-                                    display: format!("{:<16} {}", subcmd.name, subcmd.description),
-                                    replacement: subcmd.name.to_string(),
-                                });
+                                completions.push(Self::format_completion(subcmd.name, subcmd.description));
                             }
                         }
                     }
@@ -819,10 +819,11 @@ impl RapsHelper {
 
                     if trailing_space || last.starts_with('-') {
                         for flag in cmd.flags {
-                            if trailing_space || flag.starts_with(last) {
+                            let flag_name = flag.split_whitespace().next().unwrap_or(flag);
+                            if trailing_space || flag_name.starts_with(last) {
                                 completions.push(Pair {
-                                    display: flag.to_string(),
-                                    replacement: flag.to_string(),
+                                    display: format!("{:<20}  (optional)", flag_name),
+                                    replacement: flag_name.to_string(),
                                 });
                             }
                         }
@@ -987,8 +988,10 @@ impl Hinter for RapsHelper {
 
 impl Highlighter for RapsHelper {
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        // Gray out the hint text
-        Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        // Use dim + italic for better visibility across terminals
+        // \x1b[2m = dim, \x1b[3m = italic, \x1b[36m = cyan (for dark terminals)
+        // Fall back to just dim for maximum compatibility
+        Owned(format!("\x1b[2;36m{}\x1b[0m", hint))
     }
 
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
