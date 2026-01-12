@@ -768,4 +768,92 @@ mod tests {
         assert_eq!(json["data"]["type"], "folders");
         assert_eq!(json["data"]["attributes"]["name"], "New Folder");
     }
+
+    #[test]
+    fn test_hub_with_region() {
+        let json = r#"{
+            "type": "hubs",
+            "id": "b.hub-id",
+            "attributes": {
+                "name": "Test Hub",
+                "region": "US"
+            }
+        }"#;
+
+        let hub: Hub = serde_json::from_str(json).unwrap();
+        assert_eq!(hub.attributes.region, Some("US".to_string()));
+    }
+
+    #[test]
+    fn test_project_with_scopes() {
+        let json = r#"{
+            "type": "projects",
+            "id": "b.project-id",
+            "attributes": {
+                "name": "Test Project",
+                "scopes": ["docs:read", "docs:write"]
+            }
+        }"#;
+
+        let project: Project = serde_json::from_str(json).unwrap();
+        assert!(project.attributes.scopes.is_some());
+        let scopes = project.attributes.scopes.unwrap();
+        assert_eq!(scopes.len(), 2);
+    }
+
+    #[test]
+    fn test_folder_with_display_name() {
+        let json = r#"{
+            "type": "folders",
+            "id": "folder-id",
+            "attributes": {
+                "name": "folder",
+                "displayName": "Project Files"
+            }
+        }"#;
+
+        let folder: Folder = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            folder.attributes.display_name,
+            Some("Project Files".to_string())
+        );
+    }
+
+    #[test]
+    fn test_item_with_extension() {
+        let json = r#"{
+            "type": "items",
+            "id": "item-id",
+            "attributes": {
+                "displayName": "model.rvt",
+                "extension": {
+                    "type": "items:autodesk.bim360:File",
+                    "version": "1.0"
+                }
+            }
+        }"#;
+
+        let item: Item = serde_json::from_str(json).unwrap();
+        assert!(item.attributes.extension.is_some());
+        let ext = item.attributes.extension.unwrap();
+        assert_eq!(ext.extension_type, Some("items:autodesk.bim360:File".to_string()));
+    }
+
+    #[test]
+    fn test_version_with_storage_size() {
+        let json = r#"{
+            "type": "versions",
+            "id": "version-id",
+            "attributes": {
+                "name": "model.rvt",
+                "displayName": "model.rvt",
+                "versionNumber": 2,
+                "storageSize": 1048576
+            }
+        }"#;
+
+        let version: Version = serde_json::from_str(json).unwrap();
+        assert_eq!(version.attributes.storage_size, Some(1048576));
+        assert_eq!(version.attributes.version_number, Some(2));
+    }
 }

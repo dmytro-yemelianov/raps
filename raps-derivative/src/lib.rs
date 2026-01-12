@@ -752,4 +752,119 @@ mod tests {
         assert_eq!(manifest.progress, "complete");
         assert!(manifest.derivatives.is_empty());
     }
+
+    #[test]
+    fn test_output_format_from_str_case_insensitive() {
+        assert!(OutputFormat::from_str("SVF2").is_ok());
+        assert!(OutputFormat::from_str("svf2").is_ok());
+        assert!(OutputFormat::from_str("Svf2").is_ok());
+    }
+
+    #[test]
+    fn test_output_format_from_str_all_formats() {
+        assert_eq!(OutputFormat::from_str("svf2").unwrap().type_name(), "svf2");
+        assert_eq!(OutputFormat::from_str("svf").unwrap().type_name(), "svf");
+        assert_eq!(
+            OutputFormat::from_str("thumbnail").unwrap().type_name(),
+            "thumbnail"
+        );
+        assert_eq!(OutputFormat::from_str("obj").unwrap().type_name(), "obj");
+        assert_eq!(OutputFormat::from_str("stl").unwrap().type_name(), "stl");
+        assert_eq!(OutputFormat::from_str("step").unwrap().type_name(), "step");
+        assert_eq!(OutputFormat::from_str("iges").unwrap().type_name(), "iges");
+        assert_eq!(OutputFormat::from_str("ifc").unwrap().type_name(), "ifc");
+    }
+
+    #[test]
+    fn test_output_format_from_str_invalid() {
+        let result = OutputFormat::from_str("invalid");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Invalid output format"));
+        assert!(err.contains("svf2")); // Should list valid formats
+    }
+
+    #[test]
+    fn test_translation_input_serialization_minimal() {
+        let input = TranslationInput {
+            urn: "test-urn".to_string(),
+            compressed_urn: None,
+            root_filename: None,
+        };
+
+        let json = serde_json::to_value(&input).unwrap();
+        assert_eq!(json["urn"], "test-urn");
+        // Optional fields should not be present
+        assert!(json.get("compressedUrn").is_none());
+        assert!(json.get("rootFilename").is_none());
+    }
+
+    #[test]
+    fn test_translation_input_serialization_with_options() {
+        let input = TranslationInput {
+            urn: "test-urn".to_string(),
+            compressed_urn: Some(true),
+            root_filename: Some("model.rvt".to_string()),
+        };
+
+        let json = serde_json::to_value(&input).unwrap();
+        assert_eq!(json["urn"], "test-urn");
+        assert_eq!(json["compressedUrn"], true);
+        assert_eq!(json["rootFilename"], "model.rvt");
+    }
+
+    #[test]
+    fn test_output_format_spec_serialization() {
+        let spec = OutputFormatSpec {
+            format_type: "svf2".to_string(),
+            views: Some(vec!["2d".to_string(), "3d".to_string()]),
+        };
+
+        let json = serde_json::to_value(&spec).unwrap();
+        assert_eq!(json["type"], "svf2");
+        assert_eq!(json["views"], serde_json::json!(["2d", "3d"]));
+    }
+
+    #[test]
+    fn test_output_format_spec_serialization_no_views() {
+        let spec = OutputFormatSpec {
+            format_type: "obj".to_string(),
+            views: None,
+        };
+
+        let json = serde_json::to_value(&spec).unwrap();
+        assert_eq!(json["type"], "obj");
+        assert!(json.get("views").is_none());
+    }
+
+    #[test]
+    fn test_manifest_with_derivatives() {
+        let json = r#"{
+            "type": "manifest",
+            "hasThumbnail": "true",
+            "status": "success",
+            "progress": "complete",
+            "region": "US",
+            "urn": "test-urn",
+            "derivatives": [
+                {
+                    "status": "success",
+                    "progress": "complete",
+                    "outputType": "svf2",
+                    "children": []
+                }
+            ]
+        }"#;
+
+        let manifest: Manifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.derivatives.len(), 1);
+        assert_eq!(manifest.derivatives[0].output_type, "svf2");
+    }
+
+    #[test]
+    fn test_filter_by_format_empty_list() {
+        let derivatives: Vec<DownloadableDerivative> = vec![];
+        let filtered = DerivativeClient::filter_by_format(&derivatives, "obj");
+        assert!(filtered.is_empty());
+    }
 }

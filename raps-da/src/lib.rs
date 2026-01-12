@@ -597,4 +597,73 @@ mod tests {
         );
         assert_eq!(response.data.len(), 2);
     }
+
+    #[test]
+    fn test_workitem_with_progress() {
+        let json = r#"{
+            "id": "workitem-id",
+            "status": "inprogress",
+            "progress": "50%"
+        }"#;
+
+        let workitem: WorkItem = serde_json::from_str(json).unwrap();
+        assert_eq!(workitem.status, "inprogress");
+        assert_eq!(workitem.progress, Some("50%".to_string()));
+    }
+
+    #[test]
+    fn test_workitem_with_report_url() {
+        let json = r#"{
+            "id": "workitem-id",
+            "status": "success",
+            "reportUrl": "https://example.com/report.txt"
+        }"#;
+
+        let workitem: WorkItem = serde_json::from_str(json).unwrap();
+        assert!(workitem.report_url.is_some());
+    }
+
+    #[test]
+    fn test_activity_parameter_serialization() {
+        let param = ActivityParameter {
+            verb: "get".to_string(),
+            local_name: Some("input.rvt".to_string()),
+            description: Some("Input file".to_string()),
+            required: Some(true),
+            zip: Some(false),
+        };
+
+        let json = serde_json::to_value(&param).unwrap();
+        assert_eq!(json["verb"], "get");
+        assert_eq!(json["localName"], "input.rvt");
+        assert_eq!(json["required"], true);
+    }
+
+    #[test]
+    fn test_workitem_argument_with_headers() {
+        let mut headers = std::collections::HashMap::new();
+        headers.insert("Authorization".to_string(), "Bearer token".to_string());
+
+        let arg = WorkItemArgument {
+            url: "https://example.com/file.rvt".to_string(),
+            verb: Some("get".to_string()),
+            headers: Some(headers),
+        };
+
+        let json = serde_json::to_value(&arg).unwrap();
+        assert_eq!(json["url"], "https://example.com/file.rvt");
+        assert_eq!(json["headers"]["Authorization"], "Bearer token");
+    }
+
+    #[test]
+    fn test_engine_with_product_version() {
+        let json = r#"{
+            "id": "Autodesk.Revit+2024",
+            "productVersion": "2024"
+        }"#;
+
+        let engine: Engine = serde_json::from_str(json).unwrap();
+        assert_eq!(engine.id, "Autodesk.Revit+2024");
+        assert_eq!(engine.product_version, Some("2024".to_string()));
+    }
 }

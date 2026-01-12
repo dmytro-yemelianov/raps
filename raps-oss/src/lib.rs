@@ -1359,4 +1359,114 @@ mod tests {
         assert_eq!(Region::US.to_string(), "US");
         assert_eq!(Region::EMEA.to_string(), "EMEA");
     }
+
+    #[test]
+    fn test_region_all() {
+        let regions = Region::all();
+        assert_eq!(regions.len(), 2);
+        assert!(regions.contains(&Region::US));
+        assert!(regions.contains(&Region::EMEA));
+    }
+
+    #[test]
+    fn test_retention_policy_all() {
+        let policies = RetentionPolicy::all();
+        assert_eq!(policies.len(), 3);
+        assert!(policies.contains(&RetentionPolicy::Transient));
+        assert!(policies.contains(&RetentionPolicy::Temporary));
+        assert!(policies.contains(&RetentionPolicy::Persistent));
+    }
+
+    #[test]
+    fn test_retention_policy_temporary() {
+        assert_eq!(
+            RetentionPolicy::from_str("temporary"),
+            Ok(RetentionPolicy::Temporary)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("TEMPORARY"),
+            Ok(RetentionPolicy::Temporary)
+        );
+    }
+
+    #[test]
+    fn test_retention_policy_persistent() {
+        assert_eq!(
+            RetentionPolicy::from_str("persistent"),
+            Ok(RetentionPolicy::Persistent)
+        );
+        assert_eq!(
+            RetentionPolicy::from_str("PERSISTENT"),
+            Ok(RetentionPolicy::Persistent)
+        );
+    }
+
+    #[test]
+    fn test_multipart_upload_state_chunk_calculation() {
+        // File of 12 MB with 5 MB chunks = 3 parts
+        let file_size: u64 = 12 * 1024 * 1024;
+        let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
+        let total_parts = (file_size + chunk_size - 1) / chunk_size;
+        assert_eq!(total_parts, 3);
+    }
+
+    #[test]
+    fn test_multipart_upload_state_all_parts_remaining() {
+        let state = MultipartUploadState {
+            bucket_key: "test-bucket".to_string(),
+            object_key: "test-object".to_string(),
+            file_path: "/tmp/test.bin".to_string(),
+            file_size: 15 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 3,
+            completed_parts: vec![], // No parts completed
+            part_etags: std::collections::HashMap::new(),
+            upload_key: "test-key".to_string(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert_eq!(remaining, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_multipart_upload_state_no_parts_remaining() {
+        let state = MultipartUploadState {
+            bucket_key: "test-bucket".to_string(),
+            object_key: "test-object".to_string(),
+            file_path: "/tmp/test.bin".to_string(),
+            file_size: 15 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            total_parts: 3,
+            completed_parts: vec![1, 2, 3], // All parts completed
+            part_etags: std::collections::HashMap::new(),
+            upload_key: "test-key".to_string(),
+            started_at: 0,
+            file_mtime: 0,
+        };
+
+        let remaining = state.remaining_parts();
+        assert!(remaining.is_empty());
+    }
+
+    #[test]
+    fn test_create_bucket_request_serialization() {
+        let request = CreateBucketRequest {
+            bucket_key: "test-bucket".to_string(),
+            policy_key: "transient".to_string(),
+        };
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json["bucketKey"], "test-bucket");
+        assert_eq!(json["policyKey"], "transient");
+    }
+
+    #[test]
+    fn test_oss_client_url_generation() {
+        let client = create_test_oss_client();
+        let urn = client.get_urn("bucket", "object.dwg");
+        // URN should be base64 encoded
+        assert!(urn.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_'));
+    }
 }

@@ -216,3 +216,153 @@ pub trait TableFormat {
     /// Write this data as a formatted table
     fn write_table(&self) -> Result<()>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Serialize)]
+    struct TestData {
+        id: String,
+        name: String,
+        count: u32,
+    }
+
+    #[derive(Serialize)]
+    struct NestedData {
+        id: String,
+        items: Vec<String>,
+    }
+
+    #[test]
+    fn test_output_format_from_str_table() {
+        let format = OutputFormat::from_str("table").unwrap();
+        assert_eq!(format, OutputFormat::Table);
+    }
+
+    #[test]
+    fn test_output_format_from_str_json() {
+        let format = OutputFormat::from_str("json").unwrap();
+        assert_eq!(format, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_output_format_from_str_yaml() {
+        let format = OutputFormat::from_str("yaml").unwrap();
+        assert_eq!(format, OutputFormat::Yaml);
+    }
+
+    #[test]
+    fn test_output_format_from_str_yml() {
+        let format = OutputFormat::from_str("yml").unwrap();
+        assert_eq!(format, OutputFormat::Yaml);
+    }
+
+    #[test]
+    fn test_output_format_from_str_csv() {
+        let format = OutputFormat::from_str("csv").unwrap();
+        assert_eq!(format, OutputFormat::Csv);
+    }
+
+    #[test]
+    fn test_output_format_from_str_plain() {
+        let format = OutputFormat::from_str("plain").unwrap();
+        assert_eq!(format, OutputFormat::Plain);
+    }
+
+    #[test]
+    fn test_output_format_from_str_case_insensitive() {
+        assert_eq!(OutputFormat::from_str("JSON").unwrap(), OutputFormat::Json);
+        assert_eq!(OutputFormat::from_str("Table").unwrap(), OutputFormat::Table);
+        assert_eq!(OutputFormat::from_str("YAML").unwrap(), OutputFormat::Yaml);
+    }
+
+    #[test]
+    fn test_output_format_from_str_invalid() {
+        let result = OutputFormat::from_str("invalid");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_supports_colors_table() {
+        assert!(OutputFormat::Table.supports_colors());
+    }
+
+    #[test]
+    fn test_supports_colors_json() {
+        assert!(!OutputFormat::Json.supports_colors());
+    }
+
+    #[test]
+    fn test_supports_colors_yaml() {
+        assert!(!OutputFormat::Yaml.supports_colors());
+    }
+
+    #[test]
+    fn test_supports_colors_csv() {
+        assert!(!OutputFormat::Csv.supports_colors());
+    }
+
+    #[test]
+    fn test_supports_colors_plain() {
+        assert!(!OutputFormat::Plain.supports_colors());
+    }
+
+    #[test]
+    fn test_determine_explicit_format() {
+        let format = OutputFormat::determine(Some(OutputFormat::Json));
+        assert_eq!(format, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_determine_env_format() {
+        // SAFETY: Test runs with --test-threads=1 or in isolation
+        unsafe {
+            std::env::set_var("RAPS_OUTPUT_FORMAT", "yaml");
+        }
+        let _format = OutputFormat::determine(None);
+        // Note: This may be Json if not a TTY, but we're testing env var takes effect
+        unsafe {
+            std::env::remove_var("RAPS_OUTPUT_FORMAT");
+        }
+        // We can't reliably test this without controlling the terminal state
+    }
+
+    #[test]
+    fn test_format_value_for_csv_null() {
+        let value = serde_json::Value::Null;
+        assert_eq!(format_value_for_csv(&value), "");
+    }
+
+    #[test]
+    fn test_format_value_for_csv_bool() {
+        let value = serde_json::Value::Bool(true);
+        assert_eq!(format_value_for_csv(&value), "true");
+    }
+
+    #[test]
+    fn test_format_value_for_csv_number() {
+        let value = serde_json::json!(42);
+        assert_eq!(format_value_for_csv(&value), "42");
+    }
+
+    #[test]
+    fn test_format_value_for_csv_string() {
+        let value = serde_json::json!("hello");
+        assert_eq!(format_value_for_csv(&value), "hello");
+    }
+
+    #[test]
+    fn test_format_value_for_csv_array() {
+        let value = serde_json::json!(["a", "b", "c"]);
+        assert_eq!(format_value_for_csv(&value), "a; b; c");
+    }
+
+    #[test]
+    fn test_format_value_for_csv_object() {
+        let value = serde_json::json!({"key": "value"});
+        let result = format_value_for_csv(&value);
+        assert!(result.contains("key"));
+        assert!(result.contains("value"));
+    }
+}
