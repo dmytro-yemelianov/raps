@@ -67,7 +67,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -78,7 +78,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -105,9 +105,9 @@ dependencies = [
 
 [[package]]
 name = "assert_cmd"
-version = "2.1.1"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbb6924530aa9e0432442af08bbcafdad182db80d2e560da42a6d442535bf85"
+checksum = "9c5bcfa8749ac45dd12cb11055aeeb6b27a3895560d60d71e3c23bf979e60514"
 dependencies = [
  "anstyle",
  "bstr",
@@ -474,9 +474,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.64"
+version = "4.5.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c0da80818b2d95eca9aa614a30783e42f62bf5fdfee24e68cfb960b071ba8d1"
+checksum = "430b4dc2b5e3861848de79627b2bedc9f3342c7da5173a14eaa5d0f8dc18ae5d"
 dependencies = [
  "clap",
 ]
@@ -823,7 +823,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1763,7 +1763,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2110,7 +2110,7 @@ dependencies = [
 
 [[package]]
 name = "raps-acc"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2126,7 +2126,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cli"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2172,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "raps-da"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2190,7 +2190,7 @@ dependencies = [
 
 [[package]]
 name = "raps-derivative"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2210,7 +2210,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2226,7 +2226,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2259,7 +2259,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2281,7 +2281,7 @@ dependencies = [
 
 [[package]]
 name = "raps-reality"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2298,7 +2298,7 @@ dependencies = [
 
 [[package]]
 name = "raps-webhooks"
-version = "3.10.0"
+version = "3.10.1"
 dependencies = [
  "anyhow",
  "raps-kernel",
@@ -2516,7 +2516,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2731,9 +2731,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.148"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",
@@ -2967,7 +2967,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.3",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3513,7 +3513,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
