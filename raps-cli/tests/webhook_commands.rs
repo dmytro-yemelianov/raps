@@ -75,7 +75,6 @@ fn test_webhook_test_help() {
         .stdout(predicate::str::contains("URL"));
 }
 
-
 // ==================== Argument Validation Tests ====================
 
 #[test]

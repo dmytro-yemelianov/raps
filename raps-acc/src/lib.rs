@@ -703,11 +703,7 @@ impl RfiClient {
     /// List RFIs in a project
     pub async fn list_rfis(&self, project_id: &str) -> Result<Vec<Rfi>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/projects/{}/rfis",
-            self.config.rfi_url(),
-            project_id
-        );
+        let url = format!("{}/projects/{}/rfis", self.config.rfi_url(), project_id);
 
         let response = self
             .http_client
@@ -765,11 +761,7 @@ impl RfiClient {
     /// Create a new RFI
     pub async fn create_rfi(&self, project_id: &str, request: CreateRfiRequest) -> Result<Rfi> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!(
-            "{}/projects/{}/rfis",
-            self.config.rfi_url(),
-            project_id
-        );
+        let url = format!("{}/projects/{}/rfis", self.config.rfi_url(), project_id);
 
         let response = self
             .http_client

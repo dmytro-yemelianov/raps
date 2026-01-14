@@ -111,7 +111,12 @@ fn test_object_signed_url_requires_object() {
 fn test_object_upload_nonexistent_file() {
     // Uploading a nonexistent file should fail
     raps()
-        .args(["object", "upload", "test-bucket", "nonexistent-file-12345.xyz"])
+        .args([
+            "object",
+            "upload",
+            "test-bucket",
+            "nonexistent-file-12345.xyz",
+        ])
         .assert()
         .failure();
 }

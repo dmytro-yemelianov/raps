@@ -81,7 +81,14 @@ fn test_bucket_info_requires_bucket_key() {
 fn test_bucket_create_invalid_policy() {
     // Invalid policy should cause an error
     raps()
-        .args(["bucket", "create", "--key", "test", "--policy", "invalid-policy-xyz"])
+        .args([
+            "bucket",
+            "create",
+            "--key",
+            "test",
+            "--policy",
+            "invalid-policy-xyz",
+        ])
         .assert()
         .failure();
 }
@@ -90,7 +97,14 @@ fn test_bucket_create_invalid_policy() {
 fn test_bucket_create_invalid_region() {
     // Invalid region should cause an error
     raps()
-        .args(["bucket", "create", "--key", "test", "--region", "invalid-region-xyz"])
+        .args([
+            "bucket",
+            "create",
+            "--key",
+            "test",
+            "--region",
+            "invalid-region-xyz",
+        ])
         .assert()
         .failure();
 }

@@ -273,7 +273,10 @@ fn test_live_output_yaml() {
         .unwrap();
 
     // Command should accept yaml output format
-    assert!(output.status.success() || !String::from_utf8_lossy(&output.stderr).contains("invalid value 'yaml'"));
+    assert!(
+        output.status.success()
+            || !String::from_utf8_lossy(&output.stderr).contains("invalid value 'yaml'")
+    );
 }
 
 // ==================== VERBOSE/DEBUG FLAGS ====================
@@ -310,10 +313,7 @@ fn test_live_debug_flag() {
         return;
     }
 
-    let output = raps()
-        .args(["--debug", "auth", "test"])
-        .output()
-        .unwrap();
+    let output = raps().args(["--debug", "auth", "test"]).output().unwrap();
 
     // Debug mode should work (may show more info)
     assert!(output.status.success());
