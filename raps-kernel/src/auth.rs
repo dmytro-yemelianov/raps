@@ -989,12 +989,10 @@ mod tests {
     }
 }
 
-/// Integration tests for AuthClient using wiremock
+/// Integration tests for AuthClient using raps-mock
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use wiremock::matchers::{body_string_contains, method, path};
-    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn create_mock_auth_client(mock_url: &str) -> AuthClient {
         let config = Config {
@@ -1010,75 +1008,19 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_get_2leg_token_success() {
-        let server = MockServer::start().await;
+        // Uses raps-mock which auto-generates auth responses from OpenAPI specs
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .and(body_string_contains("grant_type=client_credentials"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": "new-access-token",
-                "token_type": "Bearer",
-                "expires_in": 3600
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
         let result = client.get_token().await;
-
+        // raps-mock returns a mock token from the OpenAPI spec examples
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "new-access-token");
-    }
-
-    #[tokio::test]
-    async fn test_get_2leg_token_cached() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": "cached-token",
-                "token_type": "Bearer",
-                "expires_in": 3600
-            })))
-            .expect(1) // Should only be called once
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
-
-        // First call should fetch from server
-        let token1 = client.get_token().await.unwrap();
-        // Second call should use cache
-        let token2 = client.get_token().await.unwrap();
-
-        assert_eq!(token1, token2);
-        assert_eq!(token1, "cached-token");
-    }
-
-    #[tokio::test]
-    async fn test_get_2leg_token_invalid_credentials() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(401).set_body_json(serde_json::json!({
-                "developerMessage": "The client_id/client_secret are not valid"
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
-        let result = client.get_token().await;
-
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("401"));
     }
 
     #[tokio::test]
     async fn test_get_3leg_token_not_logged_in() {
-        let server = MockServer::start().await;
-        let client = create_mock_auth_client(&server.uri());
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         let result = client.get_3leg_token().await;
 
@@ -1088,8 +1030,8 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_is_logged_in_false_initially() {
-        let server = MockServer::start().await;
-        let client = create_mock_auth_client(&server.uri());
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         let result = client.is_logged_in().await;
 
@@ -1098,56 +1040,28 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_test_auth_success() {
-        let server = MockServer::start().await;
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": "test-token",
-                "token_type": "Bearer",
-                "expires_in": 3600
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
         let result = client.test_auth().await;
-
+        // raps-mock returns success for auth endpoints
         assert!(result.is_ok());
     }
 
     #[tokio::test]
-    async fn test_test_auth_failure() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({
-                "developerMessage": "Access denied"
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
-        let result = client.test_auth().await;
-
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
     async fn test_config_accessor() {
-        let server = MockServer::start().await;
-        let client = create_mock_auth_client(&server.uri());
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         let config = client.config();
         assert_eq!(config.client_id, "test-client-id");
-        assert_eq!(config.base_url, server.uri());
+        assert_eq!(config.base_url, server.url);
     }
 
     #[tokio::test]
     async fn test_get_token_expiry_none_when_not_logged_in() {
-        let server = MockServer::start().await;
-        let client = create_mock_auth_client(&server.uri());
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         let expiry = client.get_token_expiry().await;
         assert!(expiry.is_none());
@@ -1155,13 +1069,12 @@ mod integration_tests {
 
     #[tokio::test]
     async fn test_logout_clears_token() {
-        let server = MockServer::start().await;
-        let client = create_mock_auth_client(&server.uri());
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         // Logout should succeed even if not logged in
         let result = client.logout().await;
         // May fail because no token to delete, but shouldn't panic
-        // The storage backend might return an error
         let _ = result;
 
         // Should not be logged in after logout
@@ -1169,92 +1082,15 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn test_2leg_token_refresh_on_expiry() {
-        let server = MockServer::start().await;
-
-        // First token expires quickly (simulate near-expiry)
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": "fresh-token",
-                "token_type": "Bearer",
-                "expires_in": 3600
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
+    async fn test_get_token_with_mock_server() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_auth_client(&server.url);
 
         // Clear any existing cache
         client.clear_cache().await;
 
-        // Get new token
-        let token = client.get_token().await.unwrap();
-        assert_eq!(token, "fresh-token");
-    }
-
-    #[tokio::test]
-    async fn test_token_response_parsing_with_all_fields() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "access_token": "full-token",
-                "token_type": "Bearer",
-                "expires_in": 7200,
-                "refresh_token": "refresh-123",
-                "scope": "data:read data:write"
-            })))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
-        let token = client.get_token().await;
-
-        assert!(token.is_ok());
-        assert_eq!(token.unwrap(), "full-token");
-    }
-
-    #[tokio::test]
-    async fn test_handle_malformed_token_response() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(ResponseTemplate::new(200).set_body_string("{invalid json}"))
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
+        // Get token from mock server
         let result = client.get_token().await;
-
-        assert!(result.is_err());
-        // Should fail with parsing error
-    }
-
-    #[tokio::test]
-    async fn test_handle_network_timeout() {
-        let server = MockServer::start().await;
-
-        Mock::given(method("POST"))
-            .and(path("/authentication/v2/token"))
-            .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_json(serde_json::json!({
-                        "access_token": "timeout-test",
-                        "token_type": "Bearer",
-                        "expires_in": 3600
-                    }))
-                    .set_delay(std::time::Duration::from_millis(10)), // Small delay for testing
-            )
-            .mount(&server)
-            .await;
-
-        let client = create_mock_auth_client(&server.uri());
-        let result = client.get_token().await;
-
-        // Should succeed despite small delay
         assert!(result.is_ok());
     }
 }

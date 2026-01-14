@@ -25,6 +25,6 @@ reqwest.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-wiremock.workspace = true
+raps-mock.workspace = true
 tokio-test.workspace = true
 tempfile.workspace = true
