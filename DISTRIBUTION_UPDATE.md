@@ -1,29 +1,29 @@
 # Distribution Channels Update
 
-**Date**: 2026-01-01  
-**Workspace Version**: 3.3.0
+**Date**: 2026-01-15  
+**Workspace Version**: 3.11.0
 
 ## Updated Distribution Channels
 
 ### ✅ Homebrew Tap (`homebrew-tap`)
 
-- **Version**: Updated from `3.1.0` → `3.3.0`
+- **Version**: Updated from `3.10.1` → `3.11.0`
 - **File**: `homebrew-tap/Formula/raps.rb`
-- **Status**: ✅ Updated
-- **Note**: SHA256 hashes will be updated automatically when v3.3.0 release is published
+- **Status**: ⏳ Pending (Wait for artifacts)
+- **Note**: SHA256 hashes will be updated automatically when v3.11.0 release is published
 
 ### ✅ Scoop Bucket (`scoop-bucket`)
 
-- **Version**: Updated from `3.1.0` → `3.3.0`
+- **Version**: Updated from `3.10.1` → `3.11.0`
 - **File**: `scoop-bucket/bucket/raps.json`
-- **Status**: ✅ Updated
-- **Note**: Hash needs manual update after v3.3.0 release artifacts are available
+- **Status**: ⏳ Pending (Wait for artifacts)
+- **Note**: Hash needs manual update after v3.11.0 release artifacts are available
 
 ### ✅ Docker Image (`raps-docker`)
 
-- **Version**: Updated from `2.0.0` → `3.3.0`
+- **Version**: Updated from `3.10.1` → `3.11.0`
 - **File**: `raps-docker/Dockerfile`
-- **Status**: ✅ Updated
+- **Status**: ⏳ Pending
 - **README**: Updated version references and build examples
 
 ### ✅ GitHub Action (`raps-action`)
@@ -43,7 +43,7 @@
 
 ## Next Steps
 
-1. **Release v3.3.0** with artifacts:
+1. **Release v3.11.0** with artifacts:
    - `raps-macos-x64.tar.gz`
    - `raps-macos-arm64.tar.gz`
    - `raps-linux-x64.tar.gz`
@@ -57,20 +57,20 @@
 3. **Build and push Docker images**:
    ```bash
    docker buildx build --platform linux/amd64,linux/arm64 \
-     -t dmytroyemelianov/raps:3.3.0 \
-     --build-arg VERSION=3.3.0 \
+     -t dmytroyemelianov/raps:3.11.0 \
+     --build-arg VERSION=3.11.0 \
      --push .
    ```
 
 4. **Verify distribution channels**:
    - Test Homebrew installation: `brew install dmytro-yemelianov/tap/raps`
    - Test Scoop installation: `scoop install raps`
-   - Test Docker image: `docker pull dmytroyemelianov/raps:3.3.0`
+   - Test Docker image: `docker pull dmytroyemelianov/raps:3.11.0`
    - Test GitHub Action: Use `raps-action@v1` in workflow
 
 ## Notes
 
-- All distribution channels now reference version `3.3.0`
+- All distribution channels now reference version `3.11.0`
 - Website correctly references monorepo structure
 - No breaking changes in distribution format
 - GitHub Action uses dynamic version detection (no update needed)
