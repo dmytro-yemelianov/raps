@@ -13,7 +13,8 @@ use std::time::Duration;
 use std::{path::PathBuf, str::FromStr};
 
 use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
-use raps_kernel::output::OutputFormat;
+use crate::output::OutputFormat;
+// use raps_kernel::output::OutputFormat;
 use raps_kernel::{progress, prompts};
 
 #[derive(Debug, Subcommand)]

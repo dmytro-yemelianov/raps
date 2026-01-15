@@ -17,7 +17,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use raps_kernel::interactive;
-use raps_kernel::output::OutputFormat;
+use crate::output::OutputFormat;
+// use raps_kernel::output::OutputFormat;
 use raps_reality::{OutputFormat as RealityOutputFormat, RealityCaptureClient, SceneType};
 
 #[derive(Debug, Subcommand)]

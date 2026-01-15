@@ -1,141 +1,47 @@
----
-layout: default
-title: Exit Codes
----
-
 # Exit Codes
 
-RAPS CLI uses standardized exit codes to enable reliable error handling in CI/CD pipelines and shell scripts.
+RAPS CLI uses standardized exit codes to help you write robust automation scripts.
 
-## Exit Code Reference
+| Code | Name | Description |
+|------|------|-------------|
+| `0` | **Success** | The command completed successfully. |
+| `2` | **Invalid Arguments** | Command line usage error (e.g., missing flag, invalid value) or validation failure. |
+| `3` | **Authentication Failure** | The command requires authentication, but the session is invalid, expired, or missing permissions. Run `raps auth login`. |
+| `4` | **Not Found** | The requested resource (bucket, object, hub, etc.) could not be found. |
+| `5` | **Remote/API Error** | A network error or 5xx server error occurred. These may be transient; retry strategies are recommended. |
+| `6` | **Internal Error** | An unexpected internal error occurred within the CLI. |
 
-| Code | Meaning | Description |
-|------|---------|-------------|
-| `0` | Success | Command completed successfully |
-| `2` | Invalid Arguments | Invalid arguments or validation failure |
-| `3` | Auth Failure | Authentication failure (invalid credentials, expired token, etc.) |
-| `4` | Not Found | Resource not found (404 errors) |
-| `5` | Remote/API Error | Remote server error (5xx) or network issues |
-| `6` | Internal Error | Internal CLI error or unexpected failure |
+## Examples
 
-## Usage in Scripts
-
-### Bash/Shell
+### Check for Auth Failure
 
 ```bash
-#!/bin/bash
-
 raps bucket list
-
-case $? in
-    0) echo "Success" ;;
-    2) echo "Invalid arguments" ;;
-    3) echo "Authentication failed" ;;
-    4) echo "Bucket not found" ;;
-    5) echo "API error" ;;
-    6) echo "Internal error" ;;
-esac
+if [ $? -eq 3 ]; then
+    echo "Session expired. Logging in..."
+    raps auth login
+fi
 ```
 
-### PowerShell
-
-```powershell
-raps bucket list
-
-switch ($LASTEXITCODE) {
-    0 { Write-Host "Success" }
-    2 { Write-Host "Invalid arguments" }
-    3 { Write-Host "Authentication failed" }
-    4 { Write-Host "Bucket not found" }
-    5 { Write-Host "API error" }
-    6 { Write-Host "Internal error" }
-}
-```
-
-### CI/CD Examples
-
-#### GitHub Actions
-
-```yaml
-- name: List buckets
-  run: raps bucket list
-  continue-on-error: false
-
-- name: Check result
-  if: failure()
-  run: |
-    case $? in
-      3) echo "::error::Authentication failed" ;;
-      5) echo "::warning::API error, retrying..." ;;
-      *) exit $? ;;
-    esac
-```
-
-#### Azure DevOps
-
-```yaml
-- script: raps bucket list
-  continueOnError: false
-  displayName: List buckets
-```
-
-## Error Detection
-
-Exit codes are determined by analyzing the error chain. Common patterns:
-
-- **Auth errors**: Contains "authentication failed", "unauthorized", "forbidden", "401", "403"
-- **Not found**: Contains "not found", "404"
-- **Validation errors**: Contains "invalid", "required", "missing", "cannot be empty"
-- **Remote errors**: Contains "500", "502", "503", "504", "timeout", "connection", "network"
-
-## Enhanced Error Interpretation
-
-RAPS provides human-readable error explanations and suggestions for common API errors:
-
-### Example Error Output
-
-```
-Error: Authentication failed - token may be expired or invalid.
-  Code: Unauthorized (HTTP 401)
-  Details: {"error": "invalid_token"}
-
-Suggestions:
-  → Run 'raps auth login' to refresh your token
-  → Check if your credentials have expired
-  → Verify your APS application is active
-```
-
-### Error Codes and Suggestions
-
-| HTTP Status | Error Code | Explanation | Suggestions |
-|-------------|------------|-------------|-------------|
-| 401 | Unauthorized | Authentication failed | Login again, check credentials |
-| 403 | Forbidden | Permission denied | Check scopes, verify access |
-| 404 | NotFound | Resource not found | Verify resource ID/name |
-| 409 | Conflict | Resource conflict | Check if resource exists |
-| 429 | TooManyRequests | Rate limit exceeded | Wait and retry |
-| 500+ | ServerError | Server error | Wait and retry, check status |
-
-### Programmatic Error Handling
-
-For machine-readable errors, use JSON output:
+### Retry on Remote Error
 
 ```bash
-$ raps bucket get nonexistent --format json
-{
-  "error": {
-    "status_code": 404,
-    "code": "NotFound",
-    "message": "Bucket 'nonexistent' not found",
-    "suggestions": ["Verify bucket name", "List available buckets"]
-  }
-}
+MAX_RETRIES=3
+COUNT=0
+
+while [ $COUNT -lt $MAX_RETRIES ]; do
+    raps translate status $URN --wait
+    EXIT_CODE=$?
+    
+    if [ $EXIT_CODE -eq 0 ]; then
+        break
+    elif [ $EXIT_CODE -eq 5 ]; then
+        echo "Remote error, retrying..."
+        COUNT=$((COUNT+1))
+        sleep 5
+    else
+        echo "Permanent error: $EXIT_CODE"
+        exit $EXIT_CODE
+    fi
+done
 ```
-
-## Notes
-
-- Exit code `1` is reserved for general errors (not used by RAPS CLI)
-- Exit code `2` is also used by clap for argument parsing errors
-- All commands follow the same exit code conventions
-- Use `--format json` for machine-readable error output
-

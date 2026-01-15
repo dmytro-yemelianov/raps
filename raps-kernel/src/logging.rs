@@ -54,34 +54,32 @@ pub fn debug() -> bool {
 /// Log a verbose message (only shown if --verbose or --debug)
 pub fn log_verbose(message: &str) {
     if verbose() || debug() {
-        eprintln!("{}", message);
+        eprintln!("{}", redact_secrets(message));
     }
 }
 
 /// Log a debug message (only shown if --debug)
-#[allow(dead_code)] // May be used in future
 pub fn log_debug(message: &str) {
     if debug() {
-        eprintln!("[DEBUG] {}", message);
+        eprintln!("[DEBUG] {}", redact_secrets(message));
     }
 }
 
 /// Log an HTTP request (only shown if --verbose or --debug)
 pub fn log_request(method: &str, url: &str) {
     if verbose() || debug() {
-        eprintln!("{} {}", method, url);
+        eprintln!("{} {}", method, redact_secrets(url));
     }
 }
 
 /// Log an HTTP response (only shown if --verbose or --debug)
 pub fn log_response(status: u16, url: &str) {
     if verbose() || debug() {
-        eprintln!("{} {}", status, url);
+        eprintln!("{} {}", status, redact_secrets(url));
     }
 }
 
 /// Redact secrets from debug output
-#[allow(dead_code)] // May be used in future
 pub fn redact_secrets(text: &str) -> String {
     // Redact common secret patterns
     let mut redacted = text.to_string();

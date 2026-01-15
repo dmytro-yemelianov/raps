@@ -14,7 +14,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument};
-use raps_kernel::output::OutputFormat;
+use crate::output::OutputFormat;
+// use raps_kernel::output::OutputFormat;
 use raps_kernel::{progress, prompts};
 
 #[derive(Debug, Subcommand)]
@@ -328,25 +329,39 @@ async fn list_engines(client: &DesignAutomationClient, output_format: OutputForm
 
 async fn list_appbundles(
     client: &DesignAutomationClient,
-    _output_format: OutputFormat,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    println!("{}", "Fetching app bundles...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching app bundles...".dimmed());
+    }
 
     let appbundles = client.list_appbundles().await?;
 
     if appbundles.is_empty() {
-        println!("{}", "No app bundles found.".yellow());
+        match output_format {
+            OutputFormat::Table => println!("{}", "No app bundles found.".yellow()),
+            _ => {
+                 output_format.write(&Vec::<String>::new())?;
+            }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "App Bundles:".bold());
-    println!("{}", "-".repeat(60));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "App Bundles:".bold());
+            println!("{}", "-".repeat(60));
 
-    for bundle in appbundles {
-        println!("  {} {}", "-".cyan(), bundle);
+            for bundle in &appbundles {
+                println!("  {} {}", "-".cyan(), bundle);
+            }
+
+            println!("{}", "-".repeat(60));
+        }
+        _ => {
+            output_format.write(&appbundles)?;
+        }
     }
-
-    println!("{}", "-".repeat(60));
     Ok(())
 }
 
@@ -409,25 +424,39 @@ async fn delete_appbundle(
 
 async fn list_activities(
     client: &DesignAutomationClient,
-    _output_format: OutputFormat,
+    output_format: OutputFormat,
 ) -> Result<()> {
-    println!("{}", "Fetching activities...".dimmed());
+    if output_format.supports_colors() {
+        println!("{}", "Fetching activities...".dimmed());
+    }
 
     let activities = client.list_activities().await?;
 
     if activities.is_empty() {
-        println!("{}", "No activities found.".yellow());
+        match output_format {
+             OutputFormat::Table => println!("{}", "No activities found.".yellow()),
+             _ => {
+                 output_format.write(&Vec::<String>::new())?;
+             }
+        }
         return Ok(());
     }
 
-    println!("\n{}", "Activities:".bold());
-    println!("{}", "-".repeat(60));
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Activities:".bold());
+            println!("{}", "-".repeat(60));
 
-    for activity in activities {
-        println!("  {} {}", "-".cyan(), activity);
+            for activity in &activities {
+                println!("  {} {}", "-".cyan(), activity);
+            }
+
+            println!("{}", "-".repeat(60));
+        }
+        _ => {
+            output_format.write(&activities)?;
+        }
     }
-
-    println!("{}", "-".repeat(60));
     Ok(())
 }
 

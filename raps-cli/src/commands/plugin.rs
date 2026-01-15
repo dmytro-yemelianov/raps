@@ -11,7 +11,8 @@ use colored::Colorize;
 use serde::Serialize;
 
 use crate::plugins::{PluginConfig, PluginEntry, PluginManager};
-use raps_kernel::output::OutputFormat;
+use crate::output::OutputFormat;
+// use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum PluginCommands {

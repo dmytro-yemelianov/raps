@@ -12,7 +12,8 @@ use raps_kernel::prompts;
 use serde::Serialize;
 
 use raps_kernel::auth::AuthClient;
-use raps_kernel::output::OutputFormat;
+use crate::output::OutputFormat;
+// use raps_kernel::output::OutputFormat;
 use raps_kernel::storage::{StorageBackend, TokenStorage};
 
 /// Available OAuth scopes for 3-legged authentication

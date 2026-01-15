@@ -12,3 +12,4 @@ pub mod commands;
 pub mod mcp;
 pub mod plugins;
 pub mod shell;
+pub mod output;

@@ -35,6 +35,7 @@ mod commands;
 mod mcp;
 mod plugins;
 mod shell;
+mod output;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
@@ -63,7 +64,8 @@ use raps_kernel::error::ExitCode;
 use raps_kernel::http::HttpClientConfig;
 use raps_kernel::interactive;
 use raps_kernel::logging;
-use raps_kernel::output::OutputFormat;
+// use raps_kernel::output::OutputFormat; // Removed old import
+use crate::output::OutputFormat;
 use raps_oss::OssClient;
 use raps_reality::RealityCaptureClient;
 use raps_webhooks::WebhooksClient;
@@ -78,7 +80,7 @@ use raps_webhooks::WebhooksClient;
 struct Cli {
     /// Output format: table, json, yaml, csv, or plain (default: auto-detect)
     #[arg(long, value_name = "FORMAT", global = true)]
-    output: Option<String>,
+    output: Option<OutputFormat>,
 
     /// Disable colored output
     #[arg(long, global = true)]
@@ -267,12 +269,7 @@ async fn run(cli: Cli) -> Result<()> {
     // Handle config commands (they don't need authentication)
     if let Commands::Config(_) = &cli.command {
         // Determine output format for config commands
-        let output_format = if let Some(format_str) = &cli.output {
-            Some(format_str.parse()?)
-        } else {
-            None
-        };
-        let output_format = OutputFormat::determine(output_format);
+        let output_format = OutputFormat::determine(cli.output);
         // Extract and execute the config command
         if let Commands::Config(cmd) = cli.command {
             return cmd.execute(output_format).await;
@@ -281,12 +278,7 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     // Determine output format
-    let output_format = if let Some(format_str) = &cli.output {
-        Some(format_str.parse()?)
-    } else {
-        None
-    };
-    let output_format = OutputFormat::determine(output_format);
+    let output_format = OutputFormat::determine(cli.output);
 
     // Log startup info in verbose/debug mode
     if logging::verbose() || logging::debug() {
@@ -412,12 +404,7 @@ async fn run(cli: Cli) -> Result<()> {
                         }
                     };
 
-                    let sub_output_format = if let Some(format_str) = &sub_cli.output {
-                        Some(format_str.parse()?)
-                    } else {
-                        None
-                    };
-                    let sub_output_format = OutputFormat::determine(sub_output_format);
+                    let sub_output_format = OutputFormat::determine(sub_cli.output);
                     let sub_http_config = HttpClientConfig::from_cli_and_env(sub_cli.timeout);
 
                     if let Err(err) = execute_command(
