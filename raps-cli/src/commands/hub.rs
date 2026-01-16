@@ -10,8 +10,8 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
-use raps_dm::DataManagementClient;
 use crate::output::OutputFormat;
+use raps_dm::DataManagementClient;
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

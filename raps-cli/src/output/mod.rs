@@ -1,9 +1,9 @@
+use anyhow::Result;
 use clap::ValueEnum;
 use serde::Serialize;
 use std::fmt::Display;
 use std::io::IsTerminal;
 use std::str::FromStr;
-use anyhow::Result;
 
 pub mod formatter;
 use crate::output::formatter::OutputFormatter;
@@ -54,8 +54,9 @@ impl OutputFormat {
 
         // Check environment variable
         if let Ok(env_format) = std::env::var("RAPS_OUTPUT_FORMAT")
-             && let Ok(format) = <OutputFormat as FromStr>::from_str(&env_format) {
-                 return format;
+            && let Ok(format) = <OutputFormat as FromStr>::from_str(&env_format)
+        {
+            return format;
         }
 
         if !std::io::stdout().is_terminal() {

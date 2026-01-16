@@ -33,9 +33,9 @@
 
 mod commands;
 mod mcp;
+mod output;
 mod plugins;
 mod shell;
-mod output;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
@@ -48,10 +48,10 @@ use rustyline::history::DefaultHistory;
 use std::io;
 
 use commands::{
-    AccCommands, AuthCommands, BucketCommands, ConfigCommands, DaCommands, DemoCommands,
-    FolderCommands, GenerateArgs, HubCommands, IssueCommands, ItemCommands, ObjectCommands,
-    PipelineCommands, PluginCommands, ProjectCommands, RealityCommands, RfiCommands,
-    TranslateCommands, WebhookCommands,
+    AccCommands, AdminCommands, AuthCommands, BucketCommands, ConfigCommands, DaCommands,
+    DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands, ItemCommands,
+    ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands, RealityCommands,
+    RfiCommands, TranslateCommands, WebhookCommands,
 };
 
 use raps_acc::{AccClient, IssuesClient, RfiClient};
@@ -167,6 +167,10 @@ enum Commands {
     /// ACC extended modules: Assets, Submittals, Checklists (requires 3-legged auth)
     #[command(subcommand)]
     Acc(AccCommands),
+
+    /// Account admin bulk management (add/remove users, update roles, folder rights)
+    #[command(subcommand)]
+    Admin(AdminCommands),
 
     /// ACC RFIs (Requests for Information) (requires 3-legged auth)
     #[command(subcommand)]
@@ -549,6 +553,11 @@ async fn execute_command(
             let auth_client = get_auth_client();
             let acc_client = AccClient::new(config.clone(), auth_client);
             cmd.execute(&acc_client, output_format).await?;
+        }
+
+        Commands::Admin(cmd) => {
+            let auth_client = get_auth_client();
+            cmd.execute(config, &auth_client, output_format).await?;
         }
 
         Commands::Rfi(cmd) => {

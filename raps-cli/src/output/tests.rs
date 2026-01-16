@@ -1,6 +1,6 @@
+use super::formatter::OutputFormatter;
 use super::*;
 use serde::Serialize;
-use super::formatter::OutputFormatter;
 
 #[derive(Serialize)]
 struct TestData {
@@ -20,7 +20,7 @@ fn test_json_output() {
 
     let output = String::from_utf8(buffer).unwrap();
     let expected = serde_json::to_string_pretty(&data).unwrap() + "\n";
-    
+
     // Normalize newlines for cross-platform comparison
     assert_eq!(output.replace("\r\n", "\n"), expected.replace("\r\n", "\n"));
 }
@@ -37,6 +37,6 @@ fn test_yaml_output() {
 
     let output = String::from_utf8(buffer).unwrap();
     let expected = serde_yaml::to_string(&data).unwrap();
-    
+
     assert_eq!(output, expected);
 }
