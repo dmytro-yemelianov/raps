@@ -25,6 +25,7 @@ raps-derivative.workspace = true
 raps-dm.workspace = true
 raps-da.workspace = true
 raps-acc.workspace = true
+raps-admin.workspace = true
 raps-webhooks.workspace = true
 raps-reality.workspace = true
 

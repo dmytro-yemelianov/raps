@@ -8,9 +8,16 @@
 //! - Issues - Construction Issues management
 //! - RFI - Request for Information management
 //! - Extended APIs - Assets, Submittals, Checklists
+//! - Account Admin API - User and project management
+//! - Project Users API - Project member management
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
+
+pub mod admin;
+pub mod permissions;
+pub mod types;
+pub mod users;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};

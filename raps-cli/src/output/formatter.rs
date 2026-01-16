@@ -20,7 +20,7 @@ impl OutputFormatter {
                 serde_yaml::to_writer(&mut *writer, data)?;
             }
             OutputFormat::Csv => {
-                 // Try to serialize as JSON first to get the structure for CSV
+                // Try to serialize as JSON first to get the structure for CSV
                 let json_value = serde_json::to_value(data)?;
                 write_csv(json_value, writer)?;
             }
@@ -30,9 +30,9 @@ impl OutputFormatter {
                 writeln!(writer)?;
             }
             OutputFormat::Table => {
-                 // Fallback to JSON if specific table logic isn't invoked by the command directly.
-                 serde_json::to_writer_pretty(&mut *writer, data)?;
-                 writeln!(writer)?;
+                // Fallback to JSON if specific table logic isn't invoked by the command directly.
+                serde_json::to_writer_pretty(&mut *writer, data)?;
+                writeln!(writer)?;
             }
         }
         Ok(())
@@ -40,7 +40,7 @@ impl OutputFormatter {
 }
 
 fn write_csv<W: Write>(json_value: serde_json::Value, writer: &mut W) -> Result<()> {
-     match json_value {
+    match json_value {
         serde_json::Value::Array(items) if !items.is_empty() => {
             // Get headers from first item
             if let Some(serde_json::Value::Object(map)) = items.first() {
@@ -81,14 +81,11 @@ fn format_value_for_csv(value: &serde_json::Value) -> String {
         serde_json::Value::Bool(b) => b.to_string(),
         serde_json::Value::Number(n) => n.to_string(),
         serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Array(arr) => {
-            arr.iter()
-                .map(format_value_for_csv)
-                .collect::<Vec<_>>()
-                .join("; ")
-        }
-        serde_json::Value::Object(obj) => {
-            serde_json::to_string(obj).unwrap_or_default()
-        }
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .map(format_value_for_csv)
+            .collect::<Vec<_>>()
+            .join("; "),
+        serde_json::Value::Object(obj) => serde_json::to_string(obj).unwrap_or_default(),
     }
 }

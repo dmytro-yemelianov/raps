@@ -11,8 +11,8 @@ use colored::Colorize;
 use raps_kernel::prompts;
 use serde::Serialize;
 
-use raps_kernel::auth::AuthClient;
 use crate::output::OutputFormat;
+use raps_kernel::auth::AuthClient;
 // use raps_kernel::output::OutputFormat;
 use raps_kernel::storage::{StorageBackend, TokenStorage};
 

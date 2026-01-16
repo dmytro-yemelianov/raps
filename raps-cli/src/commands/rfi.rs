@@ -10,8 +10,8 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
-use raps_acc::{CreateRfiRequest, RfiClient, UpdateRfiRequest};
 use crate::output::OutputFormat;
+use raps_acc::{CreateRfiRequest, RfiClient, UpdateRfiRequest};
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

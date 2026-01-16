@@ -1139,6 +1139,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
 name = "h2"
 version = "0.3.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2181,6 +2187,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "raps-admin"
+version = "3.11.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "directories",
+ "glob",
+ "indicatif",
+ "raps-acc",
+ "raps-kernel",
+ "raps-mock",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "uuid",
+]
+
+[[package]]
 name = "raps-cli"
 version = "3.11.0"
 dependencies = [
@@ -2201,6 +2229,7 @@ dependencies = [
  "predicates",
  "rand",
  "raps-acc",
+ "raps-admin",
  "raps-da",
  "raps-derivative",
  "raps-dm",
@@ -3451,6 +3480,7 @@ checksum = "e2e054861b4bd027cd373e18e8d8d8e6548085000e41290d95ce0c373a654b4a"
 dependencies = [
  "getrandom 0.3.4",
  "js-sys",
+ "serde_core",
  "wasm-bindgen",
 ]
 

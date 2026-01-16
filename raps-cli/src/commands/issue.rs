@@ -14,9 +14,9 @@ use dialoguer::{Input, Select};
 use raps_kernel::prompts;
 use serde::Serialize;
 
+use crate::output::OutputFormat;
 use raps_acc::{CreateIssueRequest, IssuesClient, UpdateIssueRequest};
 use raps_kernel::interactive;
-use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

@@ -13,8 +13,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument};
 use crate::output::OutputFormat;
+use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient, WorkItemArgument};
 // use raps_kernel::output::OutputFormat;
 use raps_kernel::{progress, prompts};
 
@@ -341,7 +341,7 @@ async fn list_appbundles(
         match output_format {
             OutputFormat::Table => println!("{}", "No app bundles found.".yellow()),
             _ => {
-                 output_format.write(&Vec::<String>::new())?;
+                output_format.write(&Vec::<String>::new())?;
             }
         }
         return Ok(());
@@ -434,10 +434,10 @@ async fn list_activities(
 
     if activities.is_empty() {
         match output_format {
-             OutputFormat::Table => println!("{}", "No activities found.".yellow()),
-             _ => {
-                 output_format.write(&Vec::<String>::new())?;
-             }
+            OutputFormat::Table => println!("{}", "No activities found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<String>::new())?;
+            }
         }
         return Ok(());
     }

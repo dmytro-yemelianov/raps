@@ -10,8 +10,8 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
-use crate::plugins::{PluginConfig, PluginEntry, PluginManager};
 use crate::output::OutputFormat;
+use crate::plugins::{PluginConfig, PluginEntry, PluginManager};
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

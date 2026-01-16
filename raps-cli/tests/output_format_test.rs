@@ -22,5 +22,5 @@ fn test_output_flag_accepts_yaml() {
         .arg("yaml")
         .assert()
         // It might fail due to missing auth/config, but it shouldn't fail due to "invalid value for '--output'"
-        .stderr(predicate::str::contains("invalid value").not()); 
+        .stderr(predicate::str::contains("invalid value").not());
 }

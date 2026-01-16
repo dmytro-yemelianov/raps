@@ -10,11 +10,11 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
+use crate::output::OutputFormat;
 use raps_acc::{
     AccClient, CreateAssetRequest, CreateChecklistRequest, CreateSubmittalRequest,
     UpdateAssetRequest, UpdateChecklistRequest, UpdateSubmittalRequest,
 };
-use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]

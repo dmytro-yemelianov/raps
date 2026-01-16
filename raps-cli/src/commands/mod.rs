@@ -6,6 +6,7 @@
 //! Contains subcommand implementations for all APS operations.
 
 pub mod acc;
+pub mod admin;
 pub mod auth;
 pub mod bucket;
 pub mod config;
@@ -26,6 +27,7 @@ pub mod translate;
 pub mod webhook;
 
 pub use acc::AccCommands;
+pub use admin::AdminCommands;
 pub use auth::AuthCommands;
 pub use bucket::BucketCommands;
 pub use config::ConfigCommands;
