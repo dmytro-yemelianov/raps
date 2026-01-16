@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-01-16
+
+### Added
+- **Account Admin Bulk Management Tool**: New `raps admin` command suite for bulk user management across ACC/BIM 360 accounts.
+  - `raps admin user add`: Bulk add users to multiple projects with role assignment.
+  - `raps admin user remove`: Bulk remove users from projects.
+  - `raps admin user update-role`: Bulk update user roles across projects.
+  - `raps admin folder rights`: Bulk update folder permissions (Project Files, Plans, or custom folders).
+  - `raps admin project list`: List projects with filtering by name, status, and platform.
+  - `raps admin operation status`: View operation progress and results.
+  - `raps admin operation resume`: Resume interrupted operations.
+  - `raps admin operation cancel`: Cancel in-progress operations.
+  - `raps admin operation list`: List all operations with status filtering.
+- **New `raps-admin` Crate**: Orchestration layer for bulk operations with:
+  - Resumable state persistence using JSON files.
+  - Semaphore-based concurrency control (max 50 parallel requests).
+  - Exponential backoff retry logic for rate limit handling (429 errors).
+  - Progress tracking with indicatif progress bars.
+  - Dry-run mode for operation preview.
+  - Project filtering by regex pattern.
+- **New `FolderPermissionsClient`**: ACC Folder Permissions API client in `raps-acc` crate.
+- **Comprehensive Integration Tests**: 61 tests covering all bulk operations and state management.
+
+### Changed
+- Major version bump due to significant new feature addition.
+
 ## [3.11.0] - 2026-01-15
 
 ### Added
