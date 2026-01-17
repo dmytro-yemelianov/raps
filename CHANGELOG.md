@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Multi-Channel Distribution**: New installation methods for easier onboarding.
+  - **Shell Install Script** (`install.sh`): One-liner install for Linux/macOS with automatic PATH configuration.
+    - Supports bash, zsh, and fish shells
+    - SHA256 checksum verification
+    - Version selection via `RAPS_VERSION` environment variable
+    - Uninstall support via `--uninstall` flag
+  - **PowerShell Install Script** (`install.ps1`): One-liner install for Windows.
+    - Automatic User PATH modification
+    - Checksum verification using Get-FileHash
+    - Parameters: `-Version`, `-InstallDir`, `-NoPathUpdate`, `-Uninstall`
+  - **PyPI Distribution**: Install via `pip install raps`.
+    - Platform wheels for Linux, macOS, and Windows (x64 and arm64)
+    - Uses maturin with `bindings = "bin"` for binary bundling
+    - Python 3.8+ support
+- **Enhanced Release Automation**: GitHub Actions workflow extended for multi-channel publishing.
+  - Automatic PyPI publishing using OIDC trusted publishing
+  - Post-release install script testing on all platforms
+
 ## [4.1.0] - 2026-01-17
 
 ### Added
