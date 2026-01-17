@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-01-17
+
+### Added
+- **MCP Server Expansion**: Aligned MCP server with CLI v4.0 functionality (14 → 35 tools).
+  - Admin Bulk Operations: `admin_project_list`, `admin_user_add`, `admin_user_remove`, `admin_user_update_role`, `admin_operation_list`, `admin_operation_status`.
+  - Folder/Item Management: `folder_list`, `folder_create`, `item_info`, `item_versions`.
+  - Issues: `issue_list`, `issue_get`, `issue_create`, `issue_update`.
+  - RFIs: `rfi_list`, `rfi_get`.
+  - ACC Extended: `acc_assets_list`, `acc_submittals_list`, `acc_checklists_list`.
+
+### Changed
+- MCP server instructions updated to reflect v4.0 capabilities.
+- ACC/Admin clients created on-demand in MCP server (not cached) due to Clone trait requirements.
+
 ## [4.0.0] - 2026-01-16
 
 ### Added
