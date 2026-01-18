@@ -328,3 +328,128 @@ jobs:
           repository: dmytro-yemelianov/scoop-bucket
           event-type: raps-release
           client-payload: '{"version": "${{ needs.plan.outputs.tag }}"}'
+
+  # Build Python wheels with maturin for PyPI distribution
+  build-wheels:
+    name: Build wheels (${{ matrix.os }}, ${{ matrix.target }})
+    needs:
+      - host
+    if: ${{ always() && needs.host.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+          - os: ubuntu-latest
+            target: aarch64
+          - os: macos-latest
+            target: x86_64
+          - os: macos-latest
+            target: aarch64
+          - os: windows-latest
+            target: x86_64
+          # Windows ARM64 wheels not yet fully supported by maturin
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --out dist --manifest-path python/pyproject.toml
+          working-directory: .
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/*.whl
+
+  # Publish to PyPI using OIDC trusted publishing
+  publish-pypi:
+    name: Publish to PyPI
+    needs:
+      - plan
+      - host
+      - build-wheels
+    if: ${{ always() && needs.host.result == 'success' && needs.build-wheels.result == 'success' && needs.plan.outputs.publishing == 'true' && !fromJson(needs.host.outputs.val).announcement_is_prerelease }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC trusted publishing
+    timeout-minutes: 10
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: List wheels
+        run: ls -la dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true
+
+  # Test install scripts after release
+  test-install-scripts:
+    name: Test Install Scripts (${{ matrix.os }})
+    needs:
+      - plan
+      - host
+    if: ${{ always() && needs.host.result == 'success' && needs.plan.outputs.publishing == 'true' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: bash install.sh
+          - os: macos-latest
+            script: bash install.sh
+          - os: windows-latest
+            script: pwsh -File install.ps1
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run install script
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pwsh -ExecutionPolicy Bypass -File install.ps1
+          else
+            bash install.sh
+          fi
+
+      - name: Verify installation (Unix)
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          export PATH="$HOME/.raps/bin:$PATH"
+          raps --version
+          raps --help
+
+      - name: Verify installation (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          $env:Path = "$env:USERPROFILE\.raps\bin;$env:Path"
+          raps --version
+          raps --help

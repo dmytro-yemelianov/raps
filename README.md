@@ -138,6 +138,37 @@
 
 - APS account with application credentials from [APS Developer Portal](https://aps.autodesk.com/myapps)
 
+### Quick Install (Recommended)
+
+**Linux/macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install.ps1 | iex
+```
+
+### Install via pip
+
+```bash
+pip install raps
+```
+
+### Install via Homebrew (macOS)
+
+```bash
+brew install dmytro-yemelianov/tap/raps
+```
+
+### Install via Scoop (Windows)
+
+```powershell
+scoop bucket add raps https://github.com/dmytro-yemelianov/scoop-bucket
+scoop install raps
+```
+
 ### Install from crates.io
 
 ```bash
@@ -151,8 +182,9 @@ Download the latest release for your platform from the [Releases](https://github
 | Platform | Architecture | File |
 |----------|--------------|------|
 | Windows | x64 | `raps-windows-x64.zip` |
-| macOS | Intel | `raps-macos-x64.tar.gz` |
-| macOS | Apple Silicon | `raps-macos-arm64.tar.gz` |
+| Windows | ARM64 | `raps-windows-arm64.zip` |
+| macOS | Intel | `raps-darwin-x64.tar.gz` |
+| macOS | Apple Silicon | `raps-darwin-arm64.tar.gz` |
 | Linux | x64 | `raps-linux-x64.tar.gz` |
 | Linux | ARM64 | `raps-linux-arm64.tar.gz` |
 
