@@ -16,6 +16,15 @@ python/target/
 **/*.rs.bk
 *.pdb
 
+# Node.js (npm packaging)
+node_modules/
+npm/platforms/*/raps
+npm/platforms/*/raps.exe
+npm/binaries/
+package-lock.json
+npm-debug.log*
+.npm/
+
 # Commit Cargo.lock for applications
 # !Cargo.lock
 

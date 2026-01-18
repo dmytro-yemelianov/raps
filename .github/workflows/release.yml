@@ -453,3 +453,186 @@ jobs:
           $env:Path = "$env:USERPROFILE\.raps\bin;$env:Path"
           raps --version
           raps --help
+
+  # Build and publish npm packages
+  publish-npm:
+    name: Publish to npm
+    needs:
+      - plan
+      - host
+    if: ${{ always() && needs.host.result == 'success' && needs.plan.outputs.publishing == 'true' && !fromJson(needs.host.outputs.val).announcement_is_prerelease }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Download release binaries
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          mkdir -p binaries
+
+          # Download all platform binaries
+          gh release download v${VERSION} -p "raps-cli-x86_64-pc-windows-msvc.zip" -D binaries
+          gh release download v${VERSION} -p "raps-cli-x86_64-apple-darwin.tar.xz" -D binaries
+          gh release download v${VERSION} -p "raps-cli-aarch64-apple-darwin.tar.xz" -D binaries
+          gh release download v${VERSION} -p "raps-cli-x86_64-unknown-linux-gnu.tar.xz" -D binaries
+          gh release download v${VERSION} -p "raps-cli-aarch64-unknown-linux-gnu.tar.xz" -D binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract and prepare platform packages
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Windows x64
+          cd npm/platforms/win32-x64
+          unzip ../../../binaries/raps-cli-x86_64-pc-windows-msvc.zip
+          mv raps-cli.exe raps.exe
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          cd ../../..
+
+          # macOS x64
+          cd npm/platforms/darwin-x64
+          tar -xJf ../../../binaries/raps-cli-x86_64-apple-darwin.tar.xz
+          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          chmod +x raps
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          cd ../../..
+
+          # macOS arm64
+          cd npm/platforms/darwin-arm64
+          tar -xJf ../../../binaries/raps-cli-aarch64-apple-darwin.tar.xz
+          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          chmod +x raps
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          cd ../../..
+
+          # Linux x64
+          cd npm/platforms/linux-x64
+          tar -xJf ../../../binaries/raps-cli-x86_64-unknown-linux-gnu.tar.xz
+          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          chmod +x raps
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          cd ../../..
+
+          # Linux arm64
+          cd npm/platforms/linux-arm64
+          tar -xJf ../../../binaries/raps-cli-aarch64-unknown-linux-gnu.tar.xz
+          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          chmod +x raps
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          cd ../../..
+
+          # Update main package version
+          cd npm
+          sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
+          # Update optional dependency versions
+          sed -i "s/\"@anthropic-ai\/raps-cli-[^\"]*\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-win32-x64\": \"${VERSION}\"/1" package.json
+          sed -i "s/\"@anthropic-ai\/raps-cli-darwin-x64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-darwin-x64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@anthropic-ai\/raps-cli-darwin-arm64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-darwin-arm64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@anthropic-ai\/raps-cli-linux-x64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-linux-x64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@anthropic-ai\/raps-cli-linux-arm64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-linux-arm64\": \"${VERSION}\"/" package.json
+
+      - name: Publish platform packages
+        run: |
+          for platform in win32-x64 darwin-x64 darwin-arm64 linux-x64 linux-arm64; do
+            echo "Publishing @anthropic-ai/raps-cli-${platform}..."
+            cd npm/platforms/${platform}
+            npm publish --access public || echo "Package may already exist, continuing..."
+            cd ../../..
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish main package
+        run: |
+          cd npm
+          npm publish --access public || echo "Package may already exist"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Build Python bindings (PyO3 native extension) wheels
+  build-bindings-wheels:
+    name: Build bindings wheels (${{ matrix.os }}, ${{ matrix.target }})
+    needs:
+      - host
+    if: ${{ always() && needs.host.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+          - os: macos-latest
+            target: x86_64
+          - os: macos-latest
+            target: aarch64
+          - os: windows-latest
+            target: x86_64
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: auto
+          args: --release --out dist
+          working-directory: python-bindings
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: bindings-wheels-${{ matrix.os }}-${{ matrix.target }}
+          path: python-bindings/dist/*.whl
+
+  # Publish Python bindings to PyPI
+  publish-bindings-pypi:
+    name: Publish bindings to PyPI
+    needs:
+      - plan
+      - host
+      - build-bindings-wheels
+    if: ${{ always() && needs.host.result == 'success' && needs.build-bindings-wheels.result == 'success' && needs.plan.outputs.publishing == 'true' && !fromJson(needs.host.outputs.val).announcement_is_prerelease }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC trusted publishing
+    timeout-minutes: 10
+    steps:
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bindings-wheels-*
+          path: dist
+          merge-multiple: true
+
+      - name: List wheels
+        run: ls -la dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          skip-existing: true

@@ -1,0 +1,45 @@
+{
+  "name": "@anthropic-ai/raps-cli",
+  "version": "4.2.3",
+  "description": "RAPS (rapeseed) - Rust CLI for Autodesk Platform Services",
+  "keywords": [
+    "autodesk",
+    "aps",
+    "forge",
+    "cad",
+    "bim",
+    "cli",
+    "rust"
+  ],
+  "author": "Dmytro Yemelianov",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmytro-yemelianov/raps.git"
+  },
+  "homepage": "https://rapscli.xyz",
+  "bugs": {
+    "url": "https://github.com/dmytro-yemelianov/raps/issues"
+  },
+  "bin": {
+    "raps": "src/index.js"
+  },
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "scripts"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "engines": {
+    "node": ">=14"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/raps-cli-win32-x64": "4.2.3",
+    "@anthropic-ai/raps-cli-darwin-x64": "4.2.3",
+    "@anthropic-ai/raps-cli-darwin-arm64": "4.2.3",
+    "@anthropic-ai/raps-cli-linux-x64": "4.2.3",
+    "@anthropic-ai/raps-cli-linux-arm64": "4.2.3"
+  }
+}

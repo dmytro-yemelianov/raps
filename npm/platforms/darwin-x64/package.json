@@ -1,0 +1,17 @@
+{
+  "name": "@anthropic-ai/raps-cli-darwin-x64",
+  "version": "4.2.3",
+  "description": "RAPS CLI binary for macOS x64 (Intel)",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmytro-yemelianov/raps.git"
+  },
+  "os": ["darwin"],
+  "cpu": ["x64"],
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "raps"
+  ]
+}

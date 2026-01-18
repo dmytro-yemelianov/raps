@@ -150,6 +150,18 @@ curl -fsSL https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install
 irm https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install.ps1 | iex
 ```
 
+### Install via npm
+
+```bash
+npm install -g @anthropic-ai/raps-cli
+```
+
+Or run without installing:
+
+```bash
+npx @anthropic-ai/raps-cli --version
+```
+
 ### Install via pip
 
 ```bash

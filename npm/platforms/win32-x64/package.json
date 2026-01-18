@@ -1,0 +1,17 @@
+{
+  "name": "@anthropic-ai/raps-cli-win32-x64",
+  "version": "4.2.3",
+  "description": "RAPS CLI binary for Windows x64",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dmytro-yemelianov/raps.git"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "raps.exe"
+  ]
+}

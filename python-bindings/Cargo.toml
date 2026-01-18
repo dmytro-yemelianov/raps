@@ -1,0 +1,42 @@
+[package]
+name = "raps-py"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Python bindings for RAPS - Rust Autodesk Platform Services CLI"
+keywords = ["autodesk", "aps", "forge", "cad", "bim", "python"]
+categories = ["api-bindings", "development-tools"]
+readme = "README.md"
+
+[lib]
+name = "raps"
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+# Internal crates
+raps-kernel = { path = "../raps-kernel" }
+raps-oss = { path = "../raps-oss" }
+raps-derivative = { path = "../raps-derivative" }
+raps-dm = { path = "../raps-dm" }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Base64 encoding
+base64 = { workspace = true }
+
+[build-dependencies]
+pyo3-build-config = "0.22"
