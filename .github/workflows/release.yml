@@ -499,14 +499,16 @@ jobs:
           # Windows x64
           cd npm/platforms/win32-x64
           unzip ../../../binaries/raps-cli-x86_64-pc-windows-msvc.zip
-          mv raps-cli.exe raps.exe
+          # Binary may be named raps.exe or raps-cli.exe depending on cargo-dist version
+          [ -f raps-cli.exe ] && mv raps-cli.exe raps.exe || true
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           cd ../../..
 
           # macOS x64
           cd npm/platforms/darwin-x64
           tar -xJf ../../../binaries/raps-cli-x86_64-apple-darwin.tar.xz
-          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          # Binary may be named raps or raps-cli
+          [ -f raps-cli ] && mv raps-cli raps || [ -f raps ] || find . -name "raps" -o -name "raps-cli" | head -1 | xargs -I{} mv {} raps
           chmod +x raps
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           cd ../../..
@@ -514,7 +516,7 @@ jobs:
           # macOS arm64
           cd npm/platforms/darwin-arm64
           tar -xJf ../../../binaries/raps-cli-aarch64-apple-darwin.tar.xz
-          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          [ -f raps-cli ] && mv raps-cli raps || [ -f raps ] || find . -name "raps" -o -name "raps-cli" | head -1 | xargs -I{} mv {} raps
           chmod +x raps
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           cd ../../..
@@ -522,7 +524,7 @@ jobs:
           # Linux x64
           cd npm/platforms/linux-x64
           tar -xJf ../../../binaries/raps-cli-x86_64-unknown-linux-gnu.tar.xz
-          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          [ -f raps-cli ] && mv raps-cli raps || [ -f raps ] || find . -name "raps" -o -name "raps-cli" | head -1 | xargs -I{} mv {} raps
           chmod +x raps
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           cd ../../..
@@ -530,7 +532,7 @@ jobs:
           # Linux arm64
           cd npm/platforms/linux-arm64
           tar -xJf ../../../binaries/raps-cli-aarch64-unknown-linux-gnu.tar.xz
-          mv raps-cli raps 2>/dev/null || mv */raps-cli raps 2>/dev/null || find . -name "raps-cli" -exec mv {} raps \;
+          [ -f raps-cli ] && mv raps-cli raps || [ -f raps ] || find . -name "raps" -o -name "raps-cli" | head -1 | xargs -I{} mv {} raps
           chmod +x raps
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           cd ../../..

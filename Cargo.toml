@@ -10,8 +10,9 @@ members = [
     "raps-reality",
     "raps-admin",
     "raps-cli",
-    # python-bindings excluded - built separately with maturin
 ]
+# python-bindings excluded from workspace - built separately with maturin
+exclude = ["python-bindings"]
 resolver = "2"
 
 [workspace.package]

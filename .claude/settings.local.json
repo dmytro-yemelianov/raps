@@ -40,7 +40,8 @@
       "Bash(gh release download:*)",
       "Bash(done)",
       "Bash(cargo check:*)",
-      "Bash(gh run watch:*)"
+      "Bash(gh run watch:*)",
+      "Bash(git tag:*)"
     ]
   }
 }
