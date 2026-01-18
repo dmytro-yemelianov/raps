@@ -342,15 +342,15 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64
-          - os: ubuntu-latest
-            target: aarch64
+          # Linux ARM64: excluded due to ring cross-compile issues
+          # ARM64 users can use install.sh or cargo-dist binaries
           - os: macos-latest
             target: x86_64
           - os: macos-latest
             target: aarch64
           - os: windows-latest
             target: x86_64
-          # Windows ARM64 wheels not yet fully supported by maturin
+          # Windows ARM64: not yet fully supported by maturin
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
