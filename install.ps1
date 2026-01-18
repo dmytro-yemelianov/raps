@@ -118,10 +118,11 @@ function Show-Help {
 }
 
 function Get-Architecture {
+    # Returns cargo-dist target triple for Windows
     $arch = [System.Environment]::GetEnvironmentVariable("PROCESSOR_ARCHITECTURE")
     switch ($arch) {
-        "AMD64" { return "x64" }
-        "ARM64" { return "arm64" }
+        "AMD64" { return "x86_64-pc-windows-msvc" }
+        "ARM64" { return "aarch64-pc-windows-msvc" }
         default {
             Write-Error "Unsupported architecture: $arch"
             Write-Error "Supported: AMD64, ARM64"
@@ -250,13 +251,14 @@ function Invoke-Install {
         $Version = Get-LatestVersion
     }
 
-    Write-Host "Installing RAPS `e[1mv$Version`e[0m for `e[1mwindows-$arch`e[0m..."
+    # $arch is now a cargo-dist target triple like "x86_64-pc-windows-msvc"
+    Write-Host "Installing RAPS `e[1mv$Version`e[0m for `e[1m$arch`e[0m..."
     Write-Host ""
 
-    # Construct download URLs
-    $archiveName = "raps-windows-$arch.zip"
+    # Construct download URLs (cargo-dist naming convention)
+    $archiveName = "raps-cli-$arch.zip"
     $downloadUrl = "$GitHubReleases/download/v$Version/$archiveName"
-    $checksumsUrl = "$GitHubReleases/download/v$Version/raps-$Version-checksums.txt"
+    $checksumUrl = "$GitHubReleases/download/v$Version/$archiveName.sha256"
 
     # Create temp directory
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "raps-install-$([System.Guid]::NewGuid().ToString('N'))"
@@ -279,13 +281,13 @@ function Invoke-Install {
 
         # Download and verify checksum
         Write-Info "Verifying checksum..."
-        $checksumsPath = Join-Path $tempDir "checksums.txt"
+        $checksumPath = Join-Path $tempDir "$archiveName.sha256"
         try {
-            Invoke-WebRequest -Uri $checksumsUrl -OutFile $checksumsPath -UseBasicParsing
-            $checksums = Get-Content $checksumsPath
-            $checksumLine = $checksums | Where-Object { $_ -match $archiveName }
-            if ($checksumLine) {
-                $expectedChecksum = ($checksumLine -split '\s+')[0]
+            Invoke-WebRequest -Uri $checksumUrl -OutFile $checksumPath -UseBasicParsing
+            $checksumContent = Get-Content $checksumPath
+            # cargo-dist .sha256 files contain hash followed by filename
+            $expectedChecksum = ($checksumContent -split '\s+')[0]
+            if ($expectedChecksum) {
                 if (-not (Test-Checksum -FilePath $archivePath -ExpectedChecksum $expectedChecksum)) {
                     Write-Error "Checksum verification failed. The download may be corrupted."
                     exit 1
@@ -293,11 +295,11 @@ function Invoke-Install {
                 Write-Success "Checksum verified"
             }
             else {
-                Write-Warning "Checksum not found in checksums.txt, skipping verification"
+                Write-Warning "Checksum file empty, skipping verification"
             }
         }
         catch {
-            Write-Warning "Could not download checksums file, skipping verification"
+            Write-Warning "Could not download checksum file, skipping verification"
         }
 
         # Create install directory

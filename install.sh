@@ -91,24 +91,24 @@ show_help() {
     echo "For more information, visit: https://rapscli.xyz"
 }
 
-# Detect OS
+# Detect OS (returns cargo-dist target OS component)
 detect_os() {
     local os
     os="$(uname -s)"
     case "${os}" in
-        Linux*)  echo "linux" ;;
-        Darwin*) echo "darwin" ;;
+        Linux*)  echo "unknown-linux-gnu" ;;
+        Darwin*) echo "apple-darwin" ;;
         *)       echo "unsupported" ;;
     esac
 }
 
-# Detect architecture
+# Detect architecture (returns cargo-dist target arch component)
 detect_arch() {
     local arch
     arch="$(uname -m)"
     case "${arch}" in
-        x86_64|amd64)  echo "x64" ;;
-        aarch64|arm64) echo "arm64" ;;
+        x86_64|amd64)  echo "x86_64" ;;
+        aarch64|arm64) echo "aarch64" ;;
         *)             echo "unsupported" ;;
     esac
 }
@@ -125,6 +125,11 @@ check_dependencies() {
     # Check for tar
     if ! command -v tar &> /dev/null; then
         missing+=("tar")
+    fi
+
+    # Check for xz (needed for .tar.xz extraction)
+    if ! command -v xz &> /dev/null; then
+        missing+=("xz")
     fi
 
     # Check for sha256sum or shasum
@@ -325,13 +330,15 @@ install() {
         fi
     fi
 
-    echo -e "Installing RAPS ${BOLD}v${VERSION}${NC} for ${BOLD}${os}-${arch}${NC}..."
+    # Build target triple for cargo-dist naming
+    local target="${arch}-${os}"
+    echo -e "Installing RAPS ${BOLD}v${VERSION}${NC} for ${BOLD}${target}${NC}..."
     echo ""
 
-    # Construct download URLs
-    local archive_name="raps-${os}-${arch}.tar.gz"
+    # Construct download URLs (cargo-dist naming convention)
+    local archive_name="raps-cli-${target}.tar.xz"
     local download_url="${GITHUB_RELEASES}/download/v${VERSION}/${archive_name}"
-    local checksums_url="${GITHUB_RELEASES}/download/v${VERSION}/raps-${VERSION}-checksums.txt"
+    local checksum_url="${GITHUB_RELEASES}/download/v${VERSION}/${archive_name}.sha256"
 
     # Create temp directory
     local tmp_dir
@@ -349,9 +356,10 @@ install() {
 
     # Download and verify checksum
     info "Verifying checksum..."
-    if download "$checksums_url" "${tmp_dir}/checksums.txt" 2>/dev/null; then
+    if download "$checksum_url" "${tmp_dir}/${archive_name}.sha256" 2>/dev/null; then
         local expected_checksum
-        expected_checksum=$(grep "${archive_name}" "${tmp_dir}/checksums.txt" | awk '{print $1}')
+        # cargo-dist .sha256 files contain just the hash followed by filename
+        expected_checksum=$(awk '{print $1}' "${tmp_dir}/${archive_name}.sha256")
         if [ -n "$expected_checksum" ]; then
             if ! verify_checksum "${tmp_dir}/${archive_name}" "$expected_checksum"; then
                 error "Checksum verification failed. The download may be corrupted."
@@ -359,10 +367,10 @@ install() {
             fi
             success "Checksum verified"
         else
-            warn "Checksum not found in checksums.txt, skipping verification"
+            warn "Checksum file empty, skipping verification"
         fi
     else
-        warn "Could not download checksums file, skipping verification"
+        warn "Could not download checksum file, skipping verification"
     fi
 
     # Create install directory
@@ -373,8 +381,8 @@ install() {
         exit 1
     fi
 
-    # Extract binary
-    tar -xzf "${tmp_dir}/${archive_name}" -C "$tmp_dir"
+    # Extract binary (.tar.xz format)
+    tar -xJf "${tmp_dir}/${archive_name}" -C "$tmp_dir"
 
     # Find and move binary
     local binary_path
