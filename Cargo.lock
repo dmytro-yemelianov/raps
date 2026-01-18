@@ -67,7 +67,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -78,7 +78,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -95,9 +95,9 @@ checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
 
 [[package]]
 name = "assert_cmd"
-version = "2.1.1"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcbb6924530aa9e0432442af08bbcafdad182db80d2e560da42a6d442535bf85"
+checksum = "9c5bcfa8749ac45dd12cb11055aeeb6b27a3895560d60d71e3c23bf979e60514"
 dependencies = [
  "anstyle",
  "bstr",
@@ -479,9 +479,9 @@ checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
 
 [[package]]
 name = "chrono"
-version = "0.4.42"
+version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
+checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
 dependencies = [
  "iana-time-zone",
  "js-sys",
@@ -531,9 +531,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.64"
+version = "4.5.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c0da80818b2d95eca9aa614a30783e42f62bf5fdfee24e68cfb960b071ba8d1"
+checksum = "430b4dc2b5e3861848de79627b2bedc9f3342c7da5173a14eaa5d0f8dc18ae5d"
 dependencies = [
  "clap",
 ]
@@ -876,7 +876,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1545,15 +1545,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "indoc"
-version = "2.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79cf5c93f93228cf8efb3ba362535fb11199ac548a09ce117c9b1adc3030d706"
-dependencies = [
- "rustversion",
-]
-
-[[package]]
 name = "inout"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1844,7 +1835,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2125,69 +2116,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pyo3"
-version = "0.22.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f402062616ab18202ae8319da13fa4279883a2b8a9d9f83f20dbade813ce1884"
-dependencies = [
- "cfg-if",
- "indoc",
- "libc",
- "memoffset 0.9.1",
- "once_cell",
- "portable-atomic",
- "pyo3-build-config",
- "pyo3-ffi",
- "pyo3-macros",
- "unindent",
-]
-
-[[package]]
-name = "pyo3-build-config"
-version = "0.22.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b14b5775b5ff446dd1056212d778012cbe8a0fbffd368029fd9e25b514479c38"
-dependencies = [
- "once_cell",
- "target-lexicon",
-]
-
-[[package]]
-name = "pyo3-ffi"
-version = "0.22.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ab5bcf04a2cdcbb50c7d6105de943f543f9ed92af55818fd17b660390fc8636"
-dependencies = [
- "libc",
- "pyo3-build-config",
-]
-
-[[package]]
-name = "pyo3-macros"
-version = "0.22.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fd24d897903a9e6d80b968368a34e1525aeb719d568dba8b3d4bfa5dc67d453"
-dependencies = [
- "proc-macro2",
- "pyo3-macros-backend",
- "quote",
- "syn 2.0.113",
-]
-
-[[package]]
-name = "pyo3-macros-backend"
-version = "0.22.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36c011a03ba1e50152b4b394b479826cad97e7a21eb52df179cd91ac411cbfbe"
-dependencies = [
- "heck",
- "proc-macro2",
- "pyo3-build-config",
- "quote",
- "syn 2.0.113",
-]
-
-[[package]]
 name = "quote"
 version = "1.0.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2244,7 +2172,7 @@ dependencies = [
 
 [[package]]
 name = "raps-acc"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2260,7 +2188,7 @@ dependencies = [
 
 [[package]]
 name = "raps-admin"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2282,7 +2210,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cli"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2329,7 +2257,7 @@ dependencies = [
 
 [[package]]
 name = "raps-da"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2347,7 +2275,7 @@ dependencies = [
 
 [[package]]
 name = "raps-derivative"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2367,7 +2295,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2383,7 +2311,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2442,7 +2370,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -2463,26 +2391,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "raps-py"
-version = "4.2.3"
-dependencies = [
- "anyhow",
- "base64 0.21.7",
- "pyo3",
- "pyo3-build-config",
- "raps-derivative",
- "raps-dm",
- "raps-kernel",
- "raps-oss",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
 name = "raps-reality"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2499,7 +2409,7 @@ dependencies = [
 
 [[package]]
 name = "raps-webhooks"
-version = "4.2.3"
+version = "4.3.0"
 dependencies = [
  "anyhow",
  "raps-kernel",
@@ -2717,7 +2627,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2932,9 +2842,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.148"
+version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3084b546a1dd6289475996f182a22aba973866ea8e8b02c51d9f46b1336a22da"
+checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
 dependencies = [
  "itoa",
  "memchr",
@@ -3176,12 +3086,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "target-lexicon"
-version = "0.12.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
-
-[[package]]
 name = "tempfile"
 version = "3.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3191,7 +3095,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.3",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3521,12 +3425,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
-name = "unindent"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7264e107f553ccae879d21fbea1d6724ac785e8c3bfc762137959b5802826ef3"
-
-[[package]]
 name = "unit-prefix"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3783,7 +3681,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
