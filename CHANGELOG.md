@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-01-18
+
+### Fixed
+- **PyPI Wheel Build**: Fixed maturin working directory in release workflow.
+  - Run maturin from `python/` directory instead of using `--manifest-path`.
+  - Corrected artifact upload path.
+
 ## [4.2.1] - 2026-01-18
 
 ### Fixed
