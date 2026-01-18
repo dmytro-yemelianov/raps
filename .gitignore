@@ -1,5 +1,18 @@
 # Rust
 /target
+
+# Python (maturin packaging)
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+python/target/
 **/*.rs.bk
 *.pdb
 
