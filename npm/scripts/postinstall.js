@@ -11,11 +11,11 @@ const path = require('path');
 
 // Platform to package mapping
 const PLATFORMS = {
-  'win32-x64': '@anthropic-ai/raps-cli-win32-x64',
-  'darwin-x64': '@anthropic-ai/raps-cli-darwin-x64',
-  'darwin-arm64': '@anthropic-ai/raps-cli-darwin-arm64',
-  'linux-x64': '@anthropic-ai/raps-cli-linux-x64',
-  'linux-arm64': '@anthropic-ai/raps-cli-linux-arm64',
+  'win32-x64': '@dmytro-yemelianov/raps-cli-win32-x64',
+  'darwin-x64': '@dmytro-yemelianov/raps-cli-darwin-x64',
+  'darwin-arm64': '@dmytro-yemelianov/raps-cli-darwin-arm64',
+  'linux-x64': '@dmytro-yemelianov/raps-cli-linux-x64',
+  'linux-arm64': '@dmytro-yemelianov/raps-cli-linux-arm64',
 };
 
 function getPlatformKey() {

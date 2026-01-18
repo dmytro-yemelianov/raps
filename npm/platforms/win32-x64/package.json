@@ -1,6 +1,6 @@
 {
-  "name": "@anthropic-ai/raps-cli-win32-x64",
-  "version": "4.2.3",
+  "name": "@dmytro-yemelianov/raps-cli-win32-x64",
+  "version": "4.3.0",
   "description": "RAPS CLI binary for Windows x64",
   "license": "Apache-2.0",
   "repository": {

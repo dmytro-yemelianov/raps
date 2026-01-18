@@ -7,11 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-01-18
+
 ### Added
-- **npm Distribution**: Install via `npm install -g @anthropic-ai/raps-cli`.
+- **npm Distribution**: Install via `npm install -g @dmytro-yemelianov/raps-cli`.
   - Platform-specific packages for Windows, macOS, and Linux (x64 and arm64).
   - Automatic platform detection and binary selection.
-  - Support for `npx @anthropic-ai/raps-cli` without global install.
+  - Support for `npx @dmytro-yemelianov/raps-cli` without global install.
 - **Python Bindings (PyO3)**: Native Python library `raps-bindings` for programmatic access.
   - `Client` class with 2-legged OAuth authentication.
   - `BucketsManager` for OSS bucket operations (list, create, get, delete).

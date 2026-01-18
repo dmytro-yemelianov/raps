@@ -13,11 +13,11 @@ const fs = require('fs');
 
 // Platform to package mapping
 const PLATFORMS = {
-  'win32-x64': '@anthropic-ai/raps-cli-win32-x64',
-  'darwin-x64': '@anthropic-ai/raps-cli-darwin-x64',
-  'darwin-arm64': '@anthropic-ai/raps-cli-darwin-arm64',
-  'linux-x64': '@anthropic-ai/raps-cli-linux-x64',
-  'linux-arm64': '@anthropic-ai/raps-cli-linux-arm64',
+  'win32-x64': '@dmytro-yemelianov/raps-cli-win32-x64',
+  'darwin-x64': '@dmytro-yemelianov/raps-cli-darwin-x64',
+  'darwin-arm64': '@dmytro-yemelianov/raps-cli-darwin-arm64',
+  'linux-x64': '@dmytro-yemelianov/raps-cli-linux-x64',
+  'linux-arm64': '@dmytro-yemelianov/raps-cli-linux-arm64',
 };
 
 // Get current platform identifier
@@ -69,7 +69,7 @@ function getBinaryPath() {
     console.error('optional dependency failed to install.');
     console.error('');
     console.error('Try reinstalling with:');
-    console.error('  npm install -g @anthropic-ai/raps-cli');
+    console.error('  npm install -g @dmytro-yemelianov/raps-cli');
     console.error('');
     console.error('Or install RAPS directly:');
     console.error('  curl -fsSL https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install.sh | bash');

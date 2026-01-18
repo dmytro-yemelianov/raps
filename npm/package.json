@@ -1,6 +1,6 @@
 {
-  "name": "@anthropic-ai/raps-cli",
-  "version": "4.2.3",
+  "name": "@dmytro-yemelianov/raps-cli",
+  "version": "4.3.0",
   "description": "RAPS (rapeseed) - Rust CLI for Autodesk Platform Services",
   "keywords": [
     "autodesk",
@@ -36,10 +36,10 @@
     "node": ">=14"
   },
   "optionalDependencies": {
-    "@anthropic-ai/raps-cli-win32-x64": "4.2.3",
-    "@anthropic-ai/raps-cli-darwin-x64": "4.2.3",
-    "@anthropic-ai/raps-cli-darwin-arm64": "4.2.3",
-    "@anthropic-ai/raps-cli-linux-x64": "4.2.3",
-    "@anthropic-ai/raps-cli-linux-arm64": "4.2.3"
+    "@dmytro-yemelianov/raps-cli-win32-x64": "4.3.0",
+    "@dmytro-yemelianov/raps-cli-darwin-x64": "4.3.0",
+    "@dmytro-yemelianov/raps-cli-darwin-arm64": "4.3.0",
+    "@dmytro-yemelianov/raps-cli-linux-x64": "4.3.0",
+    "@dmytro-yemelianov/raps-cli-linux-arm64": "4.3.0"
   }
 }

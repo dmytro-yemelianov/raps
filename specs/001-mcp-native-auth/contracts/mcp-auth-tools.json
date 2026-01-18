@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCP Auth Tools Schema",
+  "description": "JSON Schema for RAPS MCP server authentication tools",
+  "definitions": {
+    "auth_status": {
+      "type": "object",
+      "description": "Check authentication status with detailed guidance",
+      "properties": {
+        "name": { "const": "auth_status" },
+        "description": { "const": "Check authentication status (2-legged and 3-legged) with setup guidance" },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "response": {
+        "type": "string",
+        "description": "Multi-line status report including: credential status, token validity, tool availability by auth type, and actionable next steps"
+      }
+    },
+    "auth_test": {
+      "type": "object",
+      "description": "Test 2-legged OAuth credentials with troubleshooting guidance",
+      "properties": {
+        "name": { "const": "auth_test" },
+        "description": { "const": "Test 2-legged OAuth authentication with APS and provide troubleshooting guidance on failure" },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "response": {
+        "type": "string",
+        "description": "Success confirmation or detailed failure explanation with remediation steps"
+      }
+    },
+    "auth_login": {
+      "type": "object",
+      "description": "Initiate 3-legged OAuth flow for user authentication",
+      "properties": {
+        "name": { "const": "auth_login" },
+        "description": { "const": "Initiate 3-legged OAuth login. Opens browser if available, otherwise returns device code for headless authentication." },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "scopes": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "OAuth scopes to request. Defaults to standard APS scopes if not specified.",
+              "default": ["data:read", "data:write", "data:create", "account:read"]
+            }
+          },
+          "required": []
+        }
+      },
+      "response": {
+        "type": "string",
+        "description": "Instructions for completing authentication: browser URL or device code with verification URL"
+      }
+    },
+    "auth_logout": {
+      "type": "object",
+      "description": "Clear stored 3-legged OAuth tokens",
+      "properties": {
+        "name": { "const": "auth_logout" },
+        "description": { "const": "Clear stored 3-legged OAuth tokens and log out" },
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
+        }
+      },
+      "response": {
+        "type": "string",
+        "description": "Confirmation of logout"
+      }
+    }
+  },
+  "tools": [
+    { "$ref": "#/definitions/auth_status" },
+    { "$ref": "#/definitions/auth_test" },
+    { "$ref": "#/definitions/auth_login" },
+    { "$ref": "#/definitions/auth_logout" }
+  ]
+}

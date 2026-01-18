@@ -1,6 +1,6 @@
 {
-  "name": "@anthropic-ai/raps-cli-darwin-arm64",
-  "version": "4.2.3",
+  "name": "@dmytro-yemelianov/raps-cli-darwin-arm64",
+  "version": "4.3.0",
   "description": "RAPS CLI binary for macOS ARM64 (Apple Silicon)",
   "license": "Apache-2.0",
   "repository": {

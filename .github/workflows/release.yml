@@ -539,16 +539,16 @@ jobs:
           cd npm
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           # Update optional dependency versions
-          sed -i "s/\"@anthropic-ai\/raps-cli-[^\"]*\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-win32-x64\": \"${VERSION}\"/1" package.json
-          sed -i "s/\"@anthropic-ai\/raps-cli-darwin-x64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-darwin-x64\": \"${VERSION}\"/" package.json
-          sed -i "s/\"@anthropic-ai\/raps-cli-darwin-arm64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-darwin-arm64\": \"${VERSION}\"/" package.json
-          sed -i "s/\"@anthropic-ai\/raps-cli-linux-x64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-linux-x64\": \"${VERSION}\"/" package.json
-          sed -i "s/\"@anthropic-ai\/raps-cli-linux-arm64\": \"[^\"]*\"/\"@anthropic-ai\/raps-cli-linux-arm64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-[^\"]*\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-win32-x64\": \"${VERSION}\"/1" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-darwin-x64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-darwin-x64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-darwin-arm64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-darwin-arm64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-linux-x64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-linux-x64\": \"${VERSION}\"/" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-linux-arm64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-linux-arm64\": \"${VERSION}\"/" package.json
 
       - name: Publish platform packages
         run: |
           for platform in win32-x64 darwin-x64 darwin-arm64 linux-x64 linux-arm64; do
-            echo "Publishing @anthropic-ai/raps-cli-${platform}..."
+            echo "Publishing @dmytro-yemelianov/raps-cli-${platform}..."
             cd npm/platforms/${platform}
             npm publish --access public || echo "Package may already exist, continuing..."
             cd ../../..

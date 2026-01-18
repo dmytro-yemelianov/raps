@@ -1,17 +1,17 @@
-# @anthropic-ai/raps-cli
+# @dmytro-yemelianov/raps-cli
 
 RAPS (rapeseed) - Rust CLI for Autodesk Platform Services
 
 ## Installation
 
 ```bash
-npm install -g @anthropic-ai/raps-cli
+npm install -g @dmytro-yemelianov/raps-cli
 ```
 
 Or run without installing:
 
 ```bash
-npx @anthropic-ai/raps-cli --version
+npx @dmytro-yemelianov/raps-cli --version
 ```
 
 ## Usage

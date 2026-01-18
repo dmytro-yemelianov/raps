@@ -1,6 +1,6 @@
 {
-  "name": "@anthropic-ai/raps-cli-linux-x64",
-  "version": "4.2.3",
+  "name": "@dmytro-yemelianov/raps-cli-linux-x64",
+  "version": "4.3.0",
   "description": "RAPS CLI binary for Linux x64",
   "license": "Apache-2.0",
   "repository": {

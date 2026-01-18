@@ -31,7 +31,15 @@
       "Bash(gh run list:*)",
       "Bash(gh release view:*)",
       "Bash(gh run view:*)",
-      "Bash(gh workflow run:*)"
+      "Bash(gh workflow run:*)",
+      "Bash(gh run rerun:*)",
+      "Bash(pip index:*)",
+      "Bash(curl:*)",
+      "Bash(while read f)",
+      "Bash(do echo \"=== $f ===\")",
+      "Bash(gh release download:*)",
+      "Bash(done)",
+      "Bash(cargo check:*)"
     ]
   }
 }

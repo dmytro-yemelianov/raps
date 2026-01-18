@@ -153,13 +153,13 @@ irm https://raw.githubusercontent.com/dmytro-yemelianov/raps/main/install.ps1 | 
 ### Install via npm
 
 ```bash
-npm install -g @anthropic-ai/raps-cli
+npm install -g @dmytro-yemelianov/raps-cli
 ```
 
 Or run without installing:
 
 ```bash
-npx @anthropic-ai/raps-cli --version
+npx @dmytro-yemelianov/raps-cli --version
 ```
 
 ### Install via pip
