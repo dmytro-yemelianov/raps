@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.3] - 2026-01-18
+
+### Changed
+- **PyPI Wheels**: Excluded Linux ARM64 wheel due to `ring` cross-compile issues.
+  - Linux ARM64 users can use `install.sh` or cargo-dist binaries.
+  - Available wheels: Linux x64, macOS x64/ARM64, Windows x64.
+
 ## [4.2.2] - 2026-01-18
 
 ### Fixed
