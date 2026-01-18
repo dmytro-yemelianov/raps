@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "raps"
-version = "0.0.0"  # Replaced by maturin from Cargo.toml
+dynamic = ["version"]
 description = "Rust CLI for Autodesk Platform Services"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -28,11 +28,8 @@ Homepage = "https://rapscli.xyz"
 Repository = "https://github.com/dmytro-yemelianov/raps"
 Documentation = "https://rapscli.xyz/docs"
 
-[project.scripts]
-raps = "raps:main"
-
 [tool.maturin]
 bindings = "bin"
 strip = true
 compatibility = "manylinux2014"
-manifest-path = "../Cargo.toml"
+manifest-path = "../raps-cli/Cargo.toml"
