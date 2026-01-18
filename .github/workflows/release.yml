@@ -367,14 +367,14 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: auto
-          args: --release --out dist --manifest-path python/pyproject.toml
-          working-directory: .
+          args: --release --out dist
+          working-directory: python
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-${{ matrix.target }}
-          path: dist/*.whl
+          path: python/dist/*.whl
 
   # Publish to PyPI using OIDC trusted publishing
   publish-pypi:
