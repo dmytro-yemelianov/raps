@@ -39,7 +39,8 @@
       "Bash(do echo \"=== $f ===\")",
       "Bash(gh release download:*)",
       "Bash(done)",
-      "Bash(cargo check:*)"
+      "Bash(cargo check:*)",
+      "Bash(gh run watch:*)"
     ]
   }
 }

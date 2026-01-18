@@ -10,7 +10,7 @@ members = [
     "raps-reality",
     "raps-admin",
     "raps-cli",
-    "python-bindings",
+    # python-bindings excluded - built separately with maturin
 ]
 resolver = "2"
 
