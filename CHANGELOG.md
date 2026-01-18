@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-01-18
+
 ### Added
 - **Multi-Channel Distribution**: New installation methods for easier onboarding.
   - **Shell Install Script** (`install.sh`): One-liner install for Linux/macOS with automatic PATH configuration.
