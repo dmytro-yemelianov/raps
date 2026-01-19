@@ -47,6 +47,53 @@ pub struct UpdateProjectUserRequest {
     pub products: Option<Vec<ProductAccess>>,
 }
 
+/// User import request item
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportUserRequest {
+    /// User email address
+    pub email: String,
+    /// Optional role ID to assign
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role_id: Option<String>,
+    /// Optional product access configurations
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub products: Option<Vec<ProductAccess>>,
+}
+
+/// Result of a bulk user import operation
+#[derive(Debug, Clone)]
+pub struct ImportUsersResult {
+    /// Total number of users attempted
+    pub total: usize,
+    /// Number of users successfully imported
+    pub imported: usize,
+    /// Number of users that failed to import
+    pub failed: usize,
+    /// Individual errors for failed imports
+    pub errors: Vec<ImportUserError>,
+    /// Successfully imported users
+    pub successes: Vec<ImportUserSuccess>,
+}
+
+/// Error details for a failed user import
+#[derive(Debug, Clone)]
+pub struct ImportUserError {
+    /// Email of the user that failed to import
+    pub email: String,
+    /// Error message describing why the import failed
+    pub error: String,
+}
+
+/// Success details for an imported user
+#[derive(Debug, Clone)]
+pub struct ImportUserSuccess {
+    /// Email of the successfully imported user
+    pub email: String,
+    /// User ID if available
+    pub user_id: Option<String>,
+}
+
 impl ProjectUsersClient {
     /// Create a new Project Users client
     pub fn new(config: Config, auth: AuthClient) -> Self {
@@ -314,6 +361,69 @@ impl ProjectUsersClient {
         }
 
         Ok(all_users)
+    }
+
+    /// Import multiple users to a project at once
+    ///
+    /// Attempts to add each user individually and collects results.
+    /// This method does not use a bulk API endpoint (which doesn't exist for project users),
+    /// but instead calls add_user for each user and aggregates the results.
+    ///
+    /// # Arguments
+    /// * `project_id` - The project ID
+    /// * `users` - List of users to import
+    ///
+    /// # Returns
+    /// An `ImportUsersResult` containing the overall summary and individual results
+    pub async fn import_users(
+        &self,
+        project_id: &str,
+        users: Vec<ImportUserRequest>,
+    ) -> Result<ImportUsersResult> {
+        let total = users.len();
+        let mut imported = 0;
+        let mut failed = 0;
+        let mut errors = Vec::new();
+        let mut successes = Vec::new();
+
+        for user in users {
+            let email = user.email.clone();
+
+            // Build the add user request
+            // Note: We need the user_id, not email, for the API.
+            // The import_users tool in MCP will need to look up user IDs by email first.
+            // For now, we'll attempt to use email as user_id (the caller should resolve this)
+            let request = AddProjectUserRequest {
+                user_id: user.email.clone(), // Caller should provide actual user ID
+                role_id: user.role_id,
+                products: user.products.unwrap_or_default(),
+            };
+
+            match self.add_user(project_id, request).await {
+                Ok(project_user) => {
+                    imported += 1;
+                    successes.push(ImportUserSuccess {
+                        email,
+                        user_id: Some(project_user.id),
+                    });
+                }
+                Err(e) => {
+                    failed += 1;
+                    errors.push(ImportUserError {
+                        email,
+                        error: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        Ok(ImportUsersResult {
+            total,
+            imported,
+            failed,
+            errors,
+            successes,
+        })
     }
 }
 

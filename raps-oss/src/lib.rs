@@ -289,6 +289,36 @@ pub struct ObjectInfo {
     pub content_type: Option<String>,
 }
 
+/// Extended object metadata returned by object details endpoint
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectDetails {
+    /// Bucket key
+    pub bucket_key: String,
+    /// Object key (filename)
+    pub object_key: String,
+    /// Object ID (URN format)
+    pub object_id: String,
+    /// SHA-1 hash of the object
+    pub sha1: String,
+    /// Object size in bytes
+    pub size: u64,
+    /// MIME content type
+    pub content_type: String,
+    /// Content disposition header value
+    #[serde(default)]
+    pub content_disposition: Option<String>,
+    /// Creation timestamp (ISO 8601)
+    #[serde(alias = "createdDate")]
+    pub created_date: Option<String>,
+    /// Last modified timestamp (ISO 8601)
+    #[serde(alias = "lastModifiedDate")]
+    pub last_modified_date: Option<String>,
+    /// Location URL
+    #[serde(default)]
+    pub location: Option<String>,
+}
+
 /// Response when listing objects
 #[derive(Debug, Deserialize)]
 pub struct ObjectsResponse {
@@ -1106,6 +1136,51 @@ impl OssClient {
         }
 
         Ok(())
+    }
+
+    /// Get detailed metadata for an object without downloading it
+    ///
+    /// Returns extended information including size, SHA1 hash, content type,
+    /// and timestamps.
+    pub async fn get_object_details(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+    ) -> Result<ObjectDetails> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/buckets/{}/objects/{}/details",
+            self.config.oss_url(),
+            bucket_key,
+            urlencoding::encode(object_key)
+        );
+
+        // Log request in verbose/debug mode
+        logging::log_request("GET", &url);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get object details")?;
+
+        // Log response in verbose/debug mode
+        logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get object details ({status}): {error_text}");
+        }
+
+        let details: ObjectDetails = response
+            .json()
+            .await
+            .context("Failed to parse object details response")?;
+
+        Ok(details)
     }
 
     /// Generate a base64-encoded URN for an object

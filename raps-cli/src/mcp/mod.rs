@@ -7,5 +7,6 @@
 //! through the Model Context Protocol. Enables natural language interaction
 //! with APS APIs for buckets, objects, translation, projects, and more.
 
+pub mod auth_guidance;
 pub mod server;
 pub mod tools;

@@ -147,31 +147,19 @@ impl RapsServer {
     // Helper to get Issues client (created on demand, not cached)
     async fn get_issues_client(&self) -> IssuesClient {
         let auth = self.get_auth_client().await;
-        IssuesClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        IssuesClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
     }
 
     // Helper to get RFI client (created on demand, not cached)
     async fn get_rfi_client(&self) -> RfiClient {
         let auth = self.get_auth_client().await;
-        RfiClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        RfiClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
     }
 
     // Helper to get ACC Extended client (created on demand, not cached)
     async fn get_acc_client(&self) -> AccClient {
         let auth = self.get_auth_client().await;
-        AccClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        AccClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
     }
 
     fn clamp_limit(limit: Option<usize>, default: usize, max: usize) -> usize {
@@ -479,12 +467,24 @@ impl RapsServer {
                 let filtered = project_filter.apply(projects);
                 let filtered: Vec<_> = filtered.into_iter().take(limit).collect();
 
-                let mut output = format!("Found {} project(s) in account {}:\n\n", filtered.len(), account_id);
+                let mut output = format!(
+                    "Found {} project(s) in account {}:\n\n",
+                    filtered.len(),
+                    account_id
+                );
                 for proj in &filtered {
                     let status = proj.status.as_deref().unwrap_or("unknown");
-                    let platform = if proj.is_acc() { "ACC" } else if proj.is_bim360() { "BIM360" } else { "unknown" };
-                    output.push_str(&format!("* {} (id: {}, status: {}, platform: {})\n",
-                        proj.name, proj.id, status, platform));
+                    let platform = if proj.is_acc() {
+                        "ACC"
+                    } else if proj.is_bim360() {
+                        "BIM360"
+                    } else {
+                        "unknown"
+                    };
+                    output.push_str(&format!(
+                        "* {} (id: {}, status: {}, platform: {})\n",
+                        proj.name, proj.id, status, platform
+                    ));
                 }
                 output
             }
@@ -531,7 +531,9 @@ impl RapsServer {
             &project_filter,
             bulk_config,
             on_progress,
-        ).await {
+        )
+        .await
+        {
             Ok(result) => {
                 let mut output = format!(
                     "Bulk add user operation {}:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s\n",
@@ -546,9 +548,11 @@ impl RapsServer {
                     output.push_str("\nFailed projects:\n");
                     for detail in &result.details {
                         if let raps_admin::ItemResult::Failed { error, .. } = &detail.result {
-                            output.push_str(&format!("  * {}: {}\n",
+                            output.push_str(&format!(
+                                "  * {}: {}\n",
                                 detail.project_name.as_deref().unwrap_or(&detail.project_id),
-                                error));
+                                error
+                            ));
                         }
                     }
                 }
@@ -593,7 +597,9 @@ impl RapsServer {
             &project_filter,
             bulk_config,
             on_progress,
-        ).await {
+        )
+        .await
+        {
             Ok(result) => {
                 format!(
                     "Bulk remove user operation {}:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
@@ -647,7 +653,9 @@ impl RapsServer {
             &project_filter,
             bulk_config,
             on_progress,
-        ).await {
+        )
+        .await
+        {
             Ok(result) => {
                 format!(
                     "Bulk update role operation {}:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
@@ -667,30 +675,28 @@ impl RapsServer {
         let limit = Self::clamp_limit(limit, 10, 50);
 
         match StateManager::new() {
-            Ok(state_manager) => {
-                match state_manager.list_operations(None).await {
-                    Ok(operations) => {
-                        let operations: Vec<_> = operations.into_iter().take(limit).collect();
-                        if operations.is_empty() {
-                            return "No operations found.".to_string();
-                        }
-
-                        let mut output = format!("Found {} operation(s):\n\n", operations.len());
-                        for op in &operations {
-                            output.push_str(&format!(
-                                "* {} ({:?}) - {:?} [{}/{}]\n",
-                                op.operation_id,
-                                op.operation_type,
-                                op.status,
-                                op.completed + op.skipped + op.failed,
-                                op.total
-                            ));
-                        }
-                        output
+            Ok(state_manager) => match state_manager.list_operations(None).await {
+                Ok(operations) => {
+                    let operations: Vec<_> = operations.into_iter().take(limit).collect();
+                    if operations.is_empty() {
+                        return "No operations found.".to_string();
                     }
-                    Err(e) => format!("Failed to list operations: {}", e),
+
+                    let mut output = format!("Found {} operation(s):\n\n", operations.len());
+                    for op in &operations {
+                        output.push_str(&format!(
+                            "* {} ({:?}) - {:?} [{}/{}]\n",
+                            op.operation_id,
+                            op.operation_type,
+                            op.status,
+                            op.completed + op.skipped + op.failed,
+                            op.total
+                        ));
+                    }
+                    output
                 }
-            }
+                Err(e) => format!("Failed to list operations: {}", e),
+            },
             Err(e) => format!("Failed to initialize state manager: {}", e),
         }
     }
@@ -714,13 +720,19 @@ impl RapsServer {
 
                 match state_manager.load_operation(op_id).await {
                     Ok(state) => {
-                        let completed = state.results.values()
+                        let completed = state
+                            .results
+                            .values()
                             .filter(|r| matches!(r.result, raps_admin::ItemResult::Success))
                             .count();
-                        let skipped = state.results.values()
+                        let skipped = state
+                            .results
+                            .values()
                             .filter(|r| matches!(r.result, raps_admin::ItemResult::Skipped { .. }))
                             .count();
-                        let failed = state.results.values()
+                        let failed = state
+                            .results
+                            .values()
                             .filter(|r| matches!(r.result, raps_admin::ItemResult::Failed { .. }))
                             .count();
 
@@ -760,13 +772,21 @@ impl RapsServer {
 
                 let mut output = format!("Found {} item(s):\n\n", contents.len());
                 for item in &contents {
-                    let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
-                    let name = item.get("attributes")
+                    let item_type = item
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("unknown");
+                    let name = item
+                        .get("attributes")
                         .and_then(|a| a.get("displayName").or(a.get("name")))
                         .and_then(|n| n.as_str())
                         .unwrap_or("Unnamed");
                     let id = item.get("id").and_then(|i| i.as_str()).unwrap_or("unknown");
-                    let icon = if item_type == "folders" { "[folder]" } else { "[file]" };
+                    let icon = if item_type == "folders" {
+                        "[folder]"
+                    } else {
+                        "[file]"
+                    };
                     output.push_str(&format!("* {} {} (id: {})\n", icon, name, id));
                 }
                 output
@@ -775,10 +795,18 @@ impl RapsServer {
         }
     }
 
-    async fn folder_create(&self, project_id: String, parent_folder_id: String, name: String) -> String {
+    async fn folder_create(
+        &self,
+        project_id: String,
+        parent_folder_id: String,
+        name: String,
+    ) -> String {
         let client = self.get_dm_client().await;
 
-        match client.create_folder(&project_id, &parent_folder_id, &name).await {
+        match client
+            .create_folder(&project_id, &parent_folder_id, &name)
+            .await
+        {
             Ok(folder) => format!(
                 "Folder created successfully:\n* Name: {}\n* ID: {}",
                 folder.attributes.name, folder.id
@@ -794,9 +822,7 @@ impl RapsServer {
             Ok(item) => {
                 let mut output = format!(
                     "Item Details:\n\n* Name: {}\n* ID: {}\n* Type: {}",
-                    item.attributes.display_name,
-                    item.id,
-                    item.item_type
+                    item.attributes.display_name, item.id, item.item_type
                 );
                 if let Some(ref create_time) = item.attributes.create_time {
                     output.push_str(&format!("\n* Created: {}", create_time));
@@ -821,10 +847,15 @@ impl RapsServer {
 
                 let mut output = format!("Found {} version(s):\n\n", versions.len());
                 for v in &versions {
-                    let ver_num = v.attributes.version_number
+                    let ver_num = v
+                        .attributes
+                        .version_number
                         .map(|n| n.to_string())
                         .unwrap_or_else(|| "-".to_string());
-                    let name = v.attributes.display_name.as_ref()
+                    let name = v
+                        .attributes
+                        .display_name
+                        .as_ref()
                         .or(Some(&v.attributes.name))
                         .map(|s| s.as_str())
                         .unwrap_or("-");
@@ -851,7 +882,10 @@ impl RapsServer {
 
                 let mut output = format!("Found {} issue(s):\n\n", issues.len());
                 for issue in &issues {
-                    let display_id = issue.display_id.map(|d| d.to_string()).unwrap_or_else(|| "-".to_string());
+                    let display_id = issue
+                        .display_id
+                        .map(|d| d.to_string())
+                        .unwrap_or_else(|| "-".to_string());
                     output.push_str(&format!(
                         "* #{} {} [{}]\n  ID: {}\n",
                         display_id, issue.title, issue.status, issue.id
@@ -1063,6 +1097,677 @@ impl RapsServer {
         }
     }
 
+    // ========================================================================
+    // Object Upload/Download Operations (v4.4)
+    // ========================================================================
+
+    async fn object_upload(
+        &self,
+        bucket_key: String,
+        file_path: String,
+        object_key: Option<String>,
+    ) -> String {
+        use std::path::Path;
+
+        let path = Path::new(&file_path);
+
+        // Validate file exists
+        if !path.exists() {
+            return format!("Error: File not found: {}", file_path);
+        }
+
+        if !path.is_file() {
+            return format!("Error: Path is not a file: {}", file_path);
+        }
+
+        // Determine object key from filename if not provided
+        let obj_key = object_key.unwrap_or_else(|| {
+            path.file_name()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_else(|| "unnamed".to_string())
+        });
+
+        let client = self.get_oss_client().await;
+
+        match client.upload_object(&bucket_key, &obj_key, path).await {
+            Ok(info) => {
+                let urn = client.get_urn(&bucket_key, &obj_key);
+                format!(
+                    "Uploaded '{}' to '{}'\n* Object Key: {}\n* Size: {} bytes\n* SHA1: {}\n* URN: {}",
+                    path.file_name().unwrap_or_default().to_string_lossy(),
+                    bucket_key,
+                    info.object_key,
+                    info.size,
+                    info.sha1.unwrap_or_else(|| "-".to_string()),
+                    urn
+                )
+            }
+            Err(e) => format!("Failed to upload file: {}", e),
+        }
+    }
+
+    async fn object_upload_batch(&self, bucket_key: String, file_paths: Vec<String>) -> String {
+        use std::path::Path;
+        use std::sync::Arc;
+        use tokio::sync::Semaphore;
+
+        if file_paths.is_empty() {
+            return "Error: No files specified for upload.".to_string();
+        }
+
+        let client = self.get_oss_client().await;
+        let semaphore = Arc::new(Semaphore::new(4)); // 4-way concurrency
+
+        let mut handles = Vec::new();
+
+        for file_path in file_paths.clone() {
+            let client = client.clone();
+            let bucket_key = bucket_key.clone();
+            let permit = semaphore.clone().acquire_owned().await.unwrap();
+
+            let handle = tokio::spawn(async move {
+                let _permit = permit; // Hold permit until done
+                let path = std::path::PathBuf::from(&file_path);
+
+                if !path.exists() {
+                    return (
+                        file_path,
+                        false,
+                        None::<u64>,
+                        Some("File not found".to_string()),
+                    );
+                }
+
+                if !path.is_file() {
+                    return (
+                        file_path,
+                        false,
+                        None::<u64>,
+                        Some("Not a file".to_string()),
+                    );
+                }
+
+                let obj_key = path
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "unnamed".to_string());
+
+                match client.upload_object(&bucket_key, &obj_key, &path).await {
+                    Ok(info) => (file_path, true, Some(info.size), None::<String>),
+                    Err(e) => (file_path, false, None::<u64>, Some(e.to_string())),
+                }
+            });
+
+            handles.push(handle);
+        }
+
+        // Collect results
+        let mut successful = 0;
+        let mut failed = 0;
+        let mut results = Vec::new();
+
+        for handle in handles {
+            if let Ok((path, success, size, error)) = handle.await {
+                let path_display = Path::new(&path)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or(path);
+
+                if success {
+                    successful += 1;
+                    let size_display = size.map(format_size).unwrap_or_default();
+                    results.push(format!("✓ {} ({})", path_display, size_display));
+                } else {
+                    failed += 1;
+                    let err_msg = error.unwrap_or_else(|| "Unknown error".to_string());
+                    results.push(format!("✗ {} ({})", path_display, err_msg));
+                }
+            }
+        }
+
+        format!(
+            "Batch upload complete: {} succeeded, {} failed\n\nResults:\n{}",
+            successful,
+            failed,
+            results.join("\n")
+        )
+    }
+
+    async fn object_download(
+        &self,
+        bucket_key: String,
+        object_key: String,
+        output_path: String,
+    ) -> String {
+        use std::path::Path;
+
+        let client = self.get_oss_client().await;
+
+        // Check if parent directory exists
+        let path = Path::new(&output_path);
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                return format!("Error: Directory does not exist: {}", parent.display());
+            }
+        }
+
+        match client.download_object(&bucket_key, &object_key, path).await {
+            Ok(()) => {
+                // Get file size from downloaded file
+                let size = std::fs::metadata(&output_path)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
+                format!(
+                    "Downloaded '{}' to '{}'\n* Size: {} bytes",
+                    object_key, output_path, size
+                )
+            }
+            Err(e) => format!("Failed to download object: {}", e),
+        }
+    }
+
+    async fn object_info(&self, bucket_key: String, object_key: String) -> String {
+        let client = self.get_oss_client().await;
+
+        match client.get_object_details(&bucket_key, &object_key).await {
+            Ok(details) => {
+                let size_display = format_size(details.size);
+                let urn = client.get_urn(&bucket_key, &object_key);
+
+                format!(
+                    "Object: {} in {}\n\n\
+                     * Size: {} bytes ({})\n\
+                     * Content-Type: {}\n\
+                     * SHA1: {}\n\
+                     * Created: {}\n\
+                     * Modified: {}\n\
+                     * URN: {}",
+                    details.object_key,
+                    details.bucket_key,
+                    details.size,
+                    size_display,
+                    details.content_type,
+                    details.sha1,
+                    details.created_date.unwrap_or_else(|| "-".to_string()),
+                    details
+                        .last_modified_date
+                        .unwrap_or_else(|| "-".to_string()),
+                    urn
+                )
+            }
+            Err(e) => format!("Failed to get object details: {}", e),
+        }
+    }
+
+    async fn object_copy(
+        &self,
+        source_bucket: String,
+        source_key: String,
+        dest_bucket: String,
+        dest_key: Option<String>,
+    ) -> String {
+        let client = self.get_oss_client().await;
+        let destination_key = dest_key.unwrap_or_else(|| source_key.clone());
+
+        // Check if destination exists first (non-destructive)
+        match client
+            .get_object_details(&dest_bucket, &destination_key)
+            .await
+        {
+            Ok(existing) => {
+                return format!(
+                    "Warning: Object '{}' already exists in '{}' (skipped)\n\
+                     * Existing size: {} bytes\n\
+                     * Delete it first if you want to overwrite.",
+                    destination_key, dest_bucket, existing.size
+                );
+            }
+            Err(_) => {
+                // Object doesn't exist, proceed with copy
+            }
+        }
+
+        // OSS doesn't have a direct copy API, so we download and re-upload
+        // For now, use a temporary file approach
+        let temp_dir = std::env::temp_dir();
+        let temp_path = temp_dir.join(format!("raps_copy_{}", uuid::Uuid::new_v4()));
+
+        // Download to temp
+        match client
+            .download_object(&source_bucket, &source_key, &temp_path)
+            .await
+        {
+            Ok(_) => {}
+            Err(e) => {
+                return format!("Failed to read source object: {}", e);
+            }
+        }
+
+        // Upload to destination
+        let result = match client
+            .upload_object(&dest_bucket, &destination_key, &temp_path)
+            .await
+        {
+            Ok(info) => {
+                let urn = client.get_urn(&dest_bucket, &destination_key);
+                format!(
+                    "Copied '{}' from '{}' to '{}'\n* Size: {} bytes\n* New URN: {}",
+                    source_key, source_bucket, dest_bucket, info.size, urn
+                )
+            }
+            Err(e) => format!("Failed to copy to destination: {}", e),
+        };
+
+        // Clean up temp file
+        let _ = std::fs::remove_file(&temp_path);
+
+        result
+    }
+
+    async fn object_delete_batch(&self, bucket_key: String, object_keys: Vec<String>) -> String {
+        if object_keys.is_empty() {
+            return "Error: No objects specified for deletion.".to_string();
+        }
+
+        let client = self.get_oss_client().await;
+        let mut deleted = 0;
+        let mut skipped = 0;
+        let mut failed = 0;
+        let mut results = Vec::new();
+
+        for object_key in &object_keys {
+            match client.delete_object(&bucket_key, object_key).await {
+                Ok(()) => {
+                    deleted += 1;
+                    results.push(format!("✓ {} (deleted)", object_key));
+                }
+                Err(e) => {
+                    let err_str = e.to_string();
+                    if err_str.contains("404") || err_str.contains("not found") {
+                        skipped += 1;
+                        results.push(format!("○ {} (not found, skipped)", object_key));
+                    } else {
+                        failed += 1;
+                        results.push(format!("✗ {} ({})", object_key, err_str));
+                    }
+                }
+            }
+        }
+
+        format!(
+            "Batch delete complete: {} deleted, {} skipped, {} failed\n\nResults:\n{}",
+            deleted,
+            skipped,
+            failed,
+            results.join("\n")
+        )
+    }
+
+    // ========================================================================
+    // Project Management Operations (v4.4)
+    // ========================================================================
+
+    async fn project_info(&self, hub_id: String, project_id: String) -> String {
+        let client = self.get_dm_client().await;
+
+        match client.get_project(&hub_id, &project_id).await {
+            Ok(project) => {
+                let mut output = format!(
+                    "Project: {}\n* ID: {}\n* Hub: {}\n* Scopes: {}\n",
+                    project.attributes.name,
+                    project.id,
+                    hub_id,
+                    project
+                        .attributes
+                        .scopes
+                        .as_ref()
+                        .map(|s| s.join(", "))
+                        .unwrap_or_else(|| "-".to_string())
+                );
+
+                // Get top folders
+                match client.get_top_folders(&hub_id, &project_id).await {
+                    Ok(folders) => {
+                        if !folders.is_empty() {
+                            output.push_str("\nTop Folders:\n");
+                            for folder in &folders {
+                                let display_name = folder
+                                    .attributes
+                                    .display_name
+                                    .as_ref()
+                                    .unwrap_or(&folder.attributes.name);
+                                output.push_str(&format!("* {} ({})\n", display_name, folder.id));
+                            }
+                        }
+                    }
+                    Err(_) => {}
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to get project: {}", e),
+        }
+    }
+
+    async fn project_users_list(
+        &self,
+        project_id: String,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> String {
+        let client = self.get_users_client().await;
+        let limit = limit.unwrap_or(50).min(200);
+
+        match client
+            .list_project_users(&project_id, Some(limit), offset)
+            .await
+        {
+            Ok(response) => {
+                if response.results.is_empty() {
+                    return "No users found in project.".to_string();
+                }
+
+                let start = offset.unwrap_or(0) + 1;
+                let end = start + response.results.len() - 1;
+                let total = response.pagination.total_results;
+
+                let mut output = format!(
+                    "Project Users (showing {}-{} of {}):\n\n",
+                    start, end, total
+                );
+
+                for (i, user) in response.results.iter().enumerate() {
+                    let name = user.name.as_deref().unwrap_or("-");
+                    let email = user.email.as_deref().unwrap_or("-");
+                    let role = user
+                        .role_name
+                        .as_deref()
+                        .unwrap_or(user.role_id.as_deref().unwrap_or("-"));
+
+                    output.push_str(&format!(
+                        "{}. {} ({})\n   * Role: {}\n\n",
+                        start + i,
+                        name,
+                        email,
+                        role
+                    ));
+                }
+
+                if response.has_more() {
+                    output.push_str(&format!(
+                        "Use offset={} to see next page.",
+                        response.next_offset()
+                    ));
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to list project users: {}", e),
+        }
+    }
+
+    async fn folder_contents(
+        &self,
+        project_id: String,
+        folder_id: String,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> String {
+        let client = self.get_dm_client().await;
+
+        match client.list_folder_contents(&project_id, &folder_id).await {
+            Ok(contents) => {
+                if contents.is_empty() {
+                    return "Folder is empty.".to_string();
+                }
+
+                let offset_val = offset.unwrap_or(0);
+                let limit_val = limit.unwrap_or(50);
+                let total = contents.len();
+
+                let items: Vec<_> = contents
+                    .into_iter()
+                    .skip(offset_val)
+                    .take(limit_val)
+                    .collect();
+
+                let start = offset_val + 1;
+                let end = offset_val + items.len();
+
+                let mut output = format!(
+                    "Folder Contents (showing {}-{} of {}):\n\n",
+                    start, end, total
+                );
+
+                let mut folders = Vec::new();
+                let mut files = Vec::new();
+
+                for item in items {
+                    let item_type = item.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    let id = item.get("id").and_then(|v| v.as_str()).unwrap_or("-");
+                    let name = item
+                        .get("attributes")
+                        .and_then(|a| a.get("displayName").or_else(|| a.get("name")))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("-");
+
+                    if item_type == "folders" {
+                        folders.push(format!("📁 {} ({})", name, id));
+                    } else {
+                        files.push(format!("📄 {}", name));
+                    }
+                }
+
+                if !folders.is_empty() {
+                    output.push_str("Subfolders:\n");
+                    for f in &folders {
+                        output.push_str(&format!("{}\n", f));
+                    }
+                    output.push('\n');
+                }
+
+                if !files.is_empty() {
+                    output.push_str("Items:\n");
+                    for f in &files {
+                        output.push_str(&format!("{}\n", f));
+                    }
+                }
+
+                if end < total {
+                    output.push_str(&format!("\nUse offset={} to see next page.", end));
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to list folder contents: {}", e),
+        }
+    }
+
+    // ========================================================================
+    // ACC Project Admin Operations (v4.4)
+    // ========================================================================
+
+    async fn project_create(
+        &self,
+        account_id: String,
+        name: String,
+        template_project_id: Option<String>,
+        products: Option<Vec<String>>,
+    ) -> String {
+        use raps_acc::CreateProjectRequest;
+
+        let client = self.get_acc_client().await;
+
+        let request = CreateProjectRequest {
+            name: name.clone(),
+            template_project_id,
+            products,
+            project_type: Some("ACC".to_string()),
+        };
+
+        match client.create_project(&account_id, request).await {
+            Ok(job) => {
+                let project_id = match job.project_id {
+                    Some(id) => id,
+                    None => return "Project creation initiated but no ID returned.".to_string(),
+                };
+
+                // Wait for activation (up to 60 seconds)
+                match client
+                    .wait_for_project_activation(&account_id, &project_id, Some(60), Some(2000))
+                    .await
+                {
+                    Ok(final_job) => {
+                        let mut output = format!(
+                            "Created ACC project: {}\n* ID: {}\n* Account: {}\n* Status: Active",
+                            name,
+                            final_job.project_id.unwrap_or(project_id),
+                            account_id
+                        );
+
+                        // Add warning about template members
+                        output.push_str(
+                            "\n\nNote: Template members are NOT auto-assigned when cloning.",
+                        );
+
+                        output
+                    }
+                    Err(e) => format!(
+                        "Project created (ID: {}) but activation timed out: {}\nCheck status later.",
+                        project_id, e
+                    ),
+                }
+            }
+            Err(e) => format!("Failed to create project: {}", e),
+        }
+    }
+
+    async fn project_user_add(
+        &self,
+        project_id: String,
+        email: String,
+        role_id: Option<String>,
+    ) -> String {
+        use raps_acc::users::AddProjectUserRequest;
+
+        let client = self.get_users_client().await;
+
+        // Note: The API expects user_id, not email. The MCP tool description should clarify this.
+        // In practice, the caller should look up the user ID from email first.
+        let request = AddProjectUserRequest {
+            user_id: email.clone(), // Using email as placeholder - caller should resolve to user_id
+            role_id,
+            products: vec![],
+        };
+
+        match client.add_user(&project_id, request).await {
+            Ok(user) => format!(
+                "Added user to project:\n* Email: {}\n* Name: {}\n* Role: {}",
+                email,
+                user.name.unwrap_or_else(|| "-".to_string()),
+                user.role_name
+                    .unwrap_or_else(|| user.role_id.unwrap_or_else(|| "-".to_string()))
+            ),
+            Err(e) => format!("Failed to add user to project: {}", e),
+        }
+    }
+
+    async fn project_users_import(&self, project_id: String, users: Vec<Value>) -> String {
+        use raps_acc::users::ImportUserRequest;
+
+        let client = self.get_users_client().await;
+
+        // Parse user objects from JSON
+        let import_requests: Vec<ImportUserRequest> = users
+            .into_iter()
+            .filter_map(|v| {
+                let email = v.get("email")?.as_str()?.to_string();
+                let role_id = v.get("role_id").and_then(|r| r.as_str()).map(String::from);
+                Some(ImportUserRequest {
+                    email,
+                    role_id,
+                    products: None,
+                })
+            })
+            .collect();
+
+        if import_requests.is_empty() {
+            return "Error: No valid users provided for import.".to_string();
+        }
+
+        match client.import_users(&project_id, import_requests).await {
+            Ok(result) => {
+                let mut output = format!(
+                    "User import complete: {} imported, {} failed\n\nResults:\n",
+                    result.imported, result.failed
+                );
+
+                for success in &result.successes {
+                    output.push_str(&format!("✓ {}\n", success.email));
+                }
+
+                for error in &result.errors {
+                    output.push_str(&format!("✗ {} ({})\n", error.email, error.error));
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to import users: {}", e),
+        }
+    }
+
+    // ========================================================================
+    // Item Management Operations (v4.4)
+    // ========================================================================
+
+    async fn item_create(
+        &self,
+        project_id: String,
+        folder_id: String,
+        display_name: String,
+        storage_id: String,
+    ) -> String {
+        let client = self.get_dm_client().await;
+
+        match client
+            .create_item_from_storage(&project_id, &folder_id, &display_name, &storage_id)
+            .await
+        {
+            Ok(item) => format!(
+                "Created item in project folder:\n* Display Name: {}\n* Item ID: {}\n* Version: 1",
+                item.attributes.display_name, item.id
+            ),
+            Err(e) => format!("Failed to create item: {}", e),
+        }
+    }
+
+    async fn item_delete(&self, project_id: String, item_id: String) -> String {
+        let client = self.get_dm_client().await;
+
+        match client.delete_item(&project_id, &item_id).await {
+            Ok(()) => format!("Deleted item from project:\n* Item ID: {}", item_id),
+            Err(e) => format!("Failed to delete item: {}", e),
+        }
+    }
+
+    async fn item_rename(&self, project_id: String, item_id: String, new_name: String) -> String {
+        let client = self.get_dm_client().await;
+
+        // Get current item to show old name
+        let old_name = match client.get_item(&project_id, &item_id).await {
+            Ok(item) => item.attributes.display_name,
+            Err(_) => "-".to_string(),
+        };
+
+        match client.rename_item(&project_id, &item_id, &new_name).await {
+            Ok(item) => format!(
+                "Renamed item:\n* Old Name: {}\n* New Name: {}\n* Item ID: {}",
+                old_name, item.attributes.display_name, item.id
+            ),
+            Err(e) => format!("Failed to rename item: {}", e),
+        }
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -1193,7 +1898,10 @@ impl RapsServer {
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 let filter = Self::optional_arg(&args, "filter");
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.admin_project_list(account_id, filter, limit).await
             }
             "admin_user_add" => {
@@ -1207,8 +1915,12 @@ impl RapsServer {
                 };
                 let role = Self::optional_arg(&args, "role");
                 let filter = Self::optional_arg(&args, "filter");
-                let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
-                self.admin_user_add(account_id, email, role, filter, dry_run).await
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.admin_user_add(account_id, email, role, filter, dry_run)
+                    .await
             }
             "admin_user_remove" => {
                 let account_id = match Self::required_arg(&args, "account_id") {
@@ -1220,8 +1932,12 @@ impl RapsServer {
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 let filter = Self::optional_arg(&args, "filter");
-                let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
-                self.admin_user_remove(account_id, email, filter, dry_run).await
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.admin_user_remove(account_id, email, filter, dry_run)
+                    .await
             }
             "admin_user_update_role" => {
                 let account_id = match Self::required_arg(&args, "account_id") {
@@ -1237,11 +1953,18 @@ impl RapsServer {
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 let filter = Self::optional_arg(&args, "filter");
-                let dry_run = args.get("dry_run").and_then(|v| v.as_bool()).unwrap_or(false);
-                self.admin_user_update_role(account_id, email, role, filter, dry_run).await
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.admin_user_update_role(account_id, email, role, filter, dry_run)
+                    .await
             }
             "admin_operation_list" => {
-                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize);
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
                 self.admin_operation_list(limit).await
             }
             "admin_operation_status" => {
@@ -1334,7 +2057,8 @@ impl RapsServer {
                 };
                 let description = Self::optional_arg(&args, "description");
                 let status = Self::optional_arg(&args, "status");
-                self.issue_create(project_id, title, description, status).await
+                self.issue_create(project_id, title, description, status)
+                    .await
             }
             "issue_update" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
@@ -1348,7 +2072,8 @@ impl RapsServer {
                 let title = Self::optional_arg(&args, "title");
                 let description = Self::optional_arg(&args, "description");
                 let status = Self::optional_arg(&args, "status");
-                self.issue_update(project_id, issue_id, title, description, status).await
+                self.issue_update(project_id, issue_id, title, description, status)
+                    .await
             }
 
             // ================================================================
@@ -1398,10 +2123,266 @@ impl RapsServer {
                 self.acc_checklists_list(project_id).await
             }
 
+            // ================================================================
+            // Object Upload/Download Tools (v4.4)
+            // ================================================================
+            "object_upload" => {
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let file_path = match Self::required_arg(&args, "file_path") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = Self::optional_arg(&args, "object_key");
+                self.object_upload(bucket_key, file_path, object_key).await
+            }
+            "object_upload_batch" => {
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let file_paths: Vec<String> = args
+                    .get("file_paths")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.object_upload_batch(bucket_key, file_paths).await
+            }
+            "object_download" => {
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = match Self::required_arg(&args, "object_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let output_path = match Self::required_arg(&args, "output_path") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.object_download(bucket_key, object_key, output_path)
+                    .await
+            }
+            "object_info" => {
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_key = match Self::required_arg(&args, "object_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.object_info(bucket_key, object_key).await
+            }
+            "object_copy" => {
+                let source_bucket = match Self::required_arg(&args, "source_bucket") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let source_key = match Self::required_arg(&args, "source_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let dest_bucket = match Self::required_arg(&args, "dest_bucket") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let dest_key = Self::optional_arg(&args, "dest_key");
+                self.object_copy(source_bucket, source_key, dest_bucket, dest_key)
+                    .await
+            }
+            "object_delete_batch" => {
+                let bucket_key = match Self::required_arg(&args, "bucket_key") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let object_keys: Vec<String> = args
+                    .get("object_keys")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.object_delete_batch(bucket_key, object_keys).await
+            }
+
+            // ================================================================
+            // Project Management Tools (v4.4)
+            // ================================================================
+            "project_info" => {
+                let hub_id = match Self::required_arg(&args, "hub_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.project_info(hub_id, project_id).await
+            }
+            "project_users_list" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let offset = args
+                    .get("offset")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                self.project_users_list(project_id, limit, offset).await
+            }
+            "folder_contents" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let folder_id = match Self::required_arg(&args, "folder_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                let offset = args
+                    .get("offset")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                self.folder_contents(project_id, folder_id, limit, offset)
+                    .await
+            }
+
+            // ================================================================
+            // ACC Project Admin Tools (v4.4)
+            // ================================================================
+            "project_create" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let template_project_id = Self::optional_arg(&args, "template_project_id");
+                let products: Option<Vec<String>> =
+                    args.get("products").and_then(|v| v.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    });
+                self.project_create(account_id, name, template_project_id, products)
+                    .await
+            }
+            "project_user_add" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let email = match Self::required_arg(&args, "email") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let role_id = Self::optional_arg(&args, "role_id");
+                self.project_user_add(project_id, email, role_id).await
+            }
+            "project_users_import" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let users: Vec<Value> = args
+                    .get("users")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| arr.clone())
+                    .unwrap_or_default();
+                self.project_users_import(project_id, users).await
+            }
+
+            // ================================================================
+            // Item Management Tools (v4.4)
+            // ================================================================
+            "item_create" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let folder_id = match Self::required_arg(&args, "folder_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let display_name = match Self::required_arg(&args, "display_name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let storage_id = match Self::required_arg(&args, "storage_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.item_create(project_id, folder_id, display_name, storage_id)
+                    .await
+            }
+            "item_delete" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let item_id = match Self::required_arg(&args, "item_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.item_delete(project_id, item_id).await
+            }
+            "item_rename" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let item_id = match Self::required_arg(&args, "item_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let new_name = match Self::required_arg(&args, "new_name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.item_rename(project_id, item_id, new_name).await
+            }
+
             _ => format!("Unknown tool: {}", name),
         };
 
         CallToolResult::success(vec![Content::text(result)])
+    }
+}
+
+// Helper to format file size
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} bytes", bytes)
     }
 }
 
@@ -1557,7 +2538,6 @@ fn get_tools() -> Vec<Tool> {
                 &["hub_id"],
             ),
         ),
-
         // ================================================================
         // Admin Tools (v4.0 - Bulk Operations)
         // ================================================================
@@ -1634,7 +2614,6 @@ fn get_tools() -> Vec<Tool> {
                 &[],
             ),
         ),
-
         // ================================================================
         // Folder/Item Tools
         // ================================================================
@@ -1683,7 +2662,6 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "item_id"],
             ),
         ),
-
         // ================================================================
         // Issues Tools
         // ================================================================
@@ -1736,7 +2714,6 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "issue_id"],
             ),
         ),
-
         // ================================================================
         // RFI Tools
         // ================================================================
@@ -1761,7 +2738,6 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "rfi_id"],
             ),
         ),
-
         // ================================================================
         // ACC Extended Tools
         // ================================================================
@@ -1795,6 +2771,196 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id"],
             ),
         ),
+        // ================================================================
+        // Object Upload/Download Tools (v4.4)
+        // ================================================================
+        Tool::new(
+            "object_upload",
+            "Upload a file to an OSS bucket. Automatically uses chunked upload for files > 100MB.",
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Target bucket key (3-128 chars, lowercase)"},
+                    "file_path": {"type": "string", "description": "Absolute path to the file to upload"},
+                    "object_key": {"type": "string", "description": "Optional object key (defaults to filename)"}
+                }),
+                &["bucket_key", "file_path"],
+            ),
+        ),
+        Tool::new(
+            "object_upload_batch",
+            "Upload multiple files to an OSS bucket. Uses 4 parallel uploads. Returns summary with individual results.",
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Target bucket key"},
+                    "file_paths": {"type": "array", "items": {"type": "string"}, "description": "Array of absolute file paths to upload"}
+                }),
+                &["bucket_key", "file_paths"],
+            ),
+        ),
+        Tool::new(
+            "object_download",
+            "Download an object from OSS to a local file path.",
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Source bucket key"},
+                    "object_key": {"type": "string", "description": "Object key to download"},
+                    "output_path": {"type": "string", "description": "Local file path to save the downloaded file"}
+                }),
+                &["bucket_key", "object_key", "output_path"],
+            ),
+        ),
+        Tool::new(
+            "object_info",
+            "Get detailed metadata for an object including size, content type, SHA1 hash, and timestamps.",
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Bucket key"},
+                    "object_key": {"type": "string", "description": "Object key"}
+                }),
+                &["bucket_key", "object_key"],
+            ),
+        ),
+        Tool::new(
+            "object_copy",
+            "Copy an object from one bucket to another. If destination exists, returns existing object with warning (non-destructive).",
+            schema(
+                json!({
+                    "source_bucket": {"type": "string", "description": "Source bucket key"},
+                    "source_key": {"type": "string", "description": "Source object key"},
+                    "dest_bucket": {"type": "string", "description": "Destination bucket key"},
+                    "dest_key": {"type": "string", "description": "Destination object key (defaults to source key)"}
+                }),
+                &["source_bucket", "source_key", "dest_bucket"],
+            ),
+        ),
+        Tool::new(
+            "object_delete_batch",
+            "Delete multiple objects from an OSS bucket. Returns summary with individual results.",
+            schema(
+                json!({
+                    "bucket_key": {"type": "string", "description": "Bucket key"},
+                    "object_keys": {"type": "array", "items": {"type": "string"}, "description": "Array of object keys to delete"}
+                }),
+                &["bucket_key", "object_keys"],
+            ),
+        ),
+        // ================================================================
+        // Project Management Tools (v4.4)
+        // ================================================================
+        Tool::new(
+            "project_info",
+            "Get project details including name, type, scopes, and top-level folders. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "hub_id": {"type": "string", "description": "Hub ID (e.g., b.abc123)"},
+                    "project_id": {"type": "string", "description": "Project ID (e.g., b.project123)"}
+                }),
+                &["hub_id", "project_id"],
+            ),
+        ),
+        Tool::new(
+            "project_users_list",
+            "List users with access to a project with pagination. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "limit": {"type": "integer", "description": "Max results per page (default: 50, max: 200)"},
+                    "offset": {"type": "integer", "description": "Starting index for pagination"}
+                }),
+                &["project_id"],
+            ),
+        ),
+        Tool::new(
+            "folder_contents",
+            "List all items and subfolders within a folder. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "folder_id": {"type": "string", "description": "Folder ID (URN format)"},
+                    "limit": {"type": "integer", "description": "Max results per page (default: 50)"},
+                    "offset": {"type": "integer", "description": "Starting index"}
+                }),
+                &["project_id", "folder_id"],
+            ),
+        ),
+        // ================================================================
+        // ACC Project Admin Tools (v4.4)
+        // ================================================================
+        Tool::new(
+            "project_create",
+            "Create a new ACC project from scratch or from a template. ACC only (not BIM 360). Polls until project is activated. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "name": {"type": "string", "description": "Project name"},
+                    "template_project_id": {"type": "string", "description": "Optional template project ID to clone from"},
+                    "products": {"type": "array", "items": {"type": "string"}, "description": "Products to enable (e.g., ['build', 'docs', 'model'])"}
+                }),
+                &["account_id", "name"],
+            ),
+        ),
+        Tool::new(
+            "project_user_add",
+            "Add a user to an ACC project with optional role assignment. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "email": {"type": "string", "description": "User email address"},
+                    "role_id": {"type": "string", "description": "Optional role ID to assign"}
+                }),
+                &["project_id", "email"],
+            ),
+        ),
+        Tool::new(
+            "project_users_import",
+            "Import multiple users to an ACC project at once. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "users": {"type": "array", "items": {"type": "object", "properties": {"email": {"type": "string"}, "role_id": {"type": "string"}}, "required": ["email"]}, "description": "Array of users to import"}
+                }),
+                &["project_id", "users"],
+            ),
+        ),
+        // ================================================================
+        // Item Management Tools (v4.4)
+        // ================================================================
+        Tool::new(
+            "item_create",
+            "Create a new item in a project folder by linking an OSS storage object. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "folder_id": {"type": "string", "description": "Target folder ID (URN format)"},
+                    "display_name": {"type": "string", "description": "Display name for the item"},
+                    "storage_id": {"type": "string", "description": "OSS storage object URN"}
+                }),
+                &["project_id", "folder_id", "display_name", "storage_id"],
+            ),
+        ),
+        Tool::new(
+            "item_delete",
+            "Delete an item from a project folder. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "item_id": {"type": "string", "description": "Item ID to delete"}
+                }),
+                &["project_id", "item_id"],
+            ),
+        ),
+        Tool::new(
+            "item_rename",
+            "Update an item's display name. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "item_id": {"type": "string", "description": "Item ID"},
+                    "new_name": {"type": "string", "description": "New display name"}
+                }),
+                &["project_id", "item_id", "new_name"],
+            ),
+        ),
     ]
 }
 
@@ -1803,14 +2969,15 @@ impl ServerHandler for RapsServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "RAPS MCP Server v4.0 - Autodesk Platform Services CLI\n\n\
-                Provides direct access to APS APIs (35+ tools):\n\
+                "RAPS MCP Server v4.4 - Autodesk Platform Services CLI\n\n\
+                Provides direct access to APS APIs (50 tools):\n\
                 * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
-                * bucket_*, object_* - OSS storage operations\n\
+                * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
                 * translate_* - CAD model translation\n\
-                * hub_*, project_* - Data Management\n\
+                * hub_*, project_* - Data Management & Project Info\n\
                 * folder_*, item_* - Folder and file management\n\
-                * admin_* - Bulk account administration (v4.0)\n\
+                * project_create, project_user_* - ACC Project Admin (v4.4)\n\
+                * admin_* - Bulk account administration\n\
                 * issue_*, rfi_* - ACC Issues and RFIs\n\
                 * acc_* - ACC Assets, Submittals, Checklists\n\n\
                 Set APS_CLIENT_ID and APS_CLIENT_SECRET env vars.\n\
