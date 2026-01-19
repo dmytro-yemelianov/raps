@@ -137,9 +137,21 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         // Auth tools - work with either
         "auth_test" | "auth_status" | "auth_login" | "auth_logout" => AuthRequirement::Either,
 
-        // OSS tools - 2-legged only
-        "bucket_list" | "bucket_create" | "bucket_get" | "bucket_delete" | "object_list"
-        | "object_delete" | "object_signed_url" | "object_urn" => AuthRequirement::TwoLegged,
+        // OSS tools - 2-legged only (including v4.4 upload/download/copy)
+        "bucket_list"
+        | "bucket_create"
+        | "bucket_get"
+        | "bucket_delete"
+        | "object_list"
+        | "object_delete"
+        | "object_signed_url"
+        | "object_urn"
+        | "object_upload"
+        | "object_upload_batch"
+        | "object_download"
+        | "object_info"
+        | "object_copy"
+        | "object_delete_batch" => AuthRequirement::TwoLegged,
 
         // Derivative tools - 2-legged only
         "translate_start" | "translate_status" => AuthRequirement::TwoLegged,
@@ -157,6 +169,17 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         // Data Management tools - 3-legged required
         "hub_list" | "project_list" | "folder_list" | "folder_create" | "item_info"
         | "item_versions" => AuthRequirement::ThreeLegged,
+
+        // Project Management tools (v4.4) - 3-legged required
+        "project_info" | "project_users_list" | "folder_contents" => AuthRequirement::ThreeLegged,
+
+        // ACC Project Admin tools (v4.4) - 3-legged required
+        "project_create" | "project_user_add" | "project_users_import" => {
+            AuthRequirement::ThreeLegged
+        }
+
+        // Item Management tools (v4.4) - 3-legged required
+        "item_create" | "item_delete" | "item_rename" => AuthRequirement::ThreeLegged,
 
         // ACC/BIM 360 tools - 3-legged required
         "issue_list"

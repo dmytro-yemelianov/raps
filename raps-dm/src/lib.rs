@@ -652,6 +652,103 @@ impl DataManagementClient {
 
         Ok(api_response.data)
     }
+
+    /// Delete an item from a project
+    ///
+    /// This removes the item (file lineage) from the project folder.
+    /// Note: This does not delete the underlying OSS object.
+    pub async fn delete_item(&self, project_id: &str, item_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/items/{}",
+            self.config.data_url(),
+            project_id,
+            item_id
+        );
+
+        // Log request in verbose/debug mode
+        logging::log_request("DELETE", &url);
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete item")?;
+
+        // Log response in verbose/debug mode
+        logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete item ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
+    /// Rename an item (update display name)
+    ///
+    /// Updates the item's display name without changing the file content.
+    pub async fn rename_item(
+        &self,
+        project_id: &str,
+        item_id: &str,
+        new_name: &str,
+    ) -> Result<Item> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/items/{}",
+            self.config.data_url(),
+            project_id,
+            item_id
+        );
+
+        // Build JSON:API PATCH request for updating item
+        let request = serde_json::json!({
+            "jsonapi": {
+                "version": "1.0"
+            },
+            "data": {
+                "type": "items",
+                "id": item_id,
+                "attributes": {
+                    "displayName": new_name
+                }
+            }
+        });
+
+        // Log request in verbose/debug mode
+        logging::log_request("PATCH", &url);
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/vnd.api+json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to rename item")?;
+
+        // Log response in verbose/debug mode
+        logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to rename item ({status}): {error_text}");
+        }
+
+        let api_response: JsonApiResponse<Item> = response
+            .json()
+            .await
+            .context("Failed to parse item response")?;
+
+        Ok(api_response.data)
+    }
 }
 
 #[cfg(test)]

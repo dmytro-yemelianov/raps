@@ -172,6 +172,82 @@ pub struct AttachmentsResponse {
     pub pagination: Option<IssuesPagination>,
 }
 
+// ============================================================================
+// ACC PROJECT ADMIN API (Project Creation)
+// ============================================================================
+
+/// Status of an ACC project creation job
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProjectCreationStatus {
+    /// Job is pending
+    Pending,
+    /// Job is being processed
+    Processing,
+    /// Project created and active
+    Active,
+    /// Project creation failed
+    Failed,
+}
+
+impl ProjectCreationStatus {
+    /// Parse status from API response string
+    pub fn parse(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "pending" => ProjectCreationStatus::Pending,
+            "processing" => ProjectCreationStatus::Processing,
+            "active" => ProjectCreationStatus::Active,
+            "failed" | "error" => ProjectCreationStatus::Failed,
+            _ => ProjectCreationStatus::Processing, // Default to processing for unknown states
+        }
+    }
+}
+
+/// Result of an ACC project creation operation
+#[derive(Debug, Clone)]
+pub struct ProjectCreationJob {
+    /// The job ID returned by the API
+    pub job_id: Option<String>,
+    /// The created project ID (available after activation)
+    pub project_id: Option<String>,
+    /// Current status of the project creation
+    pub status: ProjectCreationStatus,
+    /// Project name
+    pub name: Option<String>,
+}
+
+/// Request to create an ACC project
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateProjectRequest {
+    /// Project name
+    pub name: String,
+    /// Optional template project ID to clone from
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub template_project_id: Option<String>,
+    /// Products to enable (e.g., ["build", "docs", "model"])
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub products: Option<Vec<String>>,
+    /// Project type (default: "ACC")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_type: Option<String>,
+}
+
+/// ACC Project response from API
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccProject {
+    /// Project ID
+    pub id: String,
+    /// Project name
+    pub name: String,
+    /// Project status (pending, active, etc.)
+    pub status: Option<String>,
+    /// Account ID
+    pub account_id: Option<String>,
+    /// Job ID (for tracking creation progress)
+    pub job_id: Option<String>,
+}
+
 /// Issues API client
 pub struct IssuesClient {
     config: Config,
@@ -1395,6 +1471,161 @@ impl AccClient {
             .await
             .context("Failed to parse checklist response")?;
         Ok(checklist)
+    }
+
+    // ============== ACC PROJECT ADMIN ==============
+
+    /// Get the base URL for ACC HQ Admin API
+    fn hq_url(&self, account_id: &str) -> String {
+        format!("{}/hq/v1/accounts/{}", self.config.base_url, account_id)
+    }
+
+    /// Create a new ACC project
+    ///
+    /// Creates a project in an ACC account. ACC only (not BIM 360).
+    /// The project is created asynchronously. Use `wait_for_project_activation`
+    /// to poll until the project is active.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ACC account ID
+    /// * `request` - Project creation parameters
+    ///
+    /// # Returns
+    /// A `ProjectCreationJob` containing the project ID and initial status.
+    pub async fn create_project(
+        &self,
+        account_id: &str,
+        request: CreateProjectRequest,
+    ) -> Result<ProjectCreationJob> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!("{}/projects", self.hq_url(account_id));
+
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create ACC project")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create ACC project ({status}): {error_text}");
+        }
+
+        let project: AccProject = response
+            .json()
+            .await
+            .context("Failed to parse project creation response")?;
+
+        let status = project
+            .status
+            .as_deref()
+            .map(ProjectCreationStatus::parse)
+            .unwrap_or(ProjectCreationStatus::Pending);
+
+        Ok(ProjectCreationJob {
+            job_id: project.job_id,
+            project_id: Some(project.id),
+            status,
+            name: Some(project.name),
+        })
+    }
+
+    /// Wait for a project to become active
+    ///
+    /// Polls the project status until it becomes active or fails.
+    /// Times out after the specified duration.
+    ///
+    /// # Arguments
+    /// * `account_id` - The ACC account ID
+    /// * `project_id` - The project ID to check
+    /// * `timeout_secs` - Maximum time to wait (default: 60 seconds)
+    /// * `poll_interval_ms` - Time between polls (default: 2000ms)
+    ///
+    /// # Returns
+    /// The final `ProjectCreationJob` with updated status.
+    pub async fn wait_for_project_activation(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        timeout_secs: Option<u64>,
+        poll_interval_ms: Option<u64>,
+    ) -> Result<ProjectCreationJob> {
+        let timeout = std::time::Duration::from_secs(timeout_secs.unwrap_or(60));
+        let poll_interval = std::time::Duration::from_millis(poll_interval_ms.unwrap_or(2000));
+        let start = std::time::Instant::now();
+
+        loop {
+            // Check if we've exceeded the timeout
+            if start.elapsed() > timeout {
+                anyhow::bail!(
+                    "Timeout waiting for project {} to become active (waited {}s)",
+                    project_id,
+                    timeout.as_secs()
+                );
+            }
+
+            // Get project status
+            let project = self.get_project(account_id, project_id).await?;
+            let status = project
+                .status
+                .as_deref()
+                .map(ProjectCreationStatus::parse)
+                .unwrap_or(ProjectCreationStatus::Processing);
+
+            match status {
+                ProjectCreationStatus::Active => {
+                    return Ok(ProjectCreationJob {
+                        job_id: project.job_id,
+                        project_id: Some(project.id),
+                        status: ProjectCreationStatus::Active,
+                        name: Some(project.name),
+                    });
+                }
+                ProjectCreationStatus::Failed => {
+                    anyhow::bail!("Project creation failed for project {}", project_id);
+                }
+                _ => {
+                    // Still pending/processing, wait and retry
+                    tokio::time::sleep(poll_interval).await;
+                }
+            }
+        }
+    }
+
+    /// Get an ACC project by ID
+    ///
+    /// # Arguments
+    /// * `account_id` - The ACC account ID
+    /// * `project_id` - The project ID
+    pub async fn get_project(&self, account_id: &str, project_id: &str) -> Result<AccProject> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!("{}/projects/{}", self.hq_url(account_id), project_id);
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get ACC project")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get ACC project ({status}): {error_text}");
+        }
+
+        let project: AccProject = response
+            .json()
+            .await
+            .context("Failed to parse project response")?;
+
+        Ok(project)
     }
 }
 
