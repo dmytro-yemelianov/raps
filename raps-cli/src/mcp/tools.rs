@@ -42,13 +42,16 @@ pub const TOOLS: &[&str] = &[
     "project_info",
     "project_users_list",
     "folder_contents",
-    // Admin Bulk Operations (v4.0)
+    // Admin Bulk Operations (v4.0+)
     "admin_project_list",
     "admin_user_add",
     "admin_user_remove",
     "admin_user_update_role",
+    "admin_folder_rights",
     "admin_operation_list",
     "admin_operation_status",
+    "admin_operation_resume",
+    "admin_operation_cancel",
     // ACC Project Admin (v4.4)
     "project_create",
     "project_user_add",
@@ -70,8 +73,17 @@ pub const TOOLS: &[&str] = &[
     // RFIs
     "rfi_list",
     "rfi_get",
+    "rfi_create",
+    "rfi_update",
     // ACC Extended
     "acc_assets_list",
+    "asset_create",
+    "asset_update",
+    "asset_delete",
     "acc_submittals_list",
+    "submittal_create",
+    "submittal_update",
     "acc_checklists_list",
+    "checklist_create",
+    "checklist_update",
 ];

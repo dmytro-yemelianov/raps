@@ -157,14 +157,17 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         "translate_start" | "translate_status" => AuthRequirement::TwoLegged,
 
         // Admin tools - 2-legged (account-level)
-        "admin_project_list" | "admin_operation_list" | "admin_operation_status" => {
-            AuthRequirement::TwoLegged
-        }
+        "admin_project_list"
+        | "admin_operation_list"
+        | "admin_operation_status"
+        | "admin_operation_resume"
+        | "admin_operation_cancel" => AuthRequirement::TwoLegged,
 
         // Admin user tools - 2-legged
-        "admin_user_add" | "admin_user_remove" | "admin_user_update_role" => {
-            AuthRequirement::TwoLegged
-        }
+        "admin_user_add"
+        | "admin_user_remove"
+        | "admin_user_update_role"
+        | "admin_folder_rights" => AuthRequirement::TwoLegged,
 
         // Data Management tools - 3-legged required
         "hub_list" | "project_list" | "folder_list" | "folder_create" | "item_info"
@@ -188,9 +191,18 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         | "issue_update"
         | "rfi_list"
         | "rfi_get"
+        | "rfi_create"
+        | "rfi_update"
         | "acc_assets_list"
+        | "asset_create"
+        | "asset_update"
+        | "asset_delete"
         | "acc_submittals_list"
-        | "acc_checklists_list" => AuthRequirement::ThreeLegged,
+        | "submittal_create"
+        | "submittal_update"
+        | "acc_checklists_list"
+        | "checklist_create"
+        | "checklist_update" => AuthRequirement::ThreeLegged,
 
         // Default to 2-legged for unknown tools
         _ => AuthRequirement::TwoLegged,

@@ -1158,6 +1158,33 @@ impl AccClient {
         Ok(asset)
     }
 
+    /// Delete an asset
+    pub async fn delete_asset(&self, project_id: &str, asset_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/assets/{}",
+            self.config.assets_url(),
+            project_id,
+            asset_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete asset")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete asset ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
     // ============== SUBMITTALS ==============
 
     /// List submittals in a project

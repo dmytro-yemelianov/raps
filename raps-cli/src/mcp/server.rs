@@ -11,10 +11,12 @@ use std::{str::FromStr, sync::Arc};
 use tokio::sync::RwLock;
 
 use raps_acc::{
-    AccClient, CreateIssueRequest, IssuesClient, RfiClient, UpdateIssueRequest,
-    admin::AccountAdminClient, users::ProjectUsersClient,
+    AccClient, CreateAssetRequest, CreateChecklistRequest, CreateIssueRequest, CreateRfiRequest,
+    CreateSubmittalRequest, IssuesClient, RfiClient, UpdateAssetRequest, UpdateChecklistRequest,
+    UpdateIssueRequest, UpdateRfiRequest, UpdateSubmittalRequest, admin::AccountAdminClient,
+    permissions::FolderPermissionsClient, users::ProjectUsersClient,
 };
-use raps_admin::{BulkConfig, ProjectFilter, StateManager};
+use raps_admin::{BulkConfig, FolderType, PermissionLevel, ProjectFilter, StateManager};
 use raps_derivative::{DerivativeClient, OutputFormat};
 use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
@@ -160,6 +162,16 @@ impl RapsServer {
     async fn get_acc_client(&self) -> AccClient {
         let auth = self.get_auth_client().await;
         AccClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+    }
+
+    // Helper to get Folder Permissions client (created on demand, not cached)
+    async fn get_permissions_client(&self) -> FolderPermissionsClient {
+        let auth = self.get_auth_client().await;
+        FolderPermissionsClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
     }
 
     fn clamp_limit(limit: Option<usize>, default: usize, max: usize) -> usize {
@@ -671,6 +683,87 @@ impl RapsServer {
         }
     }
 
+    async fn admin_folder_rights(
+        &self,
+        account_id: String,
+        email: String,
+        level: String,
+        folder: Option<String>,
+        filter: Option<String>,
+        dry_run: bool,
+    ) -> String {
+        // Parse permission level
+        let permission_level = match level.to_lowercase().as_str() {
+            "view_only" => PermissionLevel::ViewOnly,
+            "view_download" => PermissionLevel::ViewDownload,
+            "upload_only" => PermissionLevel::UploadOnly,
+            "view_download_upload" => PermissionLevel::ViewDownloadUpload,
+            "view_download_upload_edit" => PermissionLevel::ViewDownloadUploadEdit,
+            "folder_control" => PermissionLevel::FolderControl,
+            _ => {
+                return format!(
+                    "Invalid permission level: '{}'. Valid: view_only, view_download, upload_only, view_download_upload, view_download_upload_edit, folder_control",
+                    level
+                );
+            }
+        };
+
+        // Parse folder type
+        let folder_type = match folder.as_deref().unwrap_or("project_files") {
+            "project_files" => FolderType::ProjectFiles,
+            "plans" => FolderType::Plans,
+            id => FolderType::Custom(id.to_string()),
+        };
+
+        // Parse filter
+        let project_filter = if let Some(ref f) = filter {
+            match ProjectFilter::from_expression(f) {
+                Ok(pf) => pf,
+                Err(e) => return format!("Invalid filter expression: {}", e),
+            }
+        } else {
+            ProjectFilter::new()
+        };
+
+        let admin_client = self.get_admin_client().await;
+        let permissions_client = Arc::new(self.get_permissions_client().await);
+
+        let bulk_config = BulkConfig {
+            concurrency: 10,
+            dry_run,
+            ..Default::default()
+        };
+
+        let on_progress = |_| {};
+
+        match raps_admin::bulk_update_folder_rights(
+            &admin_client,
+            permissions_client,
+            &account_id,
+            &email,
+            permission_level,
+            folder_type,
+            &project_filter,
+            bulk_config,
+            on_progress,
+        )
+        .await
+        {
+            Ok(result) => {
+                format!(
+                    "Bulk folder rights operation {}:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
+                    if dry_run { "(DRY RUN)" } else { "completed" },
+                    result.total,
+                    result.completed,
+                    result.skipped,
+                    result.failed,
+                    result.duration.as_secs_f64()
+                )
+            }
+            Err(e) => format!("Bulk folder rights failed: {}", e),
+        }
+    }
+
     async fn admin_operation_list(&self, limit: Option<usize>) -> String {
         let limit = Self::clamp_limit(limit, 10, 50);
 
@@ -754,6 +847,160 @@ impl RapsServer {
                 }
             }
             Err(e) => format!("Failed to initialize state manager: {}", e),
+        }
+    }
+
+    async fn admin_operation_cancel(&self, operation_id: String) -> String {
+        let op_id = match uuid::Uuid::parse_str(&operation_id) {
+            Ok(uuid) => uuid,
+            Err(_) => return "Invalid operation ID format".to_string(),
+        };
+
+        match StateManager::new() {
+            Ok(state_manager) => match state_manager.cancel_operation(op_id).await {
+                Ok(()) => format!("Operation {} cancelled successfully", operation_id),
+                Err(e) => format!("Failed to cancel operation: {}", e),
+            },
+            Err(e) => format!("Failed to initialize state manager: {}", e),
+        }
+    }
+
+    async fn admin_operation_resume(&self, operation_id: Option<String>) -> String {
+        let state_manager = match StateManager::new() {
+            Ok(sm) => sm,
+            Err(e) => return format!("Failed to initialize state manager: {}", e),
+        };
+
+        // Get the operation ID (from param or most recent)
+        let op_id = match operation_id {
+            Some(id) => match uuid::Uuid::parse_str(&id) {
+                Ok(uuid) => uuid,
+                Err(_) => return "Invalid operation ID format".to_string(),
+            },
+            None => {
+                // Get most recent incomplete operation
+                match state_manager.list_operations(None).await {
+                    Ok(ops) => {
+                        match ops
+                            .iter()
+                            .find(|o| o.status == raps_admin::OperationStatus::InProgress)
+                        {
+                            Some(op) => op.operation_id,
+                            None => return "No in-progress operations to resume".to_string(),
+                        }
+                    }
+                    Err(e) => return format!("Failed to list operations: {}", e),
+                }
+            }
+        };
+
+        // Load the operation state
+        let state = match state_manager.load_operation(op_id).await {
+            Ok(s) => s,
+            Err(e) => return format!("Failed to load operation: {}", e),
+        };
+
+        // Check operation status
+        if state.status != raps_admin::OperationStatus::InProgress {
+            return format!(
+                "Operation {} has status {:?} and cannot be resumed",
+                op_id, state.status
+            );
+        }
+
+        let bulk_config = BulkConfig {
+            concurrency: 10,
+            dry_run: false,
+            ..Default::default()
+        };
+        let on_progress = |_| {};
+
+        // Resume based on operation type
+        match state.operation_type {
+            raps_admin::OperationType::AddUser => {
+                let users_client = Arc::new(self.get_users_client().await);
+                match raps_admin::resume_bulk_add_user(
+                    users_client,
+                    op_id,
+                    bulk_config,
+                    on_progress,
+                )
+                .await
+                {
+                    Ok(result) => format!(
+                        "Resumed add user operation:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
+                        result.total,
+                        result.completed,
+                        result.skipped,
+                        result.failed,
+                        result.duration.as_secs_f64()
+                    ),
+                    Err(e) => format!("Failed to resume operation: {}", e),
+                }
+            }
+            raps_admin::OperationType::RemoveUser => {
+                let users_client = Arc::new(self.get_users_client().await);
+                match raps_admin::resume_bulk_remove_user(
+                    users_client,
+                    op_id,
+                    bulk_config,
+                    on_progress,
+                )
+                .await
+                {
+                    Ok(result) => format!(
+                        "Resumed remove user operation:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
+                        result.total,
+                        result.completed,
+                        result.skipped,
+                        result.failed,
+                        result.duration.as_secs_f64()
+                    ),
+                    Err(e) => format!("Failed to resume operation: {}", e),
+                }
+            }
+            raps_admin::OperationType::UpdateRole => {
+                let users_client = Arc::new(self.get_users_client().await);
+                match raps_admin::resume_bulk_update_role(
+                    users_client,
+                    op_id,
+                    bulk_config,
+                    on_progress,
+                )
+                .await
+                {
+                    Ok(result) => format!(
+                        "Resumed update role operation:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
+                        result.total,
+                        result.completed,
+                        result.skipped,
+                        result.failed,
+                        result.duration.as_secs_f64()
+                    ),
+                    Err(e) => format!("Failed to resume operation: {}", e),
+                }
+            }
+            raps_admin::OperationType::UpdateFolderRights => {
+                let permissions_client = Arc::new(self.get_permissions_client().await);
+                match raps_admin::resume_bulk_update_folder_rights(
+                    permissions_client,
+                    op_id,
+                    bulk_config,
+                    on_progress,
+                )
+                .await
+                {
+                    Ok(result) => format!(
+                        "Resumed folder rights operation:\n\n* Total: {}\n* Completed: {}\n* Skipped: {}\n* Failed: {}\n* Duration: {:.2}s",
+                        result.total,
+                        result.completed,
+                        result.skipped,
+                        result.failed,
+                        result.duration.as_secs_f64()
+                    ),
+                    Err(e) => format!("Failed to resume operation: {}", e),
+                }
+            }
         }
     }
 
@@ -1028,6 +1275,73 @@ impl RapsServer {
         }
     }
 
+    async fn rfi_create(
+        &self,
+        project_id: String,
+        title: String,
+        question: Option<String>,
+        priority: Option<String>,
+        due_date: Option<String>,
+        assigned_to: Option<String>,
+        location: Option<String>,
+    ) -> String {
+        let client = self.get_rfi_client().await;
+
+        let request = CreateRfiRequest {
+            title,
+            question,
+            priority,
+            due_date,
+            assigned_to,
+            location,
+            discipline: None,
+        };
+
+        match client.create_rfi(&project_id, request).await {
+            Ok(rfi) => {
+                format!(
+                    "RFI created successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    rfi.id, rfi.title, rfi.status
+                )
+            }
+            Err(e) => format!("Failed to create RFI: {}", e),
+        }
+    }
+
+    async fn rfi_update(
+        &self,
+        project_id: String,
+        rfi_id: String,
+        title: Option<String>,
+        question: Option<String>,
+        answer: Option<String>,
+        status: Option<String>,
+        priority: Option<String>,
+    ) -> String {
+        let client = self.get_rfi_client().await;
+
+        let request = UpdateRfiRequest {
+            title,
+            question,
+            answer,
+            status,
+            priority,
+            due_date: None,
+            assigned_to: None,
+            location: None,
+        };
+
+        match client.update_rfi(&project_id, &rfi_id, request).await {
+            Ok(rfi) => {
+                format!(
+                    "RFI updated successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    rfi.id, rfi.title, rfi.status
+                )
+            }
+            Err(e) => format!("Failed to update RFI: {}", e),
+        }
+    }
+
     // ========================================================================
     // ACC Extended Tools (Assets, Submittals, Checklists)
     // ========================================================================
@@ -1049,6 +1363,74 @@ impl RapsServer {
                 output
             }
             Err(e) => format!("Failed to list assets: {}", e),
+        }
+    }
+
+    async fn asset_create(
+        &self,
+        project_id: String,
+        category_id: Option<String>,
+        description: Option<String>,
+        barcode: Option<String>,
+        client_asset_id: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = CreateAssetRequest {
+            category_id,
+            description,
+            barcode,
+            client_asset_id,
+        };
+
+        match client.create_asset(&project_id, request).await {
+            Ok(asset) => {
+                format!(
+                    "Asset created successfully:\n\n* ID: {}\n* Description: {}",
+                    asset.id,
+                    asset.description.as_deref().unwrap_or("-")
+                )
+            }
+            Err(e) => format!("Failed to create asset: {}", e),
+        }
+    }
+
+    async fn asset_update(
+        &self,
+        project_id: String,
+        asset_id: String,
+        category_id: Option<String>,
+        status_id: Option<String>,
+        description: Option<String>,
+        barcode: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = UpdateAssetRequest {
+            category_id,
+            status_id,
+            description,
+            barcode,
+        };
+
+        match client.update_asset(&project_id, &asset_id, request).await {
+            Ok(asset) => {
+                format!(
+                    "Asset updated successfully:\n\n* ID: {}\n* Description: {}",
+                    asset.id,
+                    asset.description.as_deref().unwrap_or("-")
+                )
+            }
+            Err(e) => format!("Failed to update asset: {}", e),
+        }
+    }
+
+    async fn asset_delete(&self, project_id: String, asset_id: String) -> String {
+        let client = self.get_acc_client().await;
+
+        match client.delete_asset(&project_id, &asset_id).await {
+            Ok(()) => format!("Asset {} deleted successfully", asset_id),
+            Err(e) => format!("Failed to delete asset: {}", e),
         }
     }
 
@@ -1075,6 +1457,62 @@ impl RapsServer {
         }
     }
 
+    async fn submittal_create(
+        &self,
+        project_id: String,
+        title: String,
+        spec_section: Option<String>,
+        due_date: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = CreateSubmittalRequest {
+            title,
+            spec_section,
+            due_date,
+        };
+
+        match client.create_submittal(&project_id, request).await {
+            Ok(submittal) => {
+                format!(
+                    "Submittal created successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    submittal.id, submittal.title, submittal.status
+                )
+            }
+            Err(e) => format!("Failed to create submittal: {}", e),
+        }
+    }
+
+    async fn submittal_update(
+        &self,
+        project_id: String,
+        submittal_id: String,
+        title: Option<String>,
+        status: Option<String>,
+        due_date: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = UpdateSubmittalRequest {
+            title,
+            status,
+            due_date,
+        };
+
+        match client
+            .update_submittal(&project_id, &submittal_id, request)
+            .await
+        {
+            Ok(submittal) => {
+                format!(
+                    "Submittal updated successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    submittal.id, submittal.title, submittal.status
+                )
+            }
+            Err(e) => format!("Failed to update submittal: {}", e),
+        }
+    }
+
     async fn acc_checklists_list(&self, project_id: String) -> String {
         let client = self.get_acc_client().await;
 
@@ -1094,6 +1532,70 @@ impl RapsServer {
                 output
             }
             Err(e) => format!("Failed to list checklists: {}", e),
+        }
+    }
+
+    async fn checklist_create(
+        &self,
+        project_id: String,
+        title: String,
+        template_id: Option<String>,
+        location: Option<String>,
+        due_date: Option<String>,
+        assignee_id: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = CreateChecklistRequest {
+            title,
+            template_id,
+            location,
+            due_date,
+            assignee_id,
+        };
+
+        match client.create_checklist(&project_id, request).await {
+            Ok(checklist) => {
+                format!(
+                    "Checklist created successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    checklist.id, checklist.title, checklist.status
+                )
+            }
+            Err(e) => format!("Failed to create checklist: {}", e),
+        }
+    }
+
+    async fn checklist_update(
+        &self,
+        project_id: String,
+        checklist_id: String,
+        title: Option<String>,
+        status: Option<String>,
+        location: Option<String>,
+        due_date: Option<String>,
+        assignee_id: Option<String>,
+    ) -> String {
+        let client = self.get_acc_client().await;
+
+        let request = UpdateChecklistRequest {
+            title,
+            status,
+            location,
+            due_date,
+            assignee_id,
+        };
+
+        match client
+            .update_checklist(&project_id, &checklist_id, request)
+            .await
+        {
+            Ok(checklist) => {
+                format!(
+                    "Checklist updated successfully:\n\n* ID: {}\n* Title: {}\n* Status: {}",
+                    checklist.id, checklist.title, checklist.status
+                )
+            }
+            Err(e) => format!("Failed to update checklist: {}", e),
         }
     }
 
@@ -1971,6 +2473,39 @@ impl RapsServer {
                 let operation_id = Self::optional_arg(&args, "operation_id");
                 self.admin_operation_status(operation_id).await
             }
+            "admin_folder_rights" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let email = match Self::required_arg(&args, "email") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let level = match Self::required_arg(&args, "level") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let folder = Self::optional_arg(&args, "folder");
+                let filter = Self::optional_arg(&args, "filter");
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.admin_folder_rights(account_id, email, level, folder, filter, dry_run)
+                    .await
+            }
+            "admin_operation_resume" => {
+                let operation_id = Self::optional_arg(&args, "operation_id");
+                self.admin_operation_resume(operation_id).await
+            }
+            "admin_operation_cancel" => {
+                let operation_id = match Self::required_arg(&args, "operation_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.admin_operation_cancel(operation_id).await
+            }
 
             // ================================================================
             // Folder/Item Tools
@@ -2097,6 +2632,50 @@ impl RapsServer {
                 };
                 self.rfi_get(project_id, rfi_id).await
             }
+            "rfi_create" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = match Self::required_arg(&args, "title") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let question = Self::optional_arg(&args, "question");
+                let priority = Self::optional_arg(&args, "priority");
+                let due_date = Self::optional_arg(&args, "due_date");
+                let assigned_to = Self::optional_arg(&args, "assigned_to");
+                let location = Self::optional_arg(&args, "location");
+                self.rfi_create(
+                    project_id,
+                    title,
+                    question,
+                    priority,
+                    due_date,
+                    assigned_to,
+                    location,
+                )
+                .await
+            }
+            "rfi_update" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let rfi_id = match Self::required_arg(&args, "rfi_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = Self::optional_arg(&args, "title");
+                let question = Self::optional_arg(&args, "question");
+                let answer = Self::optional_arg(&args, "answer");
+                let status = Self::optional_arg(&args, "status");
+                let priority = Self::optional_arg(&args, "priority");
+                self.rfi_update(
+                    project_id, rfi_id, title, question, answer, status, priority,
+                )
+                .await
+            }
 
             // ================================================================
             // ACC Extended Tools
@@ -2108,6 +2687,58 @@ impl RapsServer {
                 };
                 self.acc_assets_list(project_id).await
             }
+            "asset_create" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let category_id = Self::optional_arg(&args, "category_id");
+                let description = Self::optional_arg(&args, "description");
+                let barcode = Self::optional_arg(&args, "barcode");
+                let client_asset_id = Self::optional_arg(&args, "client_asset_id");
+                self.asset_create(
+                    project_id,
+                    category_id,
+                    description,
+                    barcode,
+                    client_asset_id,
+                )
+                .await
+            }
+            "asset_update" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let asset_id = match Self::required_arg(&args, "asset_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let category_id = Self::optional_arg(&args, "category_id");
+                let status_id = Self::optional_arg(&args, "status_id");
+                let description = Self::optional_arg(&args, "description");
+                let barcode = Self::optional_arg(&args, "barcode");
+                self.asset_update(
+                    project_id,
+                    asset_id,
+                    category_id,
+                    status_id,
+                    description,
+                    barcode,
+                )
+                .await
+            }
+            "asset_delete" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let asset_id = match Self::required_arg(&args, "asset_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.asset_delete(project_id, asset_id).await
+            }
             "acc_submittals_list" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
                     Ok(val) => val,
@@ -2115,12 +2746,89 @@ impl RapsServer {
                 };
                 self.acc_submittals_list(project_id).await
             }
+            "submittal_create" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = match Self::required_arg(&args, "title") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let spec_section = Self::optional_arg(&args, "spec_section");
+                let due_date = Self::optional_arg(&args, "due_date");
+                self.submittal_create(project_id, title, spec_section, due_date)
+                    .await
+            }
+            "submittal_update" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let submittal_id = match Self::required_arg(&args, "submittal_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = Self::optional_arg(&args, "title");
+                let status = Self::optional_arg(&args, "status");
+                let due_date = Self::optional_arg(&args, "due_date");
+                self.submittal_update(project_id, submittal_id, title, status, due_date)
+                    .await
+            }
             "acc_checklists_list" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 self.acc_checklists_list(project_id).await
+            }
+            "checklist_create" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = match Self::required_arg(&args, "title") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let template_id = Self::optional_arg(&args, "template_id");
+                let location = Self::optional_arg(&args, "location");
+                let due_date = Self::optional_arg(&args, "due_date");
+                let assignee_id = Self::optional_arg(&args, "assignee_id");
+                self.checklist_create(
+                    project_id,
+                    title,
+                    template_id,
+                    location,
+                    due_date,
+                    assignee_id,
+                )
+                .await
+            }
+            "checklist_update" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let checklist_id = match Self::required_arg(&args, "checklist_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let title = Self::optional_arg(&args, "title");
+                let status = Self::optional_arg(&args, "status");
+                let location = Self::optional_arg(&args, "location");
+                let due_date = Self::optional_arg(&args, "due_date");
+                let assignee_id = Self::optional_arg(&args, "assignee_id");
+                self.checklist_update(
+                    project_id,
+                    checklist_id,
+                    title,
+                    status,
+                    location,
+                    due_date,
+                    assignee_id,
+                )
+                .await
             }
 
             // ================================================================
@@ -2543,12 +3251,12 @@ fn get_tools() -> Vec<Tool> {
         // ================================================================
         Tool::new(
             "admin_project_list",
-            "List all projects in an ACC/BIM360 account with filtering. Use 2-legged auth.",
+            "List projects in an ACC/BIM360 account with advanced filtering. Supports name patterns, status, platform, date ranges, and regions.",
             schema(
                 json!({
                     "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
-                    "filter": {"type": "string", "description": "Filter expression (e.g., 'name:~Active', 'status:active', 'platform:acc')"},
-                    "limit": {"type": "integer", "description": "Max projects (default: 100)"}
+                    "filter": {"type": "string", "description": "Filter expression. Keys: name (glob with *), status (active|inactive|archived), platform (acc|bim360), created (>YYYY-MM-DD or <YYYY-MM-DD), region (us|emea). Example: 'name:*Hospital*,status:active,platform:acc,created:>2024-01-01'"},
+                    "limit": {"type": "integer", "description": "Max projects (default: 100, max: 500)"}
                 }),
                 &["account_id"],
             ),
@@ -2612,6 +3320,41 @@ fn get_tools() -> Vec<Tool> {
                     "operation_id": {"type": "string", "description": "Operation ID (optional, defaults to most recent)"}
                 }),
                 &[],
+            ),
+        ),
+        Tool::new(
+            "admin_folder_rights",
+            "Bulk update folder permissions for a user across multiple projects. Supports dry-run mode.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
+                    "email": {"type": "string", "description": "User email to update permissions for"},
+                    "level": {"type": "string", "description": "Permission level: view_only, view_download, upload_only, view_download_upload, view_download_upload_edit, folder_control"},
+                    "folder": {"type": "string", "description": "Folder type: project_files, plans, or custom folder ID"},
+                    "filter": {"type": "string", "description": "Project filter expression"},
+                    "dry_run": {"type": "boolean", "description": "Preview changes without applying (default: false)"}
+                }),
+                &["account_id", "email", "level"],
+            ),
+        ),
+        Tool::new(
+            "admin_operation_resume",
+            "Resume an interrupted bulk admin operation from where it left off.",
+            schema(
+                json!({
+                    "operation_id": {"type": "string", "description": "Operation ID to resume (optional, defaults to most recent in-progress)"}
+                }),
+                &[],
+            ),
+        ),
+        Tool::new(
+            "admin_operation_cancel",
+            "Cancel an in-progress bulk admin operation.",
+            schema(
+                json!({
+                    "operation_id": {"type": "string", "description": "Operation ID to cancel"}
+                }),
+                &["operation_id"],
             ),
         ),
         // ================================================================
@@ -2738,6 +3481,38 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "rfi_id"],
             ),
         ),
+        Tool::new(
+            "rfi_create",
+            "Create a new RFI (Request for Information) in an ACC/BIM360 project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "title": {"type": "string", "description": "RFI title"},
+                    "question": {"type": "string", "description": "RFI question text"},
+                    "priority": {"type": "string", "description": "Priority: low, normal, high, critical (default: normal)"},
+                    "due_date": {"type": "string", "description": "Due date in YYYY-MM-DD format"},
+                    "assigned_to": {"type": "string", "description": "User ID to assign the RFI to"},
+                    "location": {"type": "string", "description": "Location reference"}
+                }),
+                &["project_id", "title"],
+            ),
+        ),
+        Tool::new(
+            "rfi_update",
+            "Update an existing RFI.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "rfi_id": {"type": "string", "description": "The RFI ID to update"},
+                    "title": {"type": "string", "description": "New title"},
+                    "question": {"type": "string", "description": "Updated question"},
+                    "answer": {"type": "string", "description": "Answer to the RFI"},
+                    "status": {"type": "string", "description": "New status: draft, open, answered, closed, void"},
+                    "priority": {"type": "string", "description": "New priority: low, normal, high, critical"}
+                }),
+                &["project_id", "rfi_id"],
+            ),
+        ),
         // ================================================================
         // ACC Extended Tools
         // ================================================================
@@ -2752,6 +3527,46 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         Tool::new(
+            "asset_create",
+            "Create a new asset in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "category_id": {"type": "string", "description": "Asset category ID"},
+                    "description": {"type": "string", "description": "Asset description"},
+                    "barcode": {"type": "string", "description": "Asset barcode"},
+                    "client_asset_id": {"type": "string", "description": "Client-defined asset identifier"}
+                }),
+                &["project_id"],
+            ),
+        ),
+        Tool::new(
+            "asset_update",
+            "Update an existing asset.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "asset_id": {"type": "string", "description": "The asset ID to update"},
+                    "category_id": {"type": "string", "description": "New category ID"},
+                    "status_id": {"type": "string", "description": "New status ID"},
+                    "description": {"type": "string", "description": "New description"},
+                    "barcode": {"type": "string", "description": "New barcode"}
+                }),
+                &["project_id", "asset_id"],
+            ),
+        ),
+        Tool::new(
+            "asset_delete",
+            "Delete an asset from a project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "asset_id": {"type": "string", "description": "The asset ID to delete"}
+                }),
+                &["project_id", "asset_id"],
+            ),
+        ),
+        Tool::new(
             "acc_submittals_list",
             "List submittals in an ACC project.",
             schema(
@@ -2762,6 +3577,33 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         Tool::new(
+            "submittal_create",
+            "Create a new submittal in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "title": {"type": "string", "description": "Submittal title"},
+                    "spec_section": {"type": "string", "description": "Specification section reference"},
+                    "due_date": {"type": "string", "description": "Due date in YYYY-MM-DD format"}
+                }),
+                &["project_id", "title"],
+            ),
+        ),
+        Tool::new(
+            "submittal_update",
+            "Update an existing submittal.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "submittal_id": {"type": "string", "description": "The submittal ID to update"},
+                    "title": {"type": "string", "description": "New title"},
+                    "status": {"type": "string", "description": "New status"},
+                    "due_date": {"type": "string", "description": "New due date"}
+                }),
+                &["project_id", "submittal_id"],
+            ),
+        ),
+        Tool::new(
             "acc_checklists_list",
             "List checklists in an ACC project.",
             schema(
@@ -2769,6 +3611,37 @@ fn get_tools() -> Vec<Tool> {
                     "project_id": {"type": "string", "description": "The project ID"}
                 }),
                 &["project_id"],
+            ),
+        ),
+        Tool::new(
+            "checklist_create",
+            "Create a new checklist in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "title": {"type": "string", "description": "Checklist title"},
+                    "template_id": {"type": "string", "description": "Checklist template ID to use"},
+                    "location": {"type": "string", "description": "Location reference"},
+                    "due_date": {"type": "string", "description": "Due date in YYYY-MM-DD format"},
+                    "assignee_id": {"type": "string", "description": "User ID to assign the checklist to"}
+                }),
+                &["project_id", "title"],
+            ),
+        ),
+        Tool::new(
+            "checklist_update",
+            "Update an existing checklist.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "checklist_id": {"type": "string", "description": "The checklist ID to update"},
+                    "title": {"type": "string", "description": "New title"},
+                    "status": {"type": "string", "description": "New status"},
+                    "location": {"type": "string", "description": "New location"},
+                    "due_date": {"type": "string", "description": "New due date"},
+                    "assignee_id": {"type": "string", "description": "New assignee user ID"}
+                }),
+                &["project_id", "checklist_id"],
             ),
         ),
         // ================================================================
