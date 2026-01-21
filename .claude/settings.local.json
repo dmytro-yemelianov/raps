@@ -41,7 +41,26 @@
       "Bash(done)",
       "Bash(cargo check:*)",
       "Bash(gh run watch:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(npm view:*)",
+      "Bash(pip search:*)",
+      "WebFetch(domain:github.blog)",
+      "WebSearch",
+      "Bash(npm run build:*)",
+      "Bash(git fetch:*)",
+      "Bash(pwsh:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/setup-plan.ps1 -Json)",
+      "Bash(powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/update-agent-context.ps1 -AgentType claude)",
+      "Bash(powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/check-prerequisites.ps1 -Json)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(cargo clean:*)",
+      "Bash(wmic logicaldisk:*)",
+      "Bash(git stash:*)",
+      "Bash(python -m http.server:*)",
+      "Bash(timeout:*)",
+      "Bash(powershell:*)",
+      "Bash(gh api:*)",
+      "Bash(gh pr:*)"
     ]
   }
 }
