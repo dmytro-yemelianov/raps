@@ -430,6 +430,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Wait for release to propagate
+        shell: bash
+        run: |
+          VERSION="${{ needs.plan.outputs.tag }}"
+          echo "⏳ Waiting for release ${VERSION} to be fully available..."
+
+          # Wait up to 5 minutes for release to be available
+          for i in {1..30}; do
+            if curl -sL -o /dev/null -w "%{http_code}" "https://api.github.com/repos/dmytro-yemelianov/raps/releases/tags/${VERSION}" | grep -q "200"; then
+              echo "✅ Release ${VERSION} is available"
+              sleep 10  # Extra buffer for CDN propagation
+              break
+            fi
+            echo "⏳ Attempt $i/30 - Release not ready yet, waiting 10s..."
+            sleep 10
+          done
+
       - name: Run install script
         shell: bash
         run: |
