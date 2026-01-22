@@ -48,12 +48,14 @@ use rustyline::history::DefaultHistory;
 use std::io;
 
 use commands::{
-    AccCommands, AdminCommands, AuthCommands, BucketCommands, ConfigCommands, DaCommands,
-    DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands, ItemCommands,
-    ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands, RealityCommands,
-    RfiCommands, TranslateCommands, WebhookCommands,
+    AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
+    DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
+    ItemCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
+    RealityCommands, RfiCommands, TemplateCommands, TranslateCommands, WebhookCommands,
 };
 
+use raps_acc::admin::AccountAdminClient;
+use raps_acc::users::ProjectUsersClient;
 use raps_acc::{AccClient, IssuesClient, RfiClient};
 use raps_da::DesignAutomationClient;
 use raps_derivative::DerivativeClient;
@@ -172,9 +174,17 @@ enum Commands {
     #[command(subcommand)]
     Admin(AdminCommands),
 
+    /// Execute custom API calls to APS endpoints
+    #[command(subcommand)]
+    Api(ApiCommands),
+
     /// ACC RFIs (Requests for Information) (requires 3-legged auth)
     #[command(subcommand)]
     Rfi(RfiCommands),
+
+    /// Project templates management (create, list, update, archive)
+    #[command(subcommand)]
+    Template(TemplateCommands),
 
     /// Reality Capture / Photogrammetry
     #[command(subcommand)]
@@ -504,6 +514,16 @@ async fn execute_command(
         RealityCaptureClient::new_with_http_config(config.clone(), auth, http_config.clone())
     };
 
+    let get_admin_client = || -> AccountAdminClient {
+        let auth = get_auth_client();
+        AccountAdminClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
+    let get_project_users_client = || -> ProjectUsersClient {
+        let auth = get_auth_client();
+        ProjectUsersClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
     match command {
         Commands::Auth(cmd) => {
             cmd.execute(&get_auth_client(), output_format).await?;
@@ -526,7 +546,13 @@ async fn execute_command(
         }
 
         Commands::Project(cmd) => {
-            cmd.execute(&get_dm_client(), output_format).await?;
+            cmd.execute(
+                &get_dm_client(),
+                &get_admin_client(),
+                &get_project_users_client(),
+                output_format,
+            )
+            .await?;
         }
 
         Commands::Folder(cmd) => {
@@ -560,11 +586,21 @@ async fn execute_command(
             cmd.execute(config, &auth_client, output_format).await?;
         }
 
+        Commands::Api(cmd) => {
+            let auth_client = get_auth_client();
+            cmd.execute(config, &auth_client, http_config, output_format)
+                .await?;
+        }
+
         Commands::Rfi(cmd) => {
             let auth_client = get_auth_client();
             let rfi_client =
                 RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
             cmd.execute(&rfi_client, output_format).await?;
+        }
+
+        Commands::Template(cmd) => {
+            cmd.execute(&get_admin_client(), output_format).await?;
         }
 
         Commands::Reality(cmd) => {

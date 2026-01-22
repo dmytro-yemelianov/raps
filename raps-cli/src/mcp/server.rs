@@ -229,6 +229,28 @@ impl RapsServer {
         status
     }
 
+    async fn auth_login(&self) -> String {
+        // MCP cannot perform interactive OAuth login directly
+        // Return guidance for the user
+        "3-legged OAuth login requires browser interaction.\n\n\
+        To authenticate, run one of the following commands in your terminal:\n\n\
+        1. Browser-based login (recommended):\n\
+           raps auth login\n\n\
+        2. Device code flow (for headless environments):\n\
+           raps auth login --device\n\n\
+        After completing authentication, your MCP session will automatically use the stored tokens."
+            .to_string()
+    }
+
+    async fn auth_logout(&self) -> String {
+        let auth = self.get_auth_client().await;
+
+        match auth.logout().await {
+            Ok(()) => "Successfully logged out. 3-legged OAuth tokens have been cleared.".to_string(),
+            Err(e) => format!("Logout failed: {}", e),
+        }
+    }
+
     async fn bucket_list(&self, region: Option<String>, limit: Option<usize>) -> String {
         let client = self.get_oss_client().await;
         let limit = Self::clamp_limit(limit, 100, 500);
@@ -1275,6 +1297,7 @@ impl RapsServer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn rfi_create(
         &self,
         project_id: String,
@@ -1308,6 +1331,7 @@ impl RapsServer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn rfi_update(
         &self,
         project_id: String,
@@ -1565,6 +1589,7 @@ impl RapsServer {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn checklist_update(
         &self,
         project_id: String,
@@ -1747,10 +1772,10 @@ impl RapsServer {
 
         // Check if parent directory exists
         let path = Path::new(&output_path);
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                return format!("Error: Directory does not exist: {}", parent.display());
-            }
+        if let Some(parent) = path.parent()
+            && !parent.exists()
+        {
+            return format!("Error: Directory does not exist: {}", parent.display());
         }
 
         match client.download_object(&bucket_key, &object_key, path).await {
@@ -1928,21 +1953,18 @@ impl RapsServer {
                 );
 
                 // Get top folders
-                match client.get_top_folders(&hub_id, &project_id).await {
-                    Ok(folders) => {
-                        if !folders.is_empty() {
-                            output.push_str("\nTop Folders:\n");
-                            for folder in &folders {
-                                let display_name = folder
-                                    .attributes
-                                    .display_name
-                                    .as_ref()
-                                    .unwrap_or(&folder.attributes.name);
-                                output.push_str(&format!("* {} ({})\n", display_name, folder.id));
-                            }
-                        }
+                if let Ok(folders) = client.get_top_folders(&hub_id, &project_id).await
+                    && !folders.is_empty()
+                {
+                    output.push_str("\nTop Folders:\n");
+                    for folder in &folders {
+                        let display_name = folder
+                            .attributes
+                            .display_name
+                            .as_ref()
+                            .unwrap_or(&folder.attributes.name);
+                        output.push_str(&format!("* {} ({})\n", display_name, folder.id));
                     }
-                    Err(_) => {}
                 }
 
                 output
@@ -2218,6 +2240,317 @@ impl RapsServer {
         }
     }
 
+    async fn project_update(
+        &self,
+        account_id: String,
+        project_id: String,
+        name: Option<String>,
+        status: Option<String>,
+        start_date: Option<String>,
+        end_date: Option<String>,
+    ) -> String {
+        use raps_acc::admin::UpdateProjectRequest;
+
+        let client = self.get_admin_client().await;
+
+        if name.is_none() && status.is_none() && start_date.is_none() && end_date.is_none() {
+            return "Error: At least one field to update must be provided.".to_string();
+        }
+
+        let request = UpdateProjectRequest {
+            name: name.clone(),
+            status: status.clone(),
+            start_date,
+            end_date,
+            ..Default::default()
+        };
+
+        match client.update_project(&account_id, &project_id, request).await {
+            Ok(project) => format!(
+                "Updated project:\n* Name: {}\n* ID: {}\n* Status: {}",
+                project.name,
+                project.id,
+                project.status.unwrap_or_else(|| "unknown".to_string())
+            ),
+            Err(e) => format!("Failed to update project: {}", e),
+        }
+    }
+
+    async fn project_archive(&self, account_id: String, project_id: String) -> String {
+        let client = self.get_admin_client().await;
+
+        // Get project name before archiving
+        let project_name = match client.get_project(&account_id, &project_id).await {
+            Ok(project) => project.name,
+            Err(_) => "-".to_string(),
+        };
+
+        match client.archive_project(&account_id, &project_id).await {
+            Ok(()) => format!(
+                "Archived project:\n* Name: {}\n* ID: {}\n* Status: archived",
+                project_name, project_id
+            ),
+            Err(e) => format!("Failed to archive project: {}", e),
+        }
+    }
+
+    async fn project_user_remove(&self, project_id: String, user_id: String) -> String {
+        let client = self.get_users_client().await;
+
+        match client.remove_user(&project_id, &user_id).await {
+            Ok(()) => format!(
+                "Removed user from project:\n* User ID: {}\n* Project ID: {}",
+                user_id, project_id
+            ),
+            Err(e) => format!("Failed to remove user from project: {}", e),
+        }
+    }
+
+    async fn project_user_update(
+        &self,
+        project_id: String,
+        user_id: String,
+        role_id: Option<String>,
+    ) -> String {
+        use raps_acc::users::UpdateProjectUserRequest;
+
+        let client = self.get_users_client().await;
+
+        if role_id.is_none() {
+            return "Error: At least role_id must be provided.".to_string();
+        }
+
+        let request = UpdateProjectUserRequest {
+            role_id,
+            products: None,
+        };
+
+        match client.update_user(&project_id, &user_id, request).await {
+            Ok(user) => format!(
+                "Updated user in project:\n* User ID: {}\n* Name: {}\n* Role: {}",
+                user.id,
+                user.name.unwrap_or_else(|| "-".to_string()),
+                user.role_name
+                    .unwrap_or_else(|| user.role_id.unwrap_or_else(|| "-".to_string()))
+            ),
+            Err(e) => format!("Failed to update user in project: {}", e),
+        }
+    }
+
+    // ========================================================================
+    // Template Management Operations (v4.5)
+    // ========================================================================
+
+    async fn template_list(&self, account_id: String, limit: Option<usize>) -> String {
+        let client = self.get_admin_client().await;
+
+        match client
+            .list_templates(&account_id, limit, None)
+            .await
+        {
+            Ok(response) => {
+                if response.results.is_empty() {
+                    return "No templates found in this account.".to_string();
+                }
+
+                let mut output = format!(
+                    "Templates in account {} ({} total):\n\n",
+                    account_id, response.pagination.total_results
+                );
+
+                for template in &response.results {
+                    let status = template.status.as_deref().unwrap_or("unknown");
+                    output.push_str(&format!(
+                        "* {} (ID: {})\n  Status: {} | Platform: {}\n",
+                        template.name,
+                        template.id,
+                        status,
+                        template.platform.as_deref().unwrap_or("unknown")
+                    ));
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to list templates: {}", e),
+        }
+    }
+
+    async fn template_info(&self, account_id: String, template_id: String) -> String {
+        let client = self.get_admin_client().await;
+
+        match client.get_project(&account_id, &template_id).await {
+            Ok(project) => {
+                if !project.is_template() {
+                    return format!(
+                        "Project {} is not a template (classification: {:?})",
+                        template_id, project.classification
+                    );
+                }
+
+                let mut output = format!(
+                    "Template: {}\n\n\
+                    * ID: {}\n\
+                    * Status: {}\n\
+                    * Platform: {}\n\
+                    * Classification: template\n",
+                    project.name,
+                    project.id,
+                    project.status.as_deref().unwrap_or("unknown"),
+                    project.platform.as_deref().unwrap_or("unknown"),
+                );
+
+                if let Some(members) = project.member_count {
+                    output.push_str(&format!("* Members: {}\n", members));
+                }
+
+                if let Some(companies) = project.company_count {
+                    output.push_str(&format!("* Companies: {}\n", companies));
+                }
+
+                let products = project.enabled_products();
+                if !products.is_empty() {
+                    output.push_str(&format!("* Products: {:?}\n", products));
+                }
+
+                output
+            }
+            Err(e) => format!("Failed to get template: {}", e),
+        }
+    }
+
+    async fn template_create(
+        &self,
+        account_id: String,
+        name: String,
+        products: Option<Vec<String>>,
+    ) -> String {
+        use raps_acc::admin::CreateProjectRequest;
+        use raps_acc::types::ProjectClassification;
+
+        let client = self.get_admin_client().await;
+
+        let request = CreateProjectRequest {
+            name: name.clone(),
+            classification: Some(ProjectClassification::Template),
+            products,
+            ..Default::default()
+        };
+
+        match client.create_project(&account_id, request).await {
+            Ok(project) => {
+                let project_id = project.id.clone();
+
+                // Wait for activation (up to 60 seconds)
+                match client
+                    .wait_for_project_active(&account_id, &project_id, Some(60), Some(2000))
+                    .await
+                {
+                    Ok(final_project) => format!(
+                        "Created template: {}\n* ID: {}\n* Account: {}\n* Status: {}",
+                        name,
+                        final_project.id,
+                        account_id,
+                        final_project.status.unwrap_or_else(|| "active".to_string())
+                    ),
+                    Err(e) => format!(
+                        "Template created (ID: {}) but activation timed out: {}\nCheck status later.",
+                        project_id, e
+                    ),
+                }
+            }
+            Err(e) => format!("Failed to create template: {}", e),
+        }
+    }
+
+    async fn template_update(
+        &self,
+        account_id: String,
+        template_id: String,
+        name: Option<String>,
+        status: Option<String>,
+    ) -> String {
+        use raps_acc::admin::UpdateProjectRequest;
+
+        let client = self.get_admin_client().await;
+
+        // Verify it's a template first
+        match client.get_project(&account_id, &template_id).await {
+            Ok(project) => {
+                if !project.is_template() {
+                    return format!(
+                        "Project {} is not a template. Use project_update for regular projects.",
+                        template_id
+                    );
+                }
+            }
+            Err(e) => return format!("Failed to get template: {}", e),
+        }
+
+        let request = UpdateProjectRequest {
+            name,
+            status,
+            ..Default::default()
+        };
+
+        match client.update_project(&account_id, &template_id, request).await {
+            Ok(project) => format!(
+                "Updated template:\n* Name: {}\n* ID: {}\n* Status: {}",
+                project.name,
+                project.id,
+                project.status.unwrap_or_else(|| "unknown".to_string())
+            ),
+            Err(e) => format!("Failed to update template: {}", e),
+        }
+    }
+
+    async fn template_archive(&self, account_id: String, template_id: String) -> String {
+        let client = self.get_admin_client().await;
+
+        // Verify it's a template first
+        let template_name = match client.get_project(&account_id, &template_id).await {
+            Ok(project) => {
+                if !project.is_template() {
+                    return format!(
+                        "Project {} is not a template. Use project archive for regular projects.",
+                        template_id
+                    );
+                }
+                project.name
+            }
+            Err(e) => return format!("Failed to get template: {}", e),
+        };
+
+        match client.archive_project(&account_id, &template_id).await {
+            Ok(()) => format!(
+                "Archived template:\n* Name: {}\n* ID: {}\n* Status: archived",
+                template_name, template_id
+            ),
+            Err(e) => format!("Failed to archive template: {}", e),
+        }
+    }
+
+    async fn template_convert(&self, account_id: String, project_id: String) -> String {
+        let client = self.get_admin_client().await;
+
+        // Check if project exists and is not already a template
+        match client.get_project(&account_id, &project_id).await {
+            Ok(project) => {
+                if project.is_template() {
+                    return format!("Project {} is already a template.", project_id);
+                }
+
+                // ACC API does not support changing classification directly
+                format!(
+                    "Converting existing projects to templates is not supported by the ACC API.\n\n\
+                    Project '{}' (ID: {}) cannot be converted.\n\n\
+                    Workaround: Create a new template using template_create and configure it manually.",
+                    project.name, project_id
+                )
+            }
+            Err(e) => format!("Failed to get project: {}", e),
+        }
+    }
+
     // ========================================================================
     // Item Management Operations (v4.4)
     // ========================================================================
@@ -2270,6 +2603,213 @@ impl RapsServer {
         }
     }
 
+    // ================================================================
+    // Custom API Requests
+    // ================================================================
+
+    async fn api_request(
+        &self,
+        method: String,
+        endpoint: String,
+        query: Option<Map<String, Value>>,
+        headers: Option<Map<String, Value>>,
+        body: Option<Value>,
+    ) -> String {
+        use reqwest::header::{HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+        use raps_kernel::http::is_allowed_url;
+
+        // Validate HTTP method
+        let http_method = match method.to_uppercase().as_str() {
+            "GET" => reqwest::Method::GET,
+            "POST" => reqwest::Method::POST,
+            "PUT" => reqwest::Method::PUT,
+            "PATCH" => reqwest::Method::PATCH,
+            "DELETE" => reqwest::Method::DELETE,
+            _ => {
+                return format!(
+                    "Invalid HTTP method '{}'. Supported: GET, POST, PUT, PATCH, DELETE",
+                    method
+                );
+            }
+        };
+
+        // Build full URL from endpoint and query parameters
+        let full_url = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
+            endpoint.clone()
+        } else {
+            let endpoint = if endpoint.starts_with('/') {
+                endpoint.clone()
+            } else {
+                format!("/{}", endpoint)
+            };
+            format!("{}{}", self.config.base_url.trim_end_matches('/'), endpoint)
+        };
+
+        // Add query parameters
+        let full_url = if let Some(query_params) = &query {
+            let query_string: String = query_params
+                .iter()
+                .map(|(k, v)| {
+                    let val = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
+                    format!(
+                        "{}={}",
+                        urlencoding::encode(k),
+                        urlencoding::encode(&val)
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("&");
+            if full_url.contains('?') {
+                format!("{}&{}", full_url, query_string)
+            } else {
+                format!("{}?{}", full_url, query_string)
+            }
+        } else {
+            full_url
+        };
+
+        // Validate URL is allowed (APS domains only)
+        if !is_allowed_url(&full_url) {
+            return format!(
+                "URL not allowed: {}\n\n\
+                 Only APS API endpoints are permitted for security reasons.\n\
+                 Allowed domains: developer.api.autodesk.com, api.userprofile.autodesk.com, \
+                 acc.autodesk.com, developer.autodesk.com, b360dm.autodesk.com, cdn.derivative.autodesk.io",
+                full_url
+            );
+        }
+
+        // Validate body is only used with appropriate methods
+        let supports_body = matches!(
+            http_method,
+            reqwest::Method::POST | reqwest::Method::PUT | reqwest::Method::PATCH
+        );
+        if body.is_some() && !supports_body {
+            return format!(
+                "Request body is not allowed for {} requests",
+                http_method.as_str()
+            );
+        }
+
+        // Get auth token
+        let auth_client = self.get_auth_client().await;
+        let token = match auth_client.get_3leg_token().await {
+            Ok(token) => token,
+            Err(_) => match auth_client.get_token().await {
+                Ok(token) => token,
+                Err(e) => {
+                    return format!(
+                        "Authentication failed: {}\n\n\
+                         Run 'raps auth login' for 3-legged auth or configure client credentials.",
+                        e
+                    );
+                }
+            },
+        };
+
+        // Build HTTP client
+        let client = match self.http_config.create_client() {
+            Ok(c) => c,
+            Err(e) => return format!("Failed to create HTTP client: {}", e),
+        };
+
+        // Build request
+        let mut request = client.request(http_method.clone(), &full_url);
+
+        // Add authorization
+        request = request.header(AUTHORIZATION, format!("Bearer {}", token));
+
+        // Add custom headers (excluding Authorization)
+        if let Some(custom_headers) = headers {
+            for (key, value) in custom_headers {
+                if key.to_lowercase() == "authorization" {
+                    continue; // Cannot override Authorization header
+                }
+                let val_str = value
+                    .as_str()
+                    .map(String::from)
+                    .unwrap_or_else(|| value.to_string());
+                if let (Ok(name), Ok(val)) = (
+                    HeaderName::try_from(key.as_str()),
+                    HeaderValue::try_from(&val_str),
+                ) {
+                    request = request.header(name, val);
+                }
+            }
+        }
+
+        // Add body if present
+        if let Some(body) = body {
+            request = request.header(CONTENT_TYPE, "application/json").json(&body);
+        }
+
+        // Execute request
+        let response = match request.send().await {
+            Ok(r) => r,
+            Err(e) => return format!("Request failed: {}", e),
+        };
+
+        let status = response.status();
+        let status_code = status.as_u16();
+
+        // Collect response headers for display
+        let response_headers: Vec<(String, String)> = response
+            .headers()
+            .iter()
+            .take(10) // Limit headers shown
+            .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
+            .collect();
+
+        // Get content type
+        let content_type = response
+            .headers()
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("application/octet-stream")
+            .to_string();
+
+        // Read response body
+        let body_result = response.text().await;
+        let body_text = match body_result {
+            Ok(text) => text,
+            Err(e) => return format!("Failed to read response: {}", e),
+        };
+
+        // Try to parse as JSON for pretty formatting
+        let formatted_body = if content_type.contains("json") {
+            match serde_json::from_str::<Value>(&body_text) {
+                Ok(json) => serde_json::to_string_pretty(&json).unwrap_or(body_text),
+                Err(_) => body_text,
+            }
+        } else {
+            // Truncate non-JSON responses
+            if body_text.len() > 2000 {
+                format!("{}...\n[Truncated, {} bytes total]", &body_text[..2000], body_text.len())
+            } else {
+                body_text
+            }
+        };
+
+        // Format output
+        let mut output = format!(
+            "HTTP {} {}\nStatus: {} {}\n",
+            http_method.as_str(),
+            full_url,
+            status_code,
+            status.canonical_reason().unwrap_or("")
+        );
+
+        output.push_str("\nHeaders:\n");
+        for (k, v) in response_headers {
+            output.push_str(&format!("  {}: {}\n", k, v));
+        }
+
+        output.push_str("\nBody:\n");
+        output.push_str(&formatted_body);
+
+        output
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -2277,6 +2817,8 @@ impl RapsServer {
         let result = match name {
             "auth_test" => self.auth_test().await,
             "auth_status" => self.auth_status().await,
+            "auth_login" => self.auth_login().await,
+            "auth_logout" => self.auth_logout().await,
             "bucket_list" => {
                 let region = Self::optional_arg(&args, "region");
                 let limit = args
@@ -3015,9 +3557,137 @@ impl RapsServer {
                 let users: Vec<Value> = args
                     .get("users")
                     .and_then(|v| v.as_array())
-                    .map(|arr| arr.clone())
+                    .cloned()
                     .unwrap_or_default();
                 self.project_users_import(project_id, users).await
+            }
+            "project_update" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let name = Self::optional_arg(&args, "name");
+                let status = Self::optional_arg(&args, "status");
+                let start_date = Self::optional_arg(&args, "start_date");
+                let end_date = Self::optional_arg(&args, "end_date");
+                self.project_update(account_id, project_id, name, status, start_date, end_date)
+                    .await
+            }
+            "project_archive" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.project_archive(account_id, project_id).await
+            }
+            "project_user_remove" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let user_id = match Self::required_arg(&args, "user_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.project_user_remove(project_id, user_id).await
+            }
+            "project_user_update" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let user_id = match Self::required_arg(&args, "user_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let role_id = Self::optional_arg(&args, "role_id");
+                self.project_user_update(project_id, user_id, role_id).await
+            }
+
+            // ================================================================
+            // Template Management Tools (v4.5)
+            // ================================================================
+            "template_list" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let limit = args
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as usize);
+                self.template_list(account_id, limit).await
+            }
+            "template_info" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let template_id = match Self::required_arg(&args, "template_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.template_info(account_id, template_id).await
+            }
+            "template_create" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let products: Option<Vec<String>> =
+                    args.get("products").and_then(|v| v.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    });
+                self.template_create(account_id, name, products).await
+            }
+            "template_update" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let template_id = match Self::required_arg(&args, "template_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let name = Self::optional_arg(&args, "name");
+                let status = Self::optional_arg(&args, "status");
+                self.template_update(account_id, template_id, name, status).await
+            }
+            "template_archive" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let template_id = match Self::required_arg(&args, "template_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.template_archive(account_id, template_id).await
+            }
+            "template_convert" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.template_convert(account_id, project_id).await
             }
 
             // ================================================================
@@ -3070,6 +3740,30 @@ impl RapsServer {
                 self.item_rename(project_id, item_id, new_name).await
             }
 
+            // ================================================================
+            // Custom API Requests (v4.5)
+            // ================================================================
+            "api_request" => {
+                let method = match Self::required_arg(&args, "method") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let endpoint = match Self::required_arg(&args, "endpoint") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let query: Option<Map<String, Value>> = args
+                    .get("query")
+                    .and_then(|v| v.as_object())
+                    .cloned();
+                let headers: Option<Map<String, Value>> = args
+                    .get("headers")
+                    .and_then(|v| v.as_object())
+                    .cloned();
+                let body: Option<Value> = args.get("body").cloned();
+                self.api_request(method, endpoint, query, headers, body).await
+            }
+
             _ => format!("Unknown tool: {}", name),
         };
 
@@ -3114,6 +3808,16 @@ fn get_tools() -> Vec<Tool> {
         Tool::new(
             "auth_status",
             "Check authentication status (2-legged and 3-legged)",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "auth_login",
+            "Get instructions for 3-legged OAuth login. Login requires browser interaction and must be done via CLI.",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "auth_logout",
+            "Logout from 3-legged OAuth and clear stored tokens",
             schema(json!({}), &[]),
         ),
         Tool::new(
@@ -3795,6 +4499,127 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "users"],
             ),
         ),
+        Tool::new(
+            "project_update",
+            "Update an ACC project's metadata (name, status, dates). Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "project_id": {"type": "string", "description": "Project ID to update"},
+                    "name": {"type": "string", "description": "New project name"},
+                    "status": {"type": "string", "description": "New status (active, archived, suspended)"},
+                    "start_date": {"type": "string", "description": "Project start date (YYYY-MM-DD)"},
+                    "end_date": {"type": "string", "description": "Project end date (YYYY-MM-DD)"}
+                }),
+                &["account_id", "project_id"],
+            ),
+        ),
+        Tool::new(
+            "project_archive",
+            "Archive an ACC project (soft delete). Archived projects can be restored later. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "project_id": {"type": "string", "description": "Project ID to archive"}
+                }),
+                &["account_id", "project_id"],
+            ),
+        ),
+        Tool::new(
+            "project_user_remove",
+            "Remove a user from an ACC project. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "user_id": {"type": "string", "description": "User ID to remove from project"}
+                }),
+                &["project_id", "user_id"],
+            ),
+        ),
+        Tool::new(
+            "project_user_update",
+            "Update a user's role in an ACC project. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "Project ID"},
+                    "user_id": {"type": "string", "description": "User ID to update"},
+                    "role_id": {"type": "string", "description": "New role ID to assign"}
+                }),
+                &["project_id", "user_id"],
+            ),
+        ),
+        // ================================================================
+        // Template Management Tools (v4.5)
+        // ================================================================
+        Tool::new(
+            "template_list",
+            "List project templates in an ACC account. Templates are projects with classification='template' that can be used as blueprints. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "limit": {"type": "integer", "description": "Maximum results (default: 100, max: 200)"}
+                }),
+                &["account_id"],
+            ),
+        ),
+        Tool::new(
+            "template_info",
+            "Get details of a project template including name, status, products, and member counts. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "template_id": {"type": "string", "description": "Template (project) ID"}
+                }),
+                &["account_id", "template_id"],
+            ),
+        ),
+        Tool::new(
+            "template_create",
+            "Create a new project template. Templates can be used as blueprints when creating new projects via project_create. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "name": {"type": "string", "description": "Template name"},
+                    "products": {"type": "array", "items": {"type": "string"}, "description": "Products to enable (e.g., ['build', 'docs', 'model'])"}
+                }),
+                &["account_id", "name"],
+            ),
+        ),
+        Tool::new(
+            "template_update",
+            "Update a template's name or status. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "template_id": {"type": "string", "description": "Template (project) ID"},
+                    "name": {"type": "string", "description": "New template name"},
+                    "status": {"type": "string", "description": "New status (active, archived, suspended)"}
+                }),
+                &["account_id", "template_id"],
+            ),
+        ),
+        Tool::new(
+            "template_archive",
+            "Archive a template (soft delete). Archived templates cannot be used for new projects. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "template_id": {"type": "string", "description": "Template (project) ID to archive"}
+                }),
+                &["account_id", "template_id"],
+            ),
+        ),
+        Tool::new(
+            "template_convert",
+            "Convert a production project to a template. Note: ACC API may not support this operation - use template_create instead.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "ACC account ID"},
+                    "project_id": {"type": "string", "description": "Production project ID to convert"}
+                }),
+                &["account_id", "project_id"],
+            ),
+        ),
         // ================================================================
         // Item Management Tools (v4.4)
         // ================================================================
@@ -3834,6 +4659,25 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "item_id", "new_name"],
             ),
         ),
+        // ================================================================
+        // Custom API Requests (v4.5)
+        // ================================================================
+        Tool::new(
+            "api_request",
+            "Execute custom HTTP request to APS API endpoints using current authentication. \
+             Only APS domains are allowed (developer.api.autodesk.com, acc.autodesk.com, etc.). \
+             Use for API endpoints not covered by other tools.",
+            schema(
+                json!({
+                    "method": {"type": "string", "description": "HTTP method: GET, POST, PUT, PATCH, DELETE"},
+                    "endpoint": {"type": "string", "description": "API endpoint path (e.g., /oss/v2/buckets) or full URL"},
+                    "query": {"type": "object", "description": "Optional query parameters as key-value pairs"},
+                    "headers": {"type": "object", "description": "Optional custom headers (cannot override Authorization)"},
+                    "body": {"type": "object", "description": "Optional JSON request body (POST, PUT, PATCH only)"}
+                }),
+                &["method", "endpoint"],
+            ),
+        ),
     ]
 }
 
@@ -3842,14 +4686,15 @@ impl ServerHandler for RapsServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "RAPS MCP Server v4.4 - Autodesk Platform Services CLI\n\n\
-                Provides direct access to APS APIs (50 tools):\n\
+                "RAPS MCP Server v4.5 - Autodesk Platform Services CLI\n\n\
+                Provides direct access to APS APIs (72 tools):\n\
                 * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
                 * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
                 * translate_* - CAD model translation\n\
                 * hub_*, project_* - Data Management & Project Info\n\
                 * folder_*, item_* - Folder and file management\n\
-                * project_create, project_user_* - ACC Project Admin (v4.4)\n\
+                * project_create, project_user_* - ACC Project Admin\n\
+                * template_* - Project template management (v4.5)\n\
                 * admin_* - Bulk account administration\n\
                 * issue_*, rfi_* - ACC Issues and RFIs\n\
                 * acc_* - ACC Assets, Submittals, Checklists\n\n\

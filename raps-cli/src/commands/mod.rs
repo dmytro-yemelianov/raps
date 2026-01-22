@@ -7,6 +7,7 @@
 
 pub mod acc;
 pub mod admin;
+pub mod api;
 pub mod auth;
 pub mod bucket;
 pub mod config;
@@ -23,11 +24,13 @@ pub mod plugin;
 pub mod project;
 pub mod reality;
 pub mod rfi;
+pub mod template;
 pub mod translate;
 pub mod webhook;
 
 pub use acc::AccCommands;
 pub use admin::AdminCommands;
+pub use api::ApiCommands;
 pub use auth::AuthCommands;
 pub use bucket::BucketCommands;
 pub use config::ConfigCommands;
@@ -44,5 +47,6 @@ pub use plugin::PluginCommands;
 pub use project::ProjectCommands;
 pub use reality::RealityCommands;
 pub use rfi::RfiCommands;
+pub use template::TemplateCommands;
 pub use translate::TranslateCommands;
 pub use webhook::WebhookCommands;
