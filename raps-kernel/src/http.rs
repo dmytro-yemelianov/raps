@@ -9,6 +9,37 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use std::time::Duration;
 use tokio::time::sleep;
+use url::Url;
+
+/// Allowed domains for custom API calls (APS domains only)
+pub const ALLOWED_DOMAINS: &[&str] = &[
+    "developer.api.autodesk.com",
+    "api.userprofile.autodesk.com",
+    "acc.autodesk.com",
+    "developer.autodesk.com",
+    "b360dm.autodesk.com",
+    "cdn.derivative.autodesk.io",
+];
+
+/// Check if a URL is allowed (belongs to an APS domain)
+///
+/// Returns true if the URL's host matches one of the allowed domains.
+/// Used for custom API calls to prevent credential leakage to external URLs.
+pub fn is_allowed_url(url: &str) -> bool {
+    match Url::parse(url) {
+        Ok(parsed) => {
+            if let Some(host) = parsed.host_str() {
+                // Check if host matches any allowed domain
+                ALLOWED_DOMAINS.iter().any(|domain| {
+                    host == *domain || host.ends_with(&format!(".{}", domain))
+                })
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
+    }
+}
 
 /// HTTP client configuration
 #[derive(Debug, Clone)]
@@ -354,5 +385,62 @@ mod tests {
         let delay = calculate_delay(1, 2, 60);
         assert!(delay.as_secs() >= 4);
         assert!(delay.as_secs() <= 5);
+    }
+
+    #[test]
+    fn test_is_allowed_url_developer_api() {
+        assert!(is_allowed_url("https://developer.api.autodesk.com/oss/v2/buckets"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_userprofile() {
+        assert!(is_allowed_url("https://api.userprofile.autodesk.com/userinfo"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_acc() {
+        assert!(is_allowed_url("https://acc.autodesk.com/api/projects"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_with_path_and_query() {
+        assert!(is_allowed_url("https://developer.api.autodesk.com/oss/v2/buckets?limit=10&region=US"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_external_rejected() {
+        assert!(!is_allowed_url("https://evil.com/steal-token"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_localhost_rejected() {
+        assert!(!is_allowed_url("http://localhost:8080/api"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_internal_ip_rejected() {
+        assert!(!is_allowed_url("http://192.168.1.1/api"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_similar_domain_rejected() {
+        // Should not allow fake domains that look similar
+        assert!(!is_allowed_url("https://developer.api.autodesk.com.evil.com/api"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_invalid_url() {
+        assert!(!is_allowed_url("not-a-valid-url"));
+    }
+
+    #[test]
+    fn test_is_allowed_url_empty() {
+        assert!(!is_allowed_url(""));
+    }
+
+    #[test]
+    fn test_is_allowed_url_subdomain() {
+        // Subdomains of allowed domains should be allowed
+        assert!(is_allowed_url("https://us.developer.api.autodesk.com/api"));
     }
 }

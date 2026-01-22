@@ -9,7 +9,7 @@
 // Tool definitions are in server.rs.
 // This module is reserved for additional utilities and extended tool implementations.
 
-/// Available MCP tools in the RAPS server (v4.4 - 50 tools)
+/// Available MCP tools in the RAPS server (v4.5 - 56 tools)
 #[allow(dead_code)]
 pub const TOOLS: &[&str] = &[
     // Authentication
@@ -56,6 +56,12 @@ pub const TOOLS: &[&str] = &[
     "project_create",
     "project_user_add",
     "project_users_import",
+    // Template Management (v4.5)
+    "template_list",
+    "template_info",
+    "template_create",
+    "template_update",
+    "template_archive",
     // Folder/Item Management
     "folder_list",
     "folder_create",
@@ -86,4 +92,6 @@ pub const TOOLS: &[&str] = &[
     "acc_checklists_list",
     "checklist_create",
     "checklist_update",
+    // Custom API (v4.5)
+    "api_request",
 ];
