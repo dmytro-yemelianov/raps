@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: Apache-2.0
-#![allow(clippy::uninlined_format_args)]
 // Copyright 2024-2025 Dmytro Yemelianov
 
 //! Design Automation API module
@@ -8,6 +7,7 @@
 
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
+#![allow(clippy::uninlined_format_args)]
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -444,6 +444,28 @@ impl DesignAutomationClient {
             .context("Failed to parse workitem response")?;
 
         Ok(workitem)
+    }
+
+    /// Cancel a work item
+    pub async fn cancel_workitem(&self, id: &str) -> Result<()> {
+        let token = self.auth.get_token().await?;
+        let url = format!("{}/workitems/{}", self.config.da_url(), id);
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to cancel workitem")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to cancel workitem ({status}): {error_text}");
+        }
+
+        Ok(())
     }
 }
 

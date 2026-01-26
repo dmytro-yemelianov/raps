@@ -1139,6 +1139,130 @@ mod tests {
     }
 }
 
+// =============================================================================
+// Version with Storage Relationships (for RCW migration)
+// =============================================================================
+
+/// Version with included storage relationship data
+#[derive(Debug, Clone, Deserialize)]
+pub struct VersionWithRelationships {
+    /// The version data
+    #[serde(flatten)]
+    pub version: Version,
+
+    /// Related storage information
+    pub storage: Option<StorageRelationship>,
+}
+
+/// Storage relationship information
+#[derive(Debug, Clone, Deserialize)]
+pub struct StorageRelationship {
+    /// Storage object ID (OSS URN)
+    pub id: String,
+
+    /// Storage type
+    #[serde(rename = "type")]
+    pub storage_type: String,
+}
+
+/// Storage data with download URL
+#[derive(Debug, Clone, Deserialize)]
+pub struct StorageData {
+    /// Storage object ID
+    pub id: String,
+
+    /// Signed URL for download (from relationships/storage/meta/link/href)
+    pub download_url: Option<String>,
+}
+
+impl DataManagementClient {
+    /// Get a version with its storage relationship
+    ///
+    /// This fetches the version and its related storage object in a single call,
+    /// which is needed for RCW migration to get the signed download URL.
+    pub async fn get_version_with_storage(
+        &self,
+        project_id: &str,
+        version_id: &str,
+    ) -> Result<(Version, Option<StorageData>)> {
+        let token = self.auth.get_3leg_token().await?;
+
+        // First get the version details
+        let url = format!(
+            "{}/projects/{}/versions/{}",
+            self.config.data_url(),
+            project_id,
+            urlencoding::encode(version_id)
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get version")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get version ({status}): {error_text}");
+        }
+
+        let api_response: serde_json::Value = response
+            .json()
+            .await
+            .context("Failed to parse version response")?;
+
+        // Parse the version
+        let version: Version = serde_json::from_value(api_response["data"].clone())
+            .context("Failed to parse version data")?;
+
+        // Try to get storage relationship
+        let storage_data = if let Some(storage_rel) = api_response
+            .pointer("/data/relationships/storage/data")
+        {
+            let storage_id = storage_rel
+                .get("id")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            // Try to get the signed URL from meta/link
+            let download_url = api_response
+                .pointer("/data/relationships/storage/meta/link/href")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+
+            storage_id.map(|id| StorageData {
+                id,
+                download_url,
+            })
+        } else {
+            None
+        };
+
+        Ok((version, storage_data))
+    }
+
+    /// Get the signed download URL for a version's storage object
+    ///
+    /// This is useful when you need to download the file content.
+    pub async fn get_version_download_url(
+        &self,
+        project_id: &str,
+        version_id: &str,
+    ) -> Result<String> {
+        let (_, storage_data) = self.get_version_with_storage(project_id, version_id).await?;
+
+        match storage_data {
+            Some(data) => data
+                .download_url
+                .ok_or_else(|| anyhow::anyhow!("Version has no download URL")),
+            None => anyhow::bail!("Version has no storage relationship"),
+        }
+    }
+}
+
 /// Integration tests using raps-mock
 #[cfg(test)]
 mod integration_tests {

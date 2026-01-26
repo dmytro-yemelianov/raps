@@ -10,6 +10,7 @@ rust-version.workspace = true
 
 [dependencies]
 raps-kernel.workspace = true
+raps-dm.workspace = true
 
 # Error handling
 anyhow.workspace = true
@@ -28,8 +29,14 @@ tokio.workspace = true
 tokio-util.workspace = true
 futures-util.workspace = true
 
+# URL encoding
+urlencoding.workspace = true
+
 # Date/time handling
 chrono.workspace = true
+
+# UUID generation
+uuid.workspace = true
 
 [dev-dependencies]
 raps-mock.workspace = true
