@@ -116,6 +116,18 @@ pub fn select_with_default<S: Into<String>>(
 ///
 /// Returns an error in non-interactive mode.
 pub fn multi_select<S: Into<String>>(prompt: S, items: &[String]) -> Result<Vec<usize>> {
+    multi_select_with_defaults(prompt, items, &[])
+}
+
+/// Prompt for multiple selections with pre-selected defaults
+///
+/// The `defaults` slice contains indices of items that should be pre-selected.
+/// Returns an error in non-interactive mode.
+pub fn multi_select_with_defaults<S: Into<String>>(
+    prompt: S,
+    items: &[String],
+    defaults: &[usize],
+) -> Result<Vec<usize>> {
     let prompt_str = prompt.into();
 
     if interactive::is_non_interactive() {
@@ -125,9 +137,15 @@ pub fn multi_select<S: Into<String>>(prompt: S, items: &[String]) -> Result<Vec<
         );
     }
 
+    // Create a vector of bools for default selections
+    let default_selections: Vec<bool> = (0..items.len())
+        .map(|i| defaults.contains(&i))
+        .collect();
+
     MultiSelect::new()
         .with_prompt(&prompt_str)
         .items(items)
+        .defaults(&default_selections)
         .interact()
         .context("Failed to read multi-selection from terminal")
 }

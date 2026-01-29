@@ -50,8 +50,8 @@ pub struct AppBundleDetails {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadParameters {
-    pub endpoint_url: String,
-    pub form_data: std::collections::HashMap<String, String>,
+    pub endpoint_url: Option<String>,
+    pub form_data: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Activity information

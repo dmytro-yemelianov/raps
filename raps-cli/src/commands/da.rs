@@ -402,8 +402,10 @@ async fn create_appbundle(
     println!("  {} {}", "Version:".bold(), bundle.version);
 
     if let Some(upload) = bundle.upload_parameters {
-        println!("\n{}", "Upload your bundle ZIP to:".yellow());
-        println!("  {}", upload.endpoint_url);
+        if let Some(url) = upload.endpoint_url {
+            println!("\n{}", "Upload your bundle ZIP to:".yellow());
+            println!("  {}", url);
+        }
     }
 
     Ok(())
@@ -765,4 +767,3 @@ async fn check_status(
 
     Ok(())
 }
-

@@ -49,6 +49,9 @@ pub enum AuthCommands {
         /// Use default scopes without prompting
         #[arg(short, long)]
         default: bool,
+        /// Use all available scopes without prompting
+        #[arg(short, long)]
+        all: bool,
         /// Use device code flow instead of browser (headless-friendly)
         #[arg(long)]
         device: bool,
@@ -90,6 +93,7 @@ impl AuthCommands {
             AuthCommands::Test => test_auth(auth_client, output_format).await,
             AuthCommands::Login {
                 default,
+                all,
                 device,
                 token,
                 refresh_token,
@@ -98,6 +102,7 @@ impl AuthCommands {
                 login(
                     auth_client,
                     default,
+                    all,
                     device,
                     token,
                     refresh_token,
@@ -159,6 +164,7 @@ struct LoginOutput {
 async fn login(
     auth_client: &AuthClient,
     use_defaults: bool,
+    use_all: bool,
     device: bool,
     token: Option<String>,
     refresh_token: Option<String>,
@@ -224,22 +230,49 @@ async fn login(
     }
 
     // Select scopes
-    let scopes: Vec<&str> = if use_defaults {
+    let scopes: Vec<&str> = if use_all {
+        // Use all available scopes
+        AVAILABLE_SCOPES.iter().map(|(s, _)| *s).collect()
+    } else if use_defaults {
+        // Use default scopes
         DEFAULT_SCOPES.to_vec()
     } else {
+        // Interactive scope selection
         let scope_labels: Vec<String> = AVAILABLE_SCOPES
             .iter()
             .map(|(scope, desc)| format!("{} - {}", scope, desc))
             .collect();
 
-        // Find default selections
-        let selections = prompts::multi_select("Select OAuth scopes", &scope_labels)?;
+        // Pre-select default scopes
+        let default_indices: Vec<usize> = AVAILABLE_SCOPES
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (scope, _))| {
+                if DEFAULT_SCOPES.contains(scope) {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-        if selections.is_empty() {
-            anyhow::bail!("At least one scope must be selected");
+        loop {
+            let selections = prompts::multi_select_with_defaults(
+                "Select OAuth scopes (Space to toggle, Enter to confirm)",
+                &scope_labels,
+                &default_indices,
+            )?;
+
+            if selections.is_empty() {
+                println!("{}", "At least one scope must be selected".red());
+                continue;
+            }
+
+            break selections
+                .iter()
+                .map(|&i| AVAILABLE_SCOPES[i].0)
+                .collect();
         }
-
-        selections.iter().map(|&i| AVAILABLE_SCOPES[i].0).collect()
     };
 
     if output_format.supports_colors() {
