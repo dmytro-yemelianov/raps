@@ -19,6 +19,11 @@
 
 **🌼 RAPS** (rapeseed) — **R**ust **A**utodesk **P**latform **S**ervices CLI. A comprehensive command-line interface for Autodesk Platform Services (APS), written in Rust.
 
+## Demo
+
+<div align="center">
+  <img src="docs/raps-demo.gif" alt="RAPS CLI Demo" width="700"/>
+</div>
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fdmytro-yemelianov%2Fraps?ref=badge_large)
 
