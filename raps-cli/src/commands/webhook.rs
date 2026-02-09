@@ -29,6 +29,14 @@ pub enum WebhookCommands {
         /// Event type (e.g., dm.version.added)
         #[arg(short, long)]
         event: Option<String>,
+
+        /// Folder URN for scope (required for dm.* events)
+        #[arg(long)]
+        folder: Option<String>,
+
+        /// Workflow ID for scope (for extraction.* events)
+        #[arg(long)]
+        workflow: Option<String>,
     },
 
     /// Delete a webhook
@@ -73,9 +81,12 @@ impl WebhookCommands {
     pub async fn execute(self, client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
         match self {
             WebhookCommands::List => list_webhooks(client, output_format).await,
-            WebhookCommands::Create { url, event } => {
-                create_webhook(client, url, event, output_format).await
-            }
+            WebhookCommands::Create {
+                url,
+                event,
+                folder,
+                workflow,
+            } => create_webhook(client, url, event, folder, workflow, output_format).await,
             WebhookCommands::Delete {
                 hook_id,
                 system,
@@ -182,6 +193,8 @@ async fn create_webhook(
     client: &WebhooksClient,
     callback_url: Option<String>,
     event: Option<String>,
+    folder: Option<String>,
+    workflow: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Get callback URL
@@ -224,7 +237,13 @@ async fn create_webhook(
     }
 
     let webhook = client
-        .create_webhook(system, &event_type, &url, None)
+        .create_webhook(
+            system,
+            &event_type,
+            &url,
+            folder.as_deref(),
+            workflow.as_deref(),
+        )
         .await?;
 
     let output = CreateWebhookOutput {

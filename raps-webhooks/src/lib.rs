@@ -67,6 +67,7 @@ pub struct WebhookScope {
 #[serde(rename_all = "camelCase")]
 pub struct CreateWebhookRequest {
     pub callback_url: String,
+    #[serde(skip_serializing_if = "CreateWebhookScope::is_empty")]
     pub scope: CreateWebhookScope,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hook_attribute: Option<serde_json::Value>,
@@ -87,6 +88,12 @@ pub struct CreateWebhookScope {
     pub folder: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub workflow: Option<String>,
+}
+
+impl CreateWebhookScope {
+    fn is_empty(&self) -> bool {
+        self.folder.is_none() && self.workflow.is_none()
+    }
 }
 
 /// Webhooks response
@@ -198,6 +205,7 @@ impl WebhooksClient {
         event: &str,
         callback_url: &str,
         folder_urn: Option<&str>,
+        workflow_id: Option<&str>,
     ) -> Result<Webhook> {
         let token = self.auth.get_token().await?;
         let url = format!(
@@ -211,7 +219,7 @@ impl WebhooksClient {
             callback_url: callback_url.to_string(),
             scope: CreateWebhookScope {
                 folder: folder_urn.map(|s| s.to_string()),
-                workflow: None,
+                workflow: workflow_id.map(|s| s.to_string()),
             },
             hook_attribute: None,
             filter: None,
@@ -236,9 +244,33 @@ impl WebhooksClient {
             anyhow::bail!("Failed to create webhook ({status}): {error_text}");
         }
 
-        let webhook: Webhook = response
-            .json()
+        let status = response.status();
+        let body = response
+            .text()
             .await
+            .context("Failed to read webhook response body")?;
+
+        // Some webhook endpoints return 201 with an empty body
+        if body.is_empty() {
+            return Ok(Webhook {
+                hook_id: String::new(),
+                tenant: None,
+                callback_url: callback_url.to_string(),
+                created_by: None,
+                event: event.to_string(),
+                created_date: None,
+                last_updated_date: None,
+                system: system.to_string(),
+                creator_type: None,
+                status: format!("created ({})", status),
+                scope: None,
+                hook_attribute: None,
+                urn: None,
+                auto_reactivate_hook: None,
+            });
+        }
+
+        let webhook: Webhook = serde_json::from_str(&body)
             .context("Failed to parse webhook response")?;
 
         Ok(webhook)
