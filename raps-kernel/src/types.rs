@@ -32,6 +32,15 @@ pub struct ProfileConfig {
     pub da_nickname: Option<String>,
     #[serde(default = "default_use_keychain")]
     pub use_keychain: bool,
+    /// Sticky context: default hub ID for commands that need it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_hub_id: Option<String>,
+    /// Sticky context: default project ID for commands that need it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_project_id: Option<String>,
+    /// Sticky context: default account ID for admin commands
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_account_id: Option<String>,
 }
 
 fn default_use_keychain() -> bool {
@@ -161,6 +170,9 @@ mod tests {
         // Note: Default derive gives bool::default() = false for use_keychain
         // The serde default only applies during deserialization
         assert!(!config.use_keychain);
+        assert!(config.context_hub_id.is_none());
+        assert!(config.context_project_id.is_none());
+        assert!(config.context_account_id.is_none());
     }
 
     #[test]
@@ -172,6 +184,9 @@ mod tests {
             callback_url: Some("http://localhost:3000/callback".to_string()),
             da_nickname: Some("my-nickname".to_string()),
             use_keychain: true,
+            context_hub_id: None,
+            context_project_id: None,
+            context_account_id: None,
         };
 
         let json = serde_json::to_string(&config).unwrap();
@@ -298,6 +313,9 @@ mod tests {
             callback_url: Some("http://localhost/callback".to_string()),
             da_nickname: Some("nickname".to_string()),
             use_keychain: false,
+            context_hub_id: Some("b.hub-123".to_string()),
+            context_project_id: Some("b.proj-456".to_string()),
+            context_account_id: Some("acc-789".to_string()),
         };
 
         let json = serde_json::to_string(&original).unwrap();
@@ -309,5 +327,42 @@ mod tests {
         assert_eq!(original.callback_url, deserialized.callback_url);
         assert_eq!(original.da_nickname, deserialized.da_nickname);
         assert_eq!(original.use_keychain, deserialized.use_keychain);
+        assert_eq!(original.context_hub_id, deserialized.context_hub_id);
+        assert_eq!(original.context_project_id, deserialized.context_project_id);
+        assert_eq!(original.context_account_id, deserialized.context_account_id);
+    }
+
+    // ==================== Context Fields Tests ====================
+
+    #[test]
+    fn test_profile_config_context_fields_default_none() {
+        let config = ProfileConfig::default();
+        assert!(config.context_hub_id.is_none());
+        assert!(config.context_project_id.is_none());
+        assert!(config.context_account_id.is_none());
+    }
+
+    #[test]
+    fn test_profile_config_context_fields_deserialization() {
+        let json = r#"{
+            "client_id": "test",
+            "context_hub_id": "b.hub-123",
+            "context_project_id": "b.proj-456",
+            "context_account_id": "acc-789"
+        }"#;
+        let config: ProfileConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.context_hub_id.unwrap(), "b.hub-123");
+        assert_eq!(config.context_project_id.unwrap(), "b.proj-456");
+        assert_eq!(config.context_account_id.unwrap(), "acc-789");
+    }
+
+    #[test]
+    fn test_profile_config_context_fields_skip_none_serialization() {
+        let config = ProfileConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        // Context fields should NOT appear when None
+        assert!(!json.contains("context_hub_id"));
+        assert!(!json.contains("context_project_id"));
+        assert!(!json.contains("context_account_id"));
     }
 }

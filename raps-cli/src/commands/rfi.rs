@@ -227,7 +227,13 @@ async fn list_rfis(
         println!("{}", "Fetching RFIs...".dimmed());
     }
 
-    let rfis = client.list_rfis(project_id).await?;
+    let rfis = client
+        .list_rfis(project_id)
+        .await
+        .context(format!(
+            "Failed to list RFIs for project '{}'. Verify project ID (without 'b.' prefix)",
+            project_id
+        ))?;
 
     // Filter by status if provided
     let filtered: Vec<_> = if let Some(status) = status_filter {
@@ -339,7 +345,13 @@ async fn get_rfi(
         println!("{}", "Fetching RFI details...".dimmed());
     }
 
-    let rfi = client.get_rfi(project_id, rfi_id).await?;
+    let rfi = client
+        .get_rfi(project_id, rfi_id)
+        .await
+        .context(format!(
+            "Failed to get RFI '{}'. Verify the RFI ID exists",
+            rfi_id
+        ))?;
 
     let output = RfiOutput {
         id: rfi.id.clone(),
@@ -456,7 +468,10 @@ async fn create_rfi(
         discipline,
     };
 
-    let rfi = client.create_rfi(project_id, request).await?;
+    let rfi = client
+        .create_rfi(project_id, request)
+        .await
+        .context("Failed to create RFI. Verify your permissions on this project")?;
 
     let output = RfiOutput {
         id: rfi.id.clone(),
@@ -686,7 +701,13 @@ async fn update_rfi(
         location,
     };
 
-    let rfi = client.update_rfi(project_id, rfi_id, request).await?;
+    let rfi = client
+        .update_rfi(project_id, rfi_id, request)
+        .await
+        .context(format!(
+            "Failed to update RFI '{}'. Check permissions",
+            rfi_id
+        ))?;
 
     let output = RfiOutput {
         id: rfi.id.clone(),
@@ -726,7 +747,13 @@ async fn delete_rfi(
         println!("{}", "Deleting RFI...".dimmed());
     }
 
-    client.delete_rfi(project_id, rfi_id).await?;
+    client
+        .delete_rfi(project_id, rfi_id)
+        .await
+        .context(format!(
+            "Failed to delete RFI '{}'. Verify the RFI ID exists and you have permissions",
+            rfi_id
+        ))?;
 
     #[derive(Serialize)]
     struct DeleteRfiOutput {

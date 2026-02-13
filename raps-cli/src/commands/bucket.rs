@@ -5,7 +5,7 @@
 //!
 //! Commands for creating, listing, and deleting OSS buckets.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
@@ -213,7 +213,11 @@ async fn create_bucket(
 
     let bucket = client
         .create_bucket(&bucket_key, selected_policy, selected_region)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to create bucket '{}'. Bucket keys must be globally unique",
+            bucket_key
+        ))?;
 
     let bucket_output = BucketInfoOutput {
         bucket_key: bucket.bucket_key.clone(),
@@ -251,7 +255,10 @@ async fn list_buckets(client: &OssClient, output_format: OutputFormat) -> Result
         println!("{}", "Fetching buckets from all regions...".dimmed());
     }
 
-    let buckets = client.list_buckets().await?;
+    let buckets = client
+        .list_buckets()
+        .await
+        .context("Failed to list buckets. Check your authentication with 'raps auth test'")?;
 
     if buckets.is_empty() {
         match output_format {
@@ -317,7 +324,13 @@ async fn bucket_info(
         println!("{}", "Fetching bucket details...".dimmed());
     }
 
-    let bucket = client.get_bucket_details(bucket_key).await?;
+    let bucket = client
+        .get_bucket_details(bucket_key)
+        .await
+        .context(format!(
+            "Failed to get bucket details for '{}'. Verify the bucket key is correct",
+            bucket_key
+        ))?;
 
     let bucket_output = BucketInfoOutput {
         bucket_key: bucket.bucket_key.clone(),
@@ -382,7 +395,10 @@ async fn delete_bucket(
         Some(k) => k,
         None => {
             // List buckets and let user select
-            let buckets = client.list_buckets().await?;
+            let buckets = client
+                .list_buckets()
+                .await
+                .context("Failed to list buckets")?;
             if buckets.is_empty() {
                 println!("{}", "No buckets found to delete.".yellow());
                 return Ok(());
@@ -412,7 +428,13 @@ async fn delete_bucket(
         println!("{}", "Deleting bucket...".dimmed());
     }
 
-    client.delete_bucket(&key).await?;
+    client
+        .delete_bucket(&key)
+        .await
+        .context(format!(
+            "Failed to delete bucket '{}'. The bucket must be empty before deletion",
+            key
+        ))?;
 
     #[derive(Serialize)]
     struct DeleteResult {

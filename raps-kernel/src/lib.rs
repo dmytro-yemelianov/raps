@@ -31,7 +31,7 @@ pub mod test_utils;
 
 // Re-export commonly used types
 pub use auth::AuthClient;
-pub use config::Config;
+pub use config::{Config, ContextConfig};
 pub use error::ExitCode;
 pub use http::HttpClientConfig;
 pub use output::OutputFormat;

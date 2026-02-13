@@ -409,7 +409,13 @@ async fn list_assets(
         println!("{}", "Fetching assets...".dimmed());
     }
 
-    let assets = client.list_assets(project_id).await?;
+    let assets = client
+        .list_assets(project_id)
+        .await
+        .context(format!(
+            "Failed to list assets for project '{}'",
+            project_id
+        ))?;
 
     let outputs: Vec<AssetOutput> = assets
         .iter()
@@ -484,7 +490,13 @@ async fn list_submittals(
         println!("{}", "Fetching submittals...".dimmed());
     }
 
-    let submittals = client.list_submittals(project_id).await?;
+    let submittals = client
+        .list_submittals(project_id)
+        .await
+        .context(format!(
+            "Failed to list submittals for project '{}'",
+            project_id
+        ))?;
 
     let outputs: Vec<SubmittalOutput> = submittals
         .iter()
@@ -567,7 +579,13 @@ async fn list_checklists(
         println!("{}", "Fetching checklists...".dimmed());
     }
 
-    let checklists = client.list_checklists(project_id).await?;
+    let checklists = client
+        .list_checklists(project_id)
+        .await
+        .context(format!(
+            "Failed to list checklists for project '{}'",
+            project_id
+        ))?;
 
     let outputs: Vec<ChecklistOutput> = checklists
         .iter()
@@ -645,7 +663,13 @@ async fn list_templates(
         println!("{}", "Fetching checklist templates...".dimmed());
     }
 
-    let templates = client.list_checklist_templates(project_id).await?;
+    let templates = client
+        .list_checklist_templates(project_id)
+        .await
+        .context(format!(
+            "Failed to list checklist templates for project '{}'",
+            project_id
+        ))?;
 
     let outputs: Vec<TemplateOutput> = templates
         .iter()
@@ -711,7 +735,13 @@ async fn get_asset(
         println!("{}", "Fetching asset details...".dimmed());
     }
 
-    let asset = client.get_asset(project_id, asset_id).await?;
+    let asset = client
+        .get_asset(project_id, asset_id)
+        .await
+        .context(format!(
+            "Failed to get asset '{}'. Verify the asset ID exists",
+            asset_id
+        ))?;
 
     let output = AssetOutput {
         id: asset.id.clone(),
@@ -775,7 +805,10 @@ async fn create_asset(
         client_asset_id: None,
     };
 
-    let asset = client.create_asset(project_id, request).await?;
+    let asset = client
+        .create_asset(project_id, request)
+        .await
+        .context("Failed to create asset. Verify your permissions on this project")?;
 
     match output_format {
         OutputFormat::Table => {
@@ -813,7 +846,13 @@ async fn update_asset(
         category_id: None,
     };
 
-    let asset = client.update_asset(project_id, asset_id, request).await?;
+    let asset = client
+        .update_asset(project_id, asset_id, request)
+        .await
+        .context(format!(
+            "Failed to update asset '{}'. Check permissions",
+            asset_id
+        ))?;
 
     match output_format {
         OutputFormat::Table => {
@@ -841,7 +880,13 @@ async fn delete_asset(
         println!("{}", "Deleting asset...".dimmed());
     }
 
-    client.delete_asset(project_id, asset_id).await?;
+    client
+        .delete_asset(project_id, asset_id)
+        .await
+        .context(format!(
+            "Failed to delete asset '{}'. Verify the asset ID and your permissions",
+            asset_id
+        ))?;
 
     match output_format {
         OutputFormat::Table => {
@@ -871,7 +916,13 @@ async fn get_submittal(
         println!("{}", "Fetching submittal details...".dimmed());
     }
 
-    let submittal = client.get_submittal(project_id, submittal_id).await?;
+    let submittal = client
+        .get_submittal(project_id, submittal_id)
+        .await
+        .context(format!(
+            "Failed to get submittal '{}'. Verify the submittal ID exists",
+            submittal_id
+        ))?;
 
     let output = SubmittalOutput {
         id: submittal.id.clone(),
@@ -949,7 +1000,10 @@ async fn create_submittal(
         due_date,
     };
 
-    let submittal = client.create_submittal(project_id, request).await?;
+    let submittal = client
+        .create_submittal(project_id, request)
+        .await
+        .context("Failed to create submittal. Verify your permissions on this project")?;
 
     match output_format {
         OutputFormat::Table => {
@@ -1151,7 +1205,11 @@ async fn update_submittal(
 
     let submittal = client
         .update_submittal(project_id, submittal_id, request)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to update submittal '{}'. Check permissions",
+            submittal_id
+        ))?;
 
     match output_format {
         OutputFormat::Table => {
@@ -1179,7 +1237,13 @@ async fn delete_submittal(
         println!("{}", "Deleting submittal...".dimmed());
     }
 
-    client.delete_submittal(project_id, submittal_id).await?;
+    client
+        .delete_submittal(project_id, submittal_id)
+        .await
+        .context(format!(
+            "Failed to delete submittal '{}'. Verify the submittal ID and your permissions",
+            submittal_id
+        ))?;
 
     match output_format {
         OutputFormat::Table => {
@@ -1209,7 +1273,13 @@ async fn get_checklist(
         println!("{}", "Fetching checklist details...".dimmed());
     }
 
-    let checklist = client.get_checklist(project_id, checklist_id).await?;
+    let checklist = client
+        .get_checklist(project_id, checklist_id)
+        .await
+        .context(format!(
+            "Failed to get checklist '{}'. Verify the checklist ID exists",
+            checklist_id
+        ))?;
 
     let output = ChecklistOutput {
         id: checklist.id.clone(),
@@ -1269,7 +1339,10 @@ async fn create_checklist(
         assignee_id,
     };
 
-    let checklist = client.create_checklist(project_id, request).await?;
+    let checklist = client
+        .create_checklist(project_id, request)
+        .await
+        .context("Failed to create checklist. Verify your permissions on this project")?;
 
     match output_format {
         OutputFormat::Table => {
@@ -1314,7 +1387,11 @@ async fn update_checklist(
 
     let checklist = client
         .update_checklist(project_id, checklist_id, request)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to update checklist '{}'. Check permissions",
+            checklist_id
+        ))?;
 
     match output_format {
         OutputFormat::Table => {
