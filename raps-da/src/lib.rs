@@ -419,6 +419,33 @@ impl DesignAutomationClient {
         Ok(workitem)
     }
 
+    /// List all workitems
+    pub async fn list_workitems(&self) -> Result<Vec<WorkItem>> {
+        let token = self.auth.get_token().await?;
+        let url = format!("{}/workitems", self.config.da_url());
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to list workitems")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list workitems ({status}): {error_text}");
+        }
+
+        let paginated: PaginatedResponse<WorkItem> = response
+            .json()
+            .await
+            .context("Failed to parse workitems response")?;
+
+        Ok(paginated.data)
+    }
+
     /// Get work item status
     pub async fn get_workitem_status(&self, id: &str) -> Result<WorkItem> {
         let token = self.auth.get_token().await?;

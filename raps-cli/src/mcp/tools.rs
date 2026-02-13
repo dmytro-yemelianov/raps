@@ -9,7 +9,7 @@
 // Tool definitions are in server.rs.
 // This module is reserved for additional utilities and extended tool implementations.
 
-/// Available MCP tools in the RAPS server (v4.5 - 56 tools)
+/// Available MCP tools in the RAPS server (v4.5 - 72 tools)
 #[allow(dead_code)]
 pub const TOOLS: &[&str] = &[
     // Authentication
@@ -37,6 +37,7 @@ pub const TOOLS: &[&str] = &[
     "translate_status",
     // Data Management
     "hub_list",
+    "hub_info",
     "project_list",
     // Project Management (v4.4)
     "project_info",
@@ -76,6 +77,10 @@ pub const TOOLS: &[&str] = &[
     "issue_get",
     "issue_create",
     "issue_update",
+    // Issue Comments
+    "issue_comments_list",
+    "issue_comment_add",
+    "issue_comment_delete",
     // RFIs
     "rfi_list",
     "rfi_get",
@@ -86,12 +91,14 @@ pub const TOOLS: &[&str] = &[
     "asset_create",
     "asset_update",
     "asset_delete",
+    "asset_get",
     "acc_submittals_list",
     "submittal_create",
     "submittal_update",
     "acc_checklists_list",
     "checklist_create",
     "checklist_update",
+    "checklist_templates_list",
     // Custom API (v4.5)
     "api_request",
     // Admin User Listing (v4.6)
@@ -99,4 +106,26 @@ pub const TOOLS: &[&str] = &[
     // Portfolio Reports (v4.6)
     "report_rfi_summary",
     "report_issues_summary",
+    // Webhooks (v4.6)
+    "webhook_list",
+    "webhook_create",
+    "webhook_get",
+    "webhook_update",
+    "webhook_delete",
+    "webhook_events",
+    // Design Automation (v4.6)
+    "da_engines_list",
+    "da_appbundles_list",
+    "da_activities_list",
+    "da_workitem_create",
+    "da_workitem_status",
+    "da_workitems_list",
+    // Reality Capture
+    "reality_list",
+    "reality_create",
+    "reality_process",
+    "reality_status",
+    "reality_result",
+    "reality_delete",
+    "reality_formats",
 ];

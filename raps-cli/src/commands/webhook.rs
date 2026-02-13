@@ -13,7 +13,7 @@ use serde::Serialize;
 
 use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
-use raps_webhooks::{WEBHOOK_EVENTS, WebhooksClient};
+use raps_webhooks::{WEBHOOK_EVENTS, UpdateWebhookRequest, WebhooksClient};
 
 #[derive(Debug, Subcommand)]
 pub enum WebhookCommands {
@@ -29,6 +29,38 @@ pub enum WebhookCommands {
         /// Event type (e.g., dm.version.added)
         #[arg(short, long)]
         event: Option<String>,
+    },
+
+    /// Get a specific webhook
+    Get {
+        /// System (e.g., data)
+        #[arg(short, long, default_value = "data")]
+        system: String,
+        /// Event type
+        #[arg(short, long)]
+        event: String,
+        /// Hook ID
+        #[arg(long)]
+        hook_id: String,
+    },
+
+    /// Update a webhook
+    Update {
+        /// System (e.g., data)
+        #[arg(short, long, default_value = "data")]
+        system: String,
+        /// Event type
+        #[arg(short, long)]
+        event: String,
+        /// Hook ID
+        #[arg(long)]
+        hook_id: String,
+        /// New callback URL
+        #[arg(long)]
+        callback_url: Option<String>,
+        /// New status (active or inactive)
+        #[arg(long)]
+        status: Option<String>,
     },
 
     /// Delete a webhook
@@ -75,6 +107,29 @@ impl WebhookCommands {
             WebhookCommands::List => list_webhooks(client, output_format).await,
             WebhookCommands::Create { url, event } => {
                 create_webhook(client, url, event, output_format).await
+            }
+            WebhookCommands::Get {
+                system,
+                event,
+                hook_id,
+            } => get_webhook(client, &system, &event, &hook_id, output_format).await,
+            WebhookCommands::Update {
+                system,
+                event,
+                hook_id,
+                callback_url,
+                status,
+            } => {
+                update_webhook(
+                    client,
+                    &system,
+                    &event,
+                    &hook_id,
+                    callback_url,
+                    status,
+                    output_format,
+                )
+                .await
             }
             WebhookCommands::Delete {
                 hook_id,
@@ -238,6 +293,125 @@ async fn create_webhook(
     match output_format {
         OutputFormat::Table => {
             println!("{} Webhook created successfully!", "✓".green().bold());
+            println!("  {} {}", "Hook ID:".bold(), output.hook_id);
+            println!("  {} {}", "Event:".bold(), output.event.cyan());
+            println!("  {} {}", "Status:".bold(), output.status.green());
+            println!("  {} {}", "Callback:".bold(), output.callback_url);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct GetWebhookOutput {
+    hook_id: String,
+    system: String,
+    event: String,
+    callback_url: String,
+    status: String,
+    created_date: Option<String>,
+    last_updated_date: Option<String>,
+}
+
+async fn get_webhook(
+    client: &WebhooksClient,
+    system: &str,
+    event: &str,
+    hook_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching webhook...".dimmed());
+    }
+
+    let webhook = client.get_webhook(system, event, hook_id).await?;
+
+    let output = GetWebhookOutput {
+        hook_id: webhook.hook_id.clone(),
+        system: webhook.system.clone(),
+        event: webhook.event.clone(),
+        callback_url: webhook.callback_url.clone(),
+        status: webhook.status.clone(),
+        created_date: webhook.created_date.clone(),
+        last_updated_date: webhook.last_updated_date.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Webhook Details:".bold());
+            println!("{}", "-".repeat(60));
+            println!("  {} {}", "Hook ID:".bold(), output.hook_id);
+            println!("  {} {}", "System:".bold(), output.system);
+            println!("  {} {}", "Event:".bold(), output.event.cyan());
+            println!("  {} {}", "Callback:".bold(), output.callback_url);
+            let status_display = if output.status == "active" {
+                output.status.green().to_string()
+            } else {
+                output.status.red().to_string()
+            };
+            println!("  {} {}", "Status:".bold(), status_display);
+            if let Some(ref created) = output.created_date {
+                println!("  {} {}", "Created:".bold(), created);
+            }
+            if let Some(ref updated) = output.last_updated_date {
+                println!("  {} {}", "Updated:".bold(), updated);
+            }
+            println!("{}", "-".repeat(60));
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct UpdateWebhookOutput {
+    success: bool,
+    hook_id: String,
+    event: String,
+    status: String,
+    callback_url: String,
+}
+
+async fn update_webhook(
+    client: &WebhooksClient,
+    system: &str,
+    event: &str,
+    hook_id: &str,
+    callback_url: Option<String>,
+    status: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Updating webhook...".dimmed());
+    }
+
+    let request = UpdateWebhookRequest {
+        callback_url,
+        status,
+        filter: None,
+    };
+
+    let webhook = client
+        .update_webhook(system, event, hook_id, request)
+        .await?;
+
+    let output = UpdateWebhookOutput {
+        success: true,
+        hook_id: webhook.hook_id.clone(),
+        event: webhook.event.clone(),
+        status: webhook.status.clone(),
+        callback_url: webhook.callback_url.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Webhook updated successfully!", "✓".green().bold());
             println!("  {} {}", "Hook ID:".bold(), output.hook_id);
             println!("  {} {}", "Event:".bold(), output.event.cyan());
             println!("  {} {}", "Status:".bold(), output.status.green());

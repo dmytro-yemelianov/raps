@@ -14,6 +14,7 @@ use raps_kernel::prompts;
 use serde::Serialize;
 
 use crate::output::OutputFormat;
+use raps_acc::permissions::FolderPermissionsClient;
 use raps_dm::DataManagementClient;
 use raps_kernel::interactive;
 // use raps_kernel::output::OutputFormat;
@@ -38,12 +39,40 @@ pub enum FolderCommands {
         #[arg(short, long)]
         name: Option<String>,
     },
+
+    /// Rename a folder
+    Rename {
+        /// Project ID
+        project_id: String,
+        /// Folder ID
+        folder_id: String,
+        /// New folder name
+        #[arg(short, long)]
+        name: String,
+    },
+
+    /// Delete a folder
+    Delete {
+        /// Project ID
+        project_id: String,
+        /// Folder ID
+        folder_id: String,
+    },
+
+    /// Show permissions (rights) for a folder
+    Rights {
+        /// Project ID
+        project_id: String,
+        /// Folder ID
+        folder_id: String,
+    },
 }
 
 impl FolderCommands {
     pub async fn execute(
         self,
         client: &DataManagementClient,
+        permissions_client: &FolderPermissionsClient,
         output_format: OutputFormat,
     ) -> Result<()> {
         match self {
@@ -56,6 +85,21 @@ impl FolderCommands {
                 parent_folder_id,
                 name,
             } => create_folder(client, &project_id, &parent_folder_id, name, output_format).await,
+            FolderCommands::Rename {
+                project_id,
+                folder_id,
+                name,
+            } => rename_folder(client, &project_id, &folder_id, &name, output_format).await,
+            FolderCommands::Delete {
+                project_id,
+                folder_id,
+            } => delete_folder(client, &project_id, &folder_id, output_format).await,
+            FolderCommands::Rights {
+                project_id,
+                folder_id,
+            } => {
+                folder_rights(permissions_client, &project_id, &folder_id, output_format).await
+            }
         }
     }
 }
@@ -193,5 +237,151 @@ async fn create_folder(
         }
     }
 
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct RenameFolderOutput {
+    success: bool,
+    id: String,
+    name: String,
+}
+
+async fn rename_folder(
+    client: &DataManagementClient,
+    project_id: &str,
+    folder_id: &str,
+    new_name: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Renaming folder...".dimmed());
+    }
+
+    let folder = client
+        .rename_folder(project_id, folder_id, new_name)
+        .await?;
+
+    let output = RenameFolderOutput {
+        success: true,
+        id: folder.id.clone(),
+        name: folder.attributes.name.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Folder renamed successfully!", "✓".green().bold());
+            println!("  {} {}", "Name:".bold(), output.name.cyan());
+            println!("  {} {}", "ID:".bold(), output.id);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct DeleteFolderOutput {
+    success: bool,
+    folder_id: String,
+    message: String,
+}
+
+async fn delete_folder(
+    client: &DataManagementClient,
+    project_id: &str,
+    folder_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting folder...".dimmed());
+    }
+
+    client.delete_folder(project_id, folder_id).await?;
+
+    let output = DeleteFolderOutput {
+        success: true,
+        folder_id: folder_id.to_string(),
+        message: "Folder deleted successfully!".to_string(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct FolderRightOutput {
+    subject_id: String,
+    subject_type: String,
+    actions: Vec<String>,
+    inherited_from: Option<String>,
+}
+
+async fn folder_rights(
+    client: &FolderPermissionsClient,
+    project_id: &str,
+    folder_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching folder permissions...".dimmed());
+    }
+
+    let permissions = client.get_permissions(project_id, folder_id).await?;
+
+    let items: Vec<FolderRightOutput> = permissions
+        .iter()
+        .map(|p| FolderRightOutput {
+            subject_id: p.subject_id.clone(),
+            subject_type: p.subject_type.clone(),
+            actions: p.actions.clone(),
+            inherited_from: p.inherited_from.clone(),
+        })
+        .collect();
+
+    if items.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No permissions found for this folder.".yellow()),
+            _ => {
+                output_format.write(&Vec::<FolderRightOutput>::new())?;
+            }
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Folder Permissions:".bold());
+            println!("{}", "-".repeat(80));
+
+            for item in &items {
+                let inherited = item
+                    .inherited_from
+                    .as_deref()
+                    .unwrap_or("direct");
+                println!(
+                    "  {} {} [{}]",
+                    item.subject_type.cyan(),
+                    item.subject_id,
+                    inherited.dimmed()
+                );
+                println!("    {} {}", "Actions:".dimmed(), item.actions.join(", "));
+            }
+
+            println!("{}", "-".repeat(80));
+        }
+        _ => {
+            output_format.write(&items)?;
+        }
+    }
     Ok(())
 }

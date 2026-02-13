@@ -11,7 +11,7 @@ use raps_kernel::http::HttpClientConfig;
 
 use serde::Serialize;
 
-use crate::types::{AccountProject, AccountUser, PaginatedResponse, ProjectClassification};
+use crate::types::{AccountProject, AccountUser, Company, PaginatedResponse, ProjectClassification};
 
 /// Client for ACC Account Admin API
 ///
@@ -50,6 +50,14 @@ impl AccountAdminClient {
     fn admin_url(&self, account_id: &str) -> String {
         format!(
             "{}/construction/admin/v1/accounts/{}",
+            self.config.base_url, account_id
+        )
+    }
+
+    /// Get the base URL for HQ v1 API (used for companies endpoint)
+    fn hq_url(&self, account_id: &str) -> String {
+        format!(
+            "{}/hq/v1/accounts/{}",
             self.config.base_url, account_id
         )
     }
@@ -331,6 +339,47 @@ impl AccountAdminClient {
             .context("Failed to parse user update response")?;
 
         Ok(user)
+    }
+
+    // ========================================================================
+    // COMPANY OPERATIONS
+    // ========================================================================
+
+    /// List all companies in an account
+    ///
+    /// Uses the HQ v1 API endpoint for companies.
+    ///
+    /// # Arguments
+    /// * `account_id` - The account ID
+    ///
+    /// # Returns
+    /// A vector of all companies in the account
+    pub async fn list_companies(&self, account_id: &str) -> Result<Vec<Company>> {
+        let token = self.auth.get_3leg_token().await?;
+        let account_id = normalize_account_id(account_id);
+
+        let url = format!("{}/companies", self.hq_url(&account_id));
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to list companies")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list companies ({status}): {error_text}");
+        }
+
+        let companies: Vec<Company> = response
+            .json()
+            .await
+            .context("Failed to parse companies response")?;
+
+        Ok(companies)
     }
 
     // ========================================================================

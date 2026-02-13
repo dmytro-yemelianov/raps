@@ -19,8 +19,9 @@ use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use uuid::Uuid;
 
-use raps_acc::admin::AccountAdminClient;
-use raps_acc::users::ProjectUsersClient;
+use raps_acc::admin::{AccountAdminClient, CreateProjectRequest, UpdateProjectRequest};
+use raps_acc::types::ProjectClassification;
+use raps_acc::users::{ImportUserRequest, ProjectUsersClient};
 use raps_admin::{
     BulkConfig, BulkOperationResult, ItemResult, OperationStatus, PermissionLevel, ProgressUpdate,
     ProjectFilter, StateManager, bulk_add_user,
@@ -49,6 +50,14 @@ pub enum AdminCommands {
     /// Bulk operation management (status, resume, cancel)
     #[command(subcommand)]
     Operation(OperationCommands),
+
+    /// List companies in an account
+    #[command(name = "company-list")]
+    CompanyList {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
 }
 
 /// User management subcommands
@@ -186,6 +195,66 @@ pub enum UserCommands {
         #[arg(short, long)]
         yes: bool,
     },
+
+    /// Add a user to a single project by email
+    #[command(name = "add-to-project")]
+    AddToProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// Email address of the user (used as user identifier)
+        #[arg(short, long)]
+        email: String,
+
+        /// Role ID to assign
+        #[arg(short, long)]
+        role_id: Option<String>,
+    },
+
+    /// Remove a user from a single project
+    #[command(name = "remove-from-project")]
+    RemoveFromProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// User ID to remove
+        #[arg(short, long)]
+        user_id: String,
+
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
+    },
+
+    /// Update a user's role in a single project
+    #[command(name = "update-in-project")]
+    UpdateInProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// User ID to update
+        #[arg(short, long)]
+        user_id: String,
+
+        /// New role ID to assign
+        #[arg(short, long)]
+        role_id: Option<String>,
+    },
+
+    /// Import new users to a project from CSV
+    #[command(name = "import")]
+    Import {
+        /// Project ID to import users into
+        #[arg(short, long)]
+        project: String,
+
+        /// CSV file with columns: email, role_id (optional)
+        #[arg(long, value_name = "FILE")]
+        from_csv: PathBuf,
+    },
 }
 
 /// Folder permission management subcommands
@@ -285,6 +354,75 @@ pub enum AdminProjectCommands {
         #[arg(long)]
         limit: Option<usize>,
     },
+
+    /// Create a new project
+    Create {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Project name
+        #[arg(short, long)]
+        name: String,
+
+        /// Project type
+        #[arg(short = 't', long)]
+        r#type: Option<String>,
+
+        /// Project classification (production, template, component, sample)
+        #[arg(long)]
+        classification: Option<String>,
+
+        /// Project start date (ISO 8601 format)
+        #[arg(long)]
+        start_date: Option<String>,
+
+        /// Project end date (ISO 8601 format)
+        #[arg(long)]
+        end_date: Option<String>,
+
+        /// Time zone (e.g., "America/New_York")
+        #[arg(long)]
+        timezone: Option<String>,
+    },
+
+    /// Update an existing project
+    Update {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// New project name
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// New project status (active, archived, suspended)
+        #[arg(long)]
+        status: Option<String>,
+
+        /// New start date (ISO 8601 format)
+        #[arg(long)]
+        start_date: Option<String>,
+
+        /// New end date (ISO 8601 format)
+        #[arg(long)]
+        end_date: Option<String>,
+    },
+
+    /// Archive a project (sets status to archived)
+    Archive {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+    },
 }
 
 /// Operation management subcommands
@@ -340,6 +478,9 @@ impl AdminCommands {
             AdminCommands::Folder(cmd) => cmd.execute(config, auth_client, output_format).await,
             AdminCommands::Project(cmd) => cmd.execute(config, auth_client, output_format).await,
             AdminCommands::Operation(cmd) => cmd.execute(output_format).await,
+            AdminCommands::CompanyList { account } => {
+                execute_company_list(config, auth_client, account, output_format).await
+            }
         }
     }
 }
@@ -1010,6 +1151,161 @@ impl UserCommands {
 
                 Ok(())
             }
+
+            UserCommands::AddToProject {
+                project,
+                email,
+                role_id,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Adding user {} to project {}",
+                        "→".cyan(),
+                        email.cyan(),
+                        project.cyan()
+                    );
+                }
+
+                let request = raps_acc::users::AddProjectUserRequest {
+                    user_id: email.clone(),
+                    role_id: role_id.clone(),
+                    products: vec![],
+                };
+
+                let user = users_client.add_user(&project, request).await?;
+
+                #[derive(Serialize)]
+                struct AddResult {
+                    user_id: String,
+                    email: String,
+                    role: Option<String>,
+                    project: String,
+                }
+
+                let result = AddResult {
+                    user_id: user.id,
+                    email: user.email.unwrap_or(email),
+                    role: user.role_name,
+                    project,
+                };
+
+                output_format.write(&result)?;
+
+                if output_format.supports_colors() {
+                    println!("\n{} User added successfully", "✓".green());
+                }
+
+                Ok(())
+            }
+
+            UserCommands::RemoveFromProject {
+                project,
+                user_id,
+                yes,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if !yes && output_format.supports_colors() {
+                    println!(
+                        "\n{} Remove user {} from project {}?",
+                        "⚠".yellow(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                    print!("Continue? [y/N] ");
+                    use std::io::{self, Write};
+                    io::stdout().flush()?;
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input)?;
+                    if !input.trim().eq_ignore_ascii_case("y") {
+                        println!("Cancelled.");
+                        return Ok(());
+                    }
+                }
+
+                users_client.remove_user(&project, &user_id).await?;
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} User {} removed from project {}",
+                        "✓".green(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                } else {
+                    println!("User {} removed from project {}", user_id, project);
+                }
+
+                Ok(())
+            }
+
+            UserCommands::UpdateInProject {
+                project,
+                user_id,
+                role_id,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Updating user {} in project {}",
+                        "→".cyan(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                }
+
+                let request = raps_acc::users::UpdateProjectUserRequest {
+                    role_id: role_id.clone(),
+                    products: None,
+                };
+
+                let user = users_client.update_user(&project, &user_id, request).await?;
+
+                #[derive(Serialize)]
+                struct UpdateResult {
+                    user_id: String,
+                    email: Option<String>,
+                    role: Option<String>,
+                    project: String,
+                }
+
+                let result = UpdateResult {
+                    user_id: user.id,
+                    email: user.email,
+                    role: user.role_name,
+                    project,
+                };
+
+                output_format.write(&result)?;
+
+                if output_format.supports_colors() {
+                    println!("\n{} User updated successfully", "✓".green());
+                }
+
+                Ok(())
+            }
+
+            UserCommands::Import { project, from_csv } => {
+                execute_csv_import(config, auth_client, &project, &from_csv, output_format).await
+            }
         }
     }
 }
@@ -1321,6 +1617,218 @@ impl AdminProjectCommands {
 
                 Ok(())
             }
+            AdminProjectCommands::Create {
+                account,
+                name,
+                r#type,
+                classification,
+                start_date,
+                end_date,
+                timezone,
+            } => {
+                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+
+                let account_id = match account_id {
+                    Some(id) if !id.is_empty() => id,
+                    _ => {
+                        anyhow::bail!(
+                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+                        );
+                    }
+                };
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Creating project '{}' in account {}",
+                        "→".cyan(),
+                        name.cyan(),
+                        account_id.cyan()
+                    );
+                }
+
+                let parsed_classification = if let Some(ref cls) = classification {
+                    Some(match cls.to_lowercase().as_str() {
+                        "production" => ProjectClassification::Production,
+                        "template" => ProjectClassification::Template,
+                        "component" => ProjectClassification::Component,
+                        "sample" => ProjectClassification::Sample,
+                        _ => anyhow::bail!(
+                            "Invalid classification '{}'. Valid values: production, template, component, sample",
+                            cls
+                        ),
+                    })
+                } else {
+                    None
+                };
+
+                let request = CreateProjectRequest {
+                    name: name.clone(),
+                    r#type,
+                    classification: parsed_classification,
+                    start_date,
+                    end_date,
+                    timezone,
+                    ..Default::default()
+                };
+
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                let project = admin_client.create_project(&account_id, request).await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!(
+                            "\n{} Project created successfully!",
+                            "✓".green().bold()
+                        );
+                        println!("{:<15} {}", "ID:".bold(), project.id.cyan());
+                        println!("{:<15} {}", "Name:".bold(), project.name);
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            project.status.as_deref().unwrap_or("pending")
+                        );
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": project.id,
+                            "name": project.name,
+                            "status": project.status,
+                            "created": true
+                        }))?;
+                    }
+                }
+
+                Ok(())
+            }
+            AdminProjectCommands::Update {
+                account,
+                project,
+                name,
+                status,
+                start_date,
+                end_date,
+            } => {
+                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+
+                let account_id = match account_id {
+                    Some(id) if !id.is_empty() => id,
+                    _ => {
+                        anyhow::bail!(
+                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+                        );
+                    }
+                };
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Updating project {} in account {}",
+                        "→".cyan(),
+                        project.cyan(),
+                        account_id.cyan()
+                    );
+                }
+
+                let request = UpdateProjectRequest {
+                    name,
+                    status,
+                    start_date,
+                    end_date,
+                    ..Default::default()
+                };
+
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                let updated = admin_client
+                    .update_project(&account_id, &project, request)
+                    .await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!(
+                            "\n{} Project updated successfully!",
+                            "✓".green().bold()
+                        );
+                        println!("{:<15} {}", "ID:".bold(), updated.id.cyan());
+                        println!("{:<15} {}", "Name:".bold(), updated.name);
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            updated.status.as_deref().unwrap_or("-")
+                        );
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": updated.id,
+                            "name": updated.name,
+                            "status": updated.status,
+                            "updated": true
+                        }))?;
+                    }
+                }
+
+                Ok(())
+            }
+            AdminProjectCommands::Archive { account, project } => {
+                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+
+                let account_id = match account_id {
+                    Some(id) if !id.is_empty() => id,
+                    _ => {
+                        anyhow::bail!(
+                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+                        );
+                    }
+                };
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Archiving project {} in account {}",
+                        "→".cyan(),
+                        project.cyan(),
+                        account_id.cyan()
+                    );
+                }
+
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                admin_client
+                    .archive_project(&account_id, &project)
+                    .await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!(
+                            "\n{} Project archived successfully!",
+                            "✓".green().bold()
+                        );
+                        println!("{:<15} {}", "ID:".bold(), project.cyan());
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": project,
+                            "archived": true
+                        }))?;
+                    }
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -1576,7 +2084,7 @@ async fn execute_csv_update(
     }
 
     let mut updated = 0usize;
-    let mut skipped = 0usize;
+    let skipped = 0usize;
     let mut failed = 0usize;
     let mut errors = Vec::new();
 
@@ -2225,6 +2733,330 @@ fn display_bulk_result(result: &BulkOperationResult, output_format: OutputFormat
         }
         _ => {
             output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// CSV IMPORT (new users)
+// ============================================================================
+
+/// A single row from the CSV import file
+#[derive(Debug, serde::Deserialize)]
+struct CsvImportRow {
+    email: String,
+    #[serde(default)]
+    role_id: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CsvImportResultOutput {
+    total: usize,
+    imported: usize,
+    failed: usize,
+    errors: Vec<CsvImportErrorOutput>,
+}
+
+#[derive(Serialize)]
+struct CsvImportErrorOutput {
+    email: String,
+    error: String,
+}
+
+/// Execute import of new users into a project from a CSV file
+///
+/// Expected columns: email (required), role_id (optional)
+async fn execute_csv_import(
+    config: &Config,
+    auth_client: &AuthClient,
+    project_id: &str,
+    csv_path: &PathBuf,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Parse CSV file
+    let mut reader = csv::Reader::from_path(csv_path)
+        .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?;
+
+    let mut rows: Vec<CsvImportRow> = Vec::new();
+    let mut validation_errors: Vec<String> = Vec::new();
+
+    for (i, result) in reader.deserialize().enumerate() {
+        match result {
+            Ok(row) => {
+                let row: CsvImportRow = row;
+                // Validate email
+                if row.email.is_empty() || !row.email.contains('@') {
+                    validation_errors.push(format!(
+                        "Row {}: invalid email '{}'",
+                        i + 2,
+                        row.email
+                    ));
+                    continue;
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                validation_errors.push(format!("Row {}: parse error: {}", i + 2, e));
+            }
+        }
+    }
+
+    // Report validation errors
+    if !validation_errors.is_empty() {
+        if output_format.supports_colors() {
+            println!("{} CSV validation errors:", "✗".red().bold());
+            for err in &validation_errors {
+                println!("  {} {}", "•".red(), err);
+            }
+        }
+        anyhow::bail!(
+            "CSV validation failed with {} error(s). Fix errors before proceeding.",
+            validation_errors.len()
+        );
+    }
+
+    if rows.is_empty() {
+        anyhow::bail!("No valid rows found in CSV file");
+    }
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Import users: {} rows from {} into project {}",
+            "→".cyan(),
+            rows.len().to_string().green(),
+            csv_path.display().to_string().cyan(),
+            project_id.cyan()
+        );
+        println!();
+    }
+
+    // Build import requests
+    let users: Vec<ImportUserRequest> = rows
+        .iter()
+        .map(|row| ImportUserRequest {
+            email: row.email.clone(),
+            role_id: row.role_id.clone(),
+            products: None,
+        })
+        .collect();
+
+    let total = users.len();
+
+    // Create progress bar
+    let progress_bar = if output_format.supports_colors() {
+        let pb = ProgressBar::new(total as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
+    // Create users client and call import_users
+    let http_config = HttpClientConfig::default();
+    let users_client = ProjectUsersClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config,
+    );
+
+    let result = users_client.import_users(project_id, users).await?;
+
+    // Finish progress bar
+    if let Some(pb) = progress_bar {
+        pb.set_position(total as u64);
+        pb.finish_and_clear();
+    }
+
+    let errors: Vec<CsvImportErrorOutput> = result
+        .errors
+        .iter()
+        .map(|e| CsvImportErrorOutput {
+            email: e.email.clone(),
+            error: e.error.clone(),
+        })
+        .collect();
+
+    let output = CsvImportResultOutput {
+        total: result.total,
+        imported: result.imported,
+        failed: result.failed,
+        errors,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Import Results:".bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "Total:".bold(), output.total);
+            println!(
+                "{:<15} {}",
+                "Imported:".bold(),
+                output.imported.to_string().green()
+            );
+            println!(
+                "{:<15} {}",
+                "Failed:".bold(),
+                output.failed.to_string().red()
+            );
+            println!("{}", "─".repeat(60));
+
+            if !output.errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for err in &output.errors {
+                    println!("  {} {} - {}", "✗".red(), err.email, err.error.dimmed());
+                }
+            }
+
+            if output.failed == 0 {
+                println!(
+                    "\n{} All {} user(s) imported successfully!",
+                    "✓".green().bold(),
+                    output.imported
+                );
+            } else {
+                println!(
+                    "\n{} Completed with {} failure(s)",
+                    "⚠".yellow().bold(),
+                    output.failed
+                );
+            }
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    if output.failed > 0 {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// COMPANY LIST
+// ============================================================================
+
+#[derive(Serialize)]
+struct CompanyListOutput {
+    id: String,
+    name: String,
+    trade: Option<String>,
+    city: Option<String>,
+    country: Option<String>,
+    member_count: Option<usize>,
+}
+
+/// Execute company listing for an account
+async fn execute_company_list(
+    config: &Config,
+    auth_client: &AuthClient,
+    account: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Get account ID from parameter or environment
+    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+
+    let account_id = match account_id {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            anyhow::bail!(
+                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+            );
+        }
+    };
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} List companies in account {}",
+            "→".cyan(),
+            account_id.cyan()
+        );
+        println!();
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client = AccountAdminClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config,
+    );
+
+    let companies = admin_client.list_companies(&account_id).await?;
+
+    let outputs: Vec<CompanyListOutput> = companies
+        .iter()
+        .map(|c| CompanyListOutput {
+            id: c.id.clone(),
+            name: c.name.clone(),
+            trade: c.trade.clone(),
+            city: c.city.clone(),
+            country: c.country.clone(),
+            member_count: c.member_count,
+        })
+        .collect();
+
+    match output_format {
+        OutputFormat::Table => {
+            if outputs.is_empty() {
+                println!("{}", "No companies found.".yellow());
+            } else {
+                println!("{}", "Companies:".bold());
+                println!("{}", "─".repeat(110));
+                println!(
+                    "{:<38} {:<25} {:<15} {:<15} {:<10} {}",
+                    "ID".bold(),
+                    "Name".bold(),
+                    "Trade".bold(),
+                    "City".bold(),
+                    "Country".bold(),
+                    "Members".bold()
+                );
+                println!("{}", "─".repeat(110));
+
+                for c in &outputs {
+                    let name_truncated = if c.name.len() > 23 {
+                        format!("{}...", &c.name[..20])
+                    } else {
+                        c.name.clone()
+                    };
+                    let trade_display = c.trade.as_deref().unwrap_or("-");
+                    let trade_truncated = if trade_display.len() > 13 {
+                        format!("{}...", &trade_display[..10])
+                    } else {
+                        trade_display.to_string()
+                    };
+                    let city_display = c.city.as_deref().unwrap_or("-");
+                    let country_display = c.country.as_deref().unwrap_or("-");
+                    let members_display = c
+                        .member_count
+                        .map(|m| m.to_string())
+                        .unwrap_or_else(|| "-".to_string());
+
+                    println!(
+                        "{:<38} {:<25} {:<15} {:<15} {:<10} {}",
+                        c.id.cyan(),
+                        name_truncated,
+                        trade_truncated,
+                        city_display,
+                        country_display,
+                        members_display.dimmed()
+                    );
+                }
+
+                println!("{}", "─".repeat(110));
+                println!("{} {} company(ies) found", "→".cyan(), outputs.len());
+            }
+        }
+        _ => {
+            output_format.write(&outputs)?;
         }
     }
 

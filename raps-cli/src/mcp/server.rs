@@ -22,7 +22,10 @@ use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
+use raps_da::DesignAutomationClient;
 use raps_oss::{OssClient, Region, RetentionPolicy};
+use raps_reality::RealityCaptureClient;
+use raps_webhooks::{UpdateWebhookRequest, WebhooksClient};
 
 /// RAPS MCP Server
 ///
@@ -168,6 +171,36 @@ impl RapsServer {
     async fn get_permissions_client(&self) -> FolderPermissionsClient {
         let auth = self.get_auth_client().await;
         FolderPermissionsClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Webhooks client (created on demand, not cached)
+    async fn get_webhooks_client(&self) -> WebhooksClient {
+        let auth = self.get_auth_client().await;
+        WebhooksClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Design Automation client (created on demand, not cached)
+    async fn get_da_client(&self) -> DesignAutomationClient {
+        let auth = self.get_auth_client().await;
+        DesignAutomationClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Reality Capture client (created on demand, not cached)
+    async fn get_reality_client(&self) -> RealityCaptureClient {
+        let auth = self.get_auth_client().await;
+        raps_reality::RealityCaptureClient::new_with_http_config(
             (*self.config).clone(),
             auth,
             self.http_config.clone(),
@@ -453,6 +486,22 @@ impl RapsServer {
                 "Failed to list hubs (ensure you're logged in with 'raps auth login'): {}",
                 e
             ),
+        }
+    }
+
+    async fn hub_info(&self, hub_id: String) -> String {
+        let client = self.get_dm_client().await;
+
+        match client.get_hub(&hub_id).await {
+            Ok(hub) => {
+                let region = hub.attributes.region.as_deref().unwrap_or("unknown");
+                let hub_type = &hub.hub_type;
+                format!(
+                    "Hub details:\n\n* Name: {}\n* ID: {}\n* Type: {}\n* Region: {}",
+                    hub.attributes.name, hub.id, hub_type, region
+                )
+            }
+            Err(e) => format!("Failed to get hub info: {}", e),
         }
     }
 
@@ -1247,6 +1296,68 @@ impl RapsServer {
     }
 
     // ========================================================================
+    // Issue Comment Tools
+    // ========================================================================
+
+    async fn issue_comments_list(&self, project_id: String, issue_id: String) -> String {
+        let client = self.get_issues_client().await;
+
+        match client.list_comments(&project_id, &issue_id).await {
+            Ok(comments) => {
+                if comments.is_empty() {
+                    return "No comments found.".to_string();
+                }
+
+                let mut output = format!("Found {} comment(s):\n\n", comments.len());
+                for comment in &comments {
+                    let author = comment.created_by.as_deref().unwrap_or("-");
+                    let created = comment.created_at.as_deref().unwrap_or("-");
+                    output.push_str(&format!(
+                        "* [{}] by {} ({})\n  {}\n",
+                        comment.id, author, created, comment.body
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list issue comments: {}", e),
+        }
+    }
+
+    async fn issue_comment_add(
+        &self,
+        project_id: String,
+        issue_id: String,
+        body: String,
+    ) -> String {
+        let client = self.get_issues_client().await;
+
+        match client.add_comment(&project_id, &issue_id, &body).await {
+            Ok(comment) => format!(
+                "Comment added successfully:\n* ID: {}\n* Body: {}",
+                comment.id, comment.body
+            ),
+            Err(e) => format!("Failed to add issue comment: {}", e),
+        }
+    }
+
+    async fn issue_comment_delete(
+        &self,
+        project_id: String,
+        issue_id: String,
+        comment_id: String,
+    ) -> String {
+        let client = self.get_issues_client().await;
+
+        match client
+            .delete_comment(&project_id, &issue_id, &comment_id)
+            .await
+        {
+            Ok(()) => format!("Comment {} deleted successfully.", comment_id),
+            Err(e) => format!("Failed to delete issue comment: {}", e),
+        }
+    }
+
+    // ========================================================================
     // RFI Tools
     // ========================================================================
 
@@ -1458,6 +1569,36 @@ impl RapsServer {
         }
     }
 
+    async fn asset_get(&self, project_id: String, asset_id: String) -> String {
+        let client = self.get_acc_client().await;
+
+        match client.get_asset(&project_id, &asset_id).await {
+            Ok(asset) => {
+                let mut output = format!("Asset details:\n\n* ID: {}\n", asset.id);
+                if let Some(ref desc) = asset.description {
+                    output.push_str(&format!("* Description: {}\n", desc));
+                }
+                if let Some(ref status_id) = asset.status_id {
+                    output.push_str(&format!("* Status ID: {}\n", status_id));
+                }
+                if let Some(ref category_id) = asset.category_id {
+                    output.push_str(&format!("* Category ID: {}\n", category_id));
+                }
+                if let Some(ref barcode) = asset.barcode {
+                    output.push_str(&format!("* Barcode: {}\n", barcode));
+                }
+                if let Some(ref created_at) = asset.created_at {
+                    output.push_str(&format!("* Created: {}\n", created_at));
+                }
+                if let Some(ref updated_at) = asset.updated_at {
+                    output.push_str(&format!("* Updated: {}\n", updated_at));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get asset: {}", e),
+        }
+    }
+
     async fn acc_submittals_list(&self, project_id: String) -> String {
         let client = self.get_acc_client().await;
 
@@ -1556,6 +1697,30 @@ impl RapsServer {
                 output
             }
             Err(e) => format!("Failed to list checklists: {}", e),
+        }
+    }
+
+    async fn checklist_templates_list(&self, project_id: String) -> String {
+        let client = self.get_acc_client().await;
+
+        match client.list_checklist_templates(&project_id).await {
+            Ok(templates) => {
+                if templates.is_empty() {
+                    return "No checklist templates found.".to_string();
+                }
+
+                let mut output = format!("Found {} checklist template(s):\n\n", templates.len());
+                for template in &templates {
+                    let desc = template.description.as_deref().unwrap_or("-");
+                    let created = template.created_at.as_deref().unwrap_or("-");
+                    output.push_str(&format!(
+                        "* {} (id: {}, created: {})\n  Description: {}\n",
+                        template.title, template.id, created, desc
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list checklist templates: {}", e),
         }
     }
 
@@ -3076,6 +3241,401 @@ impl RapsServer {
         output
     }
 
+    // ================================================================
+    // Webhooks (v4.6)
+    // ================================================================
+
+    async fn webhook_list(&self) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.list_all_webhooks().await {
+            Ok(hooks) => {
+                if hooks.is_empty() {
+                    return "No webhooks found.".to_string();
+                }
+                let mut output = format!("Found {} webhook(s):\n\n", hooks.len());
+                for hook in &hooks {
+                    output.push_str(&format!(
+                        "* {} (system: {}, event: {}, status: {})\n  URL: {}\n",
+                        hook.hook_id,
+                        hook.system,
+                        hook.event,
+                        hook.status,
+                        hook.callback_url,
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list webhooks: {}", e),
+        }
+    }
+
+    async fn webhook_create(
+        &self,
+        system: String,
+        event: String,
+        callback_url: String,
+        folder_urn: Option<String>,
+    ) -> String {
+        let client = self.get_webhooks_client().await;
+        match client
+            .create_webhook(&system, &event, &callback_url, folder_urn.as_deref())
+            .await
+        {
+            Ok(hook) => {
+                format!(
+                    "Webhook created successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                )
+            }
+            Err(e) => format!("Failed to create webhook: {}", e),
+        }
+    }
+
+    async fn webhook_delete(&self, system: String, event: String, hook_id: String) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.delete_webhook(&system, &event, &hook_id).await {
+            Ok(()) => format!("Webhook {} deleted successfully.", hook_id),
+            Err(e) => format!("Failed to delete webhook: {}", e),
+        }
+    }
+
+    async fn webhook_events(&self) -> String {
+        let client = self.get_webhooks_client().await;
+        let events = client.available_events();
+        let mut output = format!("Available webhook events ({}):\n\n", events.len());
+        for (event_name, description) in events {
+            output.push_str(&format!("* {} - {}\n", event_name, description));
+        }
+        output
+    }
+
+    async fn webhook_get(&self, system: String, event: String, hook_id: String) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.get_webhook(&system, &event, &hook_id).await {
+            Ok(hook) => {
+                let mut output = format!(
+                    "Webhook Details:\n\n* Hook ID: {}\n* System: {}\n* Event: {}\n* Callback: {}\n* Status: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                    hook.status,
+                );
+                if let Some(ref created) = hook.created_date {
+                    output.push_str(&format!("\n* Created: {}", created));
+                }
+                if let Some(ref updated) = hook.last_updated_date {
+                    output.push_str(&format!("\n* Updated: {}", updated));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get webhook: {}", e),
+        }
+    }
+
+    async fn webhook_update(
+        &self,
+        system: String,
+        event: String,
+        hook_id: String,
+        callback_url: Option<String>,
+        status: Option<String>,
+        filter: Option<String>,
+    ) -> String {
+        let client = self.get_webhooks_client().await;
+        let request = UpdateWebhookRequest {
+            callback_url,
+            status,
+            filter,
+        };
+        match client
+            .update_webhook(&system, &event, &hook_id, request)
+            .await
+        {
+            Ok(hook) => {
+                format!(
+                    "Webhook updated successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}\nStatus: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                    hook.status,
+                )
+            }
+            Err(e) => format!("Failed to update webhook: {}", e),
+        }
+    }
+
+    // ================================================================
+    // Design Automation (v4.6)
+    // ================================================================
+
+    async fn da_engines_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_engines().await {
+            Ok(engines) => {
+                if engines.is_empty() {
+                    return "No engines found.".to_string();
+                }
+                let mut output = format!("Available engines ({}):\n\n", engines.len());
+                for engine in &engines {
+                    output.push_str(&format!("* {}\n", engine));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list engines: {}", e),
+        }
+    }
+
+    async fn da_appbundles_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_appbundles().await {
+            Ok(bundles) => {
+                if bundles.is_empty() {
+                    return "No appbundles found.".to_string();
+                }
+                let mut output = format!("AppBundles ({}):\n\n", bundles.len());
+                for bundle in &bundles {
+                    output.push_str(&format!("* {}\n", bundle));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list appbundles: {}", e),
+        }
+    }
+
+    async fn da_activities_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_activities().await {
+            Ok(activities) => {
+                if activities.is_empty() {
+                    return "No activities found.".to_string();
+                }
+                let mut output = format!("Activities ({}):\n\n", activities.len());
+                for activity in &activities {
+                    output.push_str(&format!("* {}\n", activity));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list activities: {}", e),
+        }
+    }
+
+    async fn da_workitem_create(&self, activity_id: String) -> String {
+        let client = self.get_da_client().await;
+        let arguments = std::collections::HashMap::new();
+        match client.create_workitem(&activity_id, arguments).await {
+            Ok(item) => {
+                format!(
+                    "Workitem created!\n\nID: {}\nStatus: {}\nActivity: {}",
+                    item.id,
+                    item.status,
+                    activity_id,
+                )
+            }
+            Err(e) => format!("Failed to create workitem: {}", e),
+        }
+    }
+
+    async fn da_workitem_status(&self, workitem_id: String) -> String {
+        let client = self.get_da_client().await;
+        match client.get_workitem_status(&workitem_id).await {
+            Ok(item) => {
+                let mut output = format!(
+                    "Workitem: {}\nStatus: {}\nProgress: {}",
+                    item.id,
+                    item.status,
+                    item.progress.as_deref().unwrap_or("N/A"),
+                );
+                if let Some(ref report_url) = item.report_url {
+                    output.push_str(&format!("\nReport: {}", report_url));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get workitem status: {}", e),
+        }
+    }
+
+    async fn da_workitems_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_workitems().await {
+            Ok(workitems) => {
+                if workitems.is_empty() {
+                    return "No workitems found.".to_string();
+                }
+                let mut output = format!("Workitems ({}):\n\n", workitems.len());
+                for item in &workitems {
+                    output.push_str(&format!(
+                        "* {} - Status: {} | Progress: {}\n",
+                        item.id,
+                        item.status,
+                        item.progress.as_deref().unwrap_or("N/A"),
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list workitems: {}", e),
+        }
+    }
+
+    // ================================================================
+    // Reality Capture
+    // ================================================================
+
+    async fn reality_create(
+        &self,
+        name: String,
+        scene_type: Option<String>,
+        format: Option<String>,
+    ) -> String {
+        let client = self.get_reality_client().await;
+
+        let st = match scene_type.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("aerial") => raps_reality::SceneType::Aerial,
+            Some("object") | None => raps_reality::SceneType::Object,
+            Some(other) => {
+                return format!(
+                    "Invalid scene_type '{}'. Valid values: aerial, object",
+                    other
+                )
+            }
+        };
+
+        let fmt = match format.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("rcm") | None => raps_reality::OutputFormat::Rcm,
+            Some("rcs") => raps_reality::OutputFormat::Rcs,
+            Some("obj") => raps_reality::OutputFormat::Obj,
+            Some("fbx") => raps_reality::OutputFormat::Fbx,
+            Some("ortho") => raps_reality::OutputFormat::Ortho,
+            Some(other) => {
+                return format!(
+                    "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
+                    other
+                )
+            }
+        };
+
+        match client.create_photoscene(&name, st, fmt).await {
+            Ok(scene) => {
+                format!(
+                    "Photoscene created!\n\nID: {}\nName: {}\nScene Type: {}\nFormat: {}\nStatus: {}",
+                    scene.photoscene_id,
+                    scene.name.as_deref().unwrap_or("N/A"),
+                    scene.scene_type.as_deref().unwrap_or("N/A"),
+                    scene.convert_format.as_deref().unwrap_or("N/A"),
+                    scene.status.as_deref().unwrap_or("N/A"),
+                )
+            }
+            Err(e) => format!("Failed to create photoscene: {}", e),
+        }
+    }
+
+    async fn reality_process(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.start_processing(&photoscene_id).await {
+            Ok(()) => format!(
+                "Processing started for photoscene '{}'.\n\nUse reality_status to check progress.",
+                photoscene_id
+            ),
+            Err(e) => format!("Failed to start processing: {}", e),
+        }
+    }
+
+    async fn reality_status(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.get_progress(&photoscene_id).await {
+            Ok(progress) => {
+                format!(
+                    "Photoscene: {}\nProgress: {}%\nMessage: {}\nStatus: {}",
+                    progress.photoscene_id,
+                    progress.progress,
+                    progress.progress_msg.as_deref().unwrap_or("N/A"),
+                    progress.status.as_deref().unwrap_or("N/A"),
+                )
+            }
+            Err(e) => format!("Failed to get photoscene status: {}", e),
+        }
+    }
+
+    async fn reality_result(&self, photoscene_id: String, format: Option<String>) -> String {
+        let client = self.get_reality_client().await;
+
+        let fmt = match format.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("rcm") | None => raps_reality::OutputFormat::Rcm,
+            Some("rcs") => raps_reality::OutputFormat::Rcs,
+            Some("obj") => raps_reality::OutputFormat::Obj,
+            Some("fbx") => raps_reality::OutputFormat::Fbx,
+            Some("ortho") => raps_reality::OutputFormat::Ortho,
+            Some(other) => {
+                return format!(
+                    "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
+                    other
+                )
+            }
+        };
+
+        match client.get_result(&photoscene_id, fmt).await {
+            Ok(result) => {
+                let mut output = format!(
+                    "Photoscene: {}\nProgress: {}%",
+                    result.photoscene_id, result.progress,
+                );
+                if let Some(ref link) = result.scene_link {
+                    output.push_str(&format!("\nDownload: {}", link));
+                }
+                if let Some(ref size) = result.file_size {
+                    output.push_str(&format!("\nFile Size: {} bytes", size));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get photoscene result: {}", e),
+        }
+    }
+
+    async fn reality_delete(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.delete_photoscene(&photoscene_id).await {
+            Ok(()) => format!("Photoscene '{}' deleted successfully.", photoscene_id),
+            Err(e) => format!("Failed to delete photoscene: {}", e),
+        }
+    }
+
+    async fn reality_formats(&self) -> String {
+        let formats = raps_reality::OutputFormat::all();
+        let mut output = format!("Available output formats ({}):\n\n", formats.len());
+        for fmt in &formats {
+            output.push_str(&format!("* {} - {}\n", fmt, fmt.description()));
+        }
+        output
+    }
+
+    async fn reality_list(&self) -> String {
+        let client = self.get_reality_client().await;
+        match client.list_photoscenes().await {
+            Ok(photoscenes) => {
+                if photoscenes.is_empty() {
+                    return "No photoscenes found.".to_string();
+                }
+                let mut output = format!("Photoscenes ({}):\n\n", photoscenes.len());
+                for scene in &photoscenes {
+                    output.push_str(&format!(
+                        "* {} - Name: {} | Type: {} | Status: {} | Progress: {}\n",
+                        scene.photoscene_id,
+                        scene.name.as_deref().unwrap_or("N/A"),
+                        scene.scene_type.as_deref().unwrap_or("N/A"),
+                        scene.status.as_deref().unwrap_or("N/A"),
+                        scene.progress.as_deref().unwrap_or("N/A"),
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list photoscenes: {}", e),
+        }
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -3186,6 +3746,13 @@ impl RapsServer {
                     .and_then(|v| v.as_u64())
                     .map(|v| v as usize);
                 self.hub_list(limit).await
+            }
+            "hub_info" => {
+                let hub_id = match Self::required_arg(&args, "hub_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.hub_info(hub_id).await
             }
             "project_list" => {
                 let hub_id = match Self::required_arg(&args, "hub_id") {
@@ -3420,6 +3987,52 @@ impl RapsServer {
             }
 
             // ================================================================
+            // Issue Comment Tools
+            // ================================================================
+            "issue_comments_list" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comments_list(project_id, issue_id).await
+            }
+            "issue_comment_add" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let body = match Self::required_arg(&args, "body") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comment_add(project_id, issue_id, body).await
+            }
+            "issue_comment_delete" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let comment_id = match Self::required_arg(&args, "comment_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comment_delete(project_id, issue_id, comment_id)
+                    .await
+            }
+
+            // ================================================================
             // RFI Tools
             // ================================================================
             "rfi_list" => {
@@ -3547,6 +4160,17 @@ impl RapsServer {
                 };
                 self.asset_delete(project_id, asset_id).await
             }
+            "asset_get" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let asset_id = match Self::required_arg(&args, "asset_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.asset_get(project_id, asset_id).await
+            }
             "acc_submittals_list" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
                     Ok(val) => val,
@@ -3637,6 +4261,13 @@ impl RapsServer {
                     assignee_id,
                 )
                 .await
+            }
+            "checklist_templates_list" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.checklist_templates_list(project_id).await
             }
 
             // ================================================================
@@ -4031,6 +4662,144 @@ impl RapsServer {
             }
 
             // ================================================================
+            // Webhooks (v4.6)
+            // ================================================================
+            "webhook_list" => self.webhook_list().await,
+            "webhook_create" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let callback_url = match Self::required_arg(&args, "callback_url") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let folder_urn = Self::optional_arg(&args, "folder_urn");
+                self.webhook_create(system, event, callback_url, folder_urn)
+                    .await
+            }
+            "webhook_delete" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.webhook_delete(system, event, hook_id).await
+            }
+            "webhook_events" => self.webhook_events().await,
+            "webhook_get" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.webhook_get(system, event, hook_id).await
+            }
+            "webhook_update" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let callback_url = Self::optional_arg(&args, "callback_url");
+                let status = Self::optional_arg(&args, "status");
+                let filter = Self::optional_arg(&args, "filter");
+                self.webhook_update(system, event, hook_id, callback_url, status, filter)
+                    .await
+            }
+
+            // ================================================================
+            // Design Automation (v4.6)
+            // ================================================================
+            "da_engines_list" => self.da_engines_list().await,
+            "da_appbundles_list" => self.da_appbundles_list().await,
+            "da_activities_list" => self.da_activities_list().await,
+            "da_workitem_create" => {
+                let activity_id = match Self::required_arg(&args, "activity_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.da_workitem_create(activity_id).await
+            }
+            "da_workitem_status" => {
+                let workitem_id = match Self::required_arg(&args, "workitem_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.da_workitem_status(workitem_id).await
+            }
+            "da_workitems_list" => self.da_workitems_list().await,
+
+            // ================================================================
+            // Reality Capture
+            // ================================================================
+            "reality_list" => self.reality_list().await,
+            "reality_create" => {
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let scene_type = Self::optional_arg(&args, "scene_type");
+                let format = Self::optional_arg(&args, "format");
+                self.reality_create(name, scene_type, format).await
+            }
+            "reality_process" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_process(photoscene_id).await
+            }
+            "reality_status" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_status(photoscene_id).await
+            }
+            "reality_result" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let format = Self::optional_arg(&args, "format");
+                self.reality_result(photoscene_id, format).await
+            }
+            "reality_delete" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_delete(photoscene_id).await
+            }
+            "reality_formats" => self.reality_formats().await,
+
+            // ================================================================
             // Admin User Listing (v4.6)
             // ================================================================
             "admin_user_list" => {
@@ -4241,6 +5010,16 @@ fn get_tools() -> Vec<Tool> {
                     "limit": {"type": "integer", "description": "Max hubs (default: 50)"}
                 }),
                 &[],
+            ),
+        ),
+        Tool::new(
+            "hub_info",
+            "Get details of a specific hub (name, type, region). Requires 3-legged auth.",
+            schema(
+                json!({
+                    "hub_id": {"type": "string", "description": "The hub ID"}
+                }),
+                &["hub_id"],
             ),
         ),
         Tool::new(
@@ -4466,6 +5245,44 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         // ================================================================
+        // Issue Comment Tools
+        // ================================================================
+        Tool::new(
+            "issue_comments_list",
+            "List all comments on a specific issue. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"}
+                }),
+                &["project_id", "issue_id"],
+            ),
+        ),
+        Tool::new(
+            "issue_comment_add",
+            "Add a comment to a specific issue.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"},
+                    "body": {"type": "string", "description": "The comment text"}
+                }),
+                &["project_id", "issue_id", "body"],
+            ),
+        ),
+        Tool::new(
+            "issue_comment_delete",
+            "Delete a comment from a specific issue.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"},
+                    "comment_id": {"type": "string", "description": "The comment ID to delete"}
+                }),
+                &["project_id", "issue_id", "comment_id"],
+            ),
+        ),
+        // ================================================================
         // RFI Tools
         // ================================================================
         Tool::new(
@@ -4575,6 +5392,17 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         Tool::new(
+            "asset_get",
+            "Get details of a specific asset in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "asset_id": {"type": "string", "description": "The asset ID to retrieve"}
+                }),
+                &["project_id", "asset_id"],
+            ),
+        ),
+        Tool::new(
             "acc_submittals_list",
             "List submittals in an ACC project.",
             schema(
@@ -4650,6 +5478,16 @@ fn get_tools() -> Vec<Tool> {
                     "assignee_id": {"type": "string", "description": "New assignee user ID"}
                 }),
                 &["project_id", "checklist_id"],
+            ),
+        ),
+        Tool::new(
+            "checklist_templates_list",
+            "List checklist templates in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"}
+                }),
+                &["project_id"],
             ),
         ),
         // ================================================================
@@ -4964,6 +5802,180 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         // ================================================================
+        // Webhooks (v4.6)
+        // ================================================================
+        Tool::new(
+            "webhook_list",
+            "List all registered webhooks across all systems and events.",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "webhook_create",
+            "Create a new webhook subscription for a specific system and event.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added', 'extraction.finished')"},
+                    "callback_url": {"type": "string", "description": "URL to receive webhook callbacks"},
+                    "folder_urn": {"type": "string", "description": "Optional: restrict to a specific folder URN"}
+                }),
+                &["system", "event", "callback_url"],
+            ),
+        ),
+        Tool::new(
+            "webhook_delete",
+            "Delete a webhook subscription.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name"},
+                    "event": {"type": "string", "description": "Event name"},
+                    "hook_id": {"type": "string", "description": "Webhook ID to delete"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
+        Tool::new(
+            "webhook_events",
+            "List all available webhook event types that can be subscribed to.",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "webhook_get",
+            "Get details of a specific webhook subscription.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added')"},
+                    "hook_id": {"type": "string", "description": "Webhook ID"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
+        Tool::new(
+            "webhook_update",
+            "Update a webhook subscription (callback URL, status, or filter).",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added')"},
+                    "hook_id": {"type": "string", "description": "Webhook ID to update"},
+                    "callback_url": {"type": "string", "description": "New callback URL"},
+                    "status": {"type": "string", "description": "New status ('active' or 'inactive')"},
+                    "filter": {"type": "string", "description": "New filter expression"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
+        // ================================================================
+        // Design Automation (v4.6)
+        // ================================================================
+        Tool::new(
+            "da_engines_list",
+            "List all available Design Automation engines (AutoCAD, Revit, Inventor, 3dsMax).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_appbundles_list",
+            "List all registered Design Automation appbundles (custom plugins).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_activities_list",
+            "List all registered Design Automation activities (processing recipes).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_workitem_create",
+            "Create and submit a new Design Automation workitem to execute an activity.",
+            schema(
+                json!({
+                    "activity_id": {"type": "string", "description": "Fully qualified activity ID (e.g., 'YourApp.ActivityName+alias')"}
+                }),
+                &["activity_id"],
+            ),
+        ),
+        Tool::new(
+            "da_workitem_status",
+            "Check the status and progress of a Design Automation workitem.",
+            schema(
+                json!({
+                    "workitem_id": {"type": "string", "description": "Workitem ID to check status for"}
+                }),
+                &["workitem_id"],
+            ),
+        ),
+        Tool::new(
+            "da_workitems_list",
+            "List all Design Automation workitems with their status and progress.",
+            schema(json!({}), &[]),
+        ),
+        // ================================================================
+        // Reality Capture
+        // ================================================================
+        Tool::new(
+            "reality_list",
+            "List all photoscenes for reality capture. Returns ID, name, type, status, and progress for each photoscene.",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "reality_create",
+            "Create a new photoscene for reality capture (photogrammetry). Use to set up a new 3D reconstruction job from photos.",
+            schema(
+                json!({
+                    "name": {"type": "string", "description": "Name for the new photoscene"},
+                    "scene_type": {"type": "string", "description": "Scene type: 'aerial' or 'object' (default: object)"},
+                    "format": {"type": "string", "description": "Output format: rcm, rcs, obj, fbx, ortho (default: rcm)"}
+                }),
+                &["name"],
+            ),
+        ),
+        Tool::new(
+            "reality_process",
+            "Start processing a photoscene. Call after uploading photos to begin 3D reconstruction.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to start processing"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_status",
+            "Check photoscene processing progress. Returns percentage complete and status message.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to check progress for"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_result",
+            "Get download link for a processed photoscene. Returns the scene link and file size when processing is complete.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to get results for"},
+                    "format": {"type": "string", "description": "Output format: rcm, rcs, obj, fbx, ortho (default: rcm)"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_delete",
+            "Delete a photoscene and its associated data.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to delete"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_formats",
+            "List all available output formats for reality capture photoscenes.",
+            schema(json!({}), &[]),
+        ),
+        // ================================================================
         // Custom API Requests (v4.5)
         // ================================================================
         Tool::new(
@@ -5035,7 +6047,7 @@ impl ServerHandler for RapsServer {
         ServerInfo {
             instructions: Some(
                 "RAPS MCP Server v4.5 - Autodesk Platform Services CLI\n\n\
-                Provides direct access to APS APIs (72 tools):\n\
+                Provides direct access to APS APIs (74 tools):\n\
                 * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
                 * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
                 * translate_* - CAD model translation\n\

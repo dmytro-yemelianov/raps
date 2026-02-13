@@ -260,6 +260,38 @@ pub struct ProductAccess {
 }
 
 // ============================================================================
+// COMPANY TYPES
+// ============================================================================
+
+/// Company within an account
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Company {
+    /// Company ID
+    pub id: String,
+    /// Company name
+    pub name: String,
+    /// Trade or discipline
+    #[serde(default)]
+    pub trade: Option<String>,
+    /// Address line 1
+    #[serde(default)]
+    pub address_line1: Option<String>,
+    /// City
+    #[serde(default)]
+    pub city: Option<String>,
+    /// State or province
+    #[serde(default)]
+    pub state_or_province: Option<String>,
+    /// Country
+    #[serde(default)]
+    pub country: Option<String>,
+    /// Number of members in the company
+    #[serde(default)]
+    pub member_count: Option<usize>,
+}
+
+// ============================================================================
 // FOLDER PERMISSION TYPES
 // ============================================================================
 

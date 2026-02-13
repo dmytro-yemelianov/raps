@@ -23,6 +23,9 @@ use raps_reality::{OutputFormat as RealityOutputFormat, RealityCaptureClient, Sc
 
 #[derive(Debug, Subcommand)]
 pub enum RealityCommands {
+    /// List photoscenes
+    List,
+
     /// Create a new photoscene
     Create {
         /// Photoscene name
@@ -91,6 +94,7 @@ impl RealityCommands {
         output_format: OutputFormat,
     ) -> Result<()> {
         match self {
+            RealityCommands::List => list_photoscenes(client, output_format).await,
             RealityCommands::Create {
                 name,
                 scene_type,
@@ -117,6 +121,81 @@ impl RealityCommands {
             }
         }
     }
+}
+
+async fn list_photoscenes(
+    client: &RealityCaptureClient,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching photoscenes...".dimmed());
+    }
+
+    let photoscenes = client.list_photoscenes().await?;
+
+    #[derive(Serialize)]
+    struct PhotosceneOutput {
+        id: String,
+        name: String,
+        scene_type: String,
+        status: String,
+        progress: String,
+    }
+
+    let photoscene_outputs: Vec<PhotosceneOutput> = photoscenes
+        .iter()
+        .map(|p| PhotosceneOutput {
+            id: p.photoscene_id.clone(),
+            name: p.name.clone().unwrap_or_default(),
+            scene_type: p.scene_type.clone().unwrap_or_default(),
+            status: p.status.clone().unwrap_or_default(),
+            progress: p.progress.clone().unwrap_or_default(),
+        })
+        .collect();
+
+    if photoscene_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No photoscenes found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<PhotosceneOutput>::new())?;
+            }
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Photoscenes:".bold());
+            println!(
+                "{:<30} {:<20} {:<10} {:<12} {}",
+                "ID".bold(),
+                "Name".bold(),
+                "Type".bold(),
+                "Status".bold(),
+                "Progress".bold()
+            );
+            println!("{}", "-".repeat(90));
+
+            for scene in &photoscene_outputs {
+                let status_colored = match scene.status.as_str() {
+                    "Done" | "Created" => scene.status.green().to_string(),
+                    "Error" => scene.status.red().to_string(),
+                    "Processing" => scene.status.yellow().to_string(),
+                    _ => scene.status.clone(),
+                };
+                println!(
+                    "{:<30} {:<20} {:<10} {:<12} {}",
+                    scene.id, scene.name, scene.scene_type, status_colored, scene.progress
+                );
+            }
+
+            println!("{}", "-".repeat(90));
+        }
+        _ => {
+            output_format.write(&photoscene_outputs)?;
+        }
+    }
+    Ok(())
 }
 
 async fn create_photoscene(

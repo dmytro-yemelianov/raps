@@ -96,6 +96,41 @@ pub enum ObjectCommands {
         #[arg(short, long)]
         minutes: Option<u32>,
     },
+
+    /// Get detailed information about an object
+    Info {
+        /// Bucket key
+        bucket: String,
+        /// Object key
+        object: String,
+    },
+
+    /// Copy an object to another bucket or key
+    Copy {
+        /// Source bucket key
+        #[arg(long)]
+        source_bucket: String,
+        /// Source object key
+        #[arg(long)]
+        source_object: String,
+        /// Destination bucket key
+        #[arg(long)]
+        dest_bucket: String,
+        /// Destination object key (defaults to source object key)
+        #[arg(long)]
+        dest_object: Option<String>,
+    },
+
+    /// Rename an object within a bucket
+    Rename {
+        /// Bucket key
+        bucket: String,
+        /// Current object key
+        object: String,
+        /// New object key
+        #[arg(long)]
+        new_key: String,
+    },
 }
 
 impl ObjectCommands {
@@ -128,6 +163,30 @@ impl ObjectCommands {
                 object,
                 minutes,
             } => get_signed_url(client, &bucket, &object, minutes, output_format).await,
+            ObjectCommands::Info { bucket, object } => {
+                object_info(client, &bucket, &object, output_format).await
+            }
+            ObjectCommands::Copy {
+                source_bucket,
+                source_object,
+                dest_bucket,
+                dest_object,
+            } => {
+                copy_object(
+                    client,
+                    &source_bucket,
+                    &source_object,
+                    &dest_bucket,
+                    dest_object.as_deref(),
+                    output_format,
+                )
+                .await
+            }
+            ObjectCommands::Rename {
+                bucket,
+                object,
+                new_key,
+            } => rename_object(client, &bucket, &object, &new_key, output_format).await,
         }
     }
 }
@@ -576,6 +635,288 @@ async fn get_signed_url(
                 "\n{}",
                 format!("Note: URL expires in {} minutes", expiry).yellow()
             );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============== OBJECT INFO ==============
+
+#[derive(Serialize)]
+struct ObjectInfoOutput {
+    bucket_key: String,
+    object_key: String,
+    object_id: String,
+    size: u64,
+    size_human: String,
+    content_type: String,
+    sha1: String,
+    created_date: Option<String>,
+    last_modified_date: Option<String>,
+    urn: String,
+}
+
+async fn object_info(
+    client: &OssClient,
+    bucket: &str,
+    object: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!(
+            "{}",
+            format!("Fetching details for '{}/{}'...", bucket, object).dimmed()
+        );
+    }
+
+    let details = client.get_object_details(bucket, object).await?;
+    let urn = client.get_urn(bucket, object);
+
+    let output = ObjectInfoOutput {
+        bucket_key: details.bucket_key.clone(),
+        object_key: details.object_key.clone(),
+        object_id: details.object_id.clone(),
+        size: details.size,
+        size_human: format_size(details.size),
+        content_type: details.content_type.clone(),
+        sha1: details.sha1.clone(),
+        created_date: details.created_date.clone(),
+        last_modified_date: details.last_modified_date.clone(),
+        urn,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!(
+                "\n{} {}",
+                "Object:".bold(),
+                output.object_key.cyan().bold()
+            );
+            println!("{}", "-".repeat(60));
+            println!(
+                "  {} {}",
+                "Bucket:".bold(),
+                output.bucket_key
+            );
+            println!(
+                "  {} {} ({})",
+                "Size:".bold(),
+                output.size_human,
+                output.size
+            );
+            println!(
+                "  {} {}",
+                "Content-Type:".bold(),
+                output.content_type
+            );
+            println!("  {} {}", "SHA1:".bold(), output.sha1.dimmed());
+            println!(
+                "  {} {}",
+                "Created:".bold(),
+                output
+                    .created_date
+                    .as_deref()
+                    .unwrap_or("N/A")
+            );
+            println!(
+                "  {} {}",
+                "Modified:".bold(),
+                output
+                    .last_modified_date
+                    .as_deref()
+                    .unwrap_or("N/A")
+            );
+            println!(
+                "\n  {} {}",
+                "URN (for translation):".bold().yellow(),
+                output.urn
+            );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============== OBJECT COPY ==============
+
+#[derive(Serialize)]
+struct CopyObjectOutput {
+    success: bool,
+    source_bucket: String,
+    source_object: String,
+    dest_bucket: String,
+    dest_object: String,
+    size: u64,
+    size_human: String,
+    message: String,
+}
+
+async fn copy_object(
+    client: &OssClient,
+    source_bucket: &str,
+    source_object: &str,
+    dest_bucket: &str,
+    dest_object: Option<&str>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let destination_key = dest_object.unwrap_or(source_object);
+
+    if output_format.supports_colors() {
+        println!(
+            "{} {} {} {}",
+            "Copying".dimmed(),
+            format!("{}/{}", source_bucket, source_object).cyan(),
+            "to".dimmed(),
+            format!("{}/{}", dest_bucket, destination_key).cyan()
+        );
+    }
+
+    // OSS does not have a native copy API, so we download to a temp file and re-upload
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!(
+        "raps_copy_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+
+    // Download from source
+    client
+        .download_object(source_bucket, source_object, &temp_path)
+        .await
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            e
+        })?;
+
+    // Upload to destination
+    let upload_result = client
+        .upload_object(dest_bucket, destination_key, &temp_path)
+        .await;
+
+    // Clean up temp file regardless of outcome
+    let _ = std::fs::remove_file(&temp_path);
+
+    let info = upload_result?;
+
+    let output = CopyObjectOutput {
+        success: true,
+        source_bucket: source_bucket.to_string(),
+        source_object: source_object.to_string(),
+        dest_bucket: dest_bucket.to_string(),
+        dest_object: destination_key.to_string(),
+        size: info.size,
+        size_human: format_size(info.size),
+        message: format!(
+            "Copied '{}/{}' to '{}/{}'",
+            source_bucket, source_object, dest_bucket, destination_key
+        ),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+            println!("  {} {}", "Size:".bold(), output.size_human);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============== OBJECT RENAME ==============
+
+#[derive(Serialize)]
+struct RenameObjectOutput {
+    success: bool,
+    bucket_key: String,
+    old_key: String,
+    new_key: String,
+    size: u64,
+    size_human: String,
+    message: String,
+}
+
+async fn rename_object(
+    client: &OssClient,
+    bucket: &str,
+    object: &str,
+    new_key: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!(
+            "{} {} {} {} {} {}",
+            "Renaming".dimmed(),
+            format!("{}/{}", bucket, object).cyan(),
+            "to".dimmed(),
+            format!("{}/{}", bucket, new_key).cyan(),
+            "in".dimmed(),
+            bucket.cyan()
+        );
+    }
+
+    // OSS does not have a native rename API; implement as copy + delete
+    // Step 1: Download to temp file
+    let temp_dir = std::env::temp_dir();
+    let temp_path = temp_dir.join(format!(
+        "raps_rename_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+
+    client
+        .download_object(bucket, object, &temp_path)
+        .await
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            e
+        })?;
+
+    // Step 2: Upload with new key
+    let upload_result = client
+        .upload_object(bucket, new_key, &temp_path)
+        .await;
+
+    // Clean up temp file regardless of outcome
+    let _ = std::fs::remove_file(&temp_path);
+
+    let info = upload_result?;
+
+    // Step 3: Delete the original object
+    client.delete_object(bucket, object).await?;
+
+    let output = RenameObjectOutput {
+        success: true,
+        bucket_key: bucket.to_string(),
+        old_key: object.to_string(),
+        new_key: new_key.to_string(),
+        size: info.size,
+        size_human: format_size(info.size),
+        message: format!(
+            "Renamed '{}/{}' to '{}/{}'",
+            bucket, object, bucket, new_key
+        ),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+            println!("  {} {}", "Old key:".bold(), output.old_key);
+            println!("  {} {}", "New key:".bold(), output.new_key);
+            println!("  {} {}", "Size:".bold(), output.size_human);
         }
         _ => {
             output_format.write(&output)?;

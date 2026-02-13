@@ -689,6 +689,102 @@ impl DataManagementClient {
         Ok(())
     }
 
+    /// Rename a folder
+    ///
+    /// Updates the folder's name using the JSON:API PATCH endpoint.
+    pub async fn rename_folder(
+        &self,
+        project_id: &str,
+        folder_id: &str,
+        new_name: &str,
+    ) -> Result<Folder> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/folders/{}",
+            self.config.data_url(),
+            project_id,
+            folder_id
+        );
+
+        // Build JSON:API PATCH request for updating folder
+        let request = serde_json::json!({
+            "jsonapi": {
+                "version": "1.0"
+            },
+            "data": {
+                "type": "folders",
+                "id": folder_id,
+                "attributes": {
+                    "name": new_name
+                }
+            }
+        });
+
+        // Log request in verbose/debug mode
+        logging::log_request("PATCH", &url);
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/vnd.api+json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to rename folder")?;
+
+        // Log response in verbose/debug mode
+        logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to rename folder ({status}): {error_text}");
+        }
+
+        let api_response: JsonApiResponse<Folder> = response
+            .json()
+            .await
+            .context("Failed to parse folder response")?;
+
+        Ok(api_response.data)
+    }
+
+    /// Delete a folder from a project
+    ///
+    /// This removes the folder from the project.
+    pub async fn delete_folder(&self, project_id: &str, folder_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/folders/{}",
+            self.config.data_url(),
+            project_id,
+            folder_id
+        );
+
+        // Log request in verbose/debug mode
+        logging::log_request("DELETE", &url);
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete folder")?;
+
+        // Log response in verbose/debug mode
+        logging::log_response(response.status().as_u16(), &url);
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete folder ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
     /// Rename an item (update display name)
     ///
     /// Updates the item's display name without changing the file content.
