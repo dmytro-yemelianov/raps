@@ -2,6 +2,8 @@
 //!
 //! Tests for the main raps binary, version, help, and top-level commands.
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 

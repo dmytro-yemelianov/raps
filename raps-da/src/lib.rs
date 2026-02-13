@@ -716,7 +716,10 @@ mod tests {
         }"#;
 
         let response: PaginatedResponse<WorkItem> = serde_json::from_str(json).unwrap();
-        assert_eq!(response.pagination_token, Some("next-token-abc".to_string()));
+        assert_eq!(
+            response.pagination_token,
+            Some("next-token-abc".to_string())
+        );
         assert_eq!(response.data.len(), 2);
         assert_eq!(response.data[0].id, "wi-001");
         assert_eq!(response.data[0].status, "success");
@@ -769,7 +772,10 @@ mod tests {
         assert_eq!(stats.time_queued, Some("2024-01-01T00:00:00Z".to_string()));
         assert_eq!(stats.bytes_downloaded, Some(5242880));
         assert_eq!(stats.bytes_uploaded, Some(1048576));
-        assert_eq!(stats.time_finished, Some("2024-01-01T00:01:06Z".to_string()));
+        assert_eq!(
+            stats.time_finished,
+            Some("2024-01-01T00:01:06Z".to_string())
+        );
     }
 }
 

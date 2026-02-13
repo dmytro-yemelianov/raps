@@ -702,8 +702,8 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
         } else {
             None
         };
-        let source = if data.active_profile.is_some() {
-            format!("profile:{}", data.active_profile.as_ref().unwrap())
+        let source = if let Some(ref profile) = data.active_profile {
+            format!("profile:{}", profile)
         } else {
             "environment".to_string()
         };
@@ -941,25 +941,13 @@ async fn set_context(key: &str, value: &str, output_format: OutputFormat) -> Res
 
     match key {
         "hub_id" => {
-            profile.context_hub_id = if clear {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            profile.context_hub_id = if clear { None } else { Some(value.to_string()) };
         }
         "project_id" => {
-            profile.context_project_id = if clear {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            profile.context_project_id = if clear { None } else { Some(value.to_string()) };
         }
         "account_id" => {
-            profile.context_account_id = if clear {
-                None
-            } else {
-                Some(value.to_string())
-            };
+            profile.context_account_id = if clear { None } else { Some(value.to_string()) };
         }
         _ => {
             anyhow::bail!(
@@ -982,11 +970,7 @@ async fn set_context(key: &str, value: &str, output_format: OutputFormat) -> Res
     let output = SetContextOutput {
         success: true,
         key: key.to_string(),
-        value: if clear {
-            None
-        } else {
-            Some(value.to_string())
-        },
+        value: if clear { None } else { Some(value.to_string()) },
         profile: profile_name.clone(),
     };
 
@@ -1047,10 +1031,7 @@ async fn clear_context(output_format: OutputFormat) -> Result<()> {
     let output = ClearContextOutput {
         success: true,
         profile: profile_name.clone(),
-        message: format!(
-            "All context values cleared in profile '{}'",
-            profile_name
-        ),
+        message: format!("All context values cleared in profile '{}'", profile_name),
     };
 
     match output_format {

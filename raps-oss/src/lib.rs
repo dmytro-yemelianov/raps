@@ -1481,7 +1481,7 @@ mod tests {
         // File of 12 MB with 5 MB chunks = 3 parts
         let file_size: u64 = 12 * 1024 * 1024;
         let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
-        let total_parts = (file_size + chunk_size - 1) / chunk_size;
+        let total_parts = file_size.div_ceil(chunk_size);
         assert_eq!(total_parts, 3);
     }
 
@@ -1678,14 +1678,14 @@ mod tests {
     #[test]
     fn test_retention_policy_serialization() {
         let policy = RetentionPolicy::Persistent;
-        let json = serde_json::to_value(&policy).unwrap();
+        let json = serde_json::to_value(policy).unwrap();
         assert_eq!(json, "persistent");
     }
 
     #[test]
     fn test_region_serialization() {
         let region = Region::EMEA;
-        let json = serde_json::to_value(&region).unwrap();
+        let json = serde_json::to_value(region).unwrap();
         assert_eq!(json, "EMEA");
     }
 }

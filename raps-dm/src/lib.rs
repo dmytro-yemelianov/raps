@@ -1266,7 +1266,9 @@ mod integration_tests {
     async fn test_rename_folder() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
         let client = create_mock_dm_client(&server.url);
-        let result = client.rename_folder("b.project-123", "folder-456", "New Name").await;
+        let result = client
+            .rename_folder("b.project-123", "folder-456", "New Name")
+            .await;
         let _ = result;
     }
 

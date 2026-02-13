@@ -644,9 +644,7 @@ impl UserCommands {
                                 (Some(f), Some(l)) => format!("{} {}", f, l),
                                 (Some(f), None) => f.clone(),
                                 (None, Some(l)) => l.clone(),
-                                (None, None) => {
-                                    u.name.clone().unwrap_or_default()
-                                }
+                                (None, None) => u.name.clone().unwrap_or_default(),
                             };
                             UserListOutput {
                                 id: u.id.clone(),
@@ -967,9 +965,7 @@ impl UserCommands {
 
                 // Validate: at least --role or --company must be provided
                 if role.is_none() && company.is_none() {
-                    anyhow::bail!(
-                        "At least one of --role or --company must be provided."
-                    );
+                    anyhow::bail!("At least one of --role or --company must be provided.");
                 }
 
                 // Get account ID from parameter or environment
@@ -1277,7 +1273,9 @@ impl UserCommands {
                     products: None,
                 };
 
-                let user = users_client.update_user(&project, &user_id, request).await?;
+                let user = users_client
+                    .update_user(&project, &user_id, request)
+                    .await?;
 
                 #[derive(Serialize)]
                 struct UpdateResult {
@@ -1682,10 +1680,7 @@ impl AdminProjectCommands {
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!(
-                            "\n{} Project created successfully!",
-                            "✓".green().bold()
-                        );
+                        println!("\n{} Project created successfully!", "✓".green().bold());
                         println!("{:<15} {}", "ID:".bold(), project.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), project.name);
                         println!(
@@ -1755,10 +1750,7 @@ impl AdminProjectCommands {
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!(
-                            "\n{} Project updated successfully!",
-                            "✓".green().bold()
-                        );
+                        println!("\n{} Project updated successfully!", "✓".green().bold());
                         println!("{:<15} {}", "ID:".bold(), updated.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), updated.name);
                         println!(
@@ -1807,16 +1799,11 @@ impl AdminProjectCommands {
                     http_config,
                 );
 
-                admin_client
-                    .archive_project(&account_id, &project)
-                    .await?;
+                admin_client.archive_project(&account_id, &project).await?;
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!(
-                            "\n{} Project archived successfully!",
-                            "✓".green().bold()
-                        );
+                        println!("\n{} Project archived successfully!", "✓".green().bold());
                         println!("{:<15} {}", "ID:".bold(), project.cyan());
                     }
                     _ => {
@@ -2005,11 +1992,7 @@ async fn execute_csv_update(
                 let row: CsvUpdateRow = row;
                 // Validate email
                 if row.email.is_empty() || !row.email.contains('@') {
-                    validation_errors.push(format!(
-                        "Row {}: invalid email '{}'",
-                        i + 2,
-                        row.email
-                    ));
+                    validation_errors.push(format!("Row {}: invalid email '{}'", i + 2, row.email));
                     continue;
                 }
                 // Validate at least one field to update
@@ -2104,7 +2087,7 @@ async fn execute_csv_update(
 
     for row in &rows {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", row.email));
+            pb.set_message(row.email.to_string());
         }
 
         if dry_run {
@@ -2788,11 +2771,7 @@ async fn execute_csv_import(
                 let row: CsvImportRow = row;
                 // Validate email
                 if row.email.is_empty() || !row.email.contains('@') {
-                    validation_errors.push(format!(
-                        "Row {}: invalid email '{}'",
-                        i + 2,
-                        row.email
-                    ));
+                    validation_errors.push(format!("Row {}: invalid email '{}'", i + 2, row.email));
                     continue;
                 }
                 rows.push(row);
@@ -2860,11 +2839,8 @@ async fn execute_csv_import(
 
     // Create users client and call import_users
     let http_config = HttpClientConfig::default();
-    let users_client = ProjectUsersClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config,
-    );
+    let users_client =
+        ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
 
     let result = users_client.import_users(project_id, users).await?;
 
@@ -2983,11 +2959,8 @@ async fn execute_company_list(
     }
 
     let http_config = HttpClientConfig::default();
-    let admin_client = AccountAdminClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config,
-    );
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
 
     let companies = admin_client.list_companies(&account_id).await?;
 

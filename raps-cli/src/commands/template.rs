@@ -122,12 +122,7 @@ impl TemplateCommands {
                         println!("\n{}", "Templates:".bold());
                         println!("{}", "─".repeat(80));
                         for t in &outputs {
-                            println!(
-                                "{:<40} {:<30} {}",
-                                t.id.cyan(),
-                                t.name,
-                                t.status.green()
-                            );
+                            println!("{:<40} {:<30} {}", t.id.cyan(), t.name, t.status.green());
                         }
                         println!("{}", "─".repeat(80));
                         println!("{} {} template(s)", "→".cyan(), outputs.len());
@@ -193,9 +188,7 @@ impl TemplateCommands {
                         let output = TemplateOutput {
                             id: project.id,
                             name: project.name,
-                            status: project
-                                .status
-                                .unwrap_or_else(|| "pending".to_string()),
+                            status: project.status.unwrap_or_else(|| "pending".to_string()),
                         };
                         output_format.write(&output)?;
                     }
@@ -233,9 +226,7 @@ impl TemplateCommands {
                         let output = TemplateOutput {
                             id: project.id,
                             name: project.name,
-                            status: project
-                                .status
-                                .unwrap_or_else(|| "unknown".to_string()),
+                            status: project.status.unwrap_or_else(|| "unknown".to_string()),
                         };
                         output_format.write(&output)?;
                     }

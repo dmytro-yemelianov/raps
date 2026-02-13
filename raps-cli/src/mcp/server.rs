@@ -17,12 +17,12 @@ use raps_acc::{
     permissions::FolderPermissionsClient, users::ProjectUsersClient,
 };
 use raps_admin::{BulkConfig, FolderType, PermissionLevel, ProjectFilter, StateManager};
+use raps_da::DesignAutomationClient;
 use raps_derivative::{DerivativeClient, OutputFormat};
 use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
-use raps_da::DesignAutomationClient;
 use raps_oss::{OssClient, Region, RetentionPolicy};
 use raps_reality::RealityCaptureClient;
 use raps_webhooks::{UpdateWebhookRequest, WebhooksClient};
@@ -180,11 +180,7 @@ impl RapsServer {
     // Helper to get Webhooks client (created on demand, not cached)
     async fn get_webhooks_client(&self) -> WebhooksClient {
         let auth = self.get_auth_client().await;
-        WebhooksClient::new_with_http_config(
-            (*self.config).clone(),
-            auth,
-            self.http_config.clone(),
-        )
+        WebhooksClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
     }
 
     // Helper to get Design Automation client (created on demand, not cached)
@@ -279,7 +275,9 @@ impl RapsServer {
         let auth = self.get_auth_client().await;
 
         match auth.logout().await {
-            Ok(()) => "Successfully logged out. 3-legged OAuth tokens have been cleared.".to_string(),
+            Ok(()) => {
+                "Successfully logged out. 3-legged OAuth tokens have been cleared.".to_string()
+            }
             Err(e) => format!("Logout failed: {}", e),
         }
     }
@@ -2430,7 +2428,10 @@ impl RapsServer {
             ..Default::default()
         };
 
-        match client.update_project(&account_id, &project_id, request).await {
+        match client
+            .update_project(&account_id, &project_id, request)
+            .await
+        {
             Ok(project) => format!(
                 "Updated project:\n* Name: {}\n* ID: {}\n* Status: {}",
                 project.name,
@@ -2509,10 +2510,7 @@ impl RapsServer {
     async fn template_list(&self, account_id: String, limit: Option<usize>) -> String {
         let client = self.get_admin_client().await;
 
-        match client
-            .list_templates(&account_id, limit, None)
-            .await
-        {
+        match client.list_templates(&account_id, limit, None).await {
             Ok(response) => {
                 if response.results.is_empty() {
                     return "No templates found in this account.".to_string();
@@ -2657,7 +2655,10 @@ impl RapsServer {
             ..Default::default()
         };
 
-        match client.update_project(&account_id, &template_id, request).await {
+        match client
+            .update_project(&account_id, &template_id, request)
+            .await
+        {
             Ok(project) => format!(
                 "Updated template:\n* Name: {}\n* ID: {}\n* Status: {}",
                 project.name,
@@ -2780,8 +2781,8 @@ impl RapsServer {
         headers: Option<Map<String, Value>>,
         body: Option<Value>,
     ) -> String {
-        use reqwest::header::{HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
         use raps_kernel::http::is_allowed_url;
+        use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName, HeaderValue};
 
         // Validate HTTP method
         let http_method = match method.to_uppercase().as_str() {
@@ -2815,12 +2816,11 @@ impl RapsServer {
             let query_string: String = query_params
                 .iter()
                 .map(|(k, v)| {
-                    let val = v.as_str().map(String::from).unwrap_or_else(|| v.to_string());
-                    format!(
-                        "{}={}",
-                        urlencoding::encode(k),
-                        urlencoding::encode(&val)
-                    )
+                    let val = v
+                        .as_str()
+                        .map(String::from)
+                        .unwrap_or_else(|| v.to_string());
+                    format!("{}={}", urlencoding::encode(k), urlencoding::encode(&val))
                 })
                 .collect::<Vec<_>>()
                 .join("&");
@@ -2949,7 +2949,11 @@ impl RapsServer {
         } else {
             // Truncate non-JSON responses
             if body_text.len() > 2000 {
-                format!("{}...\n[Truncated, {} bytes total]", &body_text[..2000], body_text.len())
+                format!(
+                    "{}...\n[Truncated, {} bytes total]",
+                    &body_text[..2000],
+                    body_text.len()
+                )
             } else {
                 body_text
             }
@@ -3024,19 +3028,13 @@ impl RapsServer {
                         })
                         .collect();
 
-                    let mut output = format!(
-                        "Found {} user(s) in project {}:\n\n",
-                        filtered.len(),
-                        pid
-                    );
+                    let mut output =
+                        format!("Found {} user(s) in project {}:\n\n", filtered.len(), pid);
                     for u in &filtered {
                         let email = u.email.as_deref().unwrap_or("N/A");
                         let name = u.name.as_deref().unwrap_or("N/A");
                         let role_name = u.role_name.as_deref().unwrap_or("N/A");
-                        output.push_str(&format!(
-                            "* {} ({}) - role: {}\n",
-                            email, name, role_name
-                        ));
+                        output.push_str(&format!("* {} ({}) - role: {}\n", email, name, role_name));
                     }
                     output
                 }
@@ -3256,11 +3254,7 @@ impl RapsServer {
                 for hook in &hooks {
                     output.push_str(&format!(
                         "* {} (system: {}, event: {}, status: {})\n  URL: {}\n",
-                        hook.hook_id,
-                        hook.system,
-                        hook.event,
-                        hook.status,
-                        hook.callback_url,
+                        hook.hook_id, hook.system, hook.event, hook.status, hook.callback_url,
                     ));
                 }
                 output
@@ -3284,10 +3278,7 @@ impl RapsServer {
             Ok(hook) => {
                 format!(
                     "Webhook created successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}",
-                    hook.hook_id,
-                    hook.system,
-                    hook.event,
-                    hook.callback_url,
+                    hook.hook_id, hook.system, hook.event, hook.callback_url,
                 )
             }
             Err(e) => format!("Failed to create webhook: {}", e),
@@ -3318,11 +3309,7 @@ impl RapsServer {
             Ok(hook) => {
                 let mut output = format!(
                     "Webhook Details:\n\n* Hook ID: {}\n* System: {}\n* Event: {}\n* Callback: {}\n* Status: {}",
-                    hook.hook_id,
-                    hook.system,
-                    hook.event,
-                    hook.callback_url,
-                    hook.status,
+                    hook.hook_id, hook.system, hook.event, hook.callback_url, hook.status,
                 );
                 if let Some(ref created) = hook.created_date {
                     output.push_str(&format!("\n* Created: {}", created));
@@ -3358,11 +3345,7 @@ impl RapsServer {
             Ok(hook) => {
                 format!(
                     "Webhook updated successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}\nStatus: {}",
-                    hook.hook_id,
-                    hook.system,
-                    hook.event,
-                    hook.callback_url,
-                    hook.status,
+                    hook.hook_id, hook.system, hook.event, hook.callback_url, hook.status,
                 )
             }
             Err(e) => format!("Failed to update webhook: {}", e),
@@ -3431,9 +3414,7 @@ impl RapsServer {
             Ok(item) => {
                 format!(
                     "Workitem created!\n\nID: {}\nStatus: {}\nActivity: {}",
-                    item.id,
-                    item.status,
-                    activity_id,
+                    item.id, item.status, activity_id,
                 )
             }
             Err(e) => format!("Failed to create workitem: {}", e),
@@ -3500,7 +3481,7 @@ impl RapsServer {
                 return format!(
                     "Invalid scene_type '{}'. Valid values: aerial, object",
                     other
-                )
+                );
             }
         };
 
@@ -3514,7 +3495,7 @@ impl RapsServer {
                 return format!(
                     "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
                     other
-                )
+                );
             }
         };
 
@@ -3573,7 +3554,7 @@ impl RapsServer {
                 return format!(
                     "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
                     other
-                )
+                );
             }
         };
 
@@ -4562,7 +4543,8 @@ impl RapsServer {
                 };
                 let name = Self::optional_arg(&args, "name");
                 let status = Self::optional_arg(&args, "status");
-                self.template_update(account_id, template_id, name, status).await
+                self.template_update(account_id, template_id, name, status)
+                    .await
             }
             "template_archive" => {
                 let account_id = match Self::required_arg(&args, "account_id") {
@@ -4649,16 +4631,13 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                let query: Option<Map<String, Value>> = args
-                    .get("query")
-                    .and_then(|v| v.as_object())
-                    .cloned();
-                let headers: Option<Map<String, Value>> = args
-                    .get("headers")
-                    .and_then(|v| v.as_object())
-                    .cloned();
+                let query: Option<Map<String, Value>> =
+                    args.get("query").and_then(|v| v.as_object()).cloned();
+                let headers: Option<Map<String, Value>> =
+                    args.get("headers").and_then(|v| v.as_object()).cloned();
                 let body: Option<Value> = args.get("body").cloned();
-                self.api_request(method, endpoint, query, headers, body).await
+                self.api_request(method, endpoint, query, headers, body)
+                    .await
             }
 
             // ================================================================

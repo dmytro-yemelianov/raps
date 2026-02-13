@@ -394,7 +394,10 @@ mod tests {
 
     #[test]
     fn test_project_classification_display() {
-        assert_eq!(format!("{}", ProjectClassification::Production), "production");
+        assert_eq!(
+            format!("{}", ProjectClassification::Production),
+            "production"
+        );
         assert_eq!(format!("{}", ProjectClassification::Template), "template");
         assert_eq!(format!("{}", ProjectClassification::Component), "component");
         assert_eq!(format!("{}", ProjectClassification::Sample), "sample");
@@ -444,7 +447,11 @@ mod tests {
             id: "b.123".to_string(),
             name: "Test".to_string(),
             platform: None,
-            products: Some(vec!["docs".to_string(), "build".to_string(), "modelCoordination".to_string()]),
+            products: Some(vec![
+                "docs".to_string(),
+                "build".to_string(),
+                "modelCoordination".to_string(),
+            ]),
             status: None,
             account_id: None,
             created_at: None,

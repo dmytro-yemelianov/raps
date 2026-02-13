@@ -49,6 +49,7 @@ pub struct BulkUpdateFolderRightsParams {
 ///
 /// # Returns
 /// Result containing the bulk operation outcome
+#[allow(clippy::too_many_arguments)]
 pub async fn bulk_update_folder_rights<P>(
     admin_client: &AccountAdminClient,
     permissions_client: Arc<FolderPermissionsClient>,

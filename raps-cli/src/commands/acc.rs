@@ -409,13 +409,10 @@ async fn list_assets(
         println!("{}", "Fetching assets...".dimmed());
     }
 
-    let assets = client
-        .list_assets(project_id)
-        .await
-        .context(format!(
-            "Failed to list assets for project '{}'",
-            project_id
-        ))?;
+    let assets = client.list_assets(project_id).await.context(format!(
+        "Failed to list assets for project '{}'",
+        project_id
+    ))?;
 
     let outputs: Vec<AssetOutput> = assets
         .iter()
@@ -490,13 +487,10 @@ async fn list_submittals(
         println!("{}", "Fetching submittals...".dimmed());
     }
 
-    let submittals = client
-        .list_submittals(project_id)
-        .await
-        .context(format!(
-            "Failed to list submittals for project '{}'",
-            project_id
-        ))?;
+    let submittals = client.list_submittals(project_id).await.context(format!(
+        "Failed to list submittals for project '{}'",
+        project_id
+    ))?;
 
     let outputs: Vec<SubmittalOutput> = submittals
         .iter()
@@ -579,13 +573,10 @@ async fn list_checklists(
         println!("{}", "Fetching checklists...".dimmed());
     }
 
-    let checklists = client
-        .list_checklists(project_id)
-        .await
-        .context(format!(
-            "Failed to list checklists for project '{}'",
-            project_id
-        ))?;
+    let checklists = client.list_checklists(project_id).await.context(format!(
+        "Failed to list checklists for project '{}'",
+        project_id
+    ))?;
 
     let outputs: Vec<ChecklistOutput> = checklists
         .iter()
@@ -1135,16 +1126,8 @@ async fn create_submittals_from_csv(
             println!("\n{}", "Bulk Submittal Creation Results:".bold());
             println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Total:".bold(), rows.len());
-            println!(
-                "{:<15} {}",
-                "Created:".bold(),
-                created.to_string().green()
-            );
-            println!(
-                "{:<15} {}",
-                "Failed:".bold(),
-                failed.to_string().red()
-            );
+            println!("{:<15} {}", "Created:".bold(), created.to_string().green());
+            println!("{:<15} {}", "Failed:".bold(), failed.to_string().red());
             println!("{}", "─".repeat(60));
 
             if !errors.is_empty() {

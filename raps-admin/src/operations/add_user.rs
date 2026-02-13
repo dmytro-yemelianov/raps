@@ -47,6 +47,7 @@ pub struct BulkAddUserParams {
 ///
 /// # Returns
 /// Result containing the bulk operation outcome
+#[allow(clippy::too_many_arguments)]
 pub async fn bulk_add_user<P>(
     admin_client: &AccountAdminClient,
     users_client: Arc<ProjectUsersClient>,

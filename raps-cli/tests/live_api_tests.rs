@@ -11,6 +11,8 @@
 //! - APS_CALLBACK_URL (for 3-legged tests)
 //! - APS_DA_NICKNAME (for Design Automation tests)
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt;
 use std::env;

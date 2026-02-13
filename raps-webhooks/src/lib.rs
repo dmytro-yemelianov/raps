@@ -569,7 +569,9 @@ mod integration_tests {
     async fn test_get_webhook_with_mock() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
         let client = create_mock_webhooks_client(&server.url);
-        let result = client.get_webhook("data", "dm.version.added", "hook-123").await;
+        let result = client
+            .get_webhook("data", "dm.version.added", "hook-123")
+            .await;
         let _ = result;
     }
 
@@ -582,7 +584,9 @@ mod integration_tests {
             status: None,
             filter: None,
         };
-        let result = client.update_webhook("data", "dm.version.added", "hook-123", request).await;
+        let result = client
+            .update_webhook("data", "dm.version.added", "hook-123", request)
+            .await;
         let _ = result;
     }
 }

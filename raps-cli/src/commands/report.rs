@@ -21,6 +21,7 @@ use raps_kernel::http::HttpClientConfig;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::enum_variant_names)]
 pub enum ReportCommands {
     /// RFI summary across portfolio projects
     RfiSummary {
@@ -163,15 +164,34 @@ impl ReportCommands {
                 filter,
                 status,
                 since,
-            } => rfi_summary(config, auth_client, account, filter, status, since, output_format).await,
+            } => {
+                rfi_summary(
+                    config,
+                    auth_client,
+                    account,
+                    filter,
+                    status,
+                    since,
+                    output_format,
+                )
+                .await
+            }
             ReportCommands::IssuesSummary {
                 account,
                 filter,
                 status,
                 since,
             } => {
-                issues_summary(config, auth_client, account, filter, status, since, output_format)
-                    .await
+                issues_summary(
+                    config,
+                    auth_client,
+                    account,
+                    filter,
+                    status,
+                    since,
+                    output_format,
+                )
+                .await
             }
             ReportCommands::SubmittalsSummary {
                 account,
@@ -273,7 +293,7 @@ async fn rfi_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         // Fetch RFIs for this project
@@ -478,9 +498,7 @@ async fn issues_summary(
         let pb = ProgressBar::new(filtered_projects.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching issues...",
-                )
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching issues...")
                 .unwrap()
                 .progress_chars("=>-"),
         );
@@ -496,7 +514,7 @@ async fn issues_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match issues_client.list_issues(&project.id, None).await {
@@ -698,7 +716,7 @@ async fn submittals_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_submittals(&project.id).await {
@@ -749,11 +767,7 @@ async fn submittals_summary(
 
             println!("{}", "Submittals Portfolio Summary:".bold());
             println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "Project".bold(),
-                "Total".bold()
-            );
+            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
             println!("{}", "─".repeat(45));
 
             for s in &output.projects {
@@ -762,11 +776,7 @@ async fn submittals_summary(
                 } else {
                     s.project_name.clone()
                 };
-                println!(
-                    "{:<30} {:>8}",
-                    name,
-                    s.total.to_string().cyan(),
-                );
+                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
             }
 
             println!("{}", "─".repeat(45));
@@ -865,7 +875,7 @@ async fn checklists_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_checklists(&project.id).await {
@@ -916,11 +926,7 @@ async fn checklists_summary(
 
             println!("{}", "Checklists Portfolio Summary:".bold());
             println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "Project".bold(),
-                "Total".bold()
-            );
+            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
             println!("{}", "─".repeat(45));
 
             for s in &output.projects {
@@ -929,11 +935,7 @@ async fn checklists_summary(
                 } else {
                     s.project_name.clone()
                 };
-                println!(
-                    "{:<30} {:>8}",
-                    name,
-                    s.total.to_string().cyan(),
-                );
+                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
             }
 
             println!("{}", "─".repeat(45));
@@ -1014,9 +1016,7 @@ async fn assets_summary(
         let pb = ProgressBar::new(filtered_projects.len() as u64);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching assets...",
-                )
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching assets...")
                 .unwrap()
                 .progress_chars("=>-"),
         );
@@ -1031,7 +1031,7 @@ async fn assets_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_assets(&project.id).await {
@@ -1073,11 +1073,7 @@ async fn assets_summary(
 
             println!("{}", "Assets Portfolio Summary:".bold());
             println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "Project".bold(),
-                "Total".bold()
-            );
+            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
             println!("{}", "─".repeat(45));
 
             for s in &output.projects {
@@ -1086,11 +1082,7 @@ async fn assets_summary(
                 } else {
                     s.project_name.clone()
                 };
-                println!(
-                    "{:<30} {:>8}",
-                    name,
-                    s.total.to_string().cyan(),
-                );
+                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
             }
 
             println!("{}", "─".repeat(45));

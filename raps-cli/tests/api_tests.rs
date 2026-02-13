@@ -3,6 +3,8 @@
 
 //! Integration tests for the custom API command
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 
@@ -85,7 +87,15 @@ fn test_api_get_missing_endpoint() {
 fn test_api_post_data_file_conflict() {
     // --data and --data-file should conflict
     raps()
-        .args(["api", "post", "/test", "--data", "{}", "--data-file", "test.json"])
+        .args([
+            "api",
+            "post",
+            "/test",
+            "--data",
+            "{}",
+            "--data-file",
+            "test.json",
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("cannot be used with"));

@@ -10,7 +10,7 @@
 use anyhow::{Context, Result, bail};
 use clap::Subcommand;
 use colored::Colorize;
-use reqwest::header::{HeaderName, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderName, HeaderValue};
 use reqwest::{Client, Method, Response, StatusCode};
 use serde::Serialize;
 use serde_json::Value;
@@ -51,7 +51,6 @@ impl HttpMethod {
     }
 }
 
-
 /// Error response structure
 #[derive(Debug, Clone, Serialize)]
 pub struct ApiError {
@@ -61,7 +60,6 @@ pub struct ApiError {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub details: Option<Value>,
 }
-
 
 /// Custom API call commands
 #[derive(Debug, Subcommand)]
@@ -214,7 +212,16 @@ impl ApiCommands {
                 header,
                 output,
                 verbose,
-            } => (HttpMethod::Get, endpoint, query, header, None, None, output, verbose),
+            } => (
+                HttpMethod::Get,
+                endpoint,
+                query,
+                header,
+                None,
+                None,
+                output,
+                verbose,
+            ),
 
             ApiCommands::Post {
                 endpoint,
@@ -224,7 +231,16 @@ impl ApiCommands {
                 header,
                 output,
                 verbose,
-            } => (HttpMethod::Post, endpoint, query, header, data, data_file, output, verbose),
+            } => (
+                HttpMethod::Post,
+                endpoint,
+                query,
+                header,
+                data,
+                data_file,
+                output,
+                verbose,
+            ),
 
             ApiCommands::Put {
                 endpoint,
@@ -234,7 +250,16 @@ impl ApiCommands {
                 header,
                 output,
                 verbose,
-            } => (HttpMethod::Put, endpoint, query, header, data, data_file, output, verbose),
+            } => (
+                HttpMethod::Put,
+                endpoint,
+                query,
+                header,
+                data,
+                data_file,
+                output,
+                verbose,
+            ),
 
             ApiCommands::Patch {
                 endpoint,
@@ -244,14 +269,32 @@ impl ApiCommands {
                 header,
                 output,
                 verbose,
-            } => (HttpMethod::Patch, endpoint, query, header, data, data_file, output, verbose),
+            } => (
+                HttpMethod::Patch,
+                endpoint,
+                query,
+                header,
+                data,
+                data_file,
+                output,
+                verbose,
+            ),
 
             ApiCommands::Delete {
                 endpoint,
                 query,
                 header,
                 verbose,
-            } => (HttpMethod::Delete, endpoint, query, header, None, None, None, verbose),
+            } => (
+                HttpMethod::Delete,
+                endpoint,
+                query,
+                header,
+                None,
+                None,
+                None,
+                verbose,
+            ),
         };
 
         // Build full URL from endpoint
@@ -273,15 +316,8 @@ impl ApiCommands {
 
         // Build and execute request
         let client = http_config.create_client()?;
-        let response = execute_request(
-            &client,
-            method,
-            &full_url,
-            &token,
-            &headers,
-            body.as_ref(),
-        )
-        .await?;
+        let response =
+            execute_request(&client, method, &full_url, &token, &headers, body.as_ref()).await?;
 
         // Handle response
         handle_response(response, output_format, output_file, verbose).await
@@ -292,10 +328,7 @@ impl ApiCommands {
 fn parse_key_value(s: &str) -> Result<(String, String), String> {
     let parts: Vec<&str> = s.splitn(2, '=').collect();
     if parts.len() != 2 {
-        return Err(format!(
-            "Invalid format '{}'. Expected KEY=VALUE",
-            s
-        ));
+        return Err(format!("Invalid format '{}'. Expected KEY=VALUE", s));
     }
     Ok((parts[0].to_string(), parts[1].to_string()))
 }
@@ -380,8 +413,8 @@ fn parse_body(
 
     // Parse and validate JSON
     if let Some(body_str) = body_str {
-        let value: Value = serde_json::from_str(&body_str)
-            .with_context(|| "Invalid JSON in request body")?;
+        let value: Value =
+            serde_json::from_str(&body_str).with_context(|| "Invalid JSON in request body")?;
         Ok(Some(value))
     } else {
         Ok(None)
@@ -425,25 +458,17 @@ async fn execute_request(
             logging::log_verbose("Warning: Cannot override Authorization header, ignoring");
             continue;
         }
-        if let (Ok(name), Ok(val)) = (
-            HeaderName::from_str(key),
-            HeaderValue::from_str(value),
-        ) {
+        if let (Ok(name), Ok(val)) = (HeaderName::from_str(key), HeaderValue::from_str(value)) {
             request = request.header(name, val);
         }
     }
 
     // Add body if present
     if let Some(body) = body {
-        request = request
-            .header(CONTENT_TYPE, "application/json")
-            .json(body);
+        request = request.header(CONTENT_TYPE, "application/json").json(body);
     }
 
-    let response = request
-        .send()
-        .await
-        .context("Failed to send request")?;
+    let response = request.send().await.context("Failed to send request")?;
 
     Ok(response)
 }
@@ -474,7 +499,15 @@ async fn handle_response(
 
     // Print verbose output if requested
     if verbose {
-        println!("{}", format!("HTTP/1.1 {} {}", status_code, status.canonical_reason().unwrap_or("")).cyan());
+        println!(
+            "{}",
+            format!(
+                "HTTP/1.1 {} {}",
+                status_code,
+                status.canonical_reason().unwrap_or("")
+            )
+            .cyan()
+        );
         for (key, value) in &headers {
             println!("{}: {}", key.dimmed(), value);
         }
@@ -483,7 +516,10 @@ async fn handle_response(
 
     // Handle response based on content type and status
     if content_type.contains("application/json") {
-        let body_text = response.text().await.context("Failed to read response body")?;
+        let body_text = response
+            .text()
+            .await
+            .context("Failed to read response body")?;
 
         // Try to parse as JSON
         let json: Result<Value, _> = serde_json::from_str(&body_text);
@@ -530,7 +566,10 @@ async fn handle_response(
         }
     } else if content_type.starts_with("text/") || content_type.contains("xml") {
         // Text response
-        let body_text = response.text().await.context("Failed to read response body")?;
+        let body_text = response
+            .text()
+            .await
+            .context("Failed to read response body")?;
 
         if status.is_success() {
             if let Some(path) = output_file {
@@ -546,12 +585,20 @@ async fn handle_response(
         }
     } else {
         // Binary response
-        let bytes = response.bytes().await.context("Failed to read response body")?;
+        let bytes = response
+            .bytes()
+            .await
+            .context("Failed to read response body")?;
 
         if status.is_success() {
             if let Some(path) = output_file {
                 std::fs::write(&path, &bytes)?;
-                println!("{} {} ({} bytes)", "Saved to:".green(), path.display(), bytes.len());
+                println!(
+                    "{} {} ({} bytes)",
+                    "Saved to:".green(),
+                    path.display(),
+                    bytes.len()
+                );
                 Ok(())
             } else {
                 bail!(
@@ -562,7 +609,12 @@ async fn handle_response(
                 );
             }
         } else {
-            eprintln!("{} {} - Binary error response ({} bytes)", "Error:".red(), status_code, bytes.len());
+            eprintln!(
+                "{} {} - Binary error response ({} bytes)",
+                "Error:".red(),
+                status_code,
+                bytes.len()
+            );
             std::process::exit(map_exit_code(status_code));
         }
     }
@@ -597,7 +649,10 @@ fn extract_error_message(value: &Value, status: StatusCode) -> String {
     }
 
     // Fallback to status text
-    status.canonical_reason().unwrap_or("Request failed").to_string()
+    status
+        .canonical_reason()
+        .unwrap_or("Request failed")
+        .to_string()
 }
 
 /// Map HTTP status code to exit code

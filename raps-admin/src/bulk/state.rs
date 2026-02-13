@@ -231,31 +231,30 @@ impl StateManager {
 
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "json") {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Ok(state) = serde_json::from_str::<OperationState>(&content) {
-                        // Apply status filter if provided
-                        if let Some(filter_status) = status_filter {
-                            if state.status != filter_status {
-                                continue;
-                            }
-                        }
-
-                        let (completed, failed, skipped) = count_results(&state.results);
-
-                        summaries.push(OperationSummary {
-                            operation_id: state.operation_id,
-                            operation_type: state.operation_type,
-                            status: state.status,
-                            total: state.project_ids.len(),
-                            completed,
-                            failed,
-                            skipped,
-                            created_at: state.created_at,
-                            updated_at: state.updated_at,
-                        });
-                    }
+            if path.extension().is_some_and(|ext| ext == "json")
+                && let Ok(content) = std::fs::read_to_string(&path)
+                && let Ok(state) = serde_json::from_str::<OperationState>(&content)
+            {
+                // Apply status filter if provided
+                if let Some(filter_status) = status_filter
+                    && state.status != filter_status
+                {
+                    continue;
                 }
+
+                let (completed, failed, skipped) = count_results(&state.results);
+
+                summaries.push(OperationSummary {
+                    operation_id: state.operation_id,
+                    operation_type: state.operation_type,
+                    status: state.status,
+                    total: state.project_ids.len(),
+                    completed,
+                    failed,
+                    skipped,
+                    created_at: state.created_at,
+                    updated_at: state.updated_at,
+                });
             }
         }
 

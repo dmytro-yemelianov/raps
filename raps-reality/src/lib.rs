@@ -588,7 +588,10 @@ mod tests {
         assert_eq!(response.photoscenes.photoscene.len(), 2);
         assert_eq!(response.photoscenes.photoscene[0].photoscene_id, "scene-1");
         assert_eq!(response.photoscenes.photoscene[1].photoscene_id, "scene-2");
-        assert_eq!(response.photoscenes.photoscene[0].name, Some("Scene One".to_string()));
+        assert_eq!(
+            response.photoscenes.photoscene[0].name,
+            Some("Scene One".to_string())
+        );
     }
 
     #[test]
@@ -650,7 +653,10 @@ mod tests {
         let response: ProgressResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.photoscene.photoscene_id, "scene-789");
         assert_eq!(response.photoscene.progress, "75");
-        assert_eq!(response.photoscene.progress_msg, Some("Processing images".to_string()));
+        assert_eq!(
+            response.photoscene.progress_msg,
+            Some("Processing images".to_string())
+        );
     }
 }
 

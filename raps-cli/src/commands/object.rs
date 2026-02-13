@@ -696,44 +696,26 @@ async fn object_info(
 
     match output_format {
         OutputFormat::Table => {
-            println!(
-                "\n{} {}",
-                "Object:".bold(),
-                output.object_key.cyan().bold()
-            );
+            println!("\n{} {}", "Object:".bold(), output.object_key.cyan().bold());
             println!("{}", "-".repeat(60));
-            println!(
-                "  {} {}",
-                "Bucket:".bold(),
-                output.bucket_key
-            );
+            println!("  {} {}", "Bucket:".bold(), output.bucket_key);
             println!(
                 "  {} {} ({})",
                 "Size:".bold(),
                 output.size_human,
                 output.size
             );
-            println!(
-                "  {} {}",
-                "Content-Type:".bold(),
-                output.content_type
-            );
+            println!("  {} {}", "Content-Type:".bold(), output.content_type);
             println!("  {} {}", "SHA1:".bold(), output.sha1.dimmed());
             println!(
                 "  {} {}",
                 "Created:".bold(),
-                output
-                    .created_date
-                    .as_deref()
-                    .unwrap_or("N/A")
+                output.created_date.as_deref().unwrap_or("N/A")
             );
             println!(
                 "  {} {}",
                 "Modified:".bold(),
-                output
-                    .last_modified_date
-                    .as_deref()
-                    .unwrap_or("N/A")
+                output.last_modified_date.as_deref().unwrap_or("N/A")
             );
             println!(
                 "\n  {} {}",
@@ -797,9 +779,8 @@ async fn copy_object(
     client
         .download_object(source_bucket, source_object, &temp_path)
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             let _ = std::fs::remove_file(&temp_path);
-            e
         })?;
 
     // Upload to destination
@@ -885,15 +866,12 @@ async fn rename_object(
     client
         .download_object(bucket, object, &temp_path)
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             let _ = std::fs::remove_file(&temp_path);
-            e
         })?;
 
     // Step 2: Upload with new key
-    let upload_result = client
-        .upload_object(bucket, new_key, &temp_path)
-        .await;
+    let upload_result = client.upload_object(bucket, new_key, &temp_path).await;
 
     // Clean up temp file regardless of outcome
     let _ = std::fs::remove_file(&temp_path);
