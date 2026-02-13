@@ -779,9 +779,8 @@ async fn copy_object(
     client
         .download_object(source_bucket, source_object, &temp_path)
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             let _ = std::fs::remove_file(&temp_path);
-            e
         })?;
 
     // Upload to destination
@@ -867,9 +866,8 @@ async fn rename_object(
     client
         .download_object(bucket, object, &temp_path)
         .await
-        .map_err(|e| {
+        .inspect_err(|_| {
             let _ = std::fs::remove_file(&temp_path);
-            e
         })?;
 
     // Step 2: Upload with new key

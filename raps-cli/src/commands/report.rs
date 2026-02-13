@@ -21,6 +21,7 @@ use raps_kernel::http::HttpClientConfig;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
+#[allow(clippy::enum_variant_names)]
 pub enum ReportCommands {
     /// RFI summary across portfolio projects
     RfiSummary {
@@ -292,7 +293,7 @@ async fn rfi_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         // Fetch RFIs for this project
@@ -513,7 +514,7 @@ async fn issues_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match issues_client.list_issues(&project.id, None).await {
@@ -715,7 +716,7 @@ async fn submittals_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_submittals(&project.id).await {
@@ -874,7 +875,7 @@ async fn checklists_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_checklists(&project.id).await {
@@ -1030,7 +1031,7 @@ async fn assets_summary(
 
     for project in &filtered_projects {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", project.name));
+            pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_assets(&project.id).await {

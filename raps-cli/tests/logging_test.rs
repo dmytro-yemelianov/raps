@@ -1,5 +1,6 @@
+#![allow(deprecated)]
+
 use assert_cmd::Command;
-use predicates::prelude::*;
 
 #[test]
 fn test_no_color_flag() {

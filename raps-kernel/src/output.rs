@@ -222,6 +222,7 @@ mod tests {
     use super::*;
 
     #[derive(Serialize)]
+    #[allow(dead_code)]
     struct TestData {
         id: String,
         name: String,
@@ -229,6 +230,7 @@ mod tests {
     }
 
     #[derive(Serialize)]
+    #[allow(dead_code)]
     struct NestedData {
         id: String,
         items: Vec<String>,

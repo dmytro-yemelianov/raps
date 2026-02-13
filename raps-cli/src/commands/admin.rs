@@ -2087,7 +2087,7 @@ async fn execute_csv_update(
 
     for row in &rows {
         if let Some(ref pb) = progress_bar {
-            pb.set_message(format!("{}", row.email));
+            pb.set_message(row.email.to_string());
         }
 
         if dry_run {

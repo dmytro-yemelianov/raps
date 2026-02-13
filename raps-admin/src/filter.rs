@@ -214,35 +214,33 @@ impl ProjectFilter {
         }
 
         // Check created_after
-        if let Some(ref after_date) = self.created_after {
-            if let Some(ref created) = project.created_at {
-                if created < after_date {
-                    return false;
-                }
-            }
+        if let Some(ref after_date) = self.created_after
+            && let Some(ref created) = project.created_at
+            && created < after_date
+        {
+            return false;
         }
 
         // Check created_before
-        if let Some(ref before_date) = self.created_before {
-            if let Some(ref created) = project.created_at {
-                if created > before_date {
-                    return false;
-                }
-            }
+        if let Some(ref before_date) = self.created_before
+            && let Some(ref created) = project.created_at
+            && created > before_date
+        {
+            return false;
         }
 
         // Check include_ids (if specified, project must be in the list)
-        if let Some(ref include_ids) = self.include_ids {
-            if !include_ids.contains(&project.id) {
-                return false;
-            }
+        if let Some(ref include_ids) = self.include_ids
+            && !include_ids.contains(&project.id)
+        {
+            return false;
         }
 
         // Check exclude_ids
-        if let Some(ref exclude_ids) = self.exclude_ids {
-            if exclude_ids.contains(&project.id) {
-                return false;
-            }
+        if let Some(ref exclude_ids) = self.exclude_ids
+            && exclude_ids.contains(&project.id)
+        {
+            return false;
         }
 
         true

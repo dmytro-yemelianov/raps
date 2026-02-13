@@ -702,8 +702,8 @@ async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
         } else {
             None
         };
-        let source = if data.active_profile.is_some() {
-            format!("profile:{}", data.active_profile.as_ref().unwrap())
+        let source = if let Some(ref profile) = data.active_profile {
+            format!("profile:{}", profile)
         } else {
             "environment".to_string()
         };

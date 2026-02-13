@@ -47,6 +47,7 @@ pub struct BulkUpdateRoleParams {
 ///
 /// # Returns
 /// Result containing the bulk operation outcome
+#[allow(clippy::too_many_arguments)]
 pub async fn bulk_update_role<P>(
     admin_client: &AccountAdminClient,
     users_client: Arc<ProjectUsersClient>,

@@ -2,6 +2,8 @@
 //!
 //! Tests CLI argument parsing, help output, and error handling for config commands.
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 

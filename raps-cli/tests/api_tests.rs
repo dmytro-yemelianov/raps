@@ -3,6 +3,8 @@
 
 //! Integration tests for the custom API command
 
+#![allow(deprecated)]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 

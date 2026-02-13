@@ -129,7 +129,7 @@ fn write_table<W: Write>(json_value: serde_json::Value, writer: &mut W) -> Resul
                 writeln!(writer, "\n{} row(s)", items.len())?;
             } else {
                 for item in &items {
-                    writeln!(writer, "{}", format_value_for_table(&item))?;
+                    writeln!(writer, "{}", format_value_for_table(item))?;
                 }
             }
         }

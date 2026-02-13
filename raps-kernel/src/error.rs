@@ -605,7 +605,7 @@ mod tests {
 
     #[test]
     fn test_interpret_409_conflict() {
-        let error = interpret_error(409, r#"{"error": "Conflict"}"#);
+        let _error = interpret_error(409, r#"{"error": "Conflict"}"#);
         assert_eq!(status_to_code(409), "Conflict");
     }
 
