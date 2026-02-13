@@ -696,6 +696,81 @@ mod tests {
         assert_eq!(engine.id, "Autodesk.Revit+2024");
         assert_eq!(engine.product_version, Some("2024".to_string()));
     }
+
+    #[test]
+    fn test_paginated_workitem_response_deserialization() {
+        let json = r#"{
+            "paginationToken": "next-token-abc",
+            "data": [
+                {
+                    "id": "wi-001",
+                    "status": "success",
+                    "progress": "100%",
+                    "reportUrl": "https://example.com/report1.txt"
+                },
+                {
+                    "id": "wi-002",
+                    "status": "pending"
+                }
+            ]
+        }"#;
+
+        let response: PaginatedResponse<WorkItem> = serde_json::from_str(json).unwrap();
+        assert_eq!(response.pagination_token, Some("next-token-abc".to_string()));
+        assert_eq!(response.data.len(), 2);
+        assert_eq!(response.data[0].id, "wi-001");
+        assert_eq!(response.data[0].status, "success");
+        assert!(response.data[0].report_url.is_some());
+        assert_eq!(response.data[1].id, "wi-002");
+        assert_eq!(response.data[1].status, "pending");
+        assert!(response.data[1].report_url.is_none());
+    }
+
+    #[test]
+    fn test_paginated_workitem_response_no_token() {
+        let json = r#"{
+            "data": [
+                {
+                    "id": "wi-003",
+                    "status": "inprogress",
+                    "progress": "25%"
+                }
+            ]
+        }"#;
+
+        let response: PaginatedResponse<WorkItem> = serde_json::from_str(json).unwrap();
+        assert!(response.pagination_token.is_none());
+        assert_eq!(response.data.len(), 1);
+        assert_eq!(response.data[0].progress, Some("25%".to_string()));
+    }
+
+    #[test]
+    fn test_workitem_full_stats_deserialization() {
+        let json = r#"{
+            "id": "wi-full",
+            "status": "success",
+            "reportUrl": "https://example.com/report.txt",
+            "stats": {
+                "timeQueued": "2024-01-01T00:00:00Z",
+                "timeDownloadStarted": "2024-01-01T00:00:01Z",
+                "timeInstructionStarted": "2024-01-01T00:00:02Z",
+                "timeInstructionEnded": "2024-01-01T00:01:00Z",
+                "timeUploadEnded": "2024-01-01T00:01:05Z",
+                "timeFinished": "2024-01-01T00:01:06Z",
+                "bytesDownloaded": 5242880,
+                "bytesUploaded": 1048576
+            }
+        }"#;
+
+        let workitem: WorkItem = serde_json::from_str(json).unwrap();
+        assert_eq!(workitem.id, "wi-full");
+        assert_eq!(workitem.status, "success");
+        let stats = workitem.stats.unwrap();
+        assert_eq!(stats.time_queued, Some("2024-01-01T00:00:00Z".to_string()));
+        assert_eq!(stats.bytes_downloaded, Some(5242880));
+        assert_eq!(stats.bytes_uploaded, Some(1048576));
+        assert_eq!(stats.time_finished, Some("2024-01-01T00:01:06Z".to_string()));
+    }
 }
 
 /// Integration tests using raps-mock
@@ -705,7 +780,7 @@ mod integration_tests {
     use raps_kernel::auth::AuthClient;
     use raps_kernel::config::Config;
 
-    fn create_mock_client(mock_url: &str) -> DesignAutomationClient {
+    fn create_mock_da_client(mock_url: &str) -> DesignAutomationClient {
         let config = Config {
             client_id: "test-client-id".to_string(),
             client_secret: "test-client-secret".to_string(),
@@ -721,7 +796,15 @@ mod integration_tests {
     #[tokio::test]
     async fn test_client_creation() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_client(&server.url);
+        let client = create_mock_da_client(&server.url);
         assert!(client.auth.config().base_url.starts_with("http://"));
+    }
+
+    #[tokio::test]
+    async fn test_list_workitems() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_da_client(&server.url);
+        let result = client.list_workitems().await;
+        let _ = result;
     }
 }

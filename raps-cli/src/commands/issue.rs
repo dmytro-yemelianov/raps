@@ -1043,3 +1043,99 @@ async fn transition_issue(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csv_issue_row_deserialization() {
+        let csv_data =
+            "title,description,status\nBroken pipe,Water leak in B2,open\n";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let row: CsvIssueRow = rdr.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.title, "Broken pipe");
+        assert_eq!(row.description.unwrap(), "Water leak in B2");
+        assert_eq!(row.status.unwrap(), "open");
+    }
+
+    #[test]
+    fn test_csv_issue_row_minimal() {
+        let csv_data = "title,description,status\nBroken pipe,,\n";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let row: CsvIssueRow = rdr.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.title, "Broken pipe");
+        // Optional fields may be None or empty string depending on csv crate behavior
+        assert!(
+            row.description.is_none() || row.description.as_deref() == Some(""),
+            "Expected None or empty for description, got {:?}",
+            row.description
+        );
+    }
+
+    #[test]
+    fn test_csv_issue_row_multiple_rows() {
+        let csv_data = "\
+title,description,status
+Broken pipe,Water leak in B2,open
+Missing rebar,Check section C,closed
+Crack in wall,,open
+";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let rows: Vec<CsvIssueRow> = rdr.deserialize().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].title, "Broken pipe");
+        assert_eq!(rows[1].title, "Missing rebar");
+        assert_eq!(rows[1].status.as_deref(), Some("closed"));
+        assert_eq!(rows[2].title, "Crack in wall");
+    }
+
+    #[test]
+    fn test_comment_output_serialization() {
+        let output = CommentOutput {
+            id: "comment-123".to_string(),
+            body: "This is a test comment".to_string(),
+            created_at: Some("2025-01-15T10:00:00Z".to_string()),
+            created_by: Some("user@example.com".to_string()),
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"id\":\"comment-123\""));
+        assert!(json.contains("\"body\":\"This is a test comment\""));
+        assert!(json.contains("\"created_at\":\"2025-01-15T10:00:00Z\""));
+        assert!(json.contains("\"created_by\":\"user@example.com\""));
+    }
+
+    #[test]
+    fn test_attachment_output_serialization() {
+        let output = AttachmentOutput {
+            id: "att-456".to_string(),
+            name: "photo.jpg".to_string(),
+            urn: Some("urn:adsk.objects:os.object:bucket/photo.jpg".to_string()),
+            created_at: Some("2025-02-01T12:00:00Z".to_string()),
+            created_by: None,
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"id\":\"att-456\""));
+        assert!(json.contains("\"name\":\"photo.jpg\""));
+        assert!(json.contains("\"urn\""));
+        // created_by is None so should still be present as null in default serialization
+        assert!(json.contains("\"created_by\":null"));
+    }
+
+    #[test]
+    fn test_truncate_str_short() {
+        assert_eq!(truncate_str("hello", 10), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_exact() {
+        assert_eq!(truncate_str("hello", 5), "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_long() {
+        let result = truncate_str("hello world", 8);
+        assert_eq!(result, "hello...");
+        assert_eq!(result.len(), 8);
+    }
+}

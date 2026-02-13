@@ -560,6 +560,98 @@ mod tests {
         let response: CreatePhotosceneResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.photoscene.photoscene_id, "new-scene-456");
     }
+
+    #[test]
+    fn test_list_photoscenes_response_deserialization() {
+        let json = r#"{
+            "Photoscenes": {
+                "photoscene": [
+                    {
+                        "photosceneid": "scene-1",
+                        "name": "Scene One",
+                        "scenetype": "aerial",
+                        "status": "Complete",
+                        "progress": "100"
+                    },
+                    {
+                        "photosceneid": "scene-2",
+                        "name": "Scene Two",
+                        "scenetype": "object",
+                        "status": "Created",
+                        "progress": "0"
+                    }
+                ]
+            }
+        }"#;
+
+        let response: ListPhotoscenesResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.photoscenes.photoscene.len(), 2);
+        assert_eq!(response.photoscenes.photoscene[0].photoscene_id, "scene-1");
+        assert_eq!(response.photoscenes.photoscene[1].photoscene_id, "scene-2");
+        assert_eq!(response.photoscenes.photoscene[0].name, Some("Scene One".to_string()));
+    }
+
+    #[test]
+    fn test_list_photoscenes_response_empty() {
+        let json = r#"{
+            "Photoscenes": {
+                "photoscene": []
+            }
+        }"#;
+
+        let response: ListPhotoscenesResponse = serde_json::from_str(json).unwrap();
+        assert!(response.photoscenes.photoscene.is_empty());
+    }
+
+    #[test]
+    fn test_list_photoscenes_response_missing_photoscenes() {
+        let json = r#"{}"#;
+
+        let response: ListPhotoscenesResponse = serde_json::from_str(json).unwrap();
+        assert!(response.photoscenes.photoscene.is_empty());
+    }
+
+    #[test]
+    fn test_upload_response_deserialization() {
+        let json = r#"{
+            "Files": {
+                "file": [
+                    {
+                        "filename": "photo1.jpg",
+                        "fileid": "file-001",
+                        "filesize": "2048000",
+                        "msg": "File uploaded"
+                    }
+                ]
+            },
+            "Usage": "1",
+            "Resource": "/file"
+        }"#;
+
+        let response: UploadResponse = serde_json::from_str(json).unwrap();
+        assert!(response.files.is_some());
+        let files = response.files.unwrap().file.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].filename, "photo1.jpg");
+        assert_eq!(files[0].fileid, "file-001");
+    }
+
+    #[test]
+    fn test_progress_response_deserialization() {
+        let json = r#"{
+            "Photoscene": {
+                "photosceneid": "scene-789",
+                "progress": "75",
+                "progressmsg": "Processing images",
+                "status": "InProgress"
+            }
+        }"#;
+
+        let response: ProgressResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(response.photoscene.photoscene_id, "scene-789");
+        assert_eq!(response.photoscene.progress, "75");
+        assert_eq!(response.photoscene.progress_msg, Some("Processing images".to_string()));
+    }
 }
 
 /// Integration tests using raps-mock
@@ -569,7 +661,7 @@ mod integration_tests {
     use raps_kernel::auth::AuthClient;
     use raps_kernel::config::Config;
 
-    fn create_mock_client(mock_url: &str) -> RealityCaptureClient {
+    fn create_mock_reality_client(mock_url: &str) -> RealityCaptureClient {
         let config = Config {
             client_id: "test-client-id".to_string(),
             client_secret: "test-client-secret".to_string(),
@@ -585,7 +677,15 @@ mod integration_tests {
     #[tokio::test]
     async fn test_client_creation() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_client(&server.url);
+        let client = create_mock_reality_client(&server.url);
         assert!(client.auth.config().base_url.starts_with("http://"));
+    }
+
+    #[tokio::test]
+    async fn test_list_photoscenes() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_reality_client(&server.url);
+        let result = client.list_photoscenes().await;
+        let _ = result;
     }
 }

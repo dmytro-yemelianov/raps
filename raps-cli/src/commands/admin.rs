@@ -3062,3 +3062,170 @@ async fn execute_company_list(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csv_update_row_deserialization() {
+        let csv_data = "email,role,company\njohn@example.com,Project Admin,Acme Corp\n";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let row: CsvUpdateRow = rdr.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "john@example.com");
+        assert_eq!(row.role.unwrap(), "Project Admin");
+        assert_eq!(row.company.unwrap(), "Acme Corp");
+    }
+
+    #[test]
+    fn test_csv_update_row_minimal() {
+        let csv_data = "email,role,company\njohn@example.com,,\n";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let row: CsvUpdateRow = rdr.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "john@example.com");
+        // Empty strings from CSV become Some("") rather than None
+        assert!(
+            row.role.is_none() || row.role.as_deref() == Some(""),
+            "Expected None or empty string for role, got {:?}",
+            row.role
+        );
+        assert!(
+            row.company.is_none() || row.company.as_deref() == Some(""),
+            "Expected None or empty string for company, got {:?}",
+            row.company
+        );
+    }
+
+    #[test]
+    fn test_csv_update_row_email_only_header() {
+        // When only email column is present, optional fields should default
+        let csv_data = "email\njohn@example.com\n";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let row: CsvUpdateRow = rdr.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "john@example.com");
+        assert!(row.role.is_none());
+        assert!(row.company.is_none());
+    }
+
+    #[test]
+    fn test_csv_update_row_multiple_rows() {
+        let csv_data = "\
+email,role,company
+alice@example.com,Project Admin,Alpha Inc
+bob@example.com,Document Manager,Beta LLC
+carol@example.com,,
+";
+        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
+        let rows: Vec<CsvUpdateRow> = rdr.deserialize().collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].email, "alice@example.com");
+        assert_eq!(rows[1].email, "bob@example.com");
+        assert_eq!(rows[1].role.as_deref(), Some("Document Manager"));
+        assert_eq!(rows[2].email, "carol@example.com");
+    }
+
+    #[test]
+    fn test_user_list_output_serialization() {
+        let output = UserListOutput {
+            id: "abc-123".to_string(),
+            email: "test@example.com".to_string(),
+            name: "Test User".to_string(),
+            role: "Project Admin".to_string(),
+            company: Some("Acme Corp".to_string()),
+            status: Some("active".to_string()),
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"email\":\"test@example.com\""));
+        assert!(json.contains("\"name\":\"Test User\""));
+        assert!(json.contains("\"id\":\"abc-123\""));
+        assert!(json.contains("\"role\":\"Project Admin\""));
+        assert!(json.contains("\"company\":\"Acme Corp\""));
+        assert!(json.contains("\"status\":\"active\""));
+    }
+
+    #[test]
+    fn test_user_list_output_skips_none_fields() {
+        let output = UserListOutput {
+            id: "abc-123".to_string(),
+            email: "test@example.com".to_string(),
+            name: "Test User".to_string(),
+            role: "Admin".to_string(),
+            company: None,
+            status: None,
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        // Fields with skip_serializing_if = "Option::is_none" should be absent
+        assert!(!json.contains("company"));
+        assert!(!json.contains("status"));
+    }
+
+    #[test]
+    fn test_csv_update_result_output_serialization() {
+        let output = CsvUpdateResultOutput {
+            total: 10,
+            updated: 8,
+            skipped: 1,
+            failed: 1,
+            errors: vec![CsvUpdateErrorOutput {
+                email: "fail@test.com".to_string(),
+                error: "not found".to_string(),
+            }],
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"total\":10"));
+        assert!(json.contains("\"updated\":8"));
+        assert!(json.contains("\"skipped\":1"));
+        assert!(json.contains("\"failed\":1"));
+        assert!(json.contains("fail@test.com"));
+        assert!(json.contains("not found"));
+    }
+
+    #[test]
+    fn test_csv_update_result_output_empty_errors() {
+        let output = CsvUpdateResultOutput {
+            total: 5,
+            updated: 5,
+            skipped: 0,
+            failed: 0,
+            errors: vec![],
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"errors\":[]"));
+    }
+
+    #[test]
+    fn test_csv_update_error_output_serialization() {
+        let output = CsvUpdateErrorOutput {
+            email: "bad@test.com".to_string(),
+            error: "permission denied".to_string(),
+        };
+        let json = serde_json::to_string(&output).unwrap();
+        assert!(json.contains("\"email\":\"bad@test.com\""));
+        assert!(json.contains("\"error\":\"permission denied\""));
+    }
+
+    #[test]
+    fn test_format_project_status_active() {
+        let result = format_project_status("active");
+        // Should contain the original text (colored output still contains the word)
+        assert!(result.contains("active"));
+    }
+
+    #[test]
+    fn test_format_project_status_unknown() {
+        let result = format_project_status("pending");
+        assert_eq!(result, "pending");
+    }
+
+    #[test]
+    fn test_format_user_status_active() {
+        let result = format_user_status("active");
+        assert!(result.contains("active"));
+    }
+
+    #[test]
+    fn test_format_user_status_unknown() {
+        let result = format_user_status("unknown");
+        assert_eq!(result, "unknown");
+    }
+}

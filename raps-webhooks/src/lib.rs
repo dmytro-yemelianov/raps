@@ -487,6 +487,31 @@ mod tests {
         assert!(response.links.is_some());
         assert!(response.links.unwrap().next.is_some());
     }
+
+    #[test]
+    fn test_update_webhook_request_serialization() {
+        let request = UpdateWebhookRequest {
+            callback_url: Some("https://new-url.com/hook".to_string()),
+            status: Some("inactive".to_string()),
+            filter: None,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("https://new-url.com/hook"));
+        assert!(json.contains("inactive"));
+        assert!(!json.contains("filter"));
+    }
+
+    #[test]
+    fn test_update_webhook_request_status_only() {
+        let request = UpdateWebhookRequest {
+            callback_url: None,
+            status: Some("active".to_string()),
+            filter: None,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("active"));
+        assert!(!json.contains("callbackUrl"));
+    }
 }
 
 /// Integration tests using raps-mock
@@ -537,6 +562,27 @@ mod integration_tests {
         let client = create_mock_webhooks_client(&server.url);
 
         let result = client.list_all_webhooks().await;
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn test_get_webhook_with_mock() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_webhooks_client(&server.url);
+        let result = client.get_webhook("data", "dm.version.added", "hook-123").await;
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn test_update_webhook_with_mock() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_webhooks_client(&server.url);
+        let request = UpdateWebhookRequest {
+            callback_url: Some("https://new-callback.com".to_string()),
+            status: None,
+            filter: None,
+        };
+        let result = client.update_webhook("data", "dm.version.added", "hook-123", request).await;
         let _ = result;
     }
 }
