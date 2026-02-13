@@ -106,6 +106,9 @@ pub enum DaCommands {
         wait: bool,
     },
 
+    /// List recent workitems
+    Workitems,
+
     /// Check work item status
     Status {
         /// Work item ID
@@ -198,6 +201,7 @@ impl DaCommands {
                 .await
             }
             DaCommands::ActivityDelete { id } => delete_activity(client, &id, output_format).await,
+            DaCommands::Workitems => list_workitems(client, output_format).await,
             DaCommands::Run {
                 activity,
                 input,
@@ -455,6 +459,75 @@ async fn list_activities(
         }
         _ => {
             output_format.write(&activities)?;
+        }
+    }
+    Ok(())
+}
+
+async fn list_workitems(
+    client: &DesignAutomationClient,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Fetching workitems...".dimmed());
+    }
+
+    let workitems = client.list_workitems().await?;
+
+    #[derive(Serialize)]
+    struct WorkitemOutput {
+        id: String,
+        status: String,
+        progress: String,
+    }
+
+    let workitem_outputs: Vec<WorkitemOutput> = workitems
+        .iter()
+        .map(|w| WorkitemOutput {
+            id: w.id.clone(),
+            status: w.status.clone(),
+            progress: w.progress.clone().unwrap_or_default(),
+        })
+        .collect();
+
+    if workitem_outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No workitems found.".yellow()),
+            _ => {
+                output_format.write(&Vec::<WorkitemOutput>::new())?;
+            }
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Workitems:".bold());
+            println!(
+                "{:<40} {:<15} {}",
+                "ID".bold(),
+                "Status".bold(),
+                "Progress".bold()
+            );
+            println!("{}", "-".repeat(70));
+
+            for item in &workitem_outputs {
+                let status_colored = match item.status.as_str() {
+                    "success" => item.status.green().to_string(),
+                    "failed" | "cancelled" => item.status.red().to_string(),
+                    "inprogress" | "pending" => item.status.yellow().to_string(),
+                    _ => item.status.clone(),
+                };
+                println!(
+                    "{:<40} {:<15} {}",
+                    item.id, status_colored, item.progress
+                );
+            }
+
+            println!("{}", "-".repeat(70));
+        }
+        _ => {
+            output_format.write(&workitem_outputs)?;
         }
     }
     Ok(())

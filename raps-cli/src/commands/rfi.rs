@@ -5,9 +5,12 @@
 //!
 //! Commands for managing RFIs in ACC projects.
 
-use anyhow::Result;
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
+use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
 use crate::output::OutputFormat;
@@ -46,7 +49,7 @@ pub enum RfiCommands {
 
         /// RFI title
         #[arg(long)]
-        title: String,
+        title: Option<String>,
 
         /// RFI question/description
         #[arg(long)]
@@ -71,6 +74,10 @@ pub enum RfiCommands {
         /// Discipline
         #[arg(long)]
         discipline: Option<String>,
+
+        /// Create RFIs from CSV file (columns: title, description, assigned_to)
+        #[arg(long, value_name = "FILE")]
+        from_csv: Option<PathBuf>,
     },
 
     /// Update an existing RFI
@@ -142,17 +149,19 @@ impl RfiCommands {
                 assigned_to,
                 location,
                 discipline,
+                from_csv,
             } => {
                 create_rfi(
                     client,
                     &project_id,
-                    &title,
+                    title,
                     question,
                     &priority,
                     due_date,
                     assigned_to,
                     location,
                     discipline,
+                    from_csv,
                     output_format,
                 )
                 .await
@@ -400,25 +409,45 @@ async fn get_rfi(
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+struct CsvRfiRow {
+    title: String,
+    description: Option<String>,
+    assigned_to: Option<String>,
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn create_rfi(
     client: &RfiClient,
     project_id: &str,
-    title: &str,
+    title: Option<String>,
     question: Option<String>,
     priority: &str,
     due_date: Option<String>,
     assigned_to: Option<String>,
     location: Option<String>,
     discipline: Option<String>,
+    from_csv: Option<PathBuf>,
     output_format: OutputFormat,
 ) -> Result<()> {
+    // CSV bulk import flow
+    if let Some(csv_path) = from_csv {
+        return create_rfis_from_csv(client, project_id, &csv_path, output_format).await;
+    }
+
+    let rfi_title = match title {
+        Some(t) => t,
+        None => {
+            anyhow::bail!("RFI title is required. Use --title flag or --from-csv for bulk import.");
+        }
+    };
+
     if output_format.supports_colors() {
         println!("{}", "Creating RFI...".dimmed());
     }
 
     let request = CreateRfiRequest {
-        title: title.to_string(),
+        title: rfi_title.to_string(),
         question,
         priority: Some(priority.to_string()),
         due_date,
@@ -456,6 +485,171 @@ async fn create_rfi(
         }
         _ => {
             output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn create_rfis_from_csv(
+    client: &RfiClient,
+    project_id: &str,
+    csv_path: &PathBuf,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Parse CSV file
+    let mut reader = csv::Reader::from_path(csv_path)
+        .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?;
+
+    let mut rows: Vec<CsvRfiRow> = Vec::new();
+    let mut validation_errors: Vec<String> = Vec::new();
+
+    for (i, result) in reader.deserialize().enumerate() {
+        match result {
+            Ok(row) => {
+                let row: CsvRfiRow = row;
+                // Validate title is non-empty
+                if row.title.trim().is_empty() {
+                    validation_errors.push(format!("Row {}: title is empty", i + 2));
+                    continue;
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                validation_errors.push(format!("Row {}: parse error: {}", i + 2, e));
+            }
+        }
+    }
+
+    // Report validation errors
+    if !validation_errors.is_empty() {
+        if output_format.supports_colors() {
+            println!("{} CSV validation errors:", "✗".red().bold());
+            for err in &validation_errors {
+                println!("  {} {}", "•".red(), err);
+            }
+        }
+        anyhow::bail!(
+            "CSV validation failed with {} error(s). Fix errors before proceeding.",
+            validation_errors.len()
+        );
+    }
+
+    if rows.is_empty() {
+        anyhow::bail!("No valid rows found in CSV file");
+    }
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Bulk RFI creation: {} RFIs from {}",
+            "→".cyan(),
+            rows.len().to_string().green(),
+            csv_path.display().to_string().cyan()
+        );
+        println!();
+    }
+
+    let mut created = 0usize;
+    let mut failed = 0usize;
+    let mut errors: Vec<String> = Vec::new();
+
+    // Progress bar
+    let progress_bar = if output_format.supports_colors() {
+        let pb = ProgressBar::new(rows.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
+    for row in &rows {
+        if let Some(ref pb) = progress_bar {
+            pb.set_message(truncate_str(&row.title, 30));
+        }
+
+        let request = CreateRfiRequest {
+            title: row.title.clone(),
+            question: row.description.clone(),
+            priority: Some("normal".to_string()),
+            due_date: None,
+            assigned_to: row.assigned_to.clone(),
+            location: None,
+            discipline: None,
+        };
+
+        match client.create_rfi(project_id, request).await {
+            Ok(_) => {
+                created += 1;
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: {}", row.title, e));
+            }
+        }
+
+        if let Some(ref pb) = progress_bar {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = progress_bar {
+        pb.finish_and_clear();
+    }
+
+    // Display summary
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Bulk RFI Creation Results:".bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "Total:".bold(), rows.len());
+            println!(
+                "{:<15} {}",
+                "Created:".bold(),
+                created.to_string().green()
+            );
+            println!(
+                "{:<15} {}",
+                "Failed:".bold(),
+                failed.to_string().red()
+            );
+            println!("{}", "─".repeat(60));
+
+            if !errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for err in &errors {
+                    println!("  {} {}", "✗".red(), err.dimmed());
+                }
+            }
+
+            if failed == 0 {
+                println!(
+                    "\n{} All {} RFI(s) created successfully!",
+                    "✓".green().bold(),
+                    created
+                );
+            }
+        }
+        _ => {
+            #[derive(Serialize)]
+            struct BulkCreateResult {
+                total: usize,
+                created: usize,
+                failed: usize,
+                errors: Vec<String>,
+            }
+
+            let result = BulkCreateResult {
+                total: rows.len(),
+                created,
+                failed,
+                errors,
+            };
+            output_format.write(&result)?;
         }
     }
 

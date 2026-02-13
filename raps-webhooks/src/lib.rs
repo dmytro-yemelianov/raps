@@ -89,6 +89,18 @@ pub struct CreateWebhookScope {
     pub workflow: Option<String>,
 }
 
+/// Request to update a webhook
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateWebhookRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub callback_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filter: Option<String>,
+}
+
 /// Webhooks response
 #[derive(Debug, Deserialize)]
 pub struct WebhooksResponse {
@@ -234,6 +246,80 @@ impl WebhooksClient {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             anyhow::bail!("Failed to create webhook ({status}): {error_text}");
+        }
+
+        let webhook: Webhook = response
+            .json()
+            .await
+            .context("Failed to parse webhook response")?;
+
+        Ok(webhook)
+    }
+
+    /// Get a specific webhook
+    pub async fn get_webhook(&self, system: &str, event: &str, hook_id: &str) -> Result<Webhook> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/systems/{}/events/{}/hooks/{}",
+            self.config.webhooks_url(),
+            system,
+            event,
+            hook_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to get webhook")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get webhook ({status}): {error_text}");
+        }
+
+        let webhook: Webhook = response
+            .json()
+            .await
+            .context("Failed to parse webhook response")?;
+
+        Ok(webhook)
+    }
+
+    /// Update a webhook
+    pub async fn update_webhook(
+        &self,
+        system: &str,
+        event: &str,
+        hook_id: &str,
+        request: UpdateWebhookRequest,
+    ) -> Result<Webhook> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/systems/{}/events/{}/hooks/{}",
+            self.config.webhooks_url(),
+            system,
+            event,
+            hook_id
+        );
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update webhook")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to update webhook ({status}): {error_text}");
         }
 
         let webhook: Webhook = response

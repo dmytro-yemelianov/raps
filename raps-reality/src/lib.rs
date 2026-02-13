@@ -36,6 +36,20 @@ pub struct Photoscene {
     pub progress_msg: Option<String>,
 }
 
+/// List photoscenes response
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ListPhotoscenesResponse {
+    #[serde(default)]
+    pub photoscenes: PhotoscenesList,
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct PhotoscenesList {
+    #[serde(default)]
+    pub photoscene: Vec<Photoscene>,
+}
+
 /// Photoscene creation response
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -411,6 +425,33 @@ impl RealityCaptureClient {
         }
 
         Ok(())
+    }
+
+    /// List all photoscenes
+    pub async fn list_photoscenes(&self) -> Result<Vec<Photoscene>> {
+        let token = self.auth.get_token().await?;
+        let url = format!("{}/photoscene", self.config.reality_capture_url());
+
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to list photoscenes")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list photoscenes ({status}): {error_text}");
+        }
+
+        let list_response: ListPhotoscenesResponse = response
+            .json()
+            .await
+            .context("Failed to parse photoscenes response")?;
+
+        Ok(list_response.photoscenes.photoscene)
     }
 
     /// Get available output formats

@@ -25,7 +25,7 @@ use raps_kernel::http::HttpClientConfig;
 use raps_da::DesignAutomationClient;
 use raps_oss::{OssClient, Region, RetentionPolicy};
 use raps_reality::RealityCaptureClient;
-use raps_webhooks::WebhooksClient;
+use raps_webhooks::{UpdateWebhookRequest, WebhooksClient};
 
 /// RAPS MCP Server
 ///
@@ -486,6 +486,22 @@ impl RapsServer {
                 "Failed to list hubs (ensure you're logged in with 'raps auth login'): {}",
                 e
             ),
+        }
+    }
+
+    async fn hub_info(&self, hub_id: String) -> String {
+        let client = self.get_dm_client().await;
+
+        match client.get_hub(&hub_id).await {
+            Ok(hub) => {
+                let region = hub.attributes.region.as_deref().unwrap_or("unknown");
+                let hub_type = &hub.hub_type;
+                format!(
+                    "Hub details:\n\n* Name: {}\n* ID: {}\n* Type: {}\n* Region: {}",
+                    hub.attributes.name, hub.id, hub_type, region
+                )
+            }
+            Err(e) => format!("Failed to get hub info: {}", e),
         }
     }
 
@@ -1681,6 +1697,30 @@ impl RapsServer {
                 output
             }
             Err(e) => format!("Failed to list checklists: {}", e),
+        }
+    }
+
+    async fn checklist_templates_list(&self, project_id: String) -> String {
+        let client = self.get_acc_client().await;
+
+        match client.list_checklist_templates(&project_id).await {
+            Ok(templates) => {
+                if templates.is_empty() {
+                    return "No checklist templates found.".to_string();
+                }
+
+                let mut output = format!("Found {} checklist template(s):\n\n", templates.len());
+                for template in &templates {
+                    let desc = template.description.as_deref().unwrap_or("-");
+                    let created = template.created_at.as_deref().unwrap_or("-");
+                    output.push_str(&format!(
+                        "* {} (id: {}, created: {})\n  Description: {}\n",
+                        template.title, template.id, created, desc
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list checklist templates: {}", e),
         }
     }
 
@@ -3272,6 +3312,63 @@ impl RapsServer {
         output
     }
 
+    async fn webhook_get(&self, system: String, event: String, hook_id: String) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.get_webhook(&system, &event, &hook_id).await {
+            Ok(hook) => {
+                let mut output = format!(
+                    "Webhook Details:\n\n* Hook ID: {}\n* System: {}\n* Event: {}\n* Callback: {}\n* Status: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                    hook.status,
+                );
+                if let Some(ref created) = hook.created_date {
+                    output.push_str(&format!("\n* Created: {}", created));
+                }
+                if let Some(ref updated) = hook.last_updated_date {
+                    output.push_str(&format!("\n* Updated: {}", updated));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get webhook: {}", e),
+        }
+    }
+
+    async fn webhook_update(
+        &self,
+        system: String,
+        event: String,
+        hook_id: String,
+        callback_url: Option<String>,
+        status: Option<String>,
+        filter: Option<String>,
+    ) -> String {
+        let client = self.get_webhooks_client().await;
+        let request = UpdateWebhookRequest {
+            callback_url,
+            status,
+            filter,
+        };
+        match client
+            .update_webhook(&system, &event, &hook_id, request)
+            .await
+        {
+            Ok(hook) => {
+                format!(
+                    "Webhook updated successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}\nStatus: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                    hook.status,
+                )
+            }
+            Err(e) => format!("Failed to update webhook: {}", e),
+        }
+    }
+
     // ================================================================
     // Design Automation (v4.6)
     // ================================================================
@@ -3359,6 +3456,28 @@ impl RapsServer {
                 output
             }
             Err(e) => format!("Failed to get workitem status: {}", e),
+        }
+    }
+
+    async fn da_workitems_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_workitems().await {
+            Ok(workitems) => {
+                if workitems.is_empty() {
+                    return "No workitems found.".to_string();
+                }
+                let mut output = format!("Workitems ({}):\n\n", workitems.len());
+                for item in &workitems {
+                    output.push_str(&format!(
+                        "* {} - Status: {} | Progress: {}\n",
+                        item.id,
+                        item.status,
+                        item.progress.as_deref().unwrap_or("N/A"),
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list workitems: {}", e),
         }
     }
 
@@ -3493,6 +3612,30 @@ impl RapsServer {
         output
     }
 
+    async fn reality_list(&self) -> String {
+        let client = self.get_reality_client().await;
+        match client.list_photoscenes().await {
+            Ok(photoscenes) => {
+                if photoscenes.is_empty() {
+                    return "No photoscenes found.".to_string();
+                }
+                let mut output = format!("Photoscenes ({}):\n\n", photoscenes.len());
+                for scene in &photoscenes {
+                    output.push_str(&format!(
+                        "* {} - Name: {} | Type: {} | Status: {} | Progress: {}\n",
+                        scene.photoscene_id,
+                        scene.name.as_deref().unwrap_or("N/A"),
+                        scene.scene_type.as_deref().unwrap_or("N/A"),
+                        scene.status.as_deref().unwrap_or("N/A"),
+                        scene.progress.as_deref().unwrap_or("N/A"),
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list photoscenes: {}", e),
+        }
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -3603,6 +3746,13 @@ impl RapsServer {
                     .and_then(|v| v.as_u64())
                     .map(|v| v as usize);
                 self.hub_list(limit).await
+            }
+            "hub_info" => {
+                let hub_id = match Self::required_arg(&args, "hub_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.hub_info(hub_id).await
             }
             "project_list" => {
                 let hub_id = match Self::required_arg(&args, "hub_id") {
@@ -4112,6 +4262,13 @@ impl RapsServer {
                 )
                 .await
             }
+            "checklist_templates_list" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.checklist_templates_list(project_id).await
+            }
 
             // ================================================================
             // Object Upload/Download Tools (v4.4)
@@ -4541,6 +4698,40 @@ impl RapsServer {
                 self.webhook_delete(system, event, hook_id).await
             }
             "webhook_events" => self.webhook_events().await,
+            "webhook_get" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.webhook_get(system, event, hook_id).await
+            }
+            "webhook_update" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let callback_url = Self::optional_arg(&args, "callback_url");
+                let status = Self::optional_arg(&args, "status");
+                let filter = Self::optional_arg(&args, "filter");
+                self.webhook_update(system, event, hook_id, callback_url, status, filter)
+                    .await
+            }
 
             // ================================================================
             // Design Automation (v4.6)
@@ -4562,10 +4753,12 @@ impl RapsServer {
                 };
                 self.da_workitem_status(workitem_id).await
             }
+            "da_workitems_list" => self.da_workitems_list().await,
 
             // ================================================================
             // Reality Capture
             // ================================================================
+            "reality_list" => self.reality_list().await,
             "reality_create" => {
                 let name = match Self::required_arg(&args, "name") {
                     Ok(val) => val,
@@ -4817,6 +5010,16 @@ fn get_tools() -> Vec<Tool> {
                     "limit": {"type": "integer", "description": "Max hubs (default: 50)"}
                 }),
                 &[],
+            ),
+        ),
+        Tool::new(
+            "hub_info",
+            "Get details of a specific hub (name, type, region). Requires 3-legged auth.",
+            schema(
+                json!({
+                    "hub_id": {"type": "string", "description": "The hub ID"}
+                }),
+                &["hub_id"],
             ),
         ),
         Tool::new(
@@ -5277,6 +5480,16 @@ fn get_tools() -> Vec<Tool> {
                 &["project_id", "checklist_id"],
             ),
         ),
+        Tool::new(
+            "checklist_templates_list",
+            "List checklist templates in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"}
+                }),
+                &["project_id"],
+            ),
+        ),
         // ================================================================
         // Object Upload/Download Tools (v4.4)
         // ================================================================
@@ -5626,6 +5839,33 @@ fn get_tools() -> Vec<Tool> {
             "List all available webhook event types that can be subscribed to.",
             schema(json!({}), &[]),
         ),
+        Tool::new(
+            "webhook_get",
+            "Get details of a specific webhook subscription.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added')"},
+                    "hook_id": {"type": "string", "description": "Webhook ID"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
+        Tool::new(
+            "webhook_update",
+            "Update a webhook subscription (callback URL, status, or filter).",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added')"},
+                    "hook_id": {"type": "string", "description": "Webhook ID to update"},
+                    "callback_url": {"type": "string", "description": "New callback URL"},
+                    "status": {"type": "string", "description": "New status ('active' or 'inactive')"},
+                    "filter": {"type": "string", "description": "New filter expression"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
         // ================================================================
         // Design Automation (v4.6)
         // ================================================================
@@ -5664,9 +5904,19 @@ fn get_tools() -> Vec<Tool> {
                 &["workitem_id"],
             ),
         ),
+        Tool::new(
+            "da_workitems_list",
+            "List all Design Automation workitems with their status and progress.",
+            schema(json!({}), &[]),
+        ),
         // ================================================================
         // Reality Capture
         // ================================================================
+        Tool::new(
+            "reality_list",
+            "List all photoscenes for reality capture. Returns ID, name, type, status, and progress for each photoscene.",
+            schema(json!({}), &[]),
+        ),
         Tool::new(
             "reality_create",
             "Create a new photoscene for reality capture (photogrammetry). Use to set up a new 3D reconstruction job from photos.",
@@ -5797,7 +6047,7 @@ impl ServerHandler for RapsServer {
         ServerInfo {
             instructions: Some(
                 "RAPS MCP Server v4.5 - Autodesk Platform Services CLI\n\n\
-                Provides direct access to APS APIs (72 tools):\n\
+                Provides direct access to APS APIs (74 tools):\n\
                 * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
                 * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
                 * translate_* - CAD model translation\n\
