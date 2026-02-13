@@ -12,7 +12,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Subcommand, ValueEnum};
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -54,6 +54,29 @@ pub enum AdminCommands {
 /// User management subcommands
 #[derive(Debug, Subcommand)]
 pub enum UserCommands {
+    /// List users in an account or project
+    List {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Optional: list users for a specific project only
+        #[arg(short, long)]
+        project: Option<String>,
+
+        /// Filter by role name
+        #[arg(long)]
+        role: Option<String>,
+
+        /// Filter by status (active, inactive, not_invited)
+        #[arg(long)]
+        status: Option<String>,
+
+        /// Search by email or name
+        #[arg(long)]
+        search: Option<String>,
+    },
+
     /// Add a user to multiple projects
     Add {
         /// Email address of the user to add
@@ -118,7 +141,7 @@ pub enum UserCommands {
         yes: bool,
     },
 
-    /// Update user roles across multiple projects
+    /// Update user roles and/or company across multiple projects
     Update {
         /// Email address of the user to update
         email: String,
@@ -127,9 +150,13 @@ pub enum UserCommands {
         #[arg(short, long)]
         account: Option<String>,
 
-        /// New role to assign (required)
+        /// New role to assign (required unless --company is provided)
         #[arg(short, long)]
-        role: String,
+        role: Option<String>,
+
+        /// Company name to assign at account level
+        #[arg(long)]
+        company: Option<String>,
 
         /// Only update users with this current role
         #[arg(long)]
@@ -142,6 +169,10 @@ pub enum UserCommands {
         /// File containing project IDs (one per line)
         #[arg(long, value_name = "FILE")]
         project_ids: Option<PathBuf>,
+
+        /// Import updates from a CSV file (columns: email, role, company)
+        #[arg(long, value_name = "FILE")]
+        from_csv: Option<PathBuf>,
 
         /// Parallel requests (default: 10, max: 50)
         #[arg(long, default_value = "10")]
@@ -321,6 +352,178 @@ impl UserCommands {
         output_format: OutputFormat,
     ) -> Result<()> {
         match self {
+            UserCommands::List {
+                account,
+                project,
+                role,
+                status,
+                search,
+            } => {
+                // Get account ID from parameter or environment
+                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+
+                let account_id = match account_id {
+                    Some(id) if !id.is_empty() => id,
+                    _ => {
+                        anyhow::bail!(
+                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+                        );
+                    }
+                };
+
+                let http_config = HttpClientConfig::default();
+
+                if let Some(project_id) = project {
+                    // Project-level user listing
+                    if output_format.supports_colors() {
+                        println!(
+                            "\n{} List users in project {}",
+                            "→".cyan(),
+                            project_id.cyan()
+                        );
+                        println!();
+                    }
+
+                    let users_client = ProjectUsersClient::new_with_http_config(
+                        config.clone(),
+                        auth_client.clone(),
+                        http_config,
+                    );
+
+                    let all_users = users_client.list_all_project_users(&project_id).await?;
+
+                    // Apply filters
+                    let filtered: Vec<_> = all_users
+                        .into_iter()
+                        .filter(|u| {
+                            if let Some(ref r) = role {
+                                if let Some(ref role_name) = u.role_name {
+                                    if !role_name.to_lowercase().contains(&r.to_lowercase()) {
+                                        return false;
+                                    }
+                                } else {
+                                    return false;
+                                }
+                            }
+                            if let Some(ref s) = search {
+                                let s_lower = s.to_lowercase();
+                                let email_match = u
+                                    .email
+                                    .as_ref()
+                                    .map(|e| e.to_lowercase().contains(&s_lower))
+                                    .unwrap_or(false);
+                                let name_match = u
+                                    .name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&s_lower))
+                                    .unwrap_or(false);
+                                if !email_match && !name_match {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect();
+
+                    let outputs: Vec<UserListOutput> = filtered
+                        .iter()
+                        .map(|u| UserListOutput {
+                            id: u.id.clone(),
+                            email: u.email.clone().unwrap_or_default(),
+                            name: u.name.clone().unwrap_or_default(),
+                            role: u.role_name.clone().unwrap_or_default(),
+                            company: None,
+                            status: None,
+                        })
+                        .collect();
+
+                    display_user_list(&outputs, output_format)?;
+                } else {
+                    // Account-level user listing
+                    if output_format.supports_colors() {
+                        println!(
+                            "\n{} List users in account {}",
+                            "→".cyan(),
+                            account_id.cyan()
+                        );
+                        println!();
+                    }
+
+                    let admin_client = AccountAdminClient::new_with_http_config(
+                        config.clone(),
+                        auth_client.clone(),
+                        http_config,
+                    );
+
+                    let all_users = admin_client.list_all_users(&account_id).await?;
+
+                    // Apply filters
+                    let filtered: Vec<_> = all_users
+                        .into_iter()
+                        .filter(|u| {
+                            if let Some(ref s) = status {
+                                if let Some(ref user_status) = u.status {
+                                    if !user_status.to_lowercase().eq(&s.to_lowercase()) {
+                                        return false;
+                                    }
+                                } else {
+                                    return false;
+                                }
+                            }
+                            if let Some(ref s) = search {
+                                let s_lower = s.to_lowercase();
+                                let email_match = u.email.to_lowercase().contains(&s_lower);
+                                let name_match = u
+                                    .name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&s_lower))
+                                    .unwrap_or(false);
+                                let first_match = u
+                                    .first_name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&s_lower))
+                                    .unwrap_or(false);
+                                let last_match = u
+                                    .last_name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&s_lower))
+                                    .unwrap_or(false);
+                                if !email_match && !name_match && !first_match && !last_match {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect();
+
+                    let outputs: Vec<UserListOutput> = filtered
+                        .iter()
+                        .map(|u| {
+                            let display_name = match (&u.first_name, &u.last_name) {
+                                (Some(f), Some(l)) => format!("{} {}", f, l),
+                                (Some(f), None) => f.clone(),
+                                (None, Some(l)) => l.clone(),
+                                (None, None) => {
+                                    u.name.clone().unwrap_or_default()
+                                }
+                            };
+                            UserListOutput {
+                                id: u.id.clone(),
+                                email: u.email.clone(),
+                                name: display_name,
+                                role: String::new(),
+                                company: u.company_id.clone(),
+                                status: u.status.clone(),
+                            }
+                        })
+                        .collect();
+
+                    display_user_list(&outputs, output_format)?;
+                }
+
+                Ok(())
+            }
+
             UserCommands::Add {
                 email,
                 account,
@@ -596,13 +799,38 @@ impl UserCommands {
                 email,
                 account,
                 role,
+                company,
                 from_role,
                 filter,
                 project_ids,
+                from_csv,
                 concurrency,
                 dry_run,
                 yes: _,
             } => {
+                // Handle --from-csv mode
+                if let Some(csv_path) = from_csv {
+                    return execute_csv_update(
+                        config,
+                        auth_client,
+                        account.clone(),
+                        filter.clone(),
+                        project_ids.clone(),
+                        &csv_path,
+                        concurrency,
+                        dry_run,
+                        output_format,
+                    )
+                    .await;
+                }
+
+                // Validate: at least --role or --company must be provided
+                if role.is_none() && company.is_none() {
+                    anyhow::bail!(
+                        "At least one of --role or --company must be provided."
+                    );
+                }
+
                 // Get account ID from parameter or environment
                 let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
 
@@ -615,118 +843,169 @@ impl UserCommands {
                     }
                 };
 
-                // Parse filter expression
-                let mut project_filter = if let Some(f) = &filter {
-                    ProjectFilter::from_expression(f)?
-                } else {
-                    ProjectFilter::new()
-                };
-
-                // Load project IDs from file if specified
-                if let Some(ids_file) = &project_ids {
-                    let content = std::fs::read_to_string(ids_file)?;
-                    let ids: Vec<String> = content
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                        .collect();
-                    project_filter.include_ids = Some(ids);
-                }
-
-                // Create bulk config
-                let bulk_config = BulkConfig {
-                    concurrency: concurrency.min(50),
-                    dry_run,
-                    ..Default::default()
-                };
-
-                if output_format.supports_colors() {
-                    println!(
-                        "\n{} Bulk update user: {} to role: {}",
-                        "→".cyan(),
-                        email.green(),
-                        role.yellow()
-                    );
-                    if let Some(fr) = &from_role {
-                        println!("  From role: {}", fr);
-                    }
-                    if let Some(f) = &filter {
-                        println!("  Filter: {}", f);
-                    }
-                    println!("  Concurrency: {}", concurrency.min(50));
-                    if dry_run {
-                        println!("  {} Dry-run mode enabled", "⚠".yellow());
-                    }
-                    println!();
-                }
-
-                // Create API clients
                 let http_config = HttpClientConfig::default();
                 let admin_client = AccountAdminClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
                 );
-                let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
-                    config.clone(),
-                    auth_client.clone(),
-                    http_config,
-                ));
 
-                // Create progress bar
-                let progress_bar = if output_format.supports_colors() {
-                    let pb = ProgressBar::new(0);
-                    pb.set_style(
-                        ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                            .unwrap()
-                            .progress_chars("=>-"),
-                    );
-                    Some(pb)
-                } else {
-                    None
-                };
-
-                // Progress callback
-                let pb_clone = progress_bar.clone();
-                let on_progress = move |progress: ProgressUpdate| {
-                    if let Some(ref pb) = pb_clone {
-                        pb.set_length(progress.total as u64);
-                        pb.set_position(
-                            (progress.completed + progress.failed + progress.skipped) as u64,
+                // Handle company update at account level
+                if let Some(ref company_name) = company {
+                    if output_format.supports_colors() {
+                        println!(
+                            "\n{} Update company for user: {} to: {}",
+                            "→".cyan(),
+                            email.green(),
+                            company_name.yellow()
                         );
-                        pb.set_message(format!(
-                            "✓{} ○{} ✗{}",
-                            progress.completed, progress.skipped, progress.failed
-                        ));
+                        if dry_run {
+                            println!("  {} Dry-run mode enabled", "⚠".yellow());
+                        }
                     }
-                };
 
-                // Execute bulk operation
-                let result = raps_admin::bulk_update_role(
-                    &admin_client,
-                    users_client,
-                    &account_id,
-                    &email,
-                    &role,
-                    from_role.as_deref(),
-                    &project_filter,
-                    bulk_config,
-                    on_progress,
-                )
-                .await?;
+                    if !dry_run {
+                        // Look up user by email to get user ID
+                        let user = admin_client
+                            .find_user_by_email(&account_id, &email)
+                            .await?
+                            .ok_or_else(|| anyhow::anyhow!("User not found: {}", email))?;
 
-                // Finish progress bar
-                if let Some(pb) = progress_bar {
-                    pb.finish_and_clear();
+                        let update_req = raps_acc::admin::UpdateAccountUserRequest {
+                            company_id: None,
+                            company_name: Some(company_name.clone()),
+                        };
+
+                        admin_client
+                            .update_user(&account_id, &user.id, update_req)
+                            .await?;
+
+                        if output_format.supports_colors() {
+                            println!(
+                                "{} Company updated for {} to '{}'",
+                                "✓".green().bold(),
+                                email,
+                                company_name
+                            );
+                        }
+                    } else if output_format.supports_colors() {
+                        println!(
+                            "  {} Would update company for {} to '{}'",
+                            "→".dimmed(),
+                            email,
+                            company_name
+                        );
+                    }
                 }
 
-                // Display results
-                display_bulk_result(&result, output_format)?;
+                // Handle role update across projects (if --role is provided)
+                if let Some(ref role_value) = role {
+                    // Parse filter expression
+                    let mut project_filter = if let Some(f) = &filter {
+                        ProjectFilter::from_expression(f)?
+                    } else {
+                        ProjectFilter::new()
+                    };
 
-                // Exit with appropriate code
-                if result.failed > 0 {
-                    std::process::exit(1); // Partial success
+                    // Load project IDs from file if specified
+                    if let Some(ids_file) = &project_ids {
+                        let content = std::fs::read_to_string(ids_file)?;
+                        let ids: Vec<String> = content
+                            .lines()
+                            .map(|l| l.trim().to_string())
+                            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                            .collect();
+                        project_filter.include_ids = Some(ids);
+                    }
+
+                    // Create bulk config
+                    let bulk_config = BulkConfig {
+                        concurrency: concurrency.min(50),
+                        dry_run,
+                        ..Default::default()
+                    };
+
+                    if output_format.supports_colors() {
+                        println!(
+                            "\n{} Bulk update user: {} to role: {}",
+                            "→".cyan(),
+                            email.green(),
+                            role_value.yellow()
+                        );
+                        if let Some(fr) = &from_role {
+                            println!("  From role: {}", fr);
+                        }
+                        if let Some(f) = &filter {
+                            println!("  Filter: {}", f);
+                        }
+                        println!("  Concurrency: {}", concurrency.min(50));
+                        if dry_run {
+                            println!("  {} Dry-run mode enabled", "⚠".yellow());
+                        }
+                        println!();
+                    }
+
+                    let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
+                        config.clone(),
+                        auth_client.clone(),
+                        http_config,
+                    ));
+
+                    // Create progress bar
+                    let progress_bar = if output_format.supports_colors() {
+                        let pb = ProgressBar::new(0);
+                        pb.set_style(
+                            ProgressStyle::default_bar()
+                                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+                                .unwrap()
+                                .progress_chars("=>-"),
+                        );
+                        Some(pb)
+                    } else {
+                        None
+                    };
+
+                    // Progress callback
+                    let pb_clone = progress_bar.clone();
+                    let on_progress = move |progress: ProgressUpdate| {
+                        if let Some(ref pb) = pb_clone {
+                            pb.set_length(progress.total as u64);
+                            pb.set_position(
+                                (progress.completed + progress.failed + progress.skipped) as u64,
+                            );
+                            pb.set_message(format!(
+                                "✓{} ○{} ✗{}",
+                                progress.completed, progress.skipped, progress.failed
+                            ));
+                        }
+                    };
+
+                    // Execute bulk operation
+                    let result = raps_admin::bulk_update_role(
+                        &admin_client,
+                        users_client,
+                        &account_id,
+                        &email,
+                        role_value,
+                        from_role.as_deref(),
+                        &project_filter,
+                        bulk_config,
+                        on_progress,
+                    )
+                    .await?;
+
+                    // Finish progress bar
+                    if let Some(pb) = progress_bar {
+                        pb.finish_and_clear();
+                    }
+
+                    // Display results
+                    display_bulk_result(&result, output_format)?;
+
+                    // Exit with appropriate code
+                    if result.failed > 0 {
+                        std::process::exit(1);
+                    }
                 }
 
                 Ok(())
@@ -1062,6 +1341,470 @@ fn format_project_status(status: &str) -> String {
         "archived" => status.dimmed().to_string(),
         _ => status.to_string(),
     }
+}
+
+#[derive(Serialize)]
+struct UserListOutput {
+    id: String,
+    email: String,
+    name: String,
+    role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    company: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+}
+
+fn display_user_list(users: &Vec<UserListOutput>, output_format: OutputFormat) -> Result<()> {
+    if users.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No users found.".yellow()),
+            _ => output_format.write(&Vec::<UserListOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{}", "Users:".bold());
+            println!("{}", "─".repeat(110));
+            println!(
+                "{:<30} {:<25} {:<18} {:<18} {}",
+                "Email".bold(),
+                "Name".bold(),
+                "Role".bold(),
+                "Status".bold(),
+                "Company".bold()
+            );
+            println!("{}", "─".repeat(110));
+
+            for u in users {
+                let email_truncated = if u.email.len() > 28 {
+                    format!("{}...", &u.email[..25])
+                } else {
+                    u.email.clone()
+                };
+                let name_truncated = if u.name.len() > 23 {
+                    format!("{}...", &u.name[..20])
+                } else {
+                    u.name.clone()
+                };
+                let role_display = if u.role.is_empty() {
+                    "-".to_string()
+                } else if u.role.len() > 16 {
+                    format!("{}...", &u.role[..13])
+                } else {
+                    u.role.clone()
+                };
+                let status_display = u.status.as_deref().unwrap_or("-");
+                let company_display = u.company.as_deref().unwrap_or("-");
+
+                println!(
+                    "{:<30} {:<25} {:<18} {:<18} {}",
+                    email_truncated.cyan(),
+                    name_truncated,
+                    role_display,
+                    format_user_status(status_display),
+                    company_display.dimmed()
+                );
+            }
+
+            println!("{}", "─".repeat(110));
+            println!("{} {} user(s) found", "→".cyan(), users.len());
+        }
+        _ => {
+            output_format.write(users)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn format_user_status(status: &str) -> String {
+    match status.to_lowercase().as_str() {
+        "active" => status.green().to_string(),
+        "inactive" | "not_invited" => status.yellow().to_string(),
+        "disabled" => status.red().to_string(),
+        _ => status.to_string(),
+    }
+}
+
+// ============================================================================
+// CSV UPDATE
+// ============================================================================
+
+/// A single row from the CSV update file
+#[derive(Debug, serde::Deserialize)]
+struct CsvUpdateRow {
+    email: String,
+    #[serde(default)]
+    role: Option<String>,
+    #[serde(default)]
+    company: Option<String>,
+}
+
+#[derive(Serialize)]
+struct CsvUpdateResultOutput {
+    total: usize,
+    updated: usize,
+    skipped: usize,
+    failed: usize,
+    errors: Vec<CsvUpdateErrorOutput>,
+}
+
+#[derive(Serialize)]
+struct CsvUpdateErrorOutput {
+    email: String,
+    error: String,
+}
+
+/// Execute bulk user updates from a CSV file
+///
+/// Expected columns: email (required), role (optional), company (optional)
+#[allow(clippy::too_many_arguments)]
+async fn execute_csv_update(
+    config: &Config,
+    auth_client: &AuthClient,
+    account: Option<String>,
+    filter: Option<String>,
+    project_ids: Option<PathBuf>,
+    csv_path: &PathBuf,
+    concurrency: usize,
+    dry_run: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Get account ID
+    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+    let account_id = match account_id {
+        Some(id) if !id.is_empty() => id,
+        _ => {
+            anyhow::bail!(
+                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+            );
+        }
+    };
+
+    // Parse CSV file
+    let mut reader = csv::Reader::from_path(csv_path)
+        .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?;
+
+    let mut rows: Vec<CsvUpdateRow> = Vec::new();
+    let mut validation_errors: Vec<String> = Vec::new();
+
+    for (i, result) in reader.deserialize().enumerate() {
+        match result {
+            Ok(row) => {
+                let row: CsvUpdateRow = row;
+                // Validate email
+                if row.email.is_empty() || !row.email.contains('@') {
+                    validation_errors.push(format!(
+                        "Row {}: invalid email '{}'",
+                        i + 2,
+                        row.email
+                    ));
+                    continue;
+                }
+                // Validate at least one field to update
+                if row.role.is_none() && row.company.is_none() {
+                    validation_errors.push(format!(
+                        "Row {}: email '{}' has no role or company to update",
+                        i + 2,
+                        row.email
+                    ));
+                    continue;
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                validation_errors.push(format!("Row {}: parse error: {}", i + 2, e));
+            }
+        }
+    }
+
+    // Report validation errors
+    if !validation_errors.is_empty() {
+        if output_format.supports_colors() {
+            println!("{} CSV validation errors:", "✗".red().bold());
+            for err in &validation_errors {
+                println!("  {} {}", "•".red(), err);
+            }
+        }
+        anyhow::bail!(
+            "CSV validation failed with {} error(s). Fix errors before proceeding.",
+            validation_errors.len()
+        );
+    }
+
+    if rows.is_empty() {
+        anyhow::bail!("No valid rows found in CSV file");
+    }
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} CSV update: {} rows from {}",
+            "→".cyan(),
+            rows.len().to_string().green(),
+            csv_path.display().to_string().cyan()
+        );
+        if dry_run {
+            println!("  {} Dry-run mode enabled", "⚠".yellow());
+        }
+        println!();
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client = AccountAdminClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    );
+
+    // Parse filter for role updates
+    let mut project_filter = if let Some(f) = &filter {
+        ProjectFilter::from_expression(f)?
+    } else {
+        ProjectFilter::new()
+    };
+    if let Some(ids_file) = &project_ids {
+        let content = std::fs::read_to_string(ids_file)?;
+        let ids: Vec<String> = content
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+        project_filter.include_ids = Some(ids);
+    }
+
+    let mut updated = 0usize;
+    let mut skipped = 0usize;
+    let mut failed = 0usize;
+    let mut errors = Vec::new();
+
+    // Progress bar
+    let progress_bar = if output_format.supports_colors() {
+        let pb = ProgressBar::new(rows.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
+    for row in &rows {
+        if let Some(ref pb) = progress_bar {
+            pb.set_message(format!("{}", row.email));
+        }
+
+        if dry_run {
+            if output_format.supports_colors() {
+                let mut changes = Vec::new();
+                if let Some(ref r) = row.role {
+                    changes.push(format!("role={}", r));
+                }
+                if let Some(ref c) = row.company {
+                    changes.push(format!("company={}", c));
+                }
+                if let Some(ref pb) = progress_bar {
+                    pb.println(format!(
+                        "  {} {} → {}",
+                        "→".dimmed(),
+                        row.email,
+                        changes.join(", ")
+                    ));
+                }
+            }
+            updated += 1;
+        } else {
+            let mut row_updated = false;
+
+            // Update company at account level if specified
+            if let Some(ref company_name) = row.company {
+                match admin_client
+                    .find_user_by_email(&account_id, &row.email)
+                    .await
+                {
+                    Ok(Some(user)) => {
+                        let update_req = raps_acc::admin::UpdateAccountUserRequest {
+                            company_id: None,
+                            company_name: Some(company_name.clone()),
+                        };
+                        match admin_client
+                            .update_user(&account_id, &user.id, update_req)
+                            .await
+                        {
+                            Ok(_) => {
+                                row_updated = true;
+                            }
+                            Err(e) => {
+                                failed += 1;
+                                errors.push(CsvUpdateErrorOutput {
+                                    email: row.email.clone(),
+                                    error: format!("company update failed: {}", e),
+                                });
+                                if let Some(ref pb) = progress_bar {
+                                    pb.inc(1);
+                                }
+                                continue;
+                            }
+                        }
+                    }
+                    Ok(None) => {
+                        failed += 1;
+                        errors.push(CsvUpdateErrorOutput {
+                            email: row.email.clone(),
+                            error: "user not found in account".to_string(),
+                        });
+                        if let Some(ref pb) = progress_bar {
+                            pb.inc(1);
+                        }
+                        continue;
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(CsvUpdateErrorOutput {
+                            email: row.email.clone(),
+                            error: format!("user lookup failed: {}", e),
+                        });
+                        if let Some(ref pb) = progress_bar {
+                            pb.inc(1);
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            // Update role across projects if specified
+            if let Some(ref role_value) = row.role {
+                let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config.clone(),
+                ));
+
+                let bulk_config = BulkConfig {
+                    concurrency: concurrency.min(50),
+                    dry_run: false,
+                    ..Default::default()
+                };
+
+                let noop_progress = |_: ProgressUpdate| {};
+
+                match raps_admin::bulk_update_role(
+                    &admin_client,
+                    users_client,
+                    &account_id,
+                    &row.email,
+                    role_value,
+                    None,
+                    &project_filter,
+                    bulk_config,
+                    noop_progress,
+                )
+                .await
+                {
+                    Ok(result) => {
+                        if result.failed > 0 {
+                            failed += 1;
+                            errors.push(CsvUpdateErrorOutput {
+                                email: row.email.clone(),
+                                error: format!(
+                                    "role update: {}/{} projects failed",
+                                    result.failed, result.total
+                                ),
+                            });
+                        } else {
+                            row_updated = true;
+                        }
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        errors.push(CsvUpdateErrorOutput {
+                            email: row.email.clone(),
+                            error: format!("role update failed: {}", e),
+                        });
+                    }
+                }
+            }
+
+            if row_updated {
+                updated += 1;
+            }
+        }
+
+        if let Some(ref pb) = progress_bar {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = progress_bar {
+        pb.finish_and_clear();
+    }
+
+    let output = CsvUpdateResultOutput {
+        total: rows.len(),
+        updated,
+        skipped,
+        failed,
+        errors,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "CSV Update Results:".bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "Total:".bold(), output.total);
+            println!(
+                "{:<15} {}",
+                "Updated:".bold(),
+                output.updated.to_string().green()
+            );
+            println!(
+                "{:<15} {}",
+                "Skipped:".bold(),
+                output.skipped.to_string().yellow()
+            );
+            println!(
+                "{:<15} {}",
+                "Failed:".bold(),
+                output.failed.to_string().red()
+            );
+            println!("{}", "─".repeat(60));
+
+            if !output.errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for err in &output.errors {
+                    println!("  {} {} - {}", "✗".red(), err.email, err.error.dimmed());
+                }
+            }
+
+            if output.failed == 0 {
+                println!(
+                    "\n{} All {} user(s) updated successfully!",
+                    "✓".green().bold(),
+                    output.updated
+                );
+            } else {
+                println!(
+                    "\n{} Completed with {} failure(s)",
+                    "⚠".yellow().bold(),
+                    output.failed
+                );
+            }
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    if output.failed > 0 {
+        std::process::exit(1);
+    }
+
+    Ok(())
 }
 
 impl OperationCommands {

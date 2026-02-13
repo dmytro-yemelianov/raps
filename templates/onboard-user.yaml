@@ -1,0 +1,33 @@
+# Onboard User to All Active Projects
+#
+# Adds a user to all active projects in an account with the specified role.
+# Use --dry-run first to preview which projects will be affected.
+#
+# Variables to configure:
+#   ACCOUNT_ID  - Your ACC account ID (or set APS_ACCOUNT_ID env var)
+#   USER_EMAIL  - Email address of the user to onboard
+#   ROLE        - Role to assign (e.g., "Project Member", "Document Manager")
+#   FILTER      - Optional project filter (e.g., "name:*Hospital*,status:active")
+#
+# Usage:
+#   raps pipeline run templates/onboard-user.yaml --dry-run
+#   raps pipeline run templates/onboard-user.yaml
+
+name: Onboard User
+description: Add a user to all active projects with a specified role
+
+variables:
+  ACCOUNT_ID: "your-account-id-here"
+  USER_EMAIL: "newuser@company.com"
+  ROLE: "Project Member"
+  FILTER: "status:active"
+
+steps:
+  - name: Preview target projects
+    command: admin project list --account ${ACCOUNT_ID} --filter ${FILTER} --output table
+
+  - name: Add user to projects
+    command: admin user add ${USER_EMAIL} --account ${ACCOUNT_ID} --role "${ROLE}" --filter ${FILTER} --yes
+
+  - name: Verify user was added
+    command: admin user list --account ${ACCOUNT_ID} --search ${USER_EMAIL}

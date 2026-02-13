@@ -2175,6 +2175,7 @@ name = "raps-acc"
 version = "4.4.0"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "chrono",
  "raps-kernel",
  "raps-mock",
@@ -2184,6 +2185,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-test",
+ "urlencoding",
 ]
 
 [[package]]
@@ -2214,7 +2216,7 @@ version = "4.4.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "clap",
  "clap_complete",
@@ -2278,7 +2280,7 @@ name = "raps-derivative"
 version = "4.4.0"
 dependencies = [
  "anyhow",
- "base64 0.21.7",
+ "base64 0.22.1",
  "futures-util",
  "indicatif",
  "raps-kernel",
@@ -2314,7 +2316,7 @@ name = "raps-kernel"
 version = "4.4.0"
 dependencies = [
  "anyhow",
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "colored",
  "console 0.15.11",
@@ -2373,7 +2375,7 @@ name = "raps-oss"
 version = "4.4.0"
 dependencies = [
  "anyhow",
- "base64 0.21.7",
+ "base64 0.22.1",
  "chrono",
  "directories",
  "futures-util",

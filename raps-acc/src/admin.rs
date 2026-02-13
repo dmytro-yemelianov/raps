@@ -292,6 +292,47 @@ impl AccountAdminClient {
         Ok(all_projects)
     }
 
+    /// Update an account user's properties (company, status, etc.)
+    ///
+    /// # Arguments
+    /// * `account_id` - The account ID
+    /// * `user_id` - The user ID to update
+    /// * `request` - Update parameters
+    pub async fn update_user(
+        &self,
+        account_id: &str,
+        user_id: &str,
+        request: UpdateAccountUserRequest,
+    ) -> Result<AccountUser> {
+        let token = self.auth.get_3leg_token().await?;
+        let account_id = normalize_account_id(account_id);
+
+        let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to update account user")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to update account user ({status}): {error_text}");
+        }
+
+        let user: AccountUser = response
+            .json()
+            .await
+            .context("Failed to parse user update response")?;
+
+        Ok(user)
+    }
+
     // ========================================================================
     // TEMPLATE OPERATIONS
     // ========================================================================
@@ -694,6 +735,18 @@ pub struct UpdateProjectRequest {
     /// Time zone
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+}
+
+/// Request to update an account-level user's properties
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAccountUserRequest {
+    /// Company ID to assign the user to
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_id: Option<String>,
+    /// Company name (for display purposes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_name: Option<String>,
 }
 
 /// Normalize account ID to the format expected by ACC Admin API

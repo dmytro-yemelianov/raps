@@ -49,6 +49,35 @@ impl<T> PaginatedResponse<T> {
 }
 
 // ============================================================================
+// PROJECT CLASSIFICATION
+// ============================================================================
+
+/// Project classification (production, template, etc.)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProjectClassification {
+    /// Production project
+    Production,
+    /// Template project (used as a source for creating new projects)
+    Template,
+    /// Component project
+    Component,
+    /// Sample project
+    Sample,
+}
+
+impl std::fmt::Display for ProjectClassification {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Production => write!(f, "production"),
+            Self::Template => write!(f, "template"),
+            Self::Component => write!(f, "component"),
+            Self::Sample => write!(f, "sample"),
+        }
+    }
+}
+
+// ============================================================================
 // ACCOUNT TYPES
 // ============================================================================
 
@@ -130,6 +159,18 @@ pub struct AccountProject {
     /// Project type (e.g., "ACC", "BIM 360")
     #[serde(default, alias = "projectType")]
     pub project_type: Option<String>,
+    /// Project classification (production, template, etc.)
+    #[serde(default)]
+    pub classification: Option<ProjectClassification>,
+    /// Number of members in the project
+    #[serde(default)]
+    pub member_count: Option<usize>,
+    /// Number of companies in the project
+    #[serde(default)]
+    pub company_count: Option<usize>,
+    /// Products enabled for this project
+    #[serde(default)]
+    pub products: Option<Vec<String>>,
 }
 
 impl AccountProject {
@@ -165,6 +206,16 @@ impl AccountProject {
             .as_ref()
             .map(|s| s.to_lowercase() == "active")
             .unwrap_or(true)
+    }
+
+    /// Check if this is a template project
+    pub fn is_template(&self) -> bool {
+        self.classification == Some(ProjectClassification::Template)
+    }
+
+    /// Get the list of enabled products for this project
+    pub fn enabled_products(&self) -> Vec<String> {
+        self.products.clone().unwrap_or_default()
     }
 }
 
@@ -280,6 +331,10 @@ mod tests {
             created_at: None,
             updated_at: None,
             project_type: None,
+            classification: None,
+            member_count: None,
+            company_count: None,
+            products: None,
         };
         assert!(project.is_acc());
         assert!(!project.is_bim360());
@@ -296,6 +351,10 @@ mod tests {
             created_at: None,
             updated_at: None,
             project_type: None,
+            classification: None,
+            member_count: None,
+            company_count: None,
+            products: None,
         };
         assert!(!project.is_acc());
         assert!(project.is_bim360());

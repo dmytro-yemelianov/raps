@@ -27,6 +27,12 @@ tokio.workspace = true
 # Date/time handling
 chrono.workspace = true
 
+# URL encoding for filter params
+urlencoding.workspace = true
+
+# Base64 decoding for account IDs
+base64.workspace = true
+
 [dev-dependencies]
 raps-mock.workspace = true
 tokio-test.workspace = true

@@ -2810,6 +2810,272 @@ impl RapsServer {
         output
     }
 
+    // ================================================================
+    // Admin User Listing (v4.6)
+    // ================================================================
+
+    async fn admin_user_list(
+        &self,
+        account_id: String,
+        project_id: Option<String>,
+        search: Option<String>,
+        role: Option<String>,
+        status: Option<String>,
+    ) -> String {
+        if let Some(pid) = project_id {
+            // Project-level user listing
+            let client = self.get_users_client().await;
+            match client.list_all_project_users(&pid).await {
+                Ok(users) => {
+                    let filtered: Vec<_> = users
+                        .into_iter()
+                        .filter(|u| {
+                            if let Some(ref r) = role {
+                                if let Some(ref rn) = u.role_name {
+                                    if !rn.to_lowercase().contains(&r.to_lowercase()) {
+                                        return false;
+                                    }
+                                } else {
+                                    return false;
+                                }
+                            }
+                            if let Some(ref s) = search {
+                                let sl = s.to_lowercase();
+                                let email_match = u
+                                    .email
+                                    .as_ref()
+                                    .map(|e| e.to_lowercase().contains(&sl))
+                                    .unwrap_or(false);
+                                let name_match = u
+                                    .name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&sl))
+                                    .unwrap_or(false);
+                                if !email_match && !name_match {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect();
+
+                    let mut output = format!(
+                        "Found {} user(s) in project {}:\n\n",
+                        filtered.len(),
+                        pid
+                    );
+                    for u in &filtered {
+                        let email = u.email.as_deref().unwrap_or("N/A");
+                        let name = u.name.as_deref().unwrap_or("N/A");
+                        let role_name = u.role_name.as_deref().unwrap_or("N/A");
+                        output.push_str(&format!(
+                            "* {} ({}) - role: {}\n",
+                            email, name, role_name
+                        ));
+                    }
+                    output
+                }
+                Err(e) => format!("Failed to list project users: {}", e),
+            }
+        } else {
+            // Account-level user listing
+            let client = self.get_admin_client().await;
+            match client.list_all_users(&account_id).await {
+                Ok(users) => {
+                    let filtered: Vec<_> = users
+                        .into_iter()
+                        .filter(|u| {
+                            if let Some(ref s) = status {
+                                if let Some(ref us) = u.status {
+                                    if !us.to_lowercase().eq(&s.to_lowercase()) {
+                                        return false;
+                                    }
+                                } else {
+                                    return false;
+                                }
+                            }
+                            if let Some(ref s) = search {
+                                let sl = s.to_lowercase();
+                                let email_match = u.email.to_lowercase().contains(&sl);
+                                let name_match = u
+                                    .name
+                                    .as_ref()
+                                    .map(|n| n.to_lowercase().contains(&sl))
+                                    .unwrap_or(false);
+                                if !email_match && !name_match {
+                                    return false;
+                                }
+                            }
+                            true
+                        })
+                        .collect();
+
+                    let mut output = format!(
+                        "Found {} user(s) in account {}:\n\n",
+                        filtered.len(),
+                        account_id
+                    );
+                    for u in &filtered {
+                        let name = u.display_name();
+                        let status_str = u.status.as_deref().unwrap_or("unknown");
+                        let company = u.company_id.as_deref().unwrap_or("N/A");
+                        output.push_str(&format!(
+                            "* {} ({}) - status: {}, company: {}\n",
+                            u.email, name, status_str, company
+                        ));
+                    }
+                    output
+                }
+                Err(e) => format!("Failed to list account users: {}", e),
+            }
+        }
+    }
+
+    // ================================================================
+    // Portfolio Reports (v4.6)
+    // ================================================================
+
+    async fn report_rfi_summary(
+        &self,
+        account_id: String,
+        filter: Option<String>,
+        status_filter: Option<String>,
+    ) -> String {
+        let admin_client = self.get_admin_client().await;
+
+        let project_filter = if let Some(ref f) = filter {
+            match ProjectFilter::from_expression(f) {
+                Ok(pf) => pf,
+                Err(e) => return format!("Invalid filter expression: {}", e),
+            }
+        } else {
+            ProjectFilter::new()
+        };
+
+        let projects = match admin_client.list_all_projects(&account_id).await {
+            Ok(p) => project_filter.apply(p),
+            Err(e) => return format!("Failed to list projects: {}", e),
+        };
+
+        if projects.is_empty() {
+            return "No projects found matching filter.".to_string();
+        }
+
+        let rfi_client = self.get_rfi_client().await;
+        let mut output = format!("RFI Summary for {} project(s):\n\n", projects.len());
+        let mut grand_total = 0usize;
+        let mut grand_open = 0usize;
+
+        for proj in &projects {
+            match rfi_client.list_rfis(&proj.id).await {
+                Ok(rfis) => {
+                    let filtered: Vec<_> = if let Some(ref sf) = status_filter {
+                        rfis.into_iter()
+                            .filter(|r| r.status.to_lowercase() == sf.to_lowercase())
+                            .collect()
+                    } else {
+                        rfis
+                    };
+                    let total = filtered.len();
+                    let open = filtered
+                        .iter()
+                        .filter(|r| r.status.to_lowercase() == "open")
+                        .count();
+                    grand_total += total;
+                    grand_open += open;
+                    if total > 0 {
+                        output.push_str(&format!(
+                            "* {} - {} RFIs ({} open)\n",
+                            proj.name, total, open
+                        ));
+                    }
+                }
+                Err(_) => {
+                    output.push_str(&format!("* {} - (access denied)\n", proj.name));
+                }
+            }
+        }
+
+        output.push_str(&format!(
+            "\nTotal: {} RFIs across {} projects ({} open)",
+            grand_total,
+            projects.len(),
+            grand_open
+        ));
+        output
+    }
+
+    async fn report_issues_summary(
+        &self,
+        account_id: String,
+        filter: Option<String>,
+        status_filter: Option<String>,
+    ) -> String {
+        let admin_client = self.get_admin_client().await;
+
+        let project_filter = if let Some(ref f) = filter {
+            match ProjectFilter::from_expression(f) {
+                Ok(pf) => pf,
+                Err(e) => return format!("Invalid filter expression: {}", e),
+            }
+        } else {
+            ProjectFilter::new()
+        };
+
+        let projects = match admin_client.list_all_projects(&account_id).await {
+            Ok(p) => project_filter.apply(p),
+            Err(e) => return format!("Failed to list projects: {}", e),
+        };
+
+        if projects.is_empty() {
+            return "No projects found matching filter.".to_string();
+        }
+
+        let issues_client = self.get_issues_client().await;
+        let mut output = format!("Issues Summary for {} project(s):\n\n", projects.len());
+        let mut grand_total = 0usize;
+        let mut grand_open = 0usize;
+
+        for proj in &projects {
+            match issues_client.list_issues(&proj.id, None).await {
+                Ok(issues) => {
+                    let filtered: Vec<_> = if let Some(ref sf) = status_filter {
+                        issues
+                            .into_iter()
+                            .filter(|i| i.status.to_lowercase() == sf.to_lowercase())
+                            .collect()
+                    } else {
+                        issues
+                    };
+                    let total = filtered.len();
+                    let open = filtered
+                        .iter()
+                        .filter(|i| i.status.to_lowercase() == "open")
+                        .count();
+                    grand_total += total;
+                    grand_open += open;
+                    if total > 0 {
+                        output.push_str(&format!(
+                            "* {} - {} issues ({} open)\n",
+                            proj.name, total, open
+                        ));
+                    }
+                }
+                Err(_) => {
+                    output.push_str(&format!("* {} - (access denied)\n", proj.name));
+                }
+            }
+        }
+
+        output.push_str(&format!(
+            "\nTotal: {} issues across {} projects ({} open)",
+            grand_total,
+            projects.len(),
+            grand_open
+        ));
+        output
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -3764,6 +4030,44 @@ impl RapsServer {
                 self.api_request(method, endpoint, query, headers, body).await
             }
 
+            // ================================================================
+            // Admin User Listing (v4.6)
+            // ================================================================
+            "admin_user_list" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let project_id = Self::optional_arg(&args, "project_id");
+                let search = Self::optional_arg(&args, "search");
+                let role = Self::optional_arg(&args, "role");
+                let status = Self::optional_arg(&args, "status");
+                self.admin_user_list(account_id, project_id, search, role, status)
+                    .await
+            }
+
+            // ================================================================
+            // Portfolio Reports (v4.6)
+            // ================================================================
+            "report_rfi_summary" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let filter = Self::optional_arg(&args, "filter");
+                let status = Self::optional_arg(&args, "status");
+                self.report_rfi_summary(account_id, filter, status).await
+            }
+            "report_issues_summary" => {
+                let account_id = match Self::required_arg(&args, "account_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let filter = Self::optional_arg(&args, "filter");
+                let status = Self::optional_arg(&args, "status");
+                self.report_issues_summary(account_id, filter, status).await
+            }
+
             _ => format!("Unknown tool: {}", name),
         };
 
@@ -4676,6 +4980,50 @@ fn get_tools() -> Vec<Tool> {
                     "body": {"type": "object", "description": "Optional JSON request body (POST, PUT, PATCH only)"}
                 }),
                 &["method", "endpoint"],
+            ),
+        ),
+        // ================================================================
+        // Admin User Listing (v4.6)
+        // ================================================================
+        Tool::new(
+            "admin_user_list",
+            "List users in an ACC/BIM360 account or project. Returns user details including email, name, role, status, and company.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
+                    "project_id": {"type": "string", "description": "Optional: list users for a specific project only"},
+                    "search": {"type": "string", "description": "Search by email or name"},
+                    "role": {"type": "string", "description": "Filter by role name"},
+                    "status": {"type": "string", "description": "Filter by status (active, inactive, not_invited)"}
+                }),
+                &["account_id"],
+            ),
+        ),
+        // ================================================================
+        // Portfolio Reports (v4.6)
+        // ================================================================
+        Tool::new(
+            "report_rfi_summary",
+            "Generate an RFI summary report across all projects in an account. Shows total, open, answered, and closed RFI counts per project.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
+                    "filter": {"type": "string", "description": "Project filter expression (e.g., 'status:active,name:*Hospital*')"},
+                    "status": {"type": "string", "description": "Filter RFIs by status (open, answered, closed, void)"}
+                }),
+                &["account_id"],
+            ),
+        ),
+        Tool::new(
+            "report_issues_summary",
+            "Generate an issues summary report across all projects in an account. Shows total, open, and closed issue counts per project.",
+            schema(
+                json!({
+                    "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
+                    "filter": {"type": "string", "description": "Project filter expression (e.g., 'status:active')"},
+                    "status": {"type": "string", "description": "Filter issues by status (open, closed)"}
+                }),
+                &["account_id"],
             ),
         ),
     ]

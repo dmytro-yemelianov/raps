@@ -94,4 +94,9 @@ pub const TOOLS: &[&str] = &[
     "checklist_update",
     // Custom API (v4.5)
     "api_request",
+    // Admin User Listing (v4.6)
+    "admin_user_list",
+    // Portfolio Reports (v4.6)
+    "report_rfi_summary",
+    "report_issues_summary",
 ];
