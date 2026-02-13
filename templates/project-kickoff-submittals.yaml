@@ -1,0 +1,30 @@
+# Project Kickoff Submittals
+#
+# Sets up initial submittals for a new project from a CSV template.
+# Each row defines a submittal with spec section, title, and due offset.
+#
+# Variables to configure:
+#   PROJECT_ID  - Target ACC project ID
+#   CSV_PATH    - Path to submittal template CSV (columns: title, spec_section, due_date)
+#
+# Usage:
+#   raps pipeline run templates/project-kickoff-submittals.yaml --dry-run
+#   raps pipeline run templates/project-kickoff-submittals.yaml
+
+name: Project Kickoff Submittals
+description: Create submittal packages for a new project from a CSV template
+
+variables:
+  PROJECT_ID: "your-project-id-here"
+  CSV_PATH: "submittals-template.csv"
+
+steps:
+  - name: Verify project access
+    command: acc submittals list ${PROJECT_ID} --output json
+
+  - name: Create submittals from template
+    command: acc submittals create ${PROJECT_ID} --title "Initial Submittal Package" --spec-section "01 00 00"
+    continue_on_error: true
+
+  - name: List created submittals
+    command: acc submittals list ${PROJECT_ID} --output table

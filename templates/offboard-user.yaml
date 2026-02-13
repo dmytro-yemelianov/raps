@@ -1,0 +1,30 @@
+# Offboard User from All Projects
+#
+# Removes a user from all projects in an account.
+# Use --dry-run first to preview which projects will be affected.
+#
+# Variables to configure:
+#   ACCOUNT_ID  - Your ACC account ID (or set APS_ACCOUNT_ID env var)
+#   USER_EMAIL  - Email address of the user to offboard
+#   FILTER      - Optional project filter (default: all projects)
+#
+# Usage:
+#   raps pipeline run templates/offboard-user.yaml --dry-run
+#   raps pipeline run templates/offboard-user.yaml
+
+name: Offboard User
+description: Remove a user from all projects and log the changes
+
+variables:
+  ACCOUNT_ID: "your-account-id-here"
+  USER_EMAIL: "departing-user@company.com"
+
+steps:
+  - name: List current project memberships
+    command: admin user list --account ${ACCOUNT_ID} --search ${USER_EMAIL} --output table
+
+  - name: Remove user from all projects
+    command: admin user remove ${USER_EMAIL} --account ${ACCOUNT_ID} --yes
+
+  - name: Verify removal
+    command: admin user list --account ${ACCOUNT_ID} --search ${USER_EMAIL} --output table

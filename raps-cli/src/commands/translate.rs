@@ -31,6 +31,10 @@ pub enum TranslateCommands {
         /// Root filename (for ZIP files with multiple design files)
         #[arg(short, long)]
         root_filename: Option<String>,
+
+        /// Wait for translation to complete (polls until done)
+        #[arg(short, long)]
+        wait: bool,
     },
 
     /// Check translation status
@@ -135,7 +139,8 @@ impl TranslateCommands {
                 urn,
                 format,
                 root_filename,
-            } => start_translation(client, urn, format, root_filename, output_format).await,
+                wait,
+            } => start_translation(client, urn, format, root_filename, wait, output_format).await,
             TranslateCommands::Status { urn, wait } => {
                 check_status(client, &urn, wait, output_format).await
             }
@@ -190,6 +195,7 @@ async fn start_translation(
     urn: Option<String>,
     format: Option<String>,
     root_filename: Option<String>,
+    wait: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Get URN interactively if not provided
@@ -277,14 +283,22 @@ async fn start_translation(
                 }
             }
 
-            println!(
-                "\n{}",
-                "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed()
-            );
+            if !wait {
+                println!(
+                    "\n{}",
+                    "Tip: Use 'raps translate status <urn> --wait' to monitor progress".dimmed()
+                );
+            }
         }
         _ => {
             output_format.write(&output)?;
         }
+    }
+
+    // If --wait flag is set, poll until translation completes
+    if wait {
+        let urn_for_status = response.urn.clone();
+        check_status(client, &urn_for_status, true, output_format).await?;
     }
 
     Ok(())

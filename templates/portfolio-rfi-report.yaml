@@ -1,0 +1,25 @@
+# Portfolio RFI Report
+#
+# Iterates across active projects in an account and lists RFIs,
+# allowing you to generate a portfolio-wide RFI overview.
+#
+# Variables to configure:
+#   ACCOUNT_ID  - Your ACC account ID (or set APS_ACCOUNT_ID env var)
+#   STATUS      - RFI status filter: open, answered, closed (optional)
+#
+# Usage:
+#   raps pipeline run templates/portfolio-rfi-report.yaml --dry-run
+#   raps pipeline run templates/portfolio-rfi-report.yaml
+
+name: Portfolio RFI Report
+description: Generate an RFI summary report across all active projects in an account
+
+variables:
+  ACCOUNT_ID: "your-account-id-here"
+
+steps:
+  - name: List active projects
+    command: admin project list --account ${ACCOUNT_ID} --status active --output csv
+
+  - name: Export account-wide project list
+    command: admin project list --account ${ACCOUNT_ID} --status active --output json

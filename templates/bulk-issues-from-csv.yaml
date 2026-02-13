@@ -1,0 +1,30 @@
+# Bulk Create Issues from CSV
+#
+# Reads a CSV file of issue titles/descriptions and creates issues
+# in the specified ACC project.
+#
+# Variables to configure:
+#   PROJECT_ID  - Target ACC project ID
+#   CSV_PATH    - Path to CSV file with columns: title, description, status, priority
+#
+# Usage:
+#   raps pipeline run templates/bulk-issues-from-csv.yaml --dry-run
+#   raps pipeline run templates/bulk-issues-from-csv.yaml
+
+name: Bulk Create Issues from CSV
+description: Create multiple ACC issues from a CSV file in a single pipeline run
+
+variables:
+  PROJECT_ID: "your-project-id-here"
+  CSV_PATH: "issues.csv"
+
+steps:
+  - name: Verify project access
+    command: issue list ${PROJECT_ID} --output json
+
+  - name: Create issues from CSV
+    command: issue create ${PROJECT_ID} --from-csv ${CSV_PATH}
+    continue_on_error: true
+
+  - name: Verify created issues
+    command: issue list ${PROJECT_ID} --output table

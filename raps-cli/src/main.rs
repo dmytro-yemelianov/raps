@@ -51,7 +51,8 @@ use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
-    RealityCommands, RfiCommands, TemplateCommands, TranslateCommands, WebhookCommands,
+    RealityCommands, ReportCommands, RfiCommands, TemplateCommands, TranslateCommands,
+    WebhookCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -181,6 +182,10 @@ enum Commands {
     /// ACC RFIs (Requests for Information) (requires 3-legged auth)
     #[command(subcommand)]
     Rfi(RfiCommands),
+
+    /// Portfolio reports (RFI summary, issues summary across projects)
+    #[command(subcommand)]
+    Report(ReportCommands),
 
     /// Project templates management (create, list, update, archive)
     #[command(subcommand)]
@@ -546,13 +551,7 @@ async fn execute_command(
         }
 
         Commands::Project(cmd) => {
-            cmd.execute(
-                &get_dm_client(),
-                &get_admin_client(),
-                &get_project_users_client(),
-                output_format,
-            )
-            .await?;
+            cmd.execute(&get_dm_client(), output_format).await?;
         }
 
         Commands::Folder(cmd) => {
@@ -597,6 +596,11 @@ async fn execute_command(
             let rfi_client =
                 RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
             cmd.execute(&rfi_client, output_format).await?;
+        }
+
+        Commands::Report(cmd) => {
+            let auth_client = get_auth_client();
+            cmd.execute(config, &auth_client, output_format).await?;
         }
 
         Commands::Template(cmd) => {
