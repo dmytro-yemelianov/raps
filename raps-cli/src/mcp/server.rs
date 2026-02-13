@@ -22,7 +22,9 @@ use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
+use raps_da::DesignAutomationClient;
 use raps_oss::{OssClient, Region, RetentionPolicy};
+use raps_webhooks::WebhooksClient;
 
 /// RAPS MCP Server
 ///
@@ -168,6 +170,26 @@ impl RapsServer {
     async fn get_permissions_client(&self) -> FolderPermissionsClient {
         let auth = self.get_auth_client().await;
         FolderPermissionsClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Webhooks client (created on demand, not cached)
+    async fn get_webhooks_client(&self) -> WebhooksClient {
+        let auth = self.get_auth_client().await;
+        WebhooksClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Design Automation client (created on demand, not cached)
+    async fn get_da_client(&self) -> DesignAutomationClient {
+        let auth = self.get_auth_client().await;
+        DesignAutomationClient::new_with_http_config(
             (*self.config).clone(),
             auth,
             self.http_config.clone(),
@@ -3076,6 +3098,167 @@ impl RapsServer {
         output
     }
 
+    // ================================================================
+    // Webhooks (v4.6)
+    // ================================================================
+
+    async fn webhook_list(&self) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.list_all_webhooks().await {
+            Ok(hooks) => {
+                if hooks.is_empty() {
+                    return "No webhooks found.".to_string();
+                }
+                let mut output = format!("Found {} webhook(s):\n\n", hooks.len());
+                for hook in &hooks {
+                    output.push_str(&format!(
+                        "* {} (system: {}, event: {}, status: {})\n  URL: {}\n",
+                        hook.hook_id,
+                        hook.system,
+                        hook.event,
+                        hook.status,
+                        hook.callback_url,
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list webhooks: {}", e),
+        }
+    }
+
+    async fn webhook_create(
+        &self,
+        system: String,
+        event: String,
+        callback_url: String,
+        folder_urn: Option<String>,
+    ) -> String {
+        let client = self.get_webhooks_client().await;
+        match client
+            .create_webhook(&system, &event, &callback_url, folder_urn.as_deref())
+            .await
+        {
+            Ok(hook) => {
+                format!(
+                    "Webhook created successfully!\n\nID: {}\nSystem: {}\nEvent: {}\nCallback: {}",
+                    hook.hook_id,
+                    hook.system,
+                    hook.event,
+                    hook.callback_url,
+                )
+            }
+            Err(e) => format!("Failed to create webhook: {}", e),
+        }
+    }
+
+    async fn webhook_delete(&self, system: String, event: String, hook_id: String) -> String {
+        let client = self.get_webhooks_client().await;
+        match client.delete_webhook(&system, &event, &hook_id).await {
+            Ok(()) => format!("Webhook {} deleted successfully.", hook_id),
+            Err(e) => format!("Failed to delete webhook: {}", e),
+        }
+    }
+
+    async fn webhook_events(&self) -> String {
+        let client = self.get_webhooks_client().await;
+        let events = client.available_events();
+        let mut output = format!("Available webhook events ({}):\n\n", events.len());
+        for (event_name, description) in events {
+            output.push_str(&format!("* {} - {}\n", event_name, description));
+        }
+        output
+    }
+
+    // ================================================================
+    // Design Automation (v4.6)
+    // ================================================================
+
+    async fn da_engines_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_engines().await {
+            Ok(engines) => {
+                if engines.is_empty() {
+                    return "No engines found.".to_string();
+                }
+                let mut output = format!("Available engines ({}):\n\n", engines.len());
+                for engine in &engines {
+                    output.push_str(&format!("* {}\n", engine));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list engines: {}", e),
+        }
+    }
+
+    async fn da_appbundles_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_appbundles().await {
+            Ok(bundles) => {
+                if bundles.is_empty() {
+                    return "No appbundles found.".to_string();
+                }
+                let mut output = format!("AppBundles ({}):\n\n", bundles.len());
+                for bundle in &bundles {
+                    output.push_str(&format!("* {}\n", bundle));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list appbundles: {}", e),
+        }
+    }
+
+    async fn da_activities_list(&self) -> String {
+        let client = self.get_da_client().await;
+        match client.list_activities().await {
+            Ok(activities) => {
+                if activities.is_empty() {
+                    return "No activities found.".to_string();
+                }
+                let mut output = format!("Activities ({}):\n\n", activities.len());
+                for activity in &activities {
+                    output.push_str(&format!("* {}\n", activity));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list activities: {}", e),
+        }
+    }
+
+    async fn da_workitem_create(&self, activity_id: String) -> String {
+        let client = self.get_da_client().await;
+        let arguments = std::collections::HashMap::new();
+        match client.create_workitem(&activity_id, arguments).await {
+            Ok(item) => {
+                format!(
+                    "Workitem created!\n\nID: {}\nStatus: {}\nActivity: {}",
+                    item.id,
+                    item.status,
+                    activity_id,
+                )
+            }
+            Err(e) => format!("Failed to create workitem: {}", e),
+        }
+    }
+
+    async fn da_workitem_status(&self, workitem_id: String) -> String {
+        let client = self.get_da_client().await;
+        match client.get_workitem_status(&workitem_id).await {
+            Ok(item) => {
+                let mut output = format!(
+                    "Workitem: {}\nStatus: {}\nProgress: {}",
+                    item.id,
+                    item.status,
+                    item.progress.as_deref().unwrap_or("N/A"),
+                );
+                if let Some(ref report_url) = item.report_url {
+                    output.push_str(&format!("\nReport: {}", report_url));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get workitem status: {}", e),
+        }
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -4031,6 +4214,65 @@ impl RapsServer {
             }
 
             // ================================================================
+            // Webhooks (v4.6)
+            // ================================================================
+            "webhook_list" => self.webhook_list().await,
+            "webhook_create" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let callback_url = match Self::required_arg(&args, "callback_url") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let folder_urn = Self::optional_arg(&args, "folder_urn");
+                self.webhook_create(system, event, callback_url, folder_urn)
+                    .await
+            }
+            "webhook_delete" => {
+                let system = match Self::required_arg(&args, "system") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let event = match Self::required_arg(&args, "event") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let hook_id = match Self::required_arg(&args, "hook_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.webhook_delete(system, event, hook_id).await
+            }
+            "webhook_events" => self.webhook_events().await,
+
+            // ================================================================
+            // Design Automation (v4.6)
+            // ================================================================
+            "da_engines_list" => self.da_engines_list().await,
+            "da_appbundles_list" => self.da_appbundles_list().await,
+            "da_activities_list" => self.da_activities_list().await,
+            "da_workitem_create" => {
+                let activity_id = match Self::required_arg(&args, "activity_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.da_workitem_create(activity_id).await
+            }
+            "da_workitem_status" => {
+                let workitem_id = match Self::required_arg(&args, "workitem_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.da_workitem_status(workitem_id).await
+            }
+
+            // ================================================================
             // Admin User Listing (v4.6)
             // ================================================================
             "admin_user_list" => {
@@ -4961,6 +5203,82 @@ fn get_tools() -> Vec<Tool> {
                     "new_name": {"type": "string", "description": "New display name"}
                 }),
                 &["project_id", "item_id", "new_name"],
+            ),
+        ),
+        // ================================================================
+        // Webhooks (v4.6)
+        // ================================================================
+        Tool::new(
+            "webhook_list",
+            "List all registered webhooks across all systems and events.",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "webhook_create",
+            "Create a new webhook subscription for a specific system and event.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name (e.g., 'data', 'derivative')"},
+                    "event": {"type": "string", "description": "Event name (e.g., 'dm.version.added', 'extraction.finished')"},
+                    "callback_url": {"type": "string", "description": "URL to receive webhook callbacks"},
+                    "folder_urn": {"type": "string", "description": "Optional: restrict to a specific folder URN"}
+                }),
+                &["system", "event", "callback_url"],
+            ),
+        ),
+        Tool::new(
+            "webhook_delete",
+            "Delete a webhook subscription.",
+            schema(
+                json!({
+                    "system": {"type": "string", "description": "System name"},
+                    "event": {"type": "string", "description": "Event name"},
+                    "hook_id": {"type": "string", "description": "Webhook ID to delete"}
+                }),
+                &["system", "event", "hook_id"],
+            ),
+        ),
+        Tool::new(
+            "webhook_events",
+            "List all available webhook event types that can be subscribed to.",
+            schema(json!({}), &[]),
+        ),
+        // ================================================================
+        // Design Automation (v4.6)
+        // ================================================================
+        Tool::new(
+            "da_engines_list",
+            "List all available Design Automation engines (AutoCAD, Revit, Inventor, 3dsMax).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_appbundles_list",
+            "List all registered Design Automation appbundles (custom plugins).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_activities_list",
+            "List all registered Design Automation activities (processing recipes).",
+            schema(json!({}), &[]),
+        ),
+        Tool::new(
+            "da_workitem_create",
+            "Create and submit a new Design Automation workitem to execute an activity.",
+            schema(
+                json!({
+                    "activity_id": {"type": "string", "description": "Fully qualified activity ID (e.g., 'YourApp.ActivityName+alias')"}
+                }),
+                &["activity_id"],
+            ),
+        ),
+        Tool::new(
+            "da_workitem_status",
+            "Check the status and progress of a Design Automation workitem.",
+            schema(
+                json!({
+                    "workitem_id": {"type": "string", "description": "Workitem ID to check status for"}
+                }),
+                &["workitem_id"],
             ),
         ),
         // ================================================================

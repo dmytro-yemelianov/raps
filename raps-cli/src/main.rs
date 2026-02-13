@@ -524,7 +524,7 @@ async fn execute_command(
         AccountAdminClient::new_with_http_config(config.clone(), auth, http_config.clone())
     };
 
-    let get_project_users_client = || -> ProjectUsersClient {
+    let _get_project_users_client = || -> ProjectUsersClient {
         let auth = get_auth_client();
         ProjectUsersClient::new_with_http_config(config.clone(), auth, http_config.clone())
     };

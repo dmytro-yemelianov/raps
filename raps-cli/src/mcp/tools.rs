@@ -99,4 +99,15 @@ pub const TOOLS: &[&str] = &[
     // Portfolio Reports (v4.6)
     "report_rfi_summary",
     "report_issues_summary",
+    // Webhooks (v4.6)
+    "webhook_list",
+    "webhook_create",
+    "webhook_delete",
+    "webhook_events",
+    // Design Automation (v4.6)
+    "da_engines_list",
+    "da_appbundles_list",
+    "da_activities_list",
+    "da_workitem_create",
+    "da_workitem_status",
 ];

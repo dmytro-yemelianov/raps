@@ -186,6 +186,54 @@ pub enum UserCommands {
         #[arg(short, long)]
         yes: bool,
     },
+
+    /// Add a user to a single project by email
+    #[command(name = "add-to-project")]
+    AddToProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// Email address of the user (used as user identifier)
+        #[arg(short, long)]
+        email: String,
+
+        /// Role ID to assign
+        #[arg(short, long)]
+        role_id: Option<String>,
+    },
+
+    /// Remove a user from a single project
+    #[command(name = "remove-from-project")]
+    RemoveFromProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// User ID to remove
+        #[arg(short, long)]
+        user_id: String,
+
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
+    },
+
+    /// Update a user's role in a single project
+    #[command(name = "update-in-project")]
+    UpdateInProject {
+        /// Project ID
+        #[arg(short, long)]
+        project: String,
+
+        /// User ID to update
+        #[arg(short, long)]
+        user_id: String,
+
+        /// New role ID to assign
+        #[arg(short, long)]
+        role_id: Option<String>,
+    },
 }
 
 /// Folder permission management subcommands
@@ -1010,6 +1058,157 @@ impl UserCommands {
 
                 Ok(())
             }
+
+            UserCommands::AddToProject {
+                project,
+                email,
+                role_id,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Adding user {} to project {}",
+                        "→".cyan(),
+                        email.cyan(),
+                        project.cyan()
+                    );
+                }
+
+                let request = raps_acc::users::AddProjectUserRequest {
+                    user_id: email.clone(),
+                    role_id: role_id.clone(),
+                    products: vec![],
+                };
+
+                let user = users_client.add_user(&project, request).await?;
+
+                #[derive(Serialize)]
+                struct AddResult {
+                    user_id: String,
+                    email: String,
+                    role: Option<String>,
+                    project: String,
+                }
+
+                let result = AddResult {
+                    user_id: user.id,
+                    email: user.email.unwrap_or(email),
+                    role: user.role_name,
+                    project,
+                };
+
+                output_format.write(&result)?;
+
+                if output_format.supports_colors() {
+                    println!("\n{} User added successfully", "✓".green());
+                }
+
+                Ok(())
+            }
+
+            UserCommands::RemoveFromProject {
+                project,
+                user_id,
+                yes,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if !yes && output_format.supports_colors() {
+                    println!(
+                        "\n{} Remove user {} from project {}?",
+                        "⚠".yellow(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                    print!("Continue? [y/N] ");
+                    use std::io::{self, Write};
+                    io::stdout().flush()?;
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input)?;
+                    if !input.trim().eq_ignore_ascii_case("y") {
+                        println!("Cancelled.");
+                        return Ok(());
+                    }
+                }
+
+                users_client.remove_user(&project, &user_id).await?;
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} User {} removed from project {}",
+                        "✓".green(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                } else {
+                    println!("User {} removed from project {}", user_id, project);
+                }
+
+                Ok(())
+            }
+
+            UserCommands::UpdateInProject {
+                project,
+                user_id,
+                role_id,
+            } => {
+                let http_config = HttpClientConfig::default();
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Updating user {} in project {}",
+                        "→".cyan(),
+                        user_id.cyan(),
+                        project.cyan()
+                    );
+                }
+
+                let request = raps_acc::users::UpdateProjectUserRequest {
+                    role_id: role_id.clone(),
+                    products: None,
+                };
+
+                let user = users_client.update_user(&project, &user_id, request).await?;
+
+                #[derive(Serialize)]
+                struct UpdateResult {
+                    user_id: String,
+                    email: Option<String>,
+                    role: Option<String>,
+                    project: String,
+                }
+
+                let result = UpdateResult {
+                    user_id: user.id,
+                    email: user.email,
+                    role: user.role_name,
+                    project,
+                };
+
+                output_format.write(&result)?;
+
+                if output_format.supports_colors() {
+                    println!("\n{} User updated successfully", "✓".green());
+                }
+
+                Ok(())
+            }
         }
     }
 }
@@ -1576,7 +1775,7 @@ async fn execute_csv_update(
     }
 
     let mut updated = 0usize;
-    let mut skipped = 0usize;
+    let skipped = 0usize;
     let mut failed = 0usize;
     let mut errors = Vec::new();
 

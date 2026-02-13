@@ -24,6 +24,10 @@ pub enum RfiCommands {
         /// Filter by status (open, answered, closed, void)
         #[arg(long)]
         status: Option<String>,
+
+        /// Only show RFIs created after this date (YYYY-MM-DD)
+        #[arg(long)]
+        since: Option<String>,
     },
 
     /// Get details of a specific RFI
@@ -114,8 +118,8 @@ pub enum RfiCommands {
 impl RfiCommands {
     pub async fn execute(self, client: &RfiClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            RfiCommands::List { project_id, status } => {
-                list_rfis(client, &project_id, status.as_deref(), output_format).await
+            RfiCommands::List { project_id, status, since } => {
+                list_rfis(client, &project_id, status.as_deref(), since, output_format).await
             }
             RfiCommands::Get { project_id, rfi_id } => {
                 get_rfi(client, &project_id, &rfi_id, output_format).await
@@ -194,6 +198,7 @@ async fn list_rfis(
     client: &RfiClient,
     project_id: &str,
     status_filter: Option<&str>,
+    since: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
     if output_format.supports_colors() {
@@ -209,6 +214,19 @@ async fn list_rfis(
             .collect()
     } else {
         rfis
+    };
+
+    // Apply since filter if provided
+    let filtered: Vec<_> = if let Some(ref since_date) = since {
+        filtered.into_iter()
+            .filter(|r| {
+                r.created_at.as_ref()
+                    .map(|d| d.as_str() >= since_date.as_str())
+                    .unwrap_or(true)
+            })
+            .collect()
+    } else {
+        filtered
     };
 
     let outputs: Vec<RfiOutput> = filtered

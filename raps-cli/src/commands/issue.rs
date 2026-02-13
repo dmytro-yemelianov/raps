@@ -6,10 +6,13 @@
 //! Commands for managing ACC (Autodesk Construction Cloud) issues.
 //! Uses the Construction Issues API: /construction/issues/v1
 
-use anyhow::Result;
+use std::path::PathBuf;
+
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
+use indicatif::{ProgressBar, ProgressStyle};
 #[allow(unused_imports)]
 use raps_kernel::prompts;
 use serde::Serialize;
@@ -29,6 +32,10 @@ pub enum IssueCommands {
         /// Filter by status (open, closed, etc.)
         #[arg(short, long)]
         status: Option<String>,
+
+        /// Only show issues created after this date (YYYY-MM-DD)
+        #[arg(long)]
+        since: Option<String>,
     },
 
     /// Create a new issue
@@ -43,6 +50,10 @@ pub enum IssueCommands {
         /// Issue description
         #[arg(short, long)]
         description: Option<String>,
+
+        /// Create issues from CSV file (columns: title, description, status)
+        #[arg(long, value_name = "FILE")]
+        from_csv: Option<PathBuf>,
     },
 
     /// Update an issue
@@ -126,14 +137,17 @@ pub enum CommentCommands {
 impl IssueCommands {
     pub async fn execute(self, client: &IssuesClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            IssueCommands::List { project_id, status } => {
-                list_issues(client, &project_id, status, output_format).await
+            IssueCommands::List { project_id, status, since } => {
+                list_issues(client, &project_id, status, since, output_format).await
             }
             IssueCommands::Create {
                 project_id,
                 title,
                 description,
-            } => create_issue(client, &project_id, title, description, output_format).await,
+                from_csv,
+            } => {
+                create_issue(client, &project_id, title, description, from_csv, output_format).await
+            }
             IssueCommands::Update {
                 project_id,
                 issue_id,
@@ -182,6 +196,7 @@ async fn list_issues(
     client: &IssuesClient,
     project_id: &str,
     status: Option<String>,
+    since: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
     if output_format.supports_colors() {
@@ -190,6 +205,19 @@ async fn list_issues(
 
     let filter = status.as_ref().map(|s| format!("status={}", s));
     let issues = client.list_issues(project_id, filter.as_deref()).await?;
+
+    // Apply since filter if provided
+    let issues: Vec<_> = if let Some(ref since_date) = since {
+        issues.into_iter()
+            .filter(|i| {
+                i.created_at.as_ref()
+                    .map(|d| d.as_str() >= since_date.as_str())
+                    .unwrap_or(true)
+            })
+            .collect()
+    } else {
+        issues
+    };
 
     if issues.is_empty() {
         match output_format {
@@ -295,13 +323,27 @@ async fn list_issues(
     Ok(())
 }
 
+#[derive(serde::Deserialize)]
+struct CsvIssueRow {
+    title: String,
+    description: Option<String>,
+    status: Option<String>,
+}
+
 async fn create_issue(
     client: &IssuesClient,
     project_id: &str,
     title: Option<String>,
     description: Option<String>,
-    _output_format: OutputFormat,
+    from_csv: Option<PathBuf>,
+    output_format: OutputFormat,
 ) -> Result<()> {
+    // CSV bulk import flow
+    if let Some(csv_path) = from_csv {
+        return create_issues_from_csv(client, project_id, &csv_path, output_format).await;
+    }
+
+    // Single issue creation flow
     // Get title
     let issue_title = match title {
         Some(t) => t,
@@ -352,6 +394,178 @@ async fn create_issue(
     println!("  {} {}", "ID:".bold(), issue.id);
     println!("  {} {}", "Title:".bold(), issue.title.cyan());
     println!("  {} {}", "Status:".bold(), issue.status);
+
+    Ok(())
+}
+
+async fn create_issues_from_csv(
+    client: &IssuesClient,
+    project_id: &str,
+    csv_path: &PathBuf,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Parse CSV file
+    let mut reader = csv::Reader::from_path(csv_path)
+        .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?;
+
+    let mut rows: Vec<CsvIssueRow> = Vec::new();
+    let mut validation_errors: Vec<String> = Vec::new();
+
+    for (i, result) in reader.deserialize().enumerate() {
+        match result {
+            Ok(row) => {
+                let row: CsvIssueRow = row;
+                // Validate title is non-empty
+                if row.title.trim().is_empty() {
+                    validation_errors.push(format!("Row {}: title is empty", i + 2));
+                    continue;
+                }
+                rows.push(row);
+            }
+            Err(e) => {
+                validation_errors.push(format!("Row {}: parse error: {}", i + 2, e));
+            }
+        }
+    }
+
+    // Report validation errors
+    if !validation_errors.is_empty() {
+        if output_format.supports_colors() {
+            println!("{} CSV validation errors:", "✗".red().bold());
+            for err in &validation_errors {
+                println!("  {} {}", "•".red(), err);
+            }
+        }
+        anyhow::bail!(
+            "CSV validation failed with {} error(s). Fix errors before proceeding.",
+            validation_errors.len()
+        );
+    }
+
+    if rows.is_empty() {
+        anyhow::bail!("No valid rows found in CSV file");
+    }
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Bulk issue creation: {} issues from {}",
+            "→".cyan(),
+            rows.len().to_string().green(),
+            csv_path.display().to_string().cyan()
+        );
+        println!();
+    }
+
+    let mut created = 0usize;
+    let mut failed = 0usize;
+    let mut errors: Vec<String> = Vec::new();
+
+    // Progress bar
+    let progress_bar = if output_format.supports_colors() {
+        let pb = ProgressBar::new(rows.len() as u64);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+                .unwrap()
+                .progress_chars("=>-"),
+        );
+        Some(pb)
+    } else {
+        None
+    };
+
+    for row in &rows {
+        if let Some(ref pb) = progress_bar {
+            pb.set_message(truncate_str(&row.title, 30));
+        }
+
+        let status = row
+            .status
+            .as_deref()
+            .unwrap_or("open")
+            .to_string();
+
+        let request = CreateIssueRequest {
+            title: row.title.clone(),
+            description: row.description.clone(),
+            status,
+            issue_type_id: None,
+            issue_subtype_id: None,
+            assigned_to: None,
+            assigned_to_type: None,
+            due_date: None,
+        };
+
+        match client.create_issue(project_id, request).await {
+            Ok(_) => {
+                created += 1;
+            }
+            Err(e) => {
+                failed += 1;
+                errors.push(format!("{}: {}", row.title, e));
+            }
+        }
+
+        if let Some(ref pb) = progress_bar {
+            pb.inc(1);
+        }
+    }
+
+    if let Some(pb) = progress_bar {
+        pb.finish_and_clear();
+    }
+
+    // Display summary
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Bulk Issue Creation Results:".bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "Total:".bold(), rows.len());
+            println!(
+                "{:<15} {}",
+                "Created:".bold(),
+                created.to_string().green()
+            );
+            println!(
+                "{:<15} {}",
+                "Failed:".bold(),
+                failed.to_string().red()
+            );
+            println!("{}", "─".repeat(60));
+
+            if !errors.is_empty() {
+                println!("\n{}", "Errors:".red().bold());
+                for err in &errors {
+                    println!("  {} {}", "✗".red(), err.dimmed());
+                }
+            }
+
+            if failed == 0 {
+                println!(
+                    "\n{} All {} issue(s) created successfully!",
+                    "✓".green().bold(),
+                    created
+                );
+            }
+        }
+        _ => {
+            #[derive(Serialize)]
+            struct BulkCreateResult {
+                total: usize,
+                created: usize,
+                failed: usize,
+                errors: Vec<String>,
+            }
+
+            let result = BulkCreateResult {
+                total: rows.len(),
+                created,
+                failed,
+                errors,
+            };
+            output_format.write(&result)?;
+        }
+    }
 
     Ok(())
 }
