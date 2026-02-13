@@ -102,8 +102,7 @@ fn write_table<W: Write>(json_value: serde_json::Value, writer: &mut W) -> Resul
                 writeln!(writer, "{}", header_row.join("  "))?;
 
                 // Separator
-                let separator: Vec<String> =
-                    widths.iter().map(|&w| "\u{2500}".repeat(w)).collect();
+                let separator: Vec<String> = widths.iter().map(|&w| "\u{2500}".repeat(w)).collect();
                 writeln!(writer, "{}", separator.join("\u{2500}\u{2500}"))?;
 
                 // Data rows
@@ -113,8 +112,7 @@ fn write_table<W: Write>(json_value: serde_json::Value, writer: &mut W) -> Resul
                             .iter()
                             .enumerate()
                             .map(|(i, header)| {
-                                let val =
-                                    map.get(header).unwrap_or(&serde_json::Value::Null);
+                                let val = map.get(header).unwrap_or(&serde_json::Value::Null);
                                 let val_str = format_value_for_table(val);
                                 let truncated = if val_str.len() > 50 {
                                     format!("{}...", &val_str[..47])

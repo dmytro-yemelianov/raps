@@ -97,9 +97,7 @@ impl FolderCommands {
             FolderCommands::Rights {
                 project_id,
                 folder_id,
-            } => {
-                folder_rights(permissions_client, &project_id, &folder_id, output_format).await
-            }
+            } => folder_rights(permissions_client, &project_id, &folder_id, output_format).await,
         }
     }
 }
@@ -390,10 +388,7 @@ async fn folder_rights(
             println!("{}", "-".repeat(80));
 
             for item in &items {
-                let inherited = item
-                    .inherited_from
-                    .as_deref()
-                    .unwrap_or("direct");
+                let inherited = item.inherited_from.as_deref().unwrap_or("direct");
                 println!(
                     "  {} {} [{}]",
                     item.subject_type.cyan(),

@@ -11,7 +11,9 @@ use raps_kernel::http::HttpClientConfig;
 
 use serde::Serialize;
 
-use crate::types::{AccountProject, AccountUser, Company, PaginatedResponse, ProjectClassification};
+use crate::types::{
+    AccountProject, AccountUser, Company, PaginatedResponse, ProjectClassification,
+};
 
 /// Client for ACC Account Admin API
 ///
@@ -56,10 +58,7 @@ impl AccountAdminClient {
 
     /// Get the base URL for HQ v1 API (used for companies endpoint)
     fn hq_url(&self, account_id: &str) -> String {
-        format!(
-            "{}/hq/v1/accounts/{}",
-            self.config.base_url, account_id
-        )
+        format!("{}/hq/v1/accounts/{}", self.config.base_url, account_id)
     }
 
     /// List all users in an account (paginated)
@@ -832,7 +831,7 @@ fn normalize_account_id(account_id: &str) -> String {
 
 /// Simple base64 decoder (URL-safe variant)
 fn base64_decode(input: &str) -> Result<Vec<u8>, ()> {
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     STANDARD.decode(input).map_err(|_| ())
 }
 

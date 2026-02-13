@@ -1930,7 +1930,9 @@ mod integration_tests {
     async fn test_delete_issue_not_found() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
         let client = create_mock_issues_client(&server.url);
-        let result = client.delete_issue("project-123", "nonexistent-issue").await;
+        let result = client
+            .delete_issue("project-123", "nonexistent-issue")
+            .await;
         // The mock server may return various responses - just verify it doesn't panic
         let _ = result;
     }
@@ -1947,7 +1949,9 @@ mod integration_tests {
     async fn test_delete_submittal() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
         let client = create_mock_acc_client(&server.url);
-        let result = client.delete_submittal("project-123", "submittal-789").await;
+        let result = client
+            .delete_submittal("project-123", "submittal-789")
+            .await;
         let _ = result;
     }
 }

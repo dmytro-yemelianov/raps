@@ -518,10 +518,7 @@ async fn list_workitems(
                     "inprogress" | "pending" => item.status.yellow().to_string(),
                     _ => item.status.clone(),
                 };
-                println!(
-                    "{:<40} {:<15} {}",
-                    item.id, status_colored, item.progress
-                );
+                println!("{:<40} {:<15} {}", item.id, status_colored, item.progress);
             }
 
             println!("{}", "-".repeat(70));

@@ -134,9 +134,11 @@ pub enum RfiCommands {
 impl RfiCommands {
     pub async fn execute(self, client: &RfiClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            RfiCommands::List { project_id, status, since } => {
-                list_rfis(client, &project_id, status.as_deref(), since, output_format).await
-            }
+            RfiCommands::List {
+                project_id,
+                status,
+                since,
+            } => list_rfis(client, &project_id, status.as_deref(), since, output_format).await,
             RfiCommands::Get { project_id, rfi_id } => {
                 get_rfi(client, &project_id, &rfi_id, output_format).await
             }
@@ -194,10 +196,9 @@ impl RfiCommands {
                 )
                 .await
             }
-            RfiCommands::Delete {
-                project_id,
-                rfi_id,
-            } => delete_rfi(client, &project_id, &rfi_id, output_format).await,
+            RfiCommands::Delete { project_id, rfi_id } => {
+                delete_rfi(client, &project_id, &rfi_id, output_format).await
+            }
         }
     }
 }
@@ -227,13 +228,10 @@ async fn list_rfis(
         println!("{}", "Fetching RFIs...".dimmed());
     }
 
-    let rfis = client
-        .list_rfis(project_id)
-        .await
-        .context(format!(
-            "Failed to list RFIs for project '{}'. Verify project ID (without 'b.' prefix)",
-            project_id
-        ))?;
+    let rfis = client.list_rfis(project_id).await.context(format!(
+        "Failed to list RFIs for project '{}'. Verify project ID (without 'b.' prefix)",
+        project_id
+    ))?;
 
     // Filter by status if provided
     let filtered: Vec<_> = if let Some(status) = status_filter {
@@ -246,9 +244,11 @@ async fn list_rfis(
 
     // Apply since filter if provided
     let filtered: Vec<_> = if let Some(ref since_date) = since {
-        filtered.into_iter()
+        filtered
+            .into_iter()
             .filter(|r| {
-                r.created_at.as_ref()
+                r.created_at
+                    .as_ref()
                     .map(|d| d.as_str() >= since_date.as_str())
                     .unwrap_or(true)
             })
@@ -345,13 +345,10 @@ async fn get_rfi(
         println!("{}", "Fetching RFI details...".dimmed());
     }
 
-    let rfi = client
-        .get_rfi(project_id, rfi_id)
-        .await
-        .context(format!(
-            "Failed to get RFI '{}'. Verify the RFI ID exists",
-            rfi_id
-        ))?;
+    let rfi = client.get_rfi(project_id, rfi_id).await.context(format!(
+        "Failed to get RFI '{}'. Verify the RFI ID exists",
+        rfi_id
+    ))?;
 
     let output = RfiOutput {
         id: rfi.id.clone(),
@@ -622,16 +619,8 @@ async fn create_rfis_from_csv(
             println!("\n{}", "Bulk RFI Creation Results:".bold());
             println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Total:".bold(), rows.len());
-            println!(
-                "{:<15} {}",
-                "Created:".bold(),
-                created.to_string().green()
-            );
-            println!(
-                "{:<15} {}",
-                "Failed:".bold(),
-                failed.to_string().red()
-            );
+            println!("{:<15} {}", "Created:".bold(), created.to_string().green());
+            println!("{:<15} {}", "Failed:".bold(), failed.to_string().red());
             println!("{}", "─".repeat(60));
 
             if !errors.is_empty() {
@@ -795,12 +784,14 @@ mod tests {
 
     #[test]
     fn test_csv_rfi_row_deserialization() {
-        let csv_data =
-            "title,description,assigned_to\nMissing specs,Need structural specs for floor 3,jane@example.com\n";
+        let csv_data = "title,description,assigned_to\nMissing specs,Need structural specs for floor 3,jane@example.com\n";
         let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
         let row: CsvRfiRow = rdr.deserialize().next().unwrap().unwrap();
         assert_eq!(row.title, "Missing specs");
-        assert_eq!(row.description.unwrap(), "Need structural specs for floor 3");
+        assert_eq!(
+            row.description.unwrap(),
+            "Need structural specs for floor 3"
+        );
         assert_eq!(row.assigned_to.unwrap(), "jane@example.com");
     }
 

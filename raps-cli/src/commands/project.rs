@@ -94,13 +94,10 @@ async fn list_projects(
         println!("{}", "Fetching projects...".dimmed());
     }
 
-    let projects = client
-        .list_projects(&hub)
-        .await
-        .context(format!(
-            "Failed to list projects in hub '{}'. Verify the hub ID and your permissions",
-            hub
-        ))?;
+    let projects = client.list_projects(&hub).await.context(format!(
+        "Failed to list projects in hub '{}'. Verify the hub ID and your permissions",
+        hub
+    ))?;
 
     let project_outputs: Vec<ProjectListOutput> = projects
         .iter()

@@ -145,16 +145,26 @@ pub enum CommentCommands {
 impl IssueCommands {
     pub async fn execute(self, client: &IssuesClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            IssueCommands::List { project_id, status, since } => {
-                list_issues(client, &project_id, status, since, output_format).await
-            }
+            IssueCommands::List {
+                project_id,
+                status,
+                since,
+            } => list_issues(client, &project_id, status, since, output_format).await,
             IssueCommands::Create {
                 project_id,
                 title,
                 description,
                 from_csv,
             } => {
-                create_issue(client, &project_id, title, description, from_csv, output_format).await
+                create_issue(
+                    client,
+                    &project_id,
+                    title,
+                    description,
+                    from_csv,
+                    output_format,
+                )
+                .await
             }
             IssueCommands::Update {
                 project_id,
@@ -226,9 +236,11 @@ async fn list_issues(
 
     // Apply since filter if provided
     let issues: Vec<_> = if let Some(ref since_date) = since {
-        issues.into_iter()
+        issues
+            .into_iter()
             .filter(|i| {
-                i.created_at.as_ref()
+                i.created_at
+                    .as_ref()
                     .map(|d| d.as_str() >= since_date.as_str())
                     .unwrap_or(true)
             })
@@ -500,11 +512,7 @@ async fn create_issues_from_csv(
             pb.set_message(truncate_str(&row.title, 30));
         }
 
-        let status = row
-            .status
-            .as_deref()
-            .unwrap_or("open")
-            .to_string();
+        let status = row.status.as_deref().unwrap_or("open").to_string();
 
         let request = CreateIssueRequest {
             title: row.title.clone(),
@@ -542,16 +550,8 @@ async fn create_issues_from_csv(
             println!("\n{}", "Bulk Issue Creation Results:".bold());
             println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Total:".bold(), rows.len());
-            println!(
-                "{:<15} {}",
-                "Created:".bold(),
-                created.to_string().green()
-            );
-            println!(
-                "{:<15} {}",
-                "Failed:".bold(),
-                failed.to_string().red()
-            );
+            println!("{:<15} {}", "Created:".bold(), created.to_string().green());
+            println!("{:<15} {}", "Failed:".bold(), failed.to_string().red());
             println!("{}", "─".repeat(60));
 
             if !errors.is_empty() {
@@ -703,13 +703,10 @@ async fn list_issue_types(
 ) -> Result<()> {
     println!("{}", "Fetching issue types...".dimmed());
 
-    let types = client
-        .list_issue_types(project_id)
-        .await
-        .context(format!(
-            "Failed to list issue types for project '{}'",
-            project_id
-        ))?;
+    let types = client.list_issue_types(project_id).await.context(format!(
+        "Failed to list issue types for project '{}'",
+        project_id
+    ))?;
 
     if types.is_empty() {
         println!("{}", "No issue types found.".yellow());
@@ -777,10 +774,7 @@ async fn list_comments(
     let comments = client
         .list_comments(project_id, issue_id)
         .await
-        .context(format!(
-            "Failed to list comments for issue '{}'",
-            issue_id
-        ))?;
+        .context(format!("Failed to list comments for issue '{}'", issue_id))?;
 
     let outputs: Vec<CommentOutput> = comments
         .iter()
@@ -1011,10 +1005,7 @@ async fn transition_issue(
     let current_issue = client
         .get_issue(project_id, issue_id)
         .await
-        .context(format!(
-            "Failed to get issue '{}' for transition",
-            issue_id
-        ))?;
+        .context(format!("Failed to get issue '{}' for transition", issue_id))?;
     let current_status = current_issue.status.clone();
     let allowed = get_allowed_transitions(&current_status);
 
@@ -1111,8 +1102,7 @@ mod tests {
 
     #[test]
     fn test_csv_issue_row_deserialization() {
-        let csv_data =
-            "title,description,status\nBroken pipe,Water leak in B2,open\n";
+        let csv_data = "title,description,status\nBroken pipe,Water leak in B2,open\n";
         let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
         let row: CsvIssueRow = rdr.deserialize().next().unwrap().unwrap();
         assert_eq!(row.title, "Broken pipe");

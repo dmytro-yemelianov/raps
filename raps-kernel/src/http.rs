@@ -30,9 +30,9 @@ pub fn is_allowed_url(url: &str) -> bool {
         Ok(parsed) => {
             if let Some(host) = parsed.host_str() {
                 // Check if host matches any allowed domain
-                ALLOWED_DOMAINS.iter().any(|domain| {
-                    host == *domain || host.ends_with(&format!(".{}", domain))
-                })
+                ALLOWED_DOMAINS
+                    .iter()
+                    .any(|domain| host == *domain || host.ends_with(&format!(".{}", domain)))
             } else {
                 false
             }
@@ -389,12 +389,16 @@ mod tests {
 
     #[test]
     fn test_is_allowed_url_developer_api() {
-        assert!(is_allowed_url("https://developer.api.autodesk.com/oss/v2/buckets"));
+        assert!(is_allowed_url(
+            "https://developer.api.autodesk.com/oss/v2/buckets"
+        ));
     }
 
     #[test]
     fn test_is_allowed_url_userprofile() {
-        assert!(is_allowed_url("https://api.userprofile.autodesk.com/userinfo"));
+        assert!(is_allowed_url(
+            "https://api.userprofile.autodesk.com/userinfo"
+        ));
     }
 
     #[test]
@@ -404,7 +408,9 @@ mod tests {
 
     #[test]
     fn test_is_allowed_url_with_path_and_query() {
-        assert!(is_allowed_url("https://developer.api.autodesk.com/oss/v2/buckets?limit=10&region=US"));
+        assert!(is_allowed_url(
+            "https://developer.api.autodesk.com/oss/v2/buckets?limit=10&region=US"
+        ));
     }
 
     #[test]
@@ -425,7 +431,9 @@ mod tests {
     #[test]
     fn test_is_allowed_url_similar_domain_rejected() {
         // Should not allow fake domains that look similar
-        assert!(!is_allowed_url("https://developer.api.autodesk.com.evil.com/api"));
+        assert!(!is_allowed_url(
+            "https://developer.api.autodesk.com.evil.com/api"
+        ));
     }
 
     #[test]

@@ -428,13 +428,10 @@ async fn delete_bucket(
         println!("{}", "Deleting bucket...".dimmed());
     }
 
-    client
-        .delete_bucket(&key)
-        .await
-        .context(format!(
-            "Failed to delete bucket '{}'. The bucket must be empty before deletion",
-            key
-        ))?;
+    client.delete_bucket(&key).await.context(format!(
+        "Failed to delete bucket '{}'. The bucket must be empty before deletion",
+        key
+    ))?;
 
     #[derive(Serialize)]
     struct DeleteResult {
