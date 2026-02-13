@@ -162,7 +162,10 @@ async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> 
         println!("{}", "Fetching webhooks...".dimmed());
     }
 
-    let webhooks = client.list_all_webhooks().await?;
+    let webhooks = client
+        .list_all_webhooks()
+        .await
+        .context("Failed to list webhooks. Check your authentication with 'raps auth test'")?;
 
     let webhook_outputs: Vec<WebhookListOutput> = webhooks
         .iter()
@@ -280,7 +283,11 @@ async fn create_webhook(
 
     let webhook = client
         .create_webhook(system, &event_type, &url, None)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to create webhook for event '{}'. Verify callback URL is reachable",
+            event_type
+        ))?;
 
     let output = CreateWebhookOutput {
         success: true,
@@ -328,7 +335,13 @@ async fn get_webhook(
         println!("{}", "Fetching webhook...".dimmed());
     }
 
-    let webhook = client.get_webhook(system, event, hook_id).await?;
+    let webhook = client
+        .get_webhook(system, event, hook_id)
+        .await
+        .context(format!(
+            "Failed to get webhook '{}'. Verify the hook ID, system, and event are correct",
+            hook_id
+        ))?;
 
     let output = GetWebhookOutput {
         hook_id: webhook.hook_id.clone(),
@@ -399,7 +412,11 @@ async fn update_webhook(
 
     let webhook = client
         .update_webhook(system, event, hook_id, request)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to update webhook '{}'. Verify the hook ID and permissions",
+            hook_id
+        ))?;
 
     let output = UpdateWebhookOutput {
         success: true,
@@ -443,7 +460,13 @@ async fn delete_webhook(
         println!("{}", "Deleting webhook...".dimmed());
     }
 
-    client.delete_webhook(system, event, hook_id).await?;
+    client
+        .delete_webhook(system, event, hook_id)
+        .await
+        .context(format!(
+            "Failed to delete webhook '{}'. Verify the hook ID, system, and event are correct",
+            hook_id
+        ))?;
 
     let output = DeleteWebhookOutput {
         success: true,

@@ -5,7 +5,7 @@
 //!
 //! Commands for listing, creating, and managing folders (requires 3-legged auth).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::Input;
@@ -121,7 +121,13 @@ async fn list_folder_contents(
         println!("{}", "Fetching folder contents...".dimmed());
     }
 
-    let contents = client.list_folder_contents(project_id, folder_id).await?;
+    let contents = client
+        .list_folder_contents(project_id, folder_id)
+        .await
+        .context(format!(
+            "Failed to list folder '{}' contents. Verify folder ID and permissions",
+            folder_id
+        ))?;
 
     let items: Vec<FolderItemOutput> = contents
         .iter()
@@ -218,7 +224,11 @@ async fn create_folder(
 
     let folder = client
         .create_folder(project_id, parent_folder_id, &folder_name)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to create folder '{}' in project '{}'. Check parent folder permissions",
+            folder_name, project_id
+        ))?;
 
     let output = CreateFolderOutput {
         success: true,
@@ -260,7 +270,11 @@ async fn rename_folder(
 
     let folder = client
         .rename_folder(project_id, folder_id, new_name)
-        .await?;
+        .await
+        .context(format!(
+            "Failed to rename folder '{}'. Check permissions and that folder exists",
+            folder_id
+        ))?;
 
     let output = RenameFolderOutput {
         success: true,
@@ -299,7 +313,13 @@ async fn delete_folder(
         println!("{}", "Deleting folder...".dimmed());
     }
 
-    client.delete_folder(project_id, folder_id).await?;
+    client
+        .delete_folder(project_id, folder_id)
+        .await
+        .context(format!(
+            "Failed to delete folder '{}'. Folder may not be empty or you lack permissions",
+            folder_id
+        ))?;
 
     let output = DeleteFolderOutput {
         success: true,
@@ -336,7 +356,13 @@ async fn folder_rights(
         println!("{}", "Fetching folder permissions...".dimmed());
     }
 
-    let permissions = client.get_permissions(project_id, folder_id).await?;
+    let permissions = client
+        .get_permissions(project_id, folder_id)
+        .await
+        .context(format!(
+            "Failed to get permissions for folder '{}'",
+            folder_id
+        ))?;
 
     let items: Vec<FolderRightOutput> = permissions
         .iter()

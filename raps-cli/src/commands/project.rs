@@ -5,7 +5,7 @@
 //!
 //! Commands for listing and viewing projects (requires 3-legged auth).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::Select;
@@ -67,7 +67,10 @@ async fn list_projects(
         Some(h) => h,
         None => {
             println!("{}", "Fetching hubs...".dimmed());
-            let hubs = client.list_hubs().await?;
+            let hubs = client
+                .list_hubs()
+                .await
+                .context("Failed to list hubs. This requires 3-legged auth \u{2014} run 'raps auth login' first")?;
 
             if hubs.is_empty() {
                 anyhow::bail!("No hubs found. Make sure you're logged in with 3-legged auth.");
@@ -91,7 +94,13 @@ async fn list_projects(
         println!("{}", "Fetching projects...".dimmed());
     }
 
-    let projects = client.list_projects(&hub).await?;
+    let projects = client
+        .list_projects(&hub)
+        .await
+        .context(format!(
+            "Failed to list projects in hub '{}'. Verify the hub ID and your permissions",
+            hub
+        ))?;
 
     let project_outputs: Vec<ProjectListOutput> = projects
         .iter()
@@ -165,8 +174,20 @@ async fn project_info(
         println!("{}", "Fetching project details...".dimmed());
     }
 
-    let project = client.get_project(hub_id, project_id).await?;
-    let folders = client.get_top_folders(hub_id, project_id).await?;
+    let project = client
+        .get_project(hub_id, project_id)
+        .await
+        .context(format!(
+            "Failed to get project '{}'. Verify the project ID and your permissions",
+            project_id
+        ))?;
+    let folders = client
+        .get_top_folders(hub_id, project_id)
+        .await
+        .context(format!(
+            "Failed to get top folders for project '{}'. You may lack folder-level permissions",
+            project_id
+        ))?;
 
     let folder_outputs: Vec<FolderOutput> = folders
         .iter()

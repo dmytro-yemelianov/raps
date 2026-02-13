@@ -210,6 +210,60 @@ pub fn load_profiles() -> Result<ProfilesData> {
     Ok(data)
 }
 
+/// Resolved context values from profile + environment
+#[derive(Debug, Clone, Default)]
+pub struct ContextConfig {
+    pub hub_id: Option<String>,
+    pub project_id: Option<String>,
+    pub account_id: Option<String>,
+}
+
+impl ContextConfig {
+    /// Load context from env vars > active profile
+    pub fn load() -> Self {
+        let profile_data = Config::load_profile_data().ok();
+
+        let hub_id = std::env::var("APS_HUB_ID").ok().or_else(|| {
+            profile_data
+                .as_ref()
+                .and_then(|(_, p)| p.context_hub_id.clone())
+        });
+
+        let project_id = std::env::var("APS_PROJECT_ID").ok().or_else(|| {
+            profile_data
+                .as_ref()
+                .and_then(|(_, p)| p.context_project_id.clone())
+        });
+
+        let account_id = std::env::var("APS_ACCOUNT_ID").ok().or_else(|| {
+            profile_data
+                .as_ref()
+                .and_then(|(_, p)| p.context_account_id.clone())
+        });
+
+        Self {
+            hub_id,
+            project_id,
+            account_id,
+        }
+    }
+
+    /// Resolve hub ID from explicit flag, context, or None
+    pub fn resolve_hub_id(&self, explicit: Option<String>) -> Option<String> {
+        explicit.or_else(|| self.hub_id.clone())
+    }
+
+    /// Resolve project ID from explicit flag, context, or None
+    pub fn resolve_project_id(&self, explicit: Option<String>) -> Option<String> {
+        explicit.or_else(|| self.project_id.clone())
+    }
+
+    /// Resolve account ID from explicit flag, context, or None
+    pub fn resolve_account_id(&self, explicit: Option<String>) -> Option<String> {
+        explicit.or_else(|| self.account_id.clone())
+    }
+}
+
 /// Save profiles to disk
 pub fn save_profiles(data: &ProfilesData) -> Result<()> {
     let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
@@ -425,5 +479,36 @@ mod tests {
         let config = create_test_config();
         assert!(config.callback_url.contains("localhost"));
         assert!(config.callback_url.contains("callback"));
+    }
+
+    // ==================== ContextConfig Tests ====================
+
+    #[test]
+    fn test_context_config_default() {
+        let ctx = ContextConfig::default();
+        assert!(ctx.hub_id.is_none());
+        assert!(ctx.project_id.is_none());
+        assert!(ctx.account_id.is_none());
+    }
+
+    #[test]
+    fn test_context_config_resolve_with_explicit() {
+        let ctx = ContextConfig {
+            hub_id: Some("stored-hub".to_string()),
+            project_id: Some("stored-proj".to_string()),
+            account_id: None,
+        };
+        // Explicit value takes priority
+        assert_eq!(
+            ctx.resolve_hub_id(Some("explicit-hub".to_string())),
+            Some("explicit-hub".to_string())
+        );
+        // Falls back to stored
+        assert_eq!(
+            ctx.resolve_project_id(None),
+            Some("stored-proj".to_string())
+        );
+        // None when neither
+        assert_eq!(ctx.resolve_account_id(None), None);
     }
 }

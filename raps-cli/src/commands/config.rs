@@ -34,6 +34,37 @@ pub enum ConfigCommands {
         /// Configuration value
         value: String,
     },
+
+    /// Set or show the current working context (hub, project, account)
+    #[command(subcommand)]
+    Context(ContextCommands),
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ContextCommands {
+    /// Show current context settings
+    Show,
+
+    /// Set context value
+    Set {
+        /// Key to set (hub_id, project_id, account_id)
+        key: String,
+        /// Value to set (use "clear" to remove)
+        value: String,
+    },
+
+    /// Clear all context values
+    Clear,
+}
+
+impl ContextCommands {
+    pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
+        match self {
+            ContextCommands::Show => show_context(output_format).await,
+            ContextCommands::Set { key, value } => set_context(&key, &value, output_format).await,
+            ContextCommands::Clear => clear_context(output_format).await,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -102,6 +133,7 @@ impl ConfigCommands {
             ConfigCommands::Profile(cmd) => cmd.execute(output_format).await,
             ConfigCommands::Get { key } => get_config(&key, output_format).await,
             ConfigCommands::Set { key, value } => set_config(&key, &value, output_format).await,
+            ConfigCommands::Context(cmd) => cmd.execute(output_format).await,
         }
     }
 }
@@ -138,6 +170,15 @@ pub struct ProfileConfig {
     pub callback_url: Option<String>,
     pub da_nickname: Option<String>,
     pub use_keychain: Option<bool>,
+    /// Sticky context: default hub ID for commands that need it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_hub_id: Option<String>,
+    /// Sticky context: default project ID for commands that need it
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_project_id: Option<String>,
+    /// Sticky context: default account ID for admin commands
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_account_id: Option<String>,
 }
 
 /// Profiles storage structure
@@ -206,6 +247,9 @@ async fn create_profile(name: &str, output_format: OutputFormat) -> Result<()> {
             callback_url: None,
             da_nickname: None,
             use_keychain: None,
+            context_hub_id: None,
+            context_project_id: None,
+            context_account_id: None,
         },
     );
 
@@ -226,7 +270,7 @@ async fn create_profile(name: &str, output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} {}", "✓".green().bold(), output.message);
+            println!("{} {}", "\u{2713}".green().bold(), output.message);
         }
         _ => {
             output_format.write(&output)?;
@@ -267,7 +311,7 @@ async fn list_profiles(output_format: OutputFormat) -> Result<()> {
             } else {
                 println!("{}", "Profiles:".bold());
                 for profile in &profiles {
-                    let marker = if profile.active { "→" } else { " " };
+                    let marker = if profile.active { "\u{2192}" } else { " " };
                     let name = if profile.active {
                         profile.name.cyan().bold()
                     } else {
@@ -314,7 +358,7 @@ async fn use_profile(name: &str, output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} {}", "✓".green().bold(), output.message);
+            println!("{} {}", "\u{2713}".green().bold(), output.message);
         }
         _ => {
             output_format.write(&output)?;
@@ -358,7 +402,7 @@ async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} {}", "✓".green().bold(), output.message);
+            println!("{} {}", "\u{2713}".green().bold(), output.message);
         }
         _ => {
             output_format.write(&output)?;
@@ -455,7 +499,7 @@ async fn export_profiles(
         OutputFormat::Table => {
             println!(
                 "{} Exported {} profile(s) to {}",
-                "✓".green().bold(),
+                "\u{2713}".green().bold(),
                 output.profiles_count,
                 output.path.cyan()
             );
@@ -494,7 +538,7 @@ async fn import_profiles(
             if output_format.supports_colors() {
                 println!(
                     "  {} Profile '{}' already exists, skipping",
-                    "→".yellow(),
+                    "\u{2192}".yellow(),
                     name
                 );
             }
@@ -524,13 +568,13 @@ async fn import_profiles(
         OutputFormat::Table => {
             println!(
                 "{} Imported {} profile(s)",
-                "✓".green().bold(),
+                "\u{2713}".green().bold(),
                 output.imported
             );
             if skipped > 0 {
                 println!(
                     "  {} {} profile(s) skipped (use --overwrite to replace)",
-                    "→".yellow(),
+                    "\u{2192}".yellow(),
                     skipped
                 );
             }
@@ -593,7 +637,7 @@ async fn diff_profiles(profile1: &str, profile2: &str, output_format: OutputForm
     match output_format {
         OutputFormat::Table => {
             println!("\n{}", "Profile Comparison:".bold());
-            println!("{}", "─".repeat(70));
+            println!("{}", "\u{2500}".repeat(70));
             println!(
                 "{:<15} {:<25} {:<25} {}",
                 "Key".bold(),
@@ -601,20 +645,20 @@ async fn diff_profiles(profile1: &str, profile2: &str, output_format: OutputForm
                 profile2.cyan().bold(),
                 "".bold()
             );
-            println!("{}", "─".repeat(70));
+            println!("{}", "\u{2500}".repeat(70));
 
             for diff in &diffs {
                 let v1 = diff.value1.as_deref().unwrap_or("-");
                 let v2 = diff.value2.as_deref().unwrap_or("-");
                 let marker = if diff.different {
-                    "≠".red().to_string()
+                    "\u{2260}".red().to_string()
                 } else {
                     "=".green().to_string()
                 };
                 println!("{:<15} {:<25} {:<25} {}", diff.key, v1, v2, marker);
             }
 
-            println!("{}", "─".repeat(70));
+            println!("{}", "\u{2500}".repeat(70));
         }
         _ => {
             output_format.write(&diffs)?;
@@ -722,11 +766,11 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
             // Provide immediate feedback about security implications
             if !use_keychain {
                 eprintln!(
-                    "⚠️  WARNING: Disabling keychain storage will store tokens in plaintext."
+                    "\u{26a0}\u{fe0f}  WARNING: Disabling keychain storage will store tokens in plaintext."
                 );
-                eprintln!("⚠️  This is less secure than using the OS keychain.");
+                eprintln!("\u{26a0}\u{fe0f}  This is less secure than using the OS keychain.");
             } else {
-                println!("✅ Keychain storage enabled for secure token management.");
+                println!("\u{2705} Keychain storage enabled for secure token management.");
             }
         }
         _ => {
@@ -758,11 +802,260 @@ async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Resu
         OutputFormat::Table => {
             println!(
                 "{} Set {} = {} in profile '{}'",
-                "✓".green().bold(),
+                "\u{2713}".green().bold(),
                 key.bold(),
                 value,
                 profile_name
             );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ==================== Context Commands ====================
+
+async fn show_context(output_format: OutputFormat) -> Result<()> {
+    let data = load_profiles()?;
+
+    #[derive(Serialize)]
+    struct ContextItem {
+        key: String,
+        value: Option<String>,
+        source: String,
+    }
+
+    let mut items = Vec::new();
+
+    // Check hub_id
+    let env_hub = std::env::var("APS_HUB_ID").ok();
+    let profile_hub = data
+        .active_profile
+        .as_ref()
+        .and_then(|name| data.profiles.get(name))
+        .and_then(|p| p.context_hub_id.clone());
+    items.push(ContextItem {
+        key: "hub_id".to_string(),
+        value: env_hub.clone().or(profile_hub.clone()),
+        source: if env_hub.is_some() {
+            "env:APS_HUB_ID".to_string()
+        } else if profile_hub.is_some() {
+            format!(
+                "profile:{}",
+                data.active_profile.as_deref().unwrap_or("unknown")
+            )
+        } else {
+            "(not set)".to_string()
+        },
+    });
+
+    // Check project_id
+    let env_proj = std::env::var("APS_PROJECT_ID").ok();
+    let profile_proj = data
+        .active_profile
+        .as_ref()
+        .and_then(|name| data.profiles.get(name))
+        .and_then(|p| p.context_project_id.clone());
+    items.push(ContextItem {
+        key: "project_id".to_string(),
+        value: env_proj.clone().or(profile_proj.clone()),
+        source: if env_proj.is_some() {
+            "env:APS_PROJECT_ID".to_string()
+        } else if profile_proj.is_some() {
+            format!(
+                "profile:{}",
+                data.active_profile.as_deref().unwrap_or("unknown")
+            )
+        } else {
+            "(not set)".to_string()
+        },
+    });
+
+    // Check account_id
+    let env_acc = std::env::var("APS_ACCOUNT_ID").ok();
+    let profile_acc = data
+        .active_profile
+        .as_ref()
+        .and_then(|name| data.profiles.get(name))
+        .and_then(|p| p.context_account_id.clone());
+    items.push(ContextItem {
+        key: "account_id".to_string(),
+        value: env_acc.clone().or(profile_acc.clone()),
+        source: if env_acc.is_some() {
+            "env:APS_ACCOUNT_ID".to_string()
+        } else if profile_acc.is_some() {
+            format!(
+                "profile:{}",
+                data.active_profile.as_deref().unwrap_or("unknown")
+            )
+        } else {
+            "(not set)".to_string()
+        },
+    });
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{}", "Current Context:".bold());
+            println!("{}", "-".repeat(60));
+            for item in &items {
+                let val = item.value.as_deref().unwrap_or("(not set)").to_string();
+                let display_val = if item.value.is_some() {
+                    val.cyan().to_string()
+                } else {
+                    val.dimmed().to_string()
+                };
+                println!(
+                    "  {:<15} {:<30} {}",
+                    item.key.bold(),
+                    display_val,
+                    item.source.dimmed()
+                );
+            }
+        }
+        _ => {
+            output_format.write(&items)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn set_context(key: &str, value: &str, output_format: OutputFormat) -> Result<()> {
+    let mut data = load_profiles()?;
+
+    let profile_name = data.active_profile.clone().ok_or_else(|| {
+        anyhow::anyhow!(
+            "No active profile. Create and activate one first with 'raps config profile create <name>' and 'raps config profile use <name>'"
+        )
+    })?;
+
+    let profile = data
+        .profiles
+        .get_mut(&profile_name)
+        .ok_or_else(|| anyhow::anyhow!("Active profile '{}' not found", profile_name))?;
+
+    let clear = value == "clear";
+
+    match key {
+        "hub_id" => {
+            profile.context_hub_id = if clear {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        "project_id" => {
+            profile.context_project_id = if clear {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        "account_id" => {
+            profile.context_account_id = if clear {
+                None
+            } else {
+                Some(value.to_string())
+            };
+        }
+        _ => {
+            anyhow::bail!(
+                "Unknown context key: {}. Valid keys: hub_id, project_id, account_id",
+                key
+            );
+        }
+    }
+
+    save_profiles(&data)?;
+
+    #[derive(Serialize)]
+    struct SetContextOutput {
+        success: bool,
+        key: String,
+        value: Option<String>,
+        profile: String,
+    }
+
+    let output = SetContextOutput {
+        success: true,
+        key: key.to_string(),
+        value: if clear {
+            None
+        } else {
+            Some(value.to_string())
+        },
+        profile: profile_name.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            if clear {
+                println!(
+                    "{} Cleared context {} in profile '{}'",
+                    "\u{2713}".green().bold(),
+                    key.bold(),
+                    profile_name
+                );
+            } else {
+                println!(
+                    "{} Set context {} = {} in profile '{}'",
+                    "\u{2713}".green().bold(),
+                    key.bold(),
+                    value,
+                    profile_name
+                );
+            }
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn clear_context(output_format: OutputFormat) -> Result<()> {
+    let mut data = load_profiles()?;
+
+    let profile_name = data.active_profile.clone().ok_or_else(|| {
+        anyhow::anyhow!(
+            "No active profile. Create and activate one first with 'raps config profile create <name>' and 'raps config profile use <name>'"
+        )
+    })?;
+
+    let profile = data
+        .profiles
+        .get_mut(&profile_name)
+        .ok_or_else(|| anyhow::anyhow!("Active profile '{}' not found", profile_name))?;
+
+    profile.context_hub_id = None;
+    profile.context_project_id = None;
+    profile.context_account_id = None;
+
+    save_profiles(&data)?;
+
+    #[derive(Serialize)]
+    struct ClearContextOutput {
+        success: bool,
+        profile: String,
+        message: String,
+    }
+
+    let output = ClearContextOutput {
+        success: true,
+        profile: profile_name.clone(),
+        message: format!(
+            "All context values cleared in profile '{}'",
+            profile_name
+        ),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "\u{2713}".green().bold(), output.message);
         }
         _ => {
             output_format.write(&output)?;

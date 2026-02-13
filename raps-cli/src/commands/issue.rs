@@ -216,7 +216,13 @@ async fn list_issues(
     }
 
     let filter = status.as_ref().map(|s| format!("status={}", s));
-    let issues = client.list_issues(project_id, filter.as_deref()).await?;
+    let issues = client
+        .list_issues(project_id, filter.as_deref())
+        .await
+        .context(format!(
+            "Failed to list issues for project '{}'. Verify the project ID (without 'b.' prefix)",
+            project_id
+        ))?;
 
     // Apply since filter if provided
     let issues: Vec<_> = if let Some(ref since_date) = since {
@@ -400,7 +406,10 @@ async fn create_issue(
         due_date: None,
     };
 
-    let issue = client.create_issue(project_id, request).await?;
+    let issue = client
+        .create_issue(project_id, request)
+        .await
+        .context("Failed to create issue. Verify your permissions on this project")?;
 
     println!("{} Issue created!", "✓".green().bold());
     println!("  {} {}", "ID:".bold(), issue.id);
@@ -591,7 +600,13 @@ async fn update_issue(
     _output_format: OutputFormat,
 ) -> Result<()> {
     // Get current issue
-    let current = client.get_issue(project_id, issue_id).await?;
+    let current = client
+        .get_issue(project_id, issue_id)
+        .await
+        .context(format!(
+            "Failed to get issue '{}'. Verify the issue ID exists",
+            issue_id
+        ))?;
 
     // Determine new status
     let new_status = match status {
@@ -619,7 +634,13 @@ async fn update_issue(
         due_date: None,
     };
 
-    let issue = client.update_issue(project_id, issue_id, request).await?;
+    let issue = client
+        .update_issue(project_id, issue_id, request)
+        .await
+        .context(format!(
+            "Failed to update issue '{}'. Check permissions and that the status transition is valid",
+            issue_id
+        ))?;
 
     println!("{} Issue updated!", "✓".green().bold());
     println!("  {} {}", "Title:".bold(), issue.title);
@@ -643,7 +664,13 @@ async fn delete_issue(
         println!("{}", "Deleting issue...".dimmed());
     }
 
-    client.delete_issue(project_id, issue_id).await?;
+    client
+        .delete_issue(project_id, issue_id)
+        .await
+        .context(format!(
+            "Failed to delete issue '{}'. Verify the issue ID exists and you have delete permissions",
+            issue_id
+        ))?;
 
     #[derive(Serialize)]
     struct DeleteIssueOutput {
@@ -676,7 +703,13 @@ async fn list_issue_types(
 ) -> Result<()> {
     println!("{}", "Fetching issue types...".dimmed());
 
-    let types = client.list_issue_types(project_id).await?;
+    let types = client
+        .list_issue_types(project_id)
+        .await
+        .context(format!(
+            "Failed to list issue types for project '{}'",
+            project_id
+        ))?;
 
     if types.is_empty() {
         println!("{}", "No issue types found.".yellow());
@@ -741,7 +774,13 @@ async fn list_comments(
         println!("{}", "Fetching comments...".dimmed());
     }
 
-    let comments = client.list_comments(project_id, issue_id).await?;
+    let comments = client
+        .list_comments(project_id, issue_id)
+        .await
+        .context(format!(
+            "Failed to list comments for issue '{}'",
+            issue_id
+        ))?;
 
     let outputs: Vec<CommentOutput> = comments
         .iter()
@@ -794,7 +833,10 @@ async fn add_comment(
         println!("{}", "Adding comment...".dimmed());
     }
 
-    let comment = client.add_comment(project_id, issue_id, body).await?;
+    let comment = client
+        .add_comment(project_id, issue_id, body)
+        .await
+        .context("Failed to add comment")?;
 
     #[derive(Serialize)]
     struct AddCommentOutput {
@@ -834,7 +876,8 @@ async fn delete_comment(
 
     client
         .delete_comment(project_id, issue_id, comment_id)
-        .await?;
+        .await
+        .context(format!("Failed to delete comment '{}'", comment_id))?;
 
     #[derive(Serialize)]
     struct DeleteCommentOutput {
@@ -880,7 +923,13 @@ async fn list_attachments(
         println!("{}", "Fetching attachments...".dimmed());
     }
 
-    let attachments = client.list_attachments(project_id, issue_id).await?;
+    let attachments = client
+        .list_attachments(project_id, issue_id)
+        .await
+        .context(format!(
+            "Failed to list attachments for issue '{}'",
+            issue_id
+        ))?;
 
     let outputs: Vec<AttachmentOutput> = attachments
         .iter()
@@ -959,7 +1008,13 @@ async fn transition_issue(
     output_format: OutputFormat,
 ) -> Result<()> {
     // Get current issue to determine valid transitions
-    let current_issue = client.get_issue(project_id, issue_id).await?;
+    let current_issue = client
+        .get_issue(project_id, issue_id)
+        .await
+        .context(format!(
+            "Failed to get issue '{}' for transition",
+            issue_id
+        ))?;
     let current_status = current_issue.status.clone();
     let allowed = get_allowed_transitions(&current_status);
 
@@ -1011,7 +1066,13 @@ async fn transition_issue(
         due_date: None,
     };
 
-    let updated_issue = client.update_issue(project_id, issue_id, request).await?;
+    let updated_issue = client
+        .update_issue(project_id, issue_id, request)
+        .await
+        .context(format!(
+            "Failed to transition issue '{}' to '{}'",
+            issue_id, new_status
+        ))?;
 
     #[derive(Serialize)]
     struct TransitionOutput {
