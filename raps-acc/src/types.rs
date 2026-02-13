@@ -391,4 +391,116 @@ mod tests {
         assert!(!project.is_acc());
         assert!(project.is_bim360());
     }
+
+    #[test]
+    fn test_project_classification_display() {
+        assert_eq!(format!("{}", ProjectClassification::Production), "production");
+        assert_eq!(format!("{}", ProjectClassification::Template), "template");
+        assert_eq!(format!("{}", ProjectClassification::Component), "component");
+        assert_eq!(format!("{}", ProjectClassification::Sample), "sample");
+    }
+
+    #[test]
+    fn test_account_project_is_template() {
+        let project = AccountProject {
+            id: "b.123".to_string(),
+            name: "Template Project".to_string(),
+            platform: Some("ACC".to_string()),
+            classification: Some(ProjectClassification::Template),
+            status: None,
+            account_id: None,
+            created_at: None,
+            updated_at: None,
+            project_type: None,
+            member_count: None,
+            company_count: None,
+            products: None,
+        };
+        assert!(project.is_template());
+    }
+
+    #[test]
+    fn test_account_project_not_template() {
+        let project = AccountProject {
+            id: "b.123".to_string(),
+            name: "Real Project".to_string(),
+            platform: Some("ACC".to_string()),
+            classification: Some(ProjectClassification::Production),
+            status: None,
+            account_id: None,
+            created_at: None,
+            updated_at: None,
+            project_type: None,
+            member_count: None,
+            company_count: None,
+            products: None,
+        };
+        assert!(!project.is_template());
+    }
+
+    #[test]
+    fn test_account_project_enabled_products() {
+        let project = AccountProject {
+            id: "b.123".to_string(),
+            name: "Test".to_string(),
+            platform: None,
+            products: Some(vec!["docs".to_string(), "build".to_string(), "modelCoordination".to_string()]),
+            status: None,
+            account_id: None,
+            created_at: None,
+            updated_at: None,
+            project_type: None,
+            classification: None,
+            member_count: None,
+            company_count: None,
+        };
+        let enabled = project.enabled_products();
+        assert_eq!(enabled.len(), 3);
+        assert!(enabled.contains(&"docs".to_string()));
+    }
+
+    #[test]
+    fn test_account_project_no_products() {
+        let project = AccountProject {
+            id: "b.123".to_string(),
+            name: "Test".to_string(),
+            platform: None,
+            products: None,
+            status: None,
+            account_id: None,
+            created_at: None,
+            updated_at: None,
+            project_type: None,
+            classification: None,
+            member_count: None,
+            company_count: None,
+        };
+        assert!(project.enabled_products().is_empty());
+    }
+
+    #[test]
+    fn test_company_deserialization() {
+        let json = r#"{
+            "id": "comp-123",
+            "name": "Acme Corp",
+            "trade": "General Contractor",
+            "city": "Portland",
+            "country": "US",
+            "memberCount": 42
+        }"#;
+        let company: Company = serde_json::from_str(json).unwrap();
+        assert_eq!(company.id, "comp-123");
+        assert_eq!(company.name, "Acme Corp");
+        assert_eq!(company.trade.unwrap(), "General Contractor");
+        assert_eq!(company.member_count.unwrap(), 42);
+    }
+
+    #[test]
+    fn test_company_deserialization_minimal() {
+        let json = r#"{"id": "comp-456", "name": "Minimal Co"}"#;
+        let company: Company = serde_json::from_str(json).unwrap();
+        assert_eq!(company.id, "comp-456");
+        assert!(company.trade.is_none());
+        assert!(company.member_count.is_none());
+    }
 }

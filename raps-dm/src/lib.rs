@@ -1242,7 +1242,7 @@ mod integration_tests {
     use raps_kernel::auth::AuthClient;
     use raps_kernel::config::Config;
 
-    fn create_mock_client(mock_url: &str) -> DataManagementClient {
+    fn create_mock_dm_client(mock_url: &str) -> DataManagementClient {
         let config = Config {
             client_id: "test-client-id".to_string(),
             client_secret: "test-client-secret".to_string(),
@@ -1258,7 +1258,23 @@ mod integration_tests {
     #[tokio::test]
     async fn test_client_creation() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_client(&server.url);
+        let client = create_mock_dm_client(&server.url);
         assert!(client.auth.config().base_url.starts_with("http://"));
+    }
+
+    #[tokio::test]
+    async fn test_rename_folder() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_dm_client(&server.url);
+        let result = client.rename_folder("b.project-123", "folder-456", "New Name").await;
+        let _ = result;
+    }
+
+    #[tokio::test]
+    async fn test_delete_folder() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_dm_client(&server.url);
+        let result = client.delete_folder("b.project-123", "folder-456").await;
+        let _ = result;
     }
 }
