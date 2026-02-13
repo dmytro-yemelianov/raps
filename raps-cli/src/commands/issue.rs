@@ -100,6 +100,14 @@ pub enum IssueCommands {
         #[arg(short, long)]
         to: Option<String>,
     },
+
+    /// Delete an issue
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Issue ID
+        issue_id: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -167,6 +175,10 @@ impl IssueCommands {
                 issue_id,
                 to,
             } => transition_issue(client, &project_id, &issue_id, to, output_format).await,
+            IssueCommands::Delete {
+                project_id,
+                issue_id,
+            } => delete_issue(client, &project_id, &issue_id, output_format).await,
         }
     }
 }
@@ -617,6 +629,42 @@ async fn update_issue(
         current.status.dimmed(),
         issue.status.cyan()
     );
+
+    Ok(())
+}
+
+async fn delete_issue(
+    client: &IssuesClient,
+    project_id: &str,
+    issue_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting issue...".dimmed());
+    }
+
+    client.delete_issue(project_id, issue_id).await?;
+
+    #[derive(Serialize)]
+    struct DeleteIssueOutput {
+        success: bool,
+        issue_id: String,
+        message: String,
+    }
+
+    let output = DeleteIssueOutput {
+        success: true,
+        issue_id: issue_id.to_string(),
+        message: "Issue deleted successfully".to_string(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+            println!("  {} {}", "ID:".bold(), issue_id.cyan());
+        }
+        _ => output_format.write(&output)?,
+    }
 
     Ok(())
 }

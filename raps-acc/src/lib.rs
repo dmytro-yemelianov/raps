@@ -569,6 +569,33 @@ impl IssuesClient {
         Ok(())
     }
 
+    /// Delete an issue
+    pub async fn delete_issue(&self, project_id: &str, issue_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/issues/{}",
+            self.config.issues_url(),
+            project_id,
+            issue_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete issue")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete issue ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
     // ============== ATTACHMENTS ==============
 
     /// List attachments for an issue
@@ -903,6 +930,33 @@ impl RfiClient {
             .await
             .context("Failed to parse RFI response")?;
         Ok(rfi)
+    }
+
+    /// Delete an RFI
+    pub async fn delete_rfi(&self, project_id: &str, rfi_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/rfis/{}",
+            self.config.rfi_url(),
+            project_id,
+            rfi_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete RFI")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete RFI ({status}): {error_text}");
+        }
+
+        Ok(())
     }
 }
 
@@ -1319,6 +1373,33 @@ impl AccClient {
             .await
             .context("Failed to parse submittal response")?;
         Ok(submittal)
+    }
+
+    /// Delete a submittal
+    pub async fn delete_submittal(&self, project_id: &str, submittal_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/items/{}",
+            self.config.submittals_url(),
+            project_id,
+            submittal_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to delete submittal")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete submittal ({status}): {error_text}");
+        }
+
+        Ok(())
     }
 
     // ============== CHECKLISTS ==============

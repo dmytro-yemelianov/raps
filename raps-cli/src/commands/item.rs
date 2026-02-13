@@ -46,6 +46,25 @@ pub enum ItemCommands {
         #[arg(long)]
         object_id: String,
     },
+
+    /// Delete an item from a project
+    Delete {
+        /// Project ID
+        project_id: String,
+        /// Item ID
+        item_id: String,
+    },
+
+    /// Rename an item (update display name)
+    Rename {
+        /// Project ID
+        project_id: String,
+        /// Item ID
+        item_id: String,
+        /// New display name
+        #[arg(short, long)]
+        name: String,
+    },
 }
 
 impl ItemCommands {
@@ -79,6 +98,15 @@ impl ItemCommands {
                 )
                 .await
             }
+            ItemCommands::Delete {
+                project_id,
+                item_id,
+            } => delete_item(client, &project_id, &item_id, output_format).await,
+            ItemCommands::Rename {
+                project_id,
+                item_id,
+                name,
+            } => rename_item(client, &project_id, &item_id, &name, output_format).await,
         }
     }
 }
@@ -320,6 +348,74 @@ async fn create_from_oss(
         OutputFormat::Table => {
             println!("\n{} {}", "✓".green().bold(), output.message);
             println!("  {} {}", "Item ID:".bold(), output.item_id);
+            println!("  {} {}", "Name:".bold(), output.name.cyan());
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn delete_item(
+    client: &DataManagementClient,
+    project_id: &str,
+    item_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting item...".dimmed());
+    }
+
+    client.delete_item(project_id, item_id).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Item deleted successfully!", "✓".green().bold());
+            println!("  {} {}", "Item ID:".bold(), item_id.cyan());
+        }
+        _ => {
+            output_format.write(&serde_json::json!({
+                "id": item_id,
+                "deleted": true
+            }))?;
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct RenameItemOutput {
+    id: String,
+    name: String,
+    renamed: bool,
+}
+
+async fn rename_item(
+    client: &DataManagementClient,
+    project_id: &str,
+    item_id: &str,
+    new_name: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Renaming item...".dimmed());
+    }
+
+    let item = client.rename_item(project_id, item_id, new_name).await?;
+
+    let output = RenameItemOutput {
+        id: item.id.clone(),
+        name: item.attributes.display_name.clone(),
+        renamed: true,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Item renamed successfully!", "✓".green().bold());
+            println!("  {} {}", "Item ID:".bold(), output.id.cyan());
             println!("  {} {}", "Name:".bold(), output.name.cyan());
         }
         _ => {

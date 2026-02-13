@@ -113,6 +113,15 @@ pub enum RfiCommands {
         #[arg(long)]
         location: Option<String>,
     },
+
+    /// Delete an RFI
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+
+        /// RFI ID
+        rfi_id: String,
+    },
 }
 
 impl RfiCommands {
@@ -176,6 +185,10 @@ impl RfiCommands {
                 )
                 .await
             }
+            RfiCommands::Delete {
+                project_id,
+                rfi_id,
+            } => delete_rfi(client, &project_id, &rfi_id, output_format).await,
         }
     }
 }
@@ -500,6 +513,44 @@ async fn update_rfi(
             println!("{:<15} {}", "ID:".bold(), rfi.id.cyan());
             println!("{:<15} {}", "Title:".bold(), rfi.title);
             println!("{:<15} {}", "Status:".bold(), rfi.status);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn delete_rfi(
+    client: &RfiClient,
+    project_id: &str,
+    rfi_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting RFI...".dimmed());
+    }
+
+    client.delete_rfi(project_id, rfi_id).await?;
+
+    #[derive(Serialize)]
+    struct DeleteRfiOutput {
+        success: bool,
+        rfi_id: String,
+        message: String,
+    }
+
+    let output = DeleteRfiOutput {
+        success: true,
+        rfi_id: rfi_id.to_string(),
+        message: "RFI deleted successfully".to_string(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} {}", "✓".green().bold(), output.message);
+            println!("{:<15} {}", "ID:".bold(), rfi_id.cyan());
         }
         _ => {
             output_format.write(&output)?;

@@ -79,6 +79,14 @@ pub enum AssetCommands {
         #[arg(long)]
         status_id: Option<String>,
     },
+
+    /// Delete an asset
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Asset ID
+        asset_id: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -127,6 +135,14 @@ pub enum SubmittalCommands {
         /// New due date
         #[arg(long)]
         due_date: Option<String>,
+    },
+
+    /// Delete a submittal
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Submittal ID
+        submittal_id: String,
     },
 }
 
@@ -248,6 +264,10 @@ impl AssetCommands {
                 )
                 .await
             }
+            AssetCommands::Delete {
+                project_id,
+                asset_id,
+            } => delete_asset(client, &project_id, &asset_id, output_format).await,
         }
     }
 }
@@ -296,6 +316,10 @@ impl SubmittalCommands {
                 )
                 .await
             }
+            SubmittalCommands::Delete {
+                project_id,
+                submittal_id,
+            } => delete_submittal(client, &project_id, &submittal_id, output_format).await,
         }
     }
 }
@@ -799,6 +823,34 @@ async fn update_asset(
     Ok(())
 }
 
+async fn delete_asset(
+    client: &AccClient,
+    project_id: &str,
+    asset_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting asset...".dimmed());
+    }
+
+    client.delete_asset(project_id, asset_id).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Asset deleted successfully!", "✓".green().bold());
+            println!("{:<15} {}", "ID:".bold(), asset_id.cyan());
+        }
+        _ => {
+            output_format.write(&serde_json::json!({
+                "id": asset_id,
+                "deleted": true
+            }))?;
+        }
+    }
+
+    Ok(())
+}
+
 // ============== SUBMITTAL CRUD ==============
 
 async fn get_submittal(
@@ -918,6 +970,34 @@ async fn update_submittal(
             output_format.write(&serde_json::json!({
                 "id": submittal.id,
                 "updated": true
+            }))?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn delete_submittal(
+    client: &AccClient,
+    project_id: &str,
+    submittal_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if output_format.supports_colors() {
+        println!("{}", "Deleting submittal...".dimmed());
+    }
+
+    client.delete_submittal(project_id, submittal_id).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Submittal deleted successfully!", "✓".green().bold());
+            println!("{:<15} {}", "ID:".bold(), submittal_id.cyan());
+        }
+        _ => {
+            output_format.write(&serde_json::json!({
+                "id": submittal_id,
+                "deleted": true
             }))?;
         }
     }

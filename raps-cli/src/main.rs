@@ -56,6 +56,7 @@ use commands::{
 };
 
 use raps_acc::admin::AccountAdminClient;
+use raps_acc::permissions::FolderPermissionsClient;
 use raps_acc::users::ProjectUsersClient;
 use raps_acc::{AccClient, IssuesClient, RfiClient};
 use raps_da::DesignAutomationClient;
@@ -529,6 +530,11 @@ async fn execute_command(
         ProjectUsersClient::new_with_http_config(config.clone(), auth, http_config.clone())
     };
 
+    let get_permissions_client = || -> FolderPermissionsClient {
+        let auth = get_auth_client();
+        FolderPermissionsClient::new_with_http_config(config.clone(), auth, http_config.clone())
+    };
+
     match command {
         Commands::Auth(cmd) => {
             cmd.execute(&get_auth_client(), output_format).await?;
@@ -555,7 +561,8 @@ async fn execute_command(
         }
 
         Commands::Folder(cmd) => {
-            cmd.execute(&get_dm_client(), output_format).await?;
+            cmd.execute(&get_dm_client(), &get_permissions_client(), output_format)
+                .await?;
         }
 
         Commands::Item(cmd) => {

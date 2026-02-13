@@ -24,6 +24,7 @@ use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 use raps_da::DesignAutomationClient;
 use raps_oss::{OssClient, Region, RetentionPolicy};
+use raps_reality::RealityCaptureClient;
 use raps_webhooks::WebhooksClient;
 
 /// RAPS MCP Server
@@ -190,6 +191,16 @@ impl RapsServer {
     async fn get_da_client(&self) -> DesignAutomationClient {
         let auth = self.get_auth_client().await;
         DesignAutomationClient::new_with_http_config(
+            (*self.config).clone(),
+            auth,
+            self.http_config.clone(),
+        )
+    }
+
+    // Helper to get Reality Capture client (created on demand, not cached)
+    async fn get_reality_client(&self) -> RealityCaptureClient {
+        let auth = self.get_auth_client().await;
+        raps_reality::RealityCaptureClient::new_with_http_config(
             (*self.config).clone(),
             auth,
             self.http_config.clone(),
@@ -1269,6 +1280,68 @@ impl RapsServer {
     }
 
     // ========================================================================
+    // Issue Comment Tools
+    // ========================================================================
+
+    async fn issue_comments_list(&self, project_id: String, issue_id: String) -> String {
+        let client = self.get_issues_client().await;
+
+        match client.list_comments(&project_id, &issue_id).await {
+            Ok(comments) => {
+                if comments.is_empty() {
+                    return "No comments found.".to_string();
+                }
+
+                let mut output = format!("Found {} comment(s):\n\n", comments.len());
+                for comment in &comments {
+                    let author = comment.created_by.as_deref().unwrap_or("-");
+                    let created = comment.created_at.as_deref().unwrap_or("-");
+                    output.push_str(&format!(
+                        "* [{}] by {} ({})\n  {}\n",
+                        comment.id, author, created, comment.body
+                    ));
+                }
+                output
+            }
+            Err(e) => format!("Failed to list issue comments: {}", e),
+        }
+    }
+
+    async fn issue_comment_add(
+        &self,
+        project_id: String,
+        issue_id: String,
+        body: String,
+    ) -> String {
+        let client = self.get_issues_client().await;
+
+        match client.add_comment(&project_id, &issue_id, &body).await {
+            Ok(comment) => format!(
+                "Comment added successfully:\n* ID: {}\n* Body: {}",
+                comment.id, comment.body
+            ),
+            Err(e) => format!("Failed to add issue comment: {}", e),
+        }
+    }
+
+    async fn issue_comment_delete(
+        &self,
+        project_id: String,
+        issue_id: String,
+        comment_id: String,
+    ) -> String {
+        let client = self.get_issues_client().await;
+
+        match client
+            .delete_comment(&project_id, &issue_id, &comment_id)
+            .await
+        {
+            Ok(()) => format!("Comment {} deleted successfully.", comment_id),
+            Err(e) => format!("Failed to delete issue comment: {}", e),
+        }
+    }
+
+    // ========================================================================
     // RFI Tools
     // ========================================================================
 
@@ -1477,6 +1550,36 @@ impl RapsServer {
         match client.delete_asset(&project_id, &asset_id).await {
             Ok(()) => format!("Asset {} deleted successfully", asset_id),
             Err(e) => format!("Failed to delete asset: {}", e),
+        }
+    }
+
+    async fn asset_get(&self, project_id: String, asset_id: String) -> String {
+        let client = self.get_acc_client().await;
+
+        match client.get_asset(&project_id, &asset_id).await {
+            Ok(asset) => {
+                let mut output = format!("Asset details:\n\n* ID: {}\n", asset.id);
+                if let Some(ref desc) = asset.description {
+                    output.push_str(&format!("* Description: {}\n", desc));
+                }
+                if let Some(ref status_id) = asset.status_id {
+                    output.push_str(&format!("* Status ID: {}\n", status_id));
+                }
+                if let Some(ref category_id) = asset.category_id {
+                    output.push_str(&format!("* Category ID: {}\n", category_id));
+                }
+                if let Some(ref barcode) = asset.barcode {
+                    output.push_str(&format!("* Barcode: {}\n", barcode));
+                }
+                if let Some(ref created_at) = asset.created_at {
+                    output.push_str(&format!("* Created: {}\n", created_at));
+                }
+                if let Some(ref updated_at) = asset.updated_at {
+                    output.push_str(&format!("* Updated: {}\n", updated_at));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get asset: {}", e),
         }
     }
 
@@ -3259,6 +3362,137 @@ impl RapsServer {
         }
     }
 
+    // ================================================================
+    // Reality Capture
+    // ================================================================
+
+    async fn reality_create(
+        &self,
+        name: String,
+        scene_type: Option<String>,
+        format: Option<String>,
+    ) -> String {
+        let client = self.get_reality_client().await;
+
+        let st = match scene_type.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("aerial") => raps_reality::SceneType::Aerial,
+            Some("object") | None => raps_reality::SceneType::Object,
+            Some(other) => {
+                return format!(
+                    "Invalid scene_type '{}'. Valid values: aerial, object",
+                    other
+                )
+            }
+        };
+
+        let fmt = match format.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("rcm") | None => raps_reality::OutputFormat::Rcm,
+            Some("rcs") => raps_reality::OutputFormat::Rcs,
+            Some("obj") => raps_reality::OutputFormat::Obj,
+            Some("fbx") => raps_reality::OutputFormat::Fbx,
+            Some("ortho") => raps_reality::OutputFormat::Ortho,
+            Some(other) => {
+                return format!(
+                    "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
+                    other
+                )
+            }
+        };
+
+        match client.create_photoscene(&name, st, fmt).await {
+            Ok(scene) => {
+                format!(
+                    "Photoscene created!\n\nID: {}\nName: {}\nScene Type: {}\nFormat: {}\nStatus: {}",
+                    scene.photoscene_id,
+                    scene.name.as_deref().unwrap_or("N/A"),
+                    scene.scene_type.as_deref().unwrap_or("N/A"),
+                    scene.convert_format.as_deref().unwrap_or("N/A"),
+                    scene.status.as_deref().unwrap_or("N/A"),
+                )
+            }
+            Err(e) => format!("Failed to create photoscene: {}", e),
+        }
+    }
+
+    async fn reality_process(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.start_processing(&photoscene_id).await {
+            Ok(()) => format!(
+                "Processing started for photoscene '{}'.\n\nUse reality_status to check progress.",
+                photoscene_id
+            ),
+            Err(e) => format!("Failed to start processing: {}", e),
+        }
+    }
+
+    async fn reality_status(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.get_progress(&photoscene_id).await {
+            Ok(progress) => {
+                format!(
+                    "Photoscene: {}\nProgress: {}%\nMessage: {}\nStatus: {}",
+                    progress.photoscene_id,
+                    progress.progress,
+                    progress.progress_msg.as_deref().unwrap_or("N/A"),
+                    progress.status.as_deref().unwrap_or("N/A"),
+                )
+            }
+            Err(e) => format!("Failed to get photoscene status: {}", e),
+        }
+    }
+
+    async fn reality_result(&self, photoscene_id: String, format: Option<String>) -> String {
+        let client = self.get_reality_client().await;
+
+        let fmt = match format.as_deref().map(|s| s.to_lowercase()).as_deref() {
+            Some("rcm") | None => raps_reality::OutputFormat::Rcm,
+            Some("rcs") => raps_reality::OutputFormat::Rcs,
+            Some("obj") => raps_reality::OutputFormat::Obj,
+            Some("fbx") => raps_reality::OutputFormat::Fbx,
+            Some("ortho") => raps_reality::OutputFormat::Ortho,
+            Some(other) => {
+                return format!(
+                    "Invalid format '{}'. Valid values: rcm, rcs, obj, fbx, ortho",
+                    other
+                )
+            }
+        };
+
+        match client.get_result(&photoscene_id, fmt).await {
+            Ok(result) => {
+                let mut output = format!(
+                    "Photoscene: {}\nProgress: {}%",
+                    result.photoscene_id, result.progress,
+                );
+                if let Some(ref link) = result.scene_link {
+                    output.push_str(&format!("\nDownload: {}", link));
+                }
+                if let Some(ref size) = result.file_size {
+                    output.push_str(&format!("\nFile Size: {} bytes", size));
+                }
+                output
+            }
+            Err(e) => format!("Failed to get photoscene result: {}", e),
+        }
+    }
+
+    async fn reality_delete(&self, photoscene_id: String) -> String {
+        let client = self.get_reality_client().await;
+        match client.delete_photoscene(&photoscene_id).await {
+            Ok(()) => format!("Photoscene '{}' deleted successfully.", photoscene_id),
+            Err(e) => format!("Failed to delete photoscene: {}", e),
+        }
+    }
+
+    async fn reality_formats(&self) -> String {
+        let formats = raps_reality::OutputFormat::all();
+        let mut output = format!("Available output formats ({}):\n\n", formats.len());
+        for fmt in &formats {
+            output.push_str(&format!("* {} - {}\n", fmt, fmt.description()));
+        }
+        output
+    }
+
     // Tool dispatch
     async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
         let args = args.unwrap_or_default();
@@ -3603,6 +3837,52 @@ impl RapsServer {
             }
 
             // ================================================================
+            // Issue Comment Tools
+            // ================================================================
+            "issue_comments_list" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comments_list(project_id, issue_id).await
+            }
+            "issue_comment_add" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let body = match Self::required_arg(&args, "body") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comment_add(project_id, issue_id, body).await
+            }
+            "issue_comment_delete" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let issue_id = match Self::required_arg(&args, "issue_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let comment_id = match Self::required_arg(&args, "comment_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.issue_comment_delete(project_id, issue_id, comment_id)
+                    .await
+            }
+
+            // ================================================================
             // RFI Tools
             // ================================================================
             "rfi_list" => {
@@ -3729,6 +4009,17 @@ impl RapsServer {
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 self.asset_delete(project_id, asset_id).await
+            }
+            "asset_get" => {
+                let project_id = match Self::required_arg(&args, "project_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let asset_id = match Self::required_arg(&args, "asset_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.asset_get(project_id, asset_id).await
             }
             "acc_submittals_list" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
@@ -4273,6 +4564,49 @@ impl RapsServer {
             }
 
             // ================================================================
+            // Reality Capture
+            // ================================================================
+            "reality_create" => {
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let scene_type = Self::optional_arg(&args, "scene_type");
+                let format = Self::optional_arg(&args, "format");
+                self.reality_create(name, scene_type, format).await
+            }
+            "reality_process" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_process(photoscene_id).await
+            }
+            "reality_status" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_status(photoscene_id).await
+            }
+            "reality_result" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let format = Self::optional_arg(&args, "format");
+                self.reality_result(photoscene_id, format).await
+            }
+            "reality_delete" => {
+                let photoscene_id = match Self::required_arg(&args, "photoscene_id") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.reality_delete(photoscene_id).await
+            }
+            "reality_formats" => self.reality_formats().await,
+
+            // ================================================================
             // Admin User Listing (v4.6)
             // ================================================================
             "admin_user_list" => {
@@ -4708,6 +5042,44 @@ fn get_tools() -> Vec<Tool> {
             ),
         ),
         // ================================================================
+        // Issue Comment Tools
+        // ================================================================
+        Tool::new(
+            "issue_comments_list",
+            "List all comments on a specific issue. Requires 3-legged auth.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"}
+                }),
+                &["project_id", "issue_id"],
+            ),
+        ),
+        Tool::new(
+            "issue_comment_add",
+            "Add a comment to a specific issue.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"},
+                    "body": {"type": "string", "description": "The comment text"}
+                }),
+                &["project_id", "issue_id", "body"],
+            ),
+        ),
+        Tool::new(
+            "issue_comment_delete",
+            "Delete a comment from a specific issue.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "issue_id": {"type": "string", "description": "The issue ID"},
+                    "comment_id": {"type": "string", "description": "The comment ID to delete"}
+                }),
+                &["project_id", "issue_id", "comment_id"],
+            ),
+        ),
+        // ================================================================
         // RFI Tools
         // ================================================================
         Tool::new(
@@ -4812,6 +5184,17 @@ fn get_tools() -> Vec<Tool> {
                 json!({
                     "project_id": {"type": "string", "description": "The project ID"},
                     "asset_id": {"type": "string", "description": "The asset ID to delete"}
+                }),
+                &["project_id", "asset_id"],
+            ),
+        ),
+        Tool::new(
+            "asset_get",
+            "Get details of a specific asset in an ACC project.",
+            schema(
+                json!({
+                    "project_id": {"type": "string", "description": "The project ID"},
+                    "asset_id": {"type": "string", "description": "The asset ID to retrieve"}
                 }),
                 &["project_id", "asset_id"],
             ),
@@ -5280,6 +5663,67 @@ fn get_tools() -> Vec<Tool> {
                 }),
                 &["workitem_id"],
             ),
+        ),
+        // ================================================================
+        // Reality Capture
+        // ================================================================
+        Tool::new(
+            "reality_create",
+            "Create a new photoscene for reality capture (photogrammetry). Use to set up a new 3D reconstruction job from photos.",
+            schema(
+                json!({
+                    "name": {"type": "string", "description": "Name for the new photoscene"},
+                    "scene_type": {"type": "string", "description": "Scene type: 'aerial' or 'object' (default: object)"},
+                    "format": {"type": "string", "description": "Output format: rcm, rcs, obj, fbx, ortho (default: rcm)"}
+                }),
+                &["name"],
+            ),
+        ),
+        Tool::new(
+            "reality_process",
+            "Start processing a photoscene. Call after uploading photos to begin 3D reconstruction.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to start processing"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_status",
+            "Check photoscene processing progress. Returns percentage complete and status message.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to check progress for"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_result",
+            "Get download link for a processed photoscene. Returns the scene link and file size when processing is complete.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to get results for"},
+                    "format": {"type": "string", "description": "Output format: rcm, rcs, obj, fbx, ortho (default: rcm)"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_delete",
+            "Delete a photoscene and its associated data.",
+            schema(
+                json!({
+                    "photoscene_id": {"type": "string", "description": "The photoscene ID to delete"}
+                }),
+                &["photoscene_id"],
+            ),
+        ),
+        Tool::new(
+            "reality_formats",
+            "List all available output formats for reality capture photoscenes.",
+            schema(json!({}), &[]),
         ),
         // ================================================================
         // Custom API Requests (v4.5)
