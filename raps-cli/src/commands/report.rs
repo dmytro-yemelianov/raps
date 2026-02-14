@@ -151,6 +151,146 @@ struct ReportSummaryOutput<T: Serialize> {
     projects: Vec<T>,
 }
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+fn get_account_id(account: Option<String>) -> Result<String> {
+    match account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
+        Some(id) if !id.is_empty() => Ok(id),
+        _ => {
+            anyhow::bail!(
+                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+            );
+        }
+    }
+}
+
+fn parse_project_filter(filter: &Option<String>) -> Result<ProjectFilter> {
+    match filter {
+        Some(f) => Ok(ProjectFilter::from_expression(f)?),
+        None => Ok(ProjectFilter::new()),
+    }
+}
+
+fn create_progress_bar(
+    output_format: OutputFormat,
+    count: u64,
+    message: &str,
+) -> Option<ProgressBar> {
+    if !output_format.supports_colors() {
+        return None;
+    }
+    let template = format!(
+        "{{spinner:.green}} [{{bar:40.cyan/blue}}] {{pos}}/{{len}} {}",
+        message
+    );
+    let pb = ProgressBar::new(count);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template(&template)
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+    Some(pb)
+}
+
+fn print_report_header(
+    output_format: OutputFormat,
+    label: &str,
+    account_id: &str,
+    filter: &Option<String>,
+) {
+    if !output_format.supports_colors() {
+        return;
+    }
+    println!("\n{} {} for account {}", "→".cyan(), label, account_id.cyan());
+    if let Some(f) = filter {
+        println!("  Filter: {}", f);
+    }
+    println!();
+}
+
+fn truncate_name(name: &str) -> String {
+    if name.len() > 28 {
+        format!("{}...", &name[..25])
+    } else {
+        name.to_string()
+    }
+}
+
+fn print_simple_table<T, F>(
+    title: &str,
+    output: &ReportSummaryOutput<T>,
+    output_format: OutputFormat,
+    get_total: F,
+) -> Result<()>
+where
+    T: Serialize + HasProjectName,
+    F: Fn(&T) -> usize,
+{
+    match output_format {
+        OutputFormat::Table => {
+            let grand_total: usize = output.projects.iter().map(&get_total).sum();
+
+            println!("{}", format!("{} Portfolio Summary:", title).bold());
+            println!("{}", "─".repeat(45));
+            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
+            println!("{}", "─".repeat(45));
+
+            for s in &output.projects {
+                println!(
+                    "{:<30} {:>8}",
+                    truncate_name(s.project_name()),
+                    get_total(s).to_string().cyan(),
+                );
+            }
+
+            println!("{}", "─".repeat(45));
+            println!(
+                "{:<30} {:>8}",
+                "TOTAL".bold(),
+                grand_total.to_string().bold(),
+            );
+            println!(
+                "\n{} {} projects scanned",
+                "→".cyan(),
+                output.total_projects
+            );
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+    Ok(())
+}
+
+trait HasProjectName {
+    fn project_name(&self) -> &str;
+}
+
+impl HasProjectName for SubmittalProjectSummary {
+    fn project_name(&self) -> &str {
+        &self.project_name
+    }
+}
+
+impl HasProjectName for ChecklistProjectSummary {
+    fn project_name(&self) -> &str {
+        &self.project_name
+    }
+}
+
+impl HasProjectName for AssetProjectSummary {
+    fn project_name(&self) -> &str {
+        &self.project_name
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Command dispatch
+// ---------------------------------------------------------------------------
+
 impl ReportCommands {
     pub async fn execute(
         self,
@@ -216,45 +356,27 @@ impl ReportCommands {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-async fn rfi_summary(
+// ---------------------------------------------------------------------------
+// Shared project-listing boilerplate
+// ---------------------------------------------------------------------------
+
+struct ReportContext {
+    http_config: HttpClientConfig,
+    filtered_projects: Vec<raps_acc::types::AccountProject>,
+}
+
+async fn prepare_report(
     config: &Config,
     auth_client: &AuthClient,
     account: Option<String>,
-    filter: Option<String>,
-    status_filter: Option<String>,
-    _since: Option<String>,
+    filter: &Option<String>,
+    label: &str,
     output_format: OutputFormat,
-) -> Result<()> {
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
-    };
+) -> Result<Option<ReportContext>> {
+    let account_id = get_account_id(account)?;
+    let project_filter = parse_project_filter(filter)?;
+    print_report_header(output_format, label, &account_id, filter);
 
-    let project_filter = if let Some(ref f) = filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-
-    if output_format.supports_colors() {
-        println!(
-            "\n{} RFI summary for account {}",
-            "→".cyan(),
-            account_id.cyan()
-        );
-        if let Some(ref f) = filter {
-            println!("  Filter: {}", f);
-        }
-        println!();
-    }
-
-    // List projects
     let http_config = HttpClientConfig::default();
     let admin_client = AccountAdminClient::new_with_http_config(
         config.clone(),
@@ -269,62 +391,101 @@ async fn rfi_summary(
         if output_format.supports_colors() {
             println!("{}", "No projects found matching the filter.".yellow());
         }
-        return Ok(());
+        return Ok(None);
     }
 
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(filtered_projects.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching RFIs...")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
+    Ok(Some(ReportContext {
+        http_config,
+        filtered_projects,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// RFI summary
+// ---------------------------------------------------------------------------
+
+fn count_status(items: &[impl HasStatus], status: &str) -> usize {
+    items
+        .iter()
+        .filter(|item| item.status().eq_ignore_ascii_case(status))
+        .count()
+}
+
+trait HasStatus {
+    fn status(&self) -> &str;
+}
+
+impl HasStatus for raps_acc::Rfi {
+    fn status(&self) -> &str {
+        &self.status
+    }
+}
+
+impl HasStatus for raps_acc::Issue {
+    fn status(&self) -> &str {
+        &self.status
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn rfi_summary(
+    config: &Config,
+    auth_client: &AuthClient,
+    account: Option<String>,
+    filter: Option<String>,
+    status_filter: Option<String>,
+    _since: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let ctx = match prepare_report(
+        config,
+        auth_client,
+        account,
+        &filter,
+        "RFI summary",
+        output_format,
+    )
+    .await?
+    {
+        Some(ctx) => ctx,
+        None => return Ok(()),
     };
 
-    let rfi_client =
-        RfiClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
+    let progress_bar = create_progress_bar(
+        output_format,
+        ctx.filtered_projects.len() as u64,
+        "Fetching RFIs...",
+    );
+
+    let rfi_client = RfiClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        ctx.http_config,
+    );
 
     let mut summaries = Vec::new();
 
-    for project in &filtered_projects {
+    for project in &ctx.filtered_projects {
         if let Some(ref pb) = progress_bar {
             pb.set_message(project.name.to_string());
         }
 
-        // Fetch RFIs for this project
         match rfi_client.list_rfis(&project.id).await {
             Ok(rfis) => {
-                // Apply status filter if provided
-                let filtered_rfis: Vec<_> = if let Some(ref sf) = status_filter {
-                    rfis.into_iter()
-                        .filter(|r| r.status.to_lowercase() == sf.to_lowercase())
-                        .collect()
-                } else {
-                    rfis
-                };
+                // Compute status breakdown from the UNFILTERED list
+                let open = count_status(&rfis, "open");
+                let answered = count_status(&rfis, "answered");
+                let closed = count_status(&rfis, "closed");
+                let void = count_status(&rfis, "void");
 
-                let total = filtered_rfis.len();
-                let open = filtered_rfis
-                    .iter()
-                    .filter(|r| r.status.to_lowercase() == "open")
-                    .count();
-                let answered = filtered_rfis
-                    .iter()
-                    .filter(|r| r.status.to_lowercase() == "answered")
-                    .count();
-                let closed = filtered_rfis
-                    .iter()
-                    .filter(|r| r.status.to_lowercase() == "closed")
-                    .count();
-                let void = filtered_rfis
-                    .iter()
-                    .filter(|r| r.status.to_lowercase() == "void")
-                    .count();
+                // Total reflects filtered count when a status filter is active
+                let total = if let Some(ref sf) = status_filter {
+                    rfis.iter()
+                        .filter(|r| r.status.eq_ignore_ascii_case(sf))
+                        .count()
+                } else {
+                    rfis.len()
+                };
 
                 summaries.push(RfiProjectSummary {
                     project_id: project.id.clone(),
@@ -337,7 +498,6 @@ async fn rfi_summary(
                 });
             }
             Err(_) => {
-                // Skip projects where RFI access fails (permission issues)
                 summaries.push(RfiProjectSummary {
                     project_id: project.id.clone(),
                     project_name: project.name.clone(),
@@ -366,7 +526,6 @@ async fn rfi_summary(
 
     match output_format {
         OutputFormat::Table => {
-            // Calculate totals
             let grand_total: usize = output.projects.iter().map(|s| s.total).sum();
             let grand_open: usize = output.projects.iter().map(|s| s.open).sum();
             let grand_answered: usize = output.projects.iter().map(|s| s.answered).sum();
@@ -386,14 +545,9 @@ async fn rfi_summary(
             println!("{}", "─".repeat(100));
 
             for s in &output.projects {
-                let name = if s.project_name.len() > 28 {
-                    format!("{}...", &s.project_name[..25])
-                } else {
-                    s.project_name.clone()
-                };
                 println!(
                     "{:<30} {:>8} {:>8} {:>10} {:>8} {:>8}",
-                    name,
+                    truncate_name(&s.project_name),
                     s.total.to_string().cyan(),
                     if s.open > 0 {
                         s.open.to_string().yellow().to_string()
@@ -437,6 +591,10 @@ async fn rfi_summary(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Issues summary
+// ---------------------------------------------------------------------------
+
 #[allow(clippy::too_many_arguments)]
 async fn issues_summary(
     config: &Config,
@@ -447,97 +605,55 @@ async fn issues_summary(
     _since: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
+    let ctx = match prepare_report(
+        config,
+        auth_client,
+        account,
+        &filter,
+        "Issues summary",
+        output_format,
+    )
+    .await?
+    {
+        Some(ctx) => ctx,
+        None => return Ok(()),
     };
 
-    let project_filter = if let Some(ref f) = filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-
-    if output_format.supports_colors() {
-        println!(
-            "\n{} Issues summary for account {}",
-            "→".cyan(),
-            account_id.cyan()
-        );
-        if let Some(ref f) = filter {
-            println!("  Filter: {}", f);
-        }
-        println!();
-    }
-
-    // List projects
-    let http_config = HttpClientConfig::default();
-    let admin_client = AccountAdminClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
+    let progress_bar = create_progress_bar(
+        output_format,
+        ctx.filtered_projects.len() as u64,
+        "Fetching issues...",
     );
 
-    let all_projects = admin_client.list_all_projects(&account_id).await?;
-    let filtered_projects = project_filter.apply(all_projects);
-
-    if filtered_projects.is_empty() {
-        if output_format.supports_colors() {
-            println!("{}", "No projects found matching the filter.".yellow());
-        }
-        return Ok(());
-    }
-
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(filtered_projects.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching issues...")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
-
-    let issues_client =
-        IssuesClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
+    let issues_client = IssuesClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        ctx.http_config,
+    );
 
     let mut summaries = Vec::new();
 
-    for project in &filtered_projects {
+    for project in &ctx.filtered_projects {
         if let Some(ref pb) = progress_bar {
             pb.set_message(project.name.to_string());
         }
 
         match issues_client.list_issues(&project.id, None).await {
             Ok(issues) => {
-                let filtered_issues: Vec<_> = if let Some(ref sf) = status_filter {
-                    issues
-                        .into_iter()
-                        .filter(|i| i.status.to_lowercase() == sf.to_lowercase())
-                        .collect()
-                } else {
-                    issues
-                };
+                // Compute status breakdown from the UNFILTERED list
+                let open = count_status(&issues, "open");
+                let closed = count_status(&issues, "closed");
+                let other = issues.len() - open - closed;
 
-                let total = filtered_issues.len();
-                let open = filtered_issues
-                    .iter()
-                    .filter(|i| i.status.to_lowercase() == "open")
-                    .count();
-                let closed = filtered_issues
-                    .iter()
-                    .filter(|i| i.status.to_lowercase() == "closed")
-                    .count();
-                let other = total - open - closed;
+                // Total reflects filtered count when a status filter is active
+                let total = if let Some(ref sf) = status_filter {
+                    issues
+                        .iter()
+                        .filter(|i| i.status.eq_ignore_ascii_case(sf))
+                        .count()
+                } else {
+                    issues.len()
+                };
 
                 summaries.push(IssueProjectSummary {
                     project_id: project.id.clone(),
@@ -594,14 +710,9 @@ async fn issues_summary(
             println!("{}", "─".repeat(85));
 
             for s in &output.projects {
-                let name = if s.project_name.len() > 28 {
-                    format!("{}...", &s.project_name[..25])
-                } else {
-                    s.project_name.clone()
-                };
                 println!(
                     "{:<30} {:>8} {:>8} {:>8} {:>8}",
-                    name,
+                    truncate_name(&s.project_name),
                     s.total.to_string().cyan(),
                     if s.open > 0 {
                         s.open.to_string().yellow().to_string()
@@ -640,6 +751,10 @@ async fn issues_summary(
     Ok(())
 }
 
+// ---------------------------------------------------------------------------
+// Submittals summary
+// ---------------------------------------------------------------------------
+
 async fn submittals_summary(
     config: &Config,
     auth_client: &AuthClient,
@@ -648,89 +763,44 @@ async fn submittals_summary(
     status_filter: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
+    let ctx = match prepare_report(
+        config,
+        auth_client,
+        account,
+        &filter,
+        "Submittals summary",
+        output_format,
+    )
+    .await?
+    {
+        Some(ctx) => ctx,
+        None => return Ok(()),
     };
 
-    let project_filter = if let Some(ref f) = filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-
-    if output_format.supports_colors() {
-        println!(
-            "\n{} Submittals summary for account {}",
-            "→".cyan(),
-            account_id.cyan()
-        );
-        if let Some(ref f) = filter {
-            println!("  Filter: {}", f);
-        }
-        println!();
-    }
-
-    // List projects
-    let http_config = HttpClientConfig::default();
-    let admin_client = AccountAdminClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
+    let progress_bar = create_progress_bar(
+        output_format,
+        ctx.filtered_projects.len() as u64,
+        "Fetching submittals...",
     );
 
-    let all_projects = admin_client.list_all_projects(&account_id).await?;
-    let filtered_projects = project_filter.apply(all_projects);
-
-    if filtered_projects.is_empty() {
-        if output_format.supports_colors() {
-            println!("{}", "No projects found matching the filter.".yellow());
-        }
-        return Ok(());
-    }
-
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(filtered_projects.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching submittals...",
-                )
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
-
     let acc_client = AccClient::new(config.clone(), auth_client.clone());
-
     let mut summaries = Vec::new();
 
-    for project in &filtered_projects {
+    for project in &ctx.filtered_projects {
         if let Some(ref pb) = progress_bar {
             pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_submittals(&project.id).await {
             Ok(submittals) => {
-                let filtered_submittals: Vec<_> = if let Some(ref sf) = status_filter {
+                let total = if let Some(ref sf) = status_filter {
                     submittals
-                        .into_iter()
-                        .filter(|s| s.status.to_lowercase() == sf.to_lowercase())
-                        .collect()
+                        .iter()
+                        .filter(|s| s.status.eq_ignore_ascii_case(sf))
+                        .count()
                 } else {
-                    submittals
+                    submittals.len()
                 };
-
-                let total = filtered_submittals.len();
 
                 summaries.push(SubmittalProjectSummary {
                     project_id: project.id.clone(),
@@ -761,43 +831,12 @@ async fn submittals_summary(
         projects: summaries,
     };
 
-    match output_format {
-        OutputFormat::Table => {
-            let grand_total: usize = output.projects.iter().map(|s| s.total).sum();
-
-            println!("{}", "Submittals Portfolio Summary:".bold());
-            println!("{}", "─".repeat(45));
-            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
-            println!("{}", "─".repeat(45));
-
-            for s in &output.projects {
-                let name = if s.project_name.len() > 28 {
-                    format!("{}...", &s.project_name[..25])
-                } else {
-                    s.project_name.clone()
-                };
-                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
-            }
-
-            println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "TOTAL".bold(),
-                grand_total.to_string().bold(),
-            );
-            println!(
-                "\n{} {} projects scanned",
-                "→".cyan(),
-                output.total_projects
-            );
-        }
-        _ => {
-            output_format.write(&output)?;
-        }
-    }
-
-    Ok(())
+    print_simple_table("Submittals", &output, output_format, |s| s.total)
 }
+
+// ---------------------------------------------------------------------------
+// Checklists summary
+// ---------------------------------------------------------------------------
 
 async fn checklists_summary(
     config: &Config,
@@ -807,89 +846,44 @@ async fn checklists_summary(
     status_filter: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
+    let ctx = match prepare_report(
+        config,
+        auth_client,
+        account,
+        &filter,
+        "Checklists summary",
+        output_format,
+    )
+    .await?
+    {
+        Some(ctx) => ctx,
+        None => return Ok(()),
     };
 
-    let project_filter = if let Some(ref f) = filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-
-    if output_format.supports_colors() {
-        println!(
-            "\n{} Checklists summary for account {}",
-            "→".cyan(),
-            account_id.cyan()
-        );
-        if let Some(ref f) = filter {
-            println!("  Filter: {}", f);
-        }
-        println!();
-    }
-
-    // List projects
-    let http_config = HttpClientConfig::default();
-    let admin_client = AccountAdminClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
+    let progress_bar = create_progress_bar(
+        output_format,
+        ctx.filtered_projects.len() as u64,
+        "Fetching checklists...",
     );
 
-    let all_projects = admin_client.list_all_projects(&account_id).await?;
-    let filtered_projects = project_filter.apply(all_projects);
-
-    if filtered_projects.is_empty() {
-        if output_format.supports_colors() {
-            println!("{}", "No projects found matching the filter.".yellow());
-        }
-        return Ok(());
-    }
-
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(filtered_projects.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template(
-                    "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching checklists...",
-                )
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
-
     let acc_client = AccClient::new(config.clone(), auth_client.clone());
-
     let mut summaries = Vec::new();
 
-    for project in &filtered_projects {
+    for project in &ctx.filtered_projects {
         if let Some(ref pb) = progress_bar {
             pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_checklists(&project.id).await {
             Ok(checklists) => {
-                let filtered_checklists: Vec<_> = if let Some(ref sf) = status_filter {
+                let total = if let Some(ref sf) = status_filter {
                     checklists
-                        .into_iter()
-                        .filter(|c| c.status.to_lowercase() == sf.to_lowercase())
-                        .collect()
+                        .iter()
+                        .filter(|c| c.status.eq_ignore_ascii_case(sf))
+                        .count()
                 } else {
-                    checklists
+                    checklists.len()
                 };
-
-                let total = filtered_checklists.len();
 
                 summaries.push(ChecklistProjectSummary {
                     project_id: project.id.clone(),
@@ -920,43 +914,12 @@ async fn checklists_summary(
         projects: summaries,
     };
 
-    match output_format {
-        OutputFormat::Table => {
-            let grand_total: usize = output.projects.iter().map(|s| s.total).sum();
-
-            println!("{}", "Checklists Portfolio Summary:".bold());
-            println!("{}", "─".repeat(45));
-            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
-            println!("{}", "─".repeat(45));
-
-            for s in &output.projects {
-                let name = if s.project_name.len() > 28 {
-                    format!("{}...", &s.project_name[..25])
-                } else {
-                    s.project_name.clone()
-                };
-                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
-            }
-
-            println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "TOTAL".bold(),
-                grand_total.to_string().bold(),
-            );
-            println!(
-                "\n{} {} projects scanned",
-                "→".cyan(),
-                output.total_projects
-            );
-        }
-        _ => {
-            output_format.write(&output)?;
-        }
-    }
-
-    Ok(())
+    print_simple_table("Checklists", &output, output_format, |s| s.total)
 }
+
+// ---------------------------------------------------------------------------
+// Assets summary
+// ---------------------------------------------------------------------------
 
 async fn assets_summary(
     config: &Config,
@@ -965,83 +928,40 @@ async fn assets_summary(
     filter: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
+    let ctx = match prepare_report(
+        config,
+        auth_client,
+        account,
+        &filter,
+        "Assets summary",
+        output_format,
+    )
+    .await?
+    {
+        Some(ctx) => ctx,
+        None => return Ok(()),
     };
 
-    let project_filter = if let Some(ref f) = filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-
-    if output_format.supports_colors() {
-        println!(
-            "\n{} Assets summary for account {}",
-            "→".cyan(),
-            account_id.cyan()
-        );
-        if let Some(ref f) = filter {
-            println!("  Filter: {}", f);
-        }
-        println!();
-    }
-
-    // List projects
-    let http_config = HttpClientConfig::default();
-    let admin_client = AccountAdminClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        http_config.clone(),
+    let progress_bar = create_progress_bar(
+        output_format,
+        ctx.filtered_projects.len() as u64,
+        "Fetching assets...",
     );
 
-    let all_projects = admin_client.list_all_projects(&account_id).await?;
-    let filtered_projects = project_filter.apply(all_projects);
-
-    if filtered_projects.is_empty() {
-        if output_format.supports_colors() {
-            println!("{}", "No projects found matching the filter.".yellow());
-        }
-        return Ok(());
-    }
-
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(filtered_projects.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} Fetching assets...")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
-
     let acc_client = AccClient::new(config.clone(), auth_client.clone());
-
     let mut summaries = Vec::new();
 
-    for project in &filtered_projects {
+    for project in &ctx.filtered_projects {
         if let Some(ref pb) = progress_bar {
             pb.set_message(project.name.to_string());
         }
 
         match acc_client.list_assets(&project.id).await {
             Ok(assets) => {
-                let total = assets.len();
-
                 summaries.push(AssetProjectSummary {
                     project_id: project.id.clone(),
                     project_name: project.name.clone(),
-                    total,
+                    total: assets.len(),
                 });
             }
             Err(_) => {
@@ -1067,42 +987,7 @@ async fn assets_summary(
         projects: summaries,
     };
 
-    match output_format {
-        OutputFormat::Table => {
-            let grand_total: usize = output.projects.iter().map(|s| s.total).sum();
-
-            println!("{}", "Assets Portfolio Summary:".bold());
-            println!("{}", "─".repeat(45));
-            println!("{:<30} {:>8}", "Project".bold(), "Total".bold());
-            println!("{}", "─".repeat(45));
-
-            for s in &output.projects {
-                let name = if s.project_name.len() > 28 {
-                    format!("{}...", &s.project_name[..25])
-                } else {
-                    s.project_name.clone()
-                };
-                println!("{:<30} {:>8}", name, s.total.to_string().cyan(),);
-            }
-
-            println!("{}", "─".repeat(45));
-            println!(
-                "{:<30} {:>8}",
-                "TOTAL".bold(),
-                grand_total.to_string().bold(),
-            );
-            println!(
-                "\n{} {} projects scanned",
-                "→".cyan(),
-                output.total_projects
-            );
-        }
-        _ => {
-            output_format.write(&output)?;
-        }
-    }
-
-    Ok(())
+    print_simple_table("Assets", &output, output_format, |s| s.total)
 }
 
 #[cfg(test)]
@@ -1240,12 +1125,44 @@ mod tests {
             void: 0,
         };
         let json = serde_json::to_string(&summary).unwrap();
-        // Verify all count fields serialize as zero
         let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed["total"], 0);
         assert_eq!(parsed["open"], 0);
         assert_eq!(parsed["answered"], 0);
         assert_eq!(parsed["closed"], 0);
         assert_eq!(parsed["void"], 0);
+    }
+
+    #[test]
+    fn test_truncate_name_short() {
+        assert_eq!(truncate_name("Short Name"), "Short Name");
+    }
+
+    #[test]
+    fn test_truncate_name_long() {
+        let long = "A Very Long Project Name That Exceeds Limit";
+        let result = truncate_name(long);
+        assert!(result.ends_with("..."));
+        assert!(result.len() <= 28);
+    }
+
+    #[test]
+    fn test_get_account_id_some() {
+        let id = get_account_id(Some("abc-123".to_string())).unwrap();
+        assert_eq!(id, "abc-123");
+    }
+
+    #[test]
+    fn test_get_account_id_empty() {
+        let result = get_account_id(Some(String::new()));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_account_id_none() {
+        // Without APS_ACCOUNT_ID set, should fail
+        unsafe { std::env::remove_var("APS_ACCOUNT_ID") };
+        let result = get_account_id(None);
+        assert!(result.is_err());
     }
 }

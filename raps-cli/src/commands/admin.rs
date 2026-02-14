@@ -466,6 +466,70 @@ pub enum OperationCommands {
     },
 }
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
+fn get_account_id(account: Option<String>) -> Result<String> {
+    match account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
+        Some(id) if !id.is_empty() => Ok(id),
+        _ => {
+            anyhow::bail!(
+                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+            );
+        }
+    }
+}
+
+fn parse_filter_with_ids(
+    filter: &Option<String>,
+    project_ids: &Option<PathBuf>,
+) -> Result<ProjectFilter> {
+    let mut project_filter = match filter {
+        Some(f) => ProjectFilter::from_expression(f)?,
+        None => ProjectFilter::new(),
+    };
+    if let Some(ids_file) = project_ids {
+        let content = std::fs::read_to_string(ids_file)?;
+        let ids: Vec<String> = content
+            .lines()
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .collect();
+        project_filter.include_ids = Some(ids);
+    }
+    Ok(project_filter)
+}
+
+fn create_bulk_progress_bar(output_format: OutputFormat) -> Option<ProgressBar> {
+    if !output_format.supports_colors() {
+        return None;
+    }
+    let pb = ProgressBar::new(0);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
+    Some(pb)
+}
+
+fn make_progress_callback(pb: Option<ProgressBar>) -> impl Fn(ProgressUpdate) {
+    move |progress: ProgressUpdate| {
+        if let Some(ref pb) = pb {
+            pb.set_length(progress.total as u64);
+            pb.set_position(
+                (progress.completed + progress.failed + progress.skipped) as u64,
+            );
+            pb.set_message(format!(
+                "✓{} ○{} ✗{}",
+                progress.completed, progress.skipped, progress.failed
+            ));
+        }
+    }
+}
+
 impl AdminCommands {
     pub async fn execute(
         self,
@@ -500,18 +564,7 @@ impl UserCommands {
                 status,
                 search,
             } => {
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
-
+                let account_id = get_account_id(account)?;
                 let http_config = HttpClientConfig::default();
 
                 if let Some(project_id) = project {
@@ -673,37 +726,9 @@ impl UserCommands {
                 dry_run,
                 yes: _,
             } => {
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+                let account_id = get_account_id(account)?;
+                let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
-
-                // Parse filter expression
-                let mut project_filter = if let Some(f) = &filter {
-                    ProjectFilter::from_expression(f)?
-                } else {
-                    ProjectFilter::new()
-                };
-
-                // Load project IDs from file if specified
-                if let Some(ids_file) = &project_ids {
-                    let content = std::fs::read_to_string(ids_file)?;
-                    let ids: Vec<String> = content
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                        .collect();
-                    project_filter.include_ids = Some(ids);
-                }
-
-                // Create bulk config
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
                     dry_run,
@@ -743,36 +768,9 @@ impl UserCommands {
                     http_config,
                 ));
 
-                // Create progress bar
-                let progress_bar = if output_format.supports_colors() {
-                    let pb = ProgressBar::new(0);
-                    pb.set_style(
-                        ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                            .unwrap()
-                            .progress_chars("=>-"),
-                    );
-                    Some(pb)
-                } else {
-                    None
-                };
+                let progress_bar = create_bulk_progress_bar(output_format);
+                let on_progress = make_progress_callback(progress_bar.clone());
 
-                // Progress callback
-                let pb_clone = progress_bar.clone();
-                let on_progress = move |progress: ProgressUpdate| {
-                    if let Some(ref pb) = pb_clone {
-                        pb.set_length(progress.total as u64);
-                        pb.set_position(
-                            (progress.completed + progress.failed + progress.skipped) as u64,
-                        );
-                        pb.set_message(format!(
-                            "✓{} ○{} ✗{}",
-                            progress.completed, progress.skipped, progress.failed
-                        ));
-                    }
-                };
-
-                // Execute bulk operation
                 let result = bulk_add_user(
                     &admin_client,
                     users_client,
@@ -810,37 +808,9 @@ impl UserCommands {
                 dry_run,
                 yes: _,
             } => {
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+                let account_id = get_account_id(account)?;
+                let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
-
-                // Parse filter expression
-                let mut project_filter = if let Some(f) = &filter {
-                    ProjectFilter::from_expression(f)?
-                } else {
-                    ProjectFilter::new()
-                };
-
-                // Load project IDs from file if specified
-                if let Some(ids_file) = &project_ids {
-                    let content = std::fs::read_to_string(ids_file)?;
-                    let ids: Vec<String> = content
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                        .collect();
-                    project_filter.include_ids = Some(ids);
-                }
-
-                // Create bulk config
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
                     dry_run,
@@ -877,36 +847,9 @@ impl UserCommands {
                     http_config,
                 ));
 
-                // Create progress bar
-                let progress_bar = if output_format.supports_colors() {
-                    let pb = ProgressBar::new(0);
-                    pb.set_style(
-                        ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                            .unwrap()
-                            .progress_chars("=>-"),
-                    );
-                    Some(pb)
-                } else {
-                    None
-                };
+                let progress_bar = create_bulk_progress_bar(output_format);
+                let on_progress = make_progress_callback(progress_bar.clone());
 
-                // Progress callback
-                let pb_clone = progress_bar.clone();
-                let on_progress = move |progress: ProgressUpdate| {
-                    if let Some(ref pb) = pb_clone {
-                        pb.set_length(progress.total as u64);
-                        pb.set_position(
-                            (progress.completed + progress.failed + progress.skipped) as u64,
-                        );
-                        pb.set_message(format!(
-                            "✓{} ○{} ✗{}",
-                            progress.completed, progress.skipped, progress.failed
-                        ));
-                    }
-                };
-
-                // Execute bulk operation
                 let result = raps_admin::bulk_remove_user(
                     &admin_client,
                     users_client,
@@ -968,17 +911,7 @@ impl UserCommands {
                     anyhow::bail!("At least one of --role or --company must be provided.");
                 }
 
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
+                let account_id = get_account_id(account)?;
 
                 let http_config = HttpClientConfig::default();
                 let admin_client = AccountAdminClient::new_with_http_config(
@@ -1037,25 +970,8 @@ impl UserCommands {
 
                 // Handle role update across projects (if --role is provided)
                 if let Some(ref role_value) = role {
-                    // Parse filter expression
-                    let mut project_filter = if let Some(f) = &filter {
-                        ProjectFilter::from_expression(f)?
-                    } else {
-                        ProjectFilter::new()
-                    };
+                    let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
-                    // Load project IDs from file if specified
-                    if let Some(ids_file) = &project_ids {
-                        let content = std::fs::read_to_string(ids_file)?;
-                        let ids: Vec<String> = content
-                            .lines()
-                            .map(|l| l.trim().to_string())
-                            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                            .collect();
-                        project_filter.include_ids = Some(ids);
-                    }
-
-                    // Create bulk config
                     let bulk_config = BulkConfig {
                         concurrency: concurrency.min(50),
                         dry_run,
@@ -1088,36 +1004,9 @@ impl UserCommands {
                         http_config,
                     ));
 
-                    // Create progress bar
-                    let progress_bar = if output_format.supports_colors() {
-                        let pb = ProgressBar::new(0);
-                        pb.set_style(
-                            ProgressStyle::default_bar()
-                                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                                .unwrap()
-                                .progress_chars("=>-"),
-                        );
-                        Some(pb)
-                    } else {
-                        None
-                    };
+                    let progress_bar = create_bulk_progress_bar(output_format);
+                    let on_progress = make_progress_callback(progress_bar.clone());
 
-                    // Progress callback
-                    let pb_clone = progress_bar.clone();
-                    let on_progress = move |progress: ProgressUpdate| {
-                        if let Some(ref pb) = pb_clone {
-                            pb.set_length(progress.total as u64);
-                            pb.set_position(
-                                (progress.completed + progress.failed + progress.skipped) as u64,
-                            );
-                            pb.set_message(format!(
-                                "✓{} ○{} ✗{}",
-                                progress.completed, progress.skipped, progress.failed
-                            ));
-                        }
-                    };
-
-                    // Execute bulk operation
                     let result = raps_admin::bulk_update_role(
                         &admin_client,
                         users_client,
@@ -1327,35 +1216,8 @@ impl FolderCommands {
                 dry_run,
                 yes: _,
             } => {
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
-
-                // Parse filter expression
-                let mut project_filter = if let Some(f) = &filter {
-                    ProjectFilter::from_expression(f)?
-                } else {
-                    ProjectFilter::new()
-                };
-
-                // Load project IDs from file if specified
-                if let Some(ids_file) = &project_ids {
-                    let content = std::fs::read_to_string(ids_file)?;
-                    let ids: Vec<String> = content
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                        .collect();
-                    project_filter.include_ids = Some(ids);
-                }
+                let account_id = get_account_id(account)?;
+                let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 // Parse folder type
                 let folder_type = match folder.to_lowercase().as_str() {
@@ -1405,34 +1267,8 @@ impl FolderCommands {
                     ),
                 );
 
-                // Create progress bar
-                let progress_bar = if output_format.supports_colors() {
-                    let pb = ProgressBar::new(0);
-                    pb.set_style(
-                        ProgressStyle::default_bar()
-                            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                            .unwrap()
-                            .progress_chars("=>-"),
-                    );
-                    Some(pb)
-                } else {
-                    None
-                };
-
-                // Progress callback
-                let pb_clone = progress_bar.clone();
-                let on_progress = move |progress: ProgressUpdate| {
-                    if let Some(ref pb) = pb_clone {
-                        pb.set_length(progress.total as u64);
-                        pb.set_position(
-                            (progress.completed + progress.failed + progress.skipped) as u64,
-                        );
-                        pb.set_message(format!(
-                            "✓{} ○{} ✗{}",
-                            progress.completed, progress.skipped, progress.failed
-                        ));
-                    }
-                };
+                let progress_bar = create_bulk_progress_bar(output_format);
+                let on_progress = make_progress_callback(progress_bar.clone());
 
                 // Execute bulk operation
                 let result = raps_admin::bulk_update_folder_rights(
@@ -1482,17 +1318,7 @@ impl AdminProjectCommands {
                 platform,
                 limit,
             } => {
-                // Get account ID from parameter or environment
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
+                let account_id = get_account_id(account)?;
 
                 // Build filter expression from individual flags
                 let mut filter_parts = Vec::new();
@@ -1624,16 +1450,7 @@ impl AdminProjectCommands {
                 end_date,
                 timezone,
             } => {
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
+                let account_id = get_account_id(account)?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -1709,16 +1526,7 @@ impl AdminProjectCommands {
                 start_date,
                 end_date,
             } => {
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
+                let account_id = get_account_id(account)?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -1772,16 +1580,7 @@ impl AdminProjectCommands {
                 Ok(())
             }
             AdminProjectCommands::Archive { account, project } => {
-                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-                let account_id = match account_id {
-                    Some(id) if !id.is_empty() => id,
-                    _ => {
-                        anyhow::bail!(
-                            "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-                        );
-                    }
-                };
+                let account_id = get_account_id(account)?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -1968,16 +1767,7 @@ async fn execute_csv_update(
     dry_run: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // Get account ID
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
-    };
+    let account_id = get_account_id(account)?;
 
     // Parse CSV file
     let mut reader = csv::Reader::from_path(csv_path)
@@ -2050,40 +1840,17 @@ async fn execute_csv_update(
         http_config.clone(),
     );
 
-    // Parse filter for role updates
-    let mut project_filter = if let Some(f) = &filter {
-        ProjectFilter::from_expression(f)?
-    } else {
-        ProjectFilter::new()
-    };
-    if let Some(ids_file) = &project_ids {
-        let content = std::fs::read_to_string(ids_file)?;
-        let ids: Vec<String> = content
-            .lines()
-            .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-            .collect();
-        project_filter.include_ids = Some(ids);
-    }
+    let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
     let mut updated = 0usize;
     let skipped = 0usize;
     let mut failed = 0usize;
     let mut errors = Vec::new();
 
-    // Progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(rows.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
+    let progress_bar = create_bulk_progress_bar(output_format);
+    if let Some(ref pb) = progress_bar {
+        pb.set_length(rows.len() as u64);
+    }
 
     for row in &rows {
         if let Some(ref pb) = progress_bar {
@@ -2823,19 +2590,10 @@ async fn execute_csv_import(
 
     let total = users.len();
 
-    // Create progress bar
-    let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(total as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                .unwrap()
-                .progress_chars("=>-"),
-        );
-        Some(pb)
-    } else {
-        None
-    };
+    let progress_bar = create_bulk_progress_bar(output_format);
+    if let Some(ref pb) = progress_bar {
+        pb.set_length(total as u64);
+    }
 
     // Create users client and call import_users
     let http_config = HttpClientConfig::default();
@@ -2937,17 +2695,7 @@ async fn execute_company_list(
     account: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // Get account ID from parameter or environment
-    let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
-
-    let account_id = match account_id {
-        Some(id) if !id.is_empty() => id,
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
-            );
-        }
-    };
+    let account_id = get_account_id(account)?;
 
     if output_format.supports_colors() {
         println!(
