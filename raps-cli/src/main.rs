@@ -305,8 +305,10 @@ async fn run(cli: Cli) -> Result<()> {
         logging::log_verbose("RAPS CLI starting...");
     }
 
-    // Load configuration
-    let config = Config::from_env()?;
+    // Load configuration leniently — missing credentials default to empty strings.
+    // Commands that need credentials will fail with a clear API error when they
+    // attempt to authenticate, rather than blocking all commands upfront.
+    let config = Config::from_env_lenient()?;
 
     // Create HTTP client with shared config
     let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);

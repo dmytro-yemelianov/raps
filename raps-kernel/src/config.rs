@@ -103,6 +103,65 @@ impl Config {
         })
     }
 
+    /// Load configuration leniently — missing client_id/client_secret default to empty strings.
+    /// Useful for commands that don't need API credentials (e.g., auth logout, auth status).
+    pub fn from_env_lenient() -> Result<Self> {
+        let _ = dotenvy::dotenv();
+
+        let profile_data = Self::load_profile_data().ok();
+
+        let client_id = env::var("APS_CLIENT_ID")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.client_id.clone())
+                    .ok_or(env::VarError::NotPresent)
+            })
+            .unwrap_or_default();
+
+        let client_secret = env::var("APS_CLIENT_SECRET")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.client_secret.clone())
+                    .ok_or(env::VarError::NotPresent)
+            })
+            .unwrap_or_default();
+
+        let base_url = env::var("APS_BASE_URL")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.base_url.clone())
+                    .ok_or(env::VarError::NotPresent)
+            })
+            .unwrap_or_else(|_| "https://developer.api.autodesk.com".to_string());
+
+        let callback_url = env::var("APS_CALLBACK_URL")
+            .or_else(|_| {
+                profile_data
+                    .as_ref()
+                    .and_then(|(_, profile)| profile.callback_url.clone())
+                    .ok_or(env::VarError::NotPresent)
+            })
+            .unwrap_or_else(|_| format!("http://localhost:{}/callback", DEFAULT_CALLBACK_PORT));
+
+        let da_nickname = env::var("APS_DA_NICKNAME").ok().or_else(|| {
+            profile_data
+                .as_ref()
+                .and_then(|(_, profile)| profile.da_nickname.clone())
+        });
+
+        Ok(Self {
+            client_id,
+            client_secret,
+            base_url,
+            callback_url,
+            da_nickname,
+            http_config: HttpClientConfig::default(),
+        })
+    }
+
     /// Load profile data from disk
     fn load_profile_data() -> Result<(String, ProfileConfig)> {
         let data = load_profiles()?;
