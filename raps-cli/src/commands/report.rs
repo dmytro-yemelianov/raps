@@ -204,7 +204,12 @@ fn print_report_header(
     if !output_format.supports_colors() {
         return;
     }
-    println!("\n{} {} for account {}", "→".cyan(), label, account_id.cyan());
+    println!(
+        "\n{} {} for account {}",
+        "→".cyan(),
+        label,
+        account_id.cyan()
+    );
     if let Some(f) = filter {
         println!("  Filter: {}", f);
     }
@@ -457,11 +462,8 @@ async fn rfi_summary(
         "Fetching RFIs...",
     );
 
-    let rfi_client = RfiClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        ctx.http_config,
-    );
+    let rfi_client =
+        RfiClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config);
 
     let mut summaries = Vec::new();
 
@@ -625,11 +627,8 @@ async fn issues_summary(
         "Fetching issues...",
     );
 
-    let issues_client = IssuesClient::new_with_http_config(
-        config.clone(),
-        auth_client.clone(),
-        ctx.http_config,
-    );
+    let issues_client =
+        IssuesClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config);
 
     let mut summaries = Vec::new();
 

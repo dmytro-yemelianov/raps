@@ -519,9 +519,7 @@ fn make_progress_callback(pb: Option<ProgressBar>) -> impl Fn(ProgressUpdate) {
     move |progress: ProgressUpdate| {
         if let Some(ref pb) = pb {
             pb.set_length(progress.total as u64);
-            pb.set_position(
-                (progress.completed + progress.failed + progress.skipped) as u64,
-            );
+            pb.set_position((progress.completed + progress.failed + progress.skipped) as u64);
             pb.set_message(format!(
                 "✓{} ○{} ✗{}",
                 progress.completed, progress.skipped, progress.failed
