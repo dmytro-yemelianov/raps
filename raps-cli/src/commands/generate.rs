@@ -23,8 +23,8 @@ pub enum GenerateCommands {
         count: u32,
 
         /// Output directory
-        #[arg(short, long, default_value = "./generated-files")]
-        output: PathBuf,
+        #[arg(short = 'o', long = "out-dir", default_value = "./generated-files")]
+        out_dir: PathBuf,
 
         /// Complexity level: simple, medium, complex
         #[arg(long, default_value = "medium")]
@@ -36,9 +36,9 @@ pub async fn execute(args: GenerateArgs) -> anyhow::Result<()> {
     match args.command {
         GenerateCommands::Files {
             count,
-            output,
+            out_dir,
             complexity,
-        } => generate_files(count, output, &complexity).await,
+        } => generate_files(count, out_dir, &complexity).await,
     }
 }
 

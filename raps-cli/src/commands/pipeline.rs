@@ -40,8 +40,8 @@ pub enum PipelineCommands {
     /// Generate a sample pipeline file
     Sample {
         /// Output file path
-        #[arg(short, long, default_value = "pipeline.yaml")]
-        output: PathBuf,
+        #[arg(short = 'o', long = "out-file", default_value = "pipeline.yaml")]
+        out_file: PathBuf,
     },
 }
 
@@ -84,7 +84,7 @@ impl PipelineCommands {
                 dry_run,
             } => run_pipeline(&file, continue_on_error, dry_run, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format),
-            PipelineCommands::Sample { output } => generate_sample(&output, output_format),
+            PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
         }
     }
 }

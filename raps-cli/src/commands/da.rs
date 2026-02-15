@@ -98,8 +98,8 @@ pub enum DaCommands {
         input: Vec<(String, String)>,
 
         /// Output arguments as key=value pairs (local file paths)
-        #[arg(short, long, value_parser = parse_argument)]
-        output: Vec<(String, String)>,
+        #[arg(short = 'o', long = "out-arg", value_parser = parse_argument)]
+        out_arg: Vec<(String, String)>,
 
         /// Wait for completion and download results
         #[arg(short, long)]
@@ -205,9 +205,9 @@ impl DaCommands {
             DaCommands::Run {
                 activity,
                 input,
-                output,
+                out_arg,
                 wait,
-            } => run_workitem(client, &activity, input, output, wait, output_format).await,
+            } => run_workitem(client, &activity, input, out_arg, wait, output_format).await,
             DaCommands::Status {
                 workitem_id,
                 wait,

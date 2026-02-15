@@ -96,8 +96,8 @@ pub enum ProfileCommands {
     /// Export profiles to a file
     Export {
         /// Output file path
-        #[arg(short, long, default_value = "profiles-export.json")]
-        output: std::path::PathBuf,
+        #[arg(short = 'o', long = "out-file", default_value = "profiles-export.json")]
+        out_file: std::path::PathBuf,
 
         /// Include secrets (client_id, client_secret) - use with caution
         #[arg(long)]
@@ -147,10 +147,10 @@ impl ProfileCommands {
             ProfileCommands::Delete { name } => delete_profile(&name, output_format).await,
             ProfileCommands::Current => show_current_profile(output_format).await,
             ProfileCommands::Export {
-                output,
+                out_file,
                 include_secrets,
                 name,
-            } => export_profiles(&output, include_secrets, name, output_format).await,
+            } => export_profiles(&out_file, include_secrets, name, output_format).await,
             ProfileCommands::Import { file, overwrite } => {
                 import_profiles(&file, overwrite, output_format).await
             }

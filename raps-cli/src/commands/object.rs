@@ -64,8 +64,8 @@ pub enum ObjectCommands {
         object: Option<String>,
 
         /// Output file path (defaults to object key)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-file")]
+        out_file: Option<PathBuf>,
     },
 
     /// List objects in a bucket
@@ -154,8 +154,8 @@ impl ObjectCommands {
             ObjectCommands::Download {
                 bucket,
                 object,
-                output,
-            } => download_object(client, bucket, object, output, output_format).await,
+                out_file,
+            } => download_object(client, bucket, object, out_file, output_format).await,
             ObjectCommands::List { bucket } => list_objects(client, bucket, output_format).await,
             ObjectCommands::Delete {
                 bucket,
