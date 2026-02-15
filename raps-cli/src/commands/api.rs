@@ -78,8 +78,8 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-file")]
+        out_file: Option<PathBuf>,
 
         /// Show response headers and status
         #[arg(short, long)]
@@ -108,8 +108,8 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-file")]
+        out_file: Option<PathBuf>,
 
         /// Show response headers and status
         #[arg(short, long)]
@@ -138,8 +138,8 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-file")]
+        out_file: Option<PathBuf>,
 
         /// Show response headers and status
         #[arg(short, long)]
@@ -168,8 +168,8 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-file")]
+        out_file: Option<PathBuf>,
 
         /// Show response headers and status
         #[arg(short, long)]
@@ -210,7 +210,7 @@ impl ApiCommands {
                 endpoint,
                 query,
                 header,
-                output,
+                out_file,
                 verbose,
             } => (
                 HttpMethod::Get,
@@ -219,7 +219,7 @@ impl ApiCommands {
                 header,
                 None,
                 None,
-                output,
+                out_file,
                 verbose,
             ),
 
@@ -229,7 +229,7 @@ impl ApiCommands {
                 data_file,
                 query,
                 header,
-                output,
+                out_file,
                 verbose,
             } => (
                 HttpMethod::Post,
@@ -238,7 +238,7 @@ impl ApiCommands {
                 header,
                 data,
                 data_file,
-                output,
+                out_file,
                 verbose,
             ),
 
@@ -248,7 +248,7 @@ impl ApiCommands {
                 data_file,
                 query,
                 header,
-                output,
+                out_file,
                 verbose,
             } => (
                 HttpMethod::Put,
@@ -257,7 +257,7 @@ impl ApiCommands {
                 header,
                 data,
                 data_file,
-                output,
+                out_file,
                 verbose,
             ),
 
@@ -267,7 +267,7 @@ impl ApiCommands {
                 data_file,
                 query,
                 header,
-                output,
+                out_file,
                 verbose,
             } => (
                 HttpMethod::Patch,
@@ -276,7 +276,7 @@ impl ApiCommands {
                 header,
                 data,
                 data_file,
-                output,
+                out_file,
                 verbose,
             ),
 
@@ -602,7 +602,7 @@ async fn handle_response(
                 Ok(())
             } else {
                 bail!(
-                    "Binary response received. Use --output to save to a file.\n\
+                    "Binary response received. Use --out-file to save to a file.\n\
                      Content-Type: {}, Size: {} bytes",
                     content_type,
                     bytes.len()

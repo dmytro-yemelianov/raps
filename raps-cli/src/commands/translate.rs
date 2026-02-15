@@ -77,8 +77,8 @@ pub enum TranslateCommands {
         guid: Option<String>,
 
         /// Output directory (defaults to current directory)
-        #[arg(short, long)]
-        output: Option<PathBuf>,
+        #[arg(short = 'o', long = "out-dir")]
+        out_dir: Option<PathBuf>,
 
         /// Download all available derivatives
         #[arg(short, long)]
@@ -152,9 +152,9 @@ impl TranslateCommands {
                 urn,
                 format,
                 guid,
-                output,
+                out_dir,
                 all,
-            } => download_derivatives(client, &urn, format, guid, output, all, output_format).await,
+            } => download_derivatives(client, &urn, format, guid, out_dir, all, output_format).await,
             TranslateCommands::Preset(cmd) => cmd.execute(client, output_format).await,
         }
     }
