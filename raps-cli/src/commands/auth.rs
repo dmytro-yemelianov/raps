@@ -17,16 +17,24 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::storage::{StorageBackend, TokenStorage};
 
 /// Available OAuth scopes for 3-legged authentication
+/// Reference: aps-sdk-openapi/authentication/authentication.yaml (Scopes enum)
 const AVAILABLE_SCOPES: &[(&str, &str)] = &[
     ("data:read", "Read data (hubs, projects, folders, items)"),
     ("data:write", "Write data (create/update items)"),
     ("data:create", "Create new data"),
     ("data:search", "Search for data"),
+    ("bucket:create", "Create OSS buckets"),
+    ("bucket:read", "Read OSS buckets"),
+    ("bucket:update", "Update OSS buckets"),
+    ("bucket:delete", "Delete OSS buckets"),
     ("account:read", "Read account information"),
     ("account:write", "Write account information"),
     ("user:read", "Read user profile"),
     ("user:write", "Write user profile"),
+    ("user-profile:read", "Read user profile (OpenID Connect)"),
     ("viewables:read", "Read viewable content"),
+    ("code:all", "Design Automation (all engines)"),
+    ("openid", "OpenID Connect identity"),
 ];
 
 /// Default scopes for login
@@ -34,9 +42,16 @@ const DEFAULT_SCOPES: &[&str] = &[
     "data:read",
     "data:write",
     "data:create",
+    "data:search",
+    "bucket:create",
+    "bucket:read",
+    "bucket:update",
+    "bucket:delete",
     "account:read",
+    "account:write",
     "user:read",
     "viewables:read",
+    "code:all",
 ];
 
 #[derive(Debug, Subcommand)]

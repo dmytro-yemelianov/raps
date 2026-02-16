@@ -11,6 +11,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 use url::Url;
 
+use crate::logging::log_verbose;
+
 /// Allowed domains for custom API calls (APS domains only)
 pub const ALLOWED_DOMAINS: &[&str] = &[
     "developer.api.autodesk.com",
@@ -96,104 +98,79 @@ impl HttpClientConfig {
     }
 }
 
-/// Execute HTTP request with retry logic
-pub async fn execute_with_retry<F, T>(config: &HttpClientConfig, mut request_fn: F) -> Result<T>
+/// Check if an HTTP status code is retryable (rate limit or server error)
+pub fn is_retryable_status(status: u16) -> bool {
+    matches!(status, 408 | 429 | 500 | 502 | 503 | 504)
+}
+
+/// Calculate retry delay from response headers or exponential backoff
+///
+/// Checks the `Retry-After` header first (seconds value), then falls back
+/// to exponential backoff with jitter.
+pub fn retry_delay_from_response(
+    response: &reqwest::Response,
+    attempt: u32,
+    config: &HttpClientConfig,
+) -> Duration {
+    if let Some(retry_after) = response.headers().get("retry-after")
+        && let Ok(secs) = retry_after.to_str().unwrap_or("").parse::<u64>()
+    {
+        return Duration::from_secs(secs.min(config.max_wait));
+    }
+    calculate_delay(attempt + 1, config.base_delay, config.max_wait)
+}
+
+/// Send HTTP request with automatic retry on 429/5xx and network errors
+///
+/// Inspects the HTTP response status code and retries on retryable status codes
+/// (408, 429, 5xx). Also respects the `Retry-After` header for rate limiting.
+///
+/// The closure should return a `reqwest::RequestBuilder` (not a future),
+/// which will be rebuilt on each retry attempt.
+pub async fn send_with_retry<F>(
+    config: &HttpClientConfig,
+    build_request: F,
+) -> Result<reqwest::Response>
 where
-    F: FnMut() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T>> + Send>>,
+    F: Fn() -> reqwest::RequestBuilder,
 {
     let mut attempt = 0;
-
     loop {
-        match request_fn().await {
-            Ok(result) => return Ok(result),
-            Err(err) => {
-                // Check if we should retry
-                let should_retry = should_retry_error(&err, attempt, config.max_retries);
-
-                if !should_retry {
-                    return Err(err);
+        match build_request().send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                if is_retryable_status(status) && attempt < config.max_retries {
+                    let delay = retry_delay_from_response(&response, attempt, config);
+                    attempt += 1;
+                    log_verbose(&format!(
+                        "HTTP {} (attempt {}/{}), retrying in {:.1}s...",
+                        status,
+                        attempt,
+                        config.max_retries,
+                        delay.as_secs_f64()
+                    ));
+                    sleep(delay).await;
+                    continue;
                 }
-
+                return Ok(response);
+            }
+            Err(err) => {
+                let retriable = err.is_timeout() || err.is_connect() || err.is_request();
+                if !retriable || attempt >= config.max_retries {
+                    return Err(err).context("HTTP request failed");
+                }
                 attempt += 1;
-
-                // Calculate delay with exponential backoff and jitter
                 let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
-
-                // Log retry attempt
-                crate::logging::log_verbose(&format!(
-                    "Request failed (attempt {}/{}), retrying in {}s...",
+                log_verbose(&format!(
+                    "Network error (attempt {}/{}), retrying in {:.1}s...",
                     attempt,
                     config.max_retries,
-                    delay.as_secs()
+                    delay.as_secs_f64()
                 ));
-
                 sleep(delay).await;
             }
         }
     }
-}
-
-/// Determine if an error should be retried
-fn should_retry_error(err: &anyhow::Error, attempt: u32, max_retries: u32) -> bool {
-    if attempt >= max_retries {
-        return false;
-    }
-
-    // Check if it's a reqwest error with status code
-    if let Some(reqwest_err) = err.downcast_ref::<reqwest::Error>() {
-        if reqwest_err.is_status()
-            && let Some(status) = reqwest_err.status()
-        {
-            // Retry on rate limiting (429)
-            if status.as_u16() == 429 {
-                return true;
-            }
-
-            // Retry on server errors (5xx)
-            if status.is_server_error() {
-                return true;
-            }
-
-            // Don't retry on client errors (4xx except 429)
-            if status.is_client_error() {
-                return false;
-            }
-        }
-
-        // Retry on network/timeout errors
-        if reqwest_err.is_timeout() || reqwest_err.is_connect() || reqwest_err.is_request() {
-            return true;
-        }
-    }
-
-    // Check error string for common patterns
-    let error_str = err.to_string().to_lowercase();
-
-    // Retry on rate limiting (429)
-    if error_str.contains("429") || error_str.contains("too many requests") {
-        return true;
-    }
-
-    // Retry on server errors (5xx)
-    if error_str.contains("500")
-        || error_str.contains("502")
-        || error_str.contains("503")
-        || error_str.contains("504")
-        || error_str.contains("server error")
-    {
-        return true;
-    }
-
-    // Retry on network/timeout errors
-    if error_str.contains("timeout")
-        || error_str.contains("connection")
-        || error_str.contains("network")
-    {
-        return true;
-    }
-
-    // Default: don't retry unknown errors
-    false
 }
 
 /// Calculate delay with exponential backoff and jitter
@@ -279,84 +256,6 @@ mod tests {
         unsafe {
             std::env::remove_var("RAPS_TIMEOUT");
         }
-    }
-
-    #[test]
-    fn test_should_retry_429() {
-        let err = anyhow::anyhow!("Request failed with 429 Too Many Requests");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_500() {
-        let err = anyhow::anyhow!("Server error: 500 Internal Server Error");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_502() {
-        let err = anyhow::anyhow!("502 Bad Gateway");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_503() {
-        let err = anyhow::anyhow!("503 Service Unavailable");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_504() {
-        let err = anyhow::anyhow!("504 Gateway Timeout");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_timeout() {
-        let err = anyhow::anyhow!("Request timeout after 30s");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_connection() {
-        let err = anyhow::anyhow!("Connection refused");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_retry_network() {
-        let err = anyhow::anyhow!("Network error occurred");
-        assert!(should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_not_retry_400() {
-        let err = anyhow::anyhow!("Bad request: 400");
-        assert!(!should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_not_retry_401() {
-        let err = anyhow::anyhow!("Unauthorized: 401");
-        assert!(!should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_not_retry_403() {
-        let err = anyhow::anyhow!("Forbidden: 403");
-        assert!(!should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_not_retry_404() {
-        let err = anyhow::anyhow!("Not found: 404");
-        assert!(!should_retry_error(&err, 0, 3));
-    }
-
-    #[test]
-    fn test_should_not_retry_max_attempts() {
-        let err = anyhow::anyhow!("500 Server Error");
-        assert!(!should_retry_error(&err, 3, 3)); // At max retries
     }
 
     #[test]
@@ -450,5 +349,128 @@ mod tests {
     fn test_is_allowed_url_subdomain() {
         // Subdomains of allowed domains should be allowed
         assert!(is_allowed_url("https://us.developer.api.autodesk.com/api"));
+    }
+
+    #[test]
+    fn test_is_retryable_status_429() {
+        assert!(is_retryable_status(429));
+    }
+
+    #[test]
+    fn test_is_retryable_status_408() {
+        assert!(is_retryable_status(408));
+    }
+
+    #[test]
+    fn test_is_retryable_status_5xx() {
+        assert!(is_retryable_status(500));
+        assert!(is_retryable_status(502));
+        assert!(is_retryable_status(503));
+        assert!(is_retryable_status(504));
+    }
+
+    #[test]
+    fn test_is_retryable_status_not_retryable() {
+        assert!(!is_retryable_status(200));
+        assert!(!is_retryable_status(201));
+        assert!(!is_retryable_status(400));
+        assert!(!is_retryable_status(401));
+        assert!(!is_retryable_status(403));
+        assert!(!is_retryable_status(404));
+        assert!(!is_retryable_status(409));
+        assert!(!is_retryable_status(422));
+    }
+
+    /// Helper: bind a TCP listener on a random port and return (addr, listener)
+    fn bind_test_server() -> (std::net::SocketAddr, std::net::TcpListener) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        (addr, listener)
+    }
+
+    fn accept_and_respond(listener: &std::net::TcpListener, raw_response: &str) {
+        use std::io::{Read, Write};
+        let (mut stream, _) = listener.accept().unwrap();
+        // Drain the request
+        let mut buf = [0u8; 4096];
+        let _ = stream.read(&mut buf);
+        stream.write_all(raw_response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_retry_delay_from_response_with_retry_after_header() {
+        let (addr, listener) = bind_test_server();
+        let handle = std::thread::spawn(move || {
+            accept_and_respond(
+                &listener,
+                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 5\r\nContent-Length: 0\r\n\r\n",
+            );
+        });
+
+        let client = reqwest::Client::new();
+        let response = client.get(format!("http://{}", addr)).send().await.unwrap();
+        let config = HttpClientConfig::default();
+        let delay = retry_delay_from_response(&response, 0, &config);
+        assert_eq!(delay, Duration::from_secs(5));
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_retry_delay_from_response_retry_after_capped_at_max_wait() {
+        let (addr, listener) = bind_test_server();
+        let handle = std::thread::spawn(move || {
+            accept_and_respond(
+                &listener,
+                "HTTP/1.1 429 Too Many Requests\r\nRetry-After: 300\r\nContent-Length: 0\r\n\r\n",
+            );
+        });
+
+        let client = reqwest::Client::new();
+        let response = client.get(format!("http://{}", addr)).send().await.unwrap();
+        let config = HttpClientConfig {
+            max_wait: 60,
+            ..Default::default()
+        };
+        let delay = retry_delay_from_response(&response, 0, &config);
+        assert_eq!(delay, Duration::from_secs(60));
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_retry_delay_from_response_fallback_to_exponential() {
+        let (addr, listener) = bind_test_server();
+        let handle = std::thread::spawn(move || {
+            accept_and_respond(
+                &listener,
+                "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n",
+            );
+        });
+
+        let client = reqwest::Client::new();
+        let response = client.get(format!("http://{}", addr)).send().await.unwrap();
+        let config = HttpClientConfig::default();
+        // attempt=0 -> calculate_delay(1, 1, 60) -> 1*2^1 = 2s + jitter
+        let delay = retry_delay_from_response(&response, 0, &config);
+        assert!(delay.as_secs() >= 2);
+        assert!(delay.as_secs() <= 3);
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_send_with_retry_success() {
+        let (addr, listener) = bind_test_server();
+        let handle = std::thread::spawn(move || {
+            accept_and_respond(&listener, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK");
+        });
+
+        let config = HttpClientConfig::default();
+        let client = reqwest::Client::new();
+        let url = format!("http://{}", addr);
+
+        let response = send_with_retry(&config, || client.get(&url)).await;
+        assert!(response.is_ok());
+        assert_eq!(response.unwrap().status().as_u16(), 200);
+        handle.join().unwrap();
     }
 }

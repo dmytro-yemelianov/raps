@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
-use raps_kernel::http::HttpClientConfig;
+use raps_kernel::http::{self, HttpClientConfig};
 
 /// Folder permission entry
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -102,13 +102,10 @@ impl FolderPermissionsClient {
             folder_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get folder permissions")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -161,15 +158,14 @@ impl FolderPermissionsClient {
             folder_id
         );
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to update folder permissions")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -195,13 +191,10 @@ impl FolderPermissionsClient {
             project_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project folders")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -263,13 +256,10 @@ impl FolderPermissionsClient {
             project_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project folders")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
-use raps_kernel::http::HttpClientConfig;
+use raps_kernel::http::{self, HttpClientConfig};
 
 /// Engine information
 #[derive(Debug, Clone, Deserialize)]
@@ -192,13 +192,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/engines", self.config.da_url());
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list engines")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -219,13 +216,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles", self.config.da_url());
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list appbundles")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -257,15 +251,14 @@ impl DesignAutomationClient {
             description: description.map(|s| s.to_string()),
         };
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create appbundle")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -286,13 +279,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles/{}", self.config.da_url(), id);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete appbundle")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -308,13 +298,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list activities")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -335,15 +322,14 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create activity")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -364,13 +350,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities/{}", self.config.da_url(), id);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete activity")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -395,15 +378,14 @@ impl DesignAutomationClient {
             arguments,
         };
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create workitem")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -420,17 +402,23 @@ impl DesignAutomationClient {
     }
 
     /// List all workitems
+    ///
+    /// The DA API requires a `startAfterTime` query parameter.
+    /// Defaults to 24 hours ago if not specified.
     pub async fn list_workitems(&self) -> Result<Vec<WorkItem>> {
         let token = self.auth.get_token().await?;
-        let url = format!("{}/workitems", self.config.da_url());
+        // DA API requires startAfterTime — default to 24h ago
+        let start_after = chrono::Utc::now() - chrono::Duration::hours(24);
+        let url = format!(
+            "{}/workitems?startAfterTime={}",
+            self.config.da_url(),
+            start_after.format("%Y-%m-%dT%H:%M:%SZ")
+        );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list workitems")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -451,13 +439,10 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/workitems/{}", self.config.da_url(), id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get workitem status")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();

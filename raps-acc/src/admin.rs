@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
-use raps_kernel::http::HttpClientConfig;
+use raps_kernel::http::{self, HttpClientConfig};
 
 use serde::Serialize;
 
@@ -90,13 +90,10 @@ impl AccountAdminClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list account users")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -134,15 +131,14 @@ impl AccountAdminClient {
             "email": email
         });
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request_body)
-            .send()
-            .await
-            .context("Failed to search for user")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request_body)
+        })
+        .await?;
 
         if response.status().as_u16() == 404 {
             return Ok(None);
@@ -192,13 +188,10 @@ impl AccountAdminClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list projects")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -226,13 +219,10 @@ impl AccountAdminClient {
 
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -316,15 +306,14 @@ impl AccountAdminClient {
 
         let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
 
-        let response = self
-            .http_client
-            .patch(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to update account user")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -359,13 +348,10 @@ impl AccountAdminClient {
 
         let url = format!("{}/companies", self.hq_url(&account_id));
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list companies")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -448,13 +434,10 @@ impl AccountAdminClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list projects")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -515,15 +498,14 @@ impl AccountAdminClient {
 
         let url = format!("{}/projects", self.admin_url(&account_id));
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create project")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -557,15 +539,14 @@ impl AccountAdminClient {
 
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
-        let response = self
-            .http_client
-            .patch(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to update project")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();

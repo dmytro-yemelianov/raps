@@ -593,8 +593,8 @@ impl AuthClient {
 
         println!("Authorization code received, exchanging for token...");
 
-        // Exchange code for tokens
-        let token = self.exchange_code(&code).await?;
+        // Exchange code for tokens (must use the actual callback URL that was sent in the authorize request)
+        let token = self.exchange_code(&code, &actual_callback_url).await?;
 
         // Store the token
         let stored = StoredToken {
@@ -616,13 +616,13 @@ impl AuthClient {
     }
 
     /// Exchange authorization code for tokens
-    async fn exchange_code(&self, code: &str) -> Result<TokenResponse> {
+    async fn exchange_code(&self, code: &str, redirect_uri: &str) -> Result<TokenResponse> {
         let url = self.config.auth_url();
 
         let params = [
             ("grant_type", "authorization_code"),
             ("code", code),
-            ("redirect_uri", &self.config.callback_url),
+            ("redirect_uri", redirect_uri),
         ];
 
         let response = self

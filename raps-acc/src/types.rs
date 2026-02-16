@@ -168,9 +168,9 @@ pub struct AccountProject {
     /// Number of companies in the project
     #[serde(default)]
     pub company_count: Option<usize>,
-    /// Products enabled for this project
+    /// Products enabled for this project (API returns objects with key/access fields)
     #[serde(default)]
-    pub products: Option<Vec<String>>,
+    pub products: Option<Vec<serde_json::Value>>,
 }
 
 impl AccountProject {
@@ -213,9 +213,25 @@ impl AccountProject {
         self.classification == Some(ProjectClassification::Template)
     }
 
-    /// Get the list of enabled products for this project
+    /// Get the list of enabled product keys for this project
     pub fn enabled_products(&self) -> Vec<String> {
-        self.products.clone().unwrap_or_default()
+        self.products
+            .as_ref()
+            .map(|products| {
+                products
+                    .iter()
+                    .filter_map(|v| {
+                        // API returns objects like {"key": "docs", "access": "administrator"}
+                        v.as_object()
+                            .and_then(|obj| obj.get("key"))
+                            .and_then(|k| k.as_str())
+                            .map(String::from)
+                            // Fallback: if it's a plain string (shouldn't happen but be safe)
+                            .or_else(|| v.as_str().map(String::from))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -448,9 +464,9 @@ mod tests {
             name: "Test".to_string(),
             platform: None,
             products: Some(vec![
-                "docs".to_string(),
-                "build".to_string(),
-                "modelCoordination".to_string(),
+                serde_json::json!({"key": "docs", "access": "administrator"}),
+                serde_json::json!({"key": "build", "access": "member"}),
+                serde_json::json!({"key": "modelCoordination", "access": "member"}),
             ]),
             status: None,
             account_id: None,

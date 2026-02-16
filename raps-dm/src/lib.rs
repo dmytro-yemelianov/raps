@@ -248,19 +248,8 @@ impl DataManagementClient {
         logging::log_request("GET", &url);
 
         // Use retry logic for API requests
-        let http_config = HttpClientConfig::default();
-        let response = raps_kernel::http::execute_with_retry(&http_config, || {
-            let client = self.http_client.clone();
-            let url = url.clone();
-            let token = token.clone();
-            Box::pin(async move {
-                client
-                    .get(&url)
-                    .bearer_auth(&token)
-                    .send()
-                    .await
-                    .context("Failed to list hubs")
-            })
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
 
@@ -286,13 +275,10 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs/{}", self.config.project_url(), hub_id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get hub")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -313,13 +299,10 @@ impl DataManagementClient {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/hubs/{}/projects", self.config.project_url(), hub_id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list projects")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -345,13 +328,10 @@ impl DataManagementClient {
             project_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -377,13 +357,10 @@ impl DataManagementClient {
             project_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get top folders")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -413,13 +390,10 @@ impl DataManagementClient {
             folder_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list folder contents")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -473,15 +447,14 @@ impl DataManagementClient {
             },
         };
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create folder")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/vnd.api+json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -507,13 +480,10 @@ impl DataManagementClient {
             item_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get item")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -539,13 +509,10 @@ impl DataManagementClient {
             item_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get item versions")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -625,15 +592,14 @@ impl DataManagementClient {
             ]
         });
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to create item from storage")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/vnd.api+json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -669,13 +635,10 @@ impl DataManagementClient {
         // Log request in verbose/debug mode
         logging::log_request("DELETE", &url);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete item")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);
@@ -723,15 +686,14 @@ impl DataManagementClient {
         // Log request in verbose/debug mode
         logging::log_request("PATCH", &url);
 
-        let response = self
-            .http_client
-            .patch(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to rename folder")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/vnd.api+json")
+                .json(&request)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);
@@ -765,13 +727,10 @@ impl DataManagementClient {
         // Log request in verbose/debug mode
         logging::log_request("DELETE", &url);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete folder")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);
@@ -819,15 +778,14 @@ impl DataManagementClient {
         // Log request in verbose/debug mode
         logging::log_request("PATCH", &url);
 
-        let response = self
-            .http_client
-            .patch(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/vnd.api+json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to rename item")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/vnd.api+json")
+                .json(&request)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);

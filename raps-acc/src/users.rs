@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
-use raps_kernel::http::HttpClientConfig;
+use raps_kernel::http::{self, HttpClientConfig};
 
 use crate::types::{PaginatedResponse, ProductAccess, ProjectUser};
 
@@ -154,13 +154,10 @@ impl ProjectUsersClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list project users")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -186,13 +183,10 @@ impl ProjectUsersClient {
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get project user")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -225,15 +219,14 @@ impl ProjectUsersClient {
 
         let url = format!("{}/users", self.project_url(project_id));
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to add user to project")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -265,15 +258,14 @@ impl ProjectUsersClient {
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
 
-        let response = self
-            .http_client
-            .patch(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&request)
-            .send()
-            .await
-            .context("Failed to update project user")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -299,13 +291,10 @@ impl ProjectUsersClient {
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to remove user from project")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -329,13 +318,10 @@ impl ProjectUsersClient {
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to check user existence")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         Ok(response.status().is_success())
     }

@@ -17,7 +17,7 @@ use tokio::io::AsyncReadExt;
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
-use raps_kernel::http::HttpClientConfig;
+use raps_kernel::http::{self, HttpClientConfig};
 
 /// Photoscene information
 #[derive(Debug, Clone, Deserialize)]
@@ -80,11 +80,20 @@ pub struct UploadedFile {
     pub msg: Option<String>,
 }
 
+/// API-level error returned with HTTP 200 (documented Reality Capture API quirk)
+#[derive(Debug, Deserialize)]
+pub struct RcApiError {
+    pub code: Option<String>,
+    #[serde(alias = "message")]
+    pub msg: Option<String>,
+}
+
 /// Progress response
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ProgressResponse {
-    pub photoscene: PhotosceneProgress,
+    pub photoscene: Option<PhotosceneProgress>,
+    pub error: Option<RcApiError>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,7 +111,8 @@ pub struct PhotosceneProgress {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ResultResponse {
-    pub photoscene: PhotosceneResult,
+    pub photoscene: Option<PhotosceneResult>,
+    pub error: Option<RcApiError>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -221,14 +231,13 @@ impl RealityCaptureClient {
             ("format", &format.to_string()),
         ];
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .form(&params)
-            .send()
-            .await
-            .context("Failed to create photoscene")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .form(&params)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -253,11 +262,9 @@ impl RealityCaptureClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/file", self.config.reality_capture_url());
 
-        let mut form = reqwest::multipart::Form::new()
-            .text("photosceneid", photoscene_id.to_string())
-            .text("type", "image");
-
-        for (i, path) in photo_paths.iter().enumerate() {
+        // Read all files into memory so the retry closure can rebuild the multipart form
+        let mut file_parts: Vec<(String, Vec<u8>)> = Vec::new();
+        for path in photo_paths {
             let mut file = File::open(path)
                 .await
                 .context(format!("Failed to open file: {}", path.display()))?;
@@ -273,21 +280,30 @@ impl RealityCaptureClient {
                 .unwrap_or("photo.jpg")
                 .to_string();
 
-            let part = reqwest::multipart::Part::bytes(buffer)
-                .file_name(filename.clone())
-                .mime_str("image/jpeg")?;
-
-            form = form.part(format!("file[{}]", i), part);
+            file_parts.push((filename, buffer));
         }
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .multipart(form)
-            .send()
-            .await
-            .context("Failed to upload photos")?;
+        let photoscene_id_owned = photoscene_id.to_string();
+        let response = http::send_with_retry(&self.config.http_config, || {
+            let mut form = reqwest::multipart::Form::new()
+                .text("photosceneid", photoscene_id_owned.clone())
+                .text("type", "image");
+
+            for (i, (filename, buffer)) in file_parts.iter().enumerate() {
+                let part = reqwest::multipart::Part::bytes(buffer.clone())
+                    .file_name(filename.clone())
+                    .mime_str("image/jpeg")
+                    .expect("valid MIME type");
+
+                form = form.part(format!("file[{}]", i), part);
+            }
+
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .multipart(form)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -317,13 +333,10 @@ impl RealityCaptureClient {
             photoscene_id
         );
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to start processing")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.post(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -343,13 +356,10 @@ impl RealityCaptureClient {
             photoscene_id
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get progress")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -362,7 +372,15 @@ impl RealityCaptureClient {
             .await
             .context("Failed to parse progress response")?;
 
-        Ok(progress_response.photoscene)
+        if let Some(err) = progress_response.error {
+            let code = err.code.unwrap_or_default();
+            let msg = err.msg.unwrap_or_default();
+            anyhow::bail!("Reality Capture API error ({code}): {msg}");
+        }
+
+        progress_response
+            .photoscene
+            .ok_or_else(|| anyhow::anyhow!("Progress response missing Photoscene data"))
     }
 
     /// Get photoscene result (download link)
@@ -379,13 +397,10 @@ impl RealityCaptureClient {
             format
         );
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get result")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -398,7 +413,15 @@ impl RealityCaptureClient {
             .await
             .context("Failed to parse result response")?;
 
-        Ok(result_response.photoscene)
+        if let Some(err) = result_response.error {
+            let code = err.code.unwrap_or_default();
+            let msg = err.msg.unwrap_or_default();
+            anyhow::bail!("Reality Capture API error ({code}): {msg}");
+        }
+
+        result_response
+            .photoscene
+            .ok_or_else(|| anyhow::anyhow!("Result response missing Photoscene data"))
     }
 
     /// Delete a photoscene
@@ -410,13 +433,10 @@ impl RealityCaptureClient {
             photoscene_id
         );
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete photoscene")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -432,13 +452,10 @@ impl RealityCaptureClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/photoscene", self.config.reality_capture_url());
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to list photoscenes")?;
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -651,12 +668,29 @@ mod tests {
         }"#;
 
         let response: ProgressResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.photoscene.photoscene_id, "scene-789");
-        assert_eq!(response.photoscene.progress, "75");
-        assert_eq!(
-            response.photoscene.progress_msg,
-            Some("Processing images".to_string())
-        );
+        let ps = response.photoscene.unwrap();
+        assert_eq!(ps.photoscene_id, "scene-789");
+        assert_eq!(ps.progress, "75");
+        assert_eq!(ps.progress_msg, Some("Processing images".to_string()));
+    }
+
+    #[test]
+    fn test_progress_response_with_error() {
+        let json = r#"{
+            "Usage": "0.51",
+            "Resource": "/photoscene/xyz/progress",
+            "Error": {
+                "code": "ERR-001",
+                "msg": "Scene not found"
+            }
+        }"#;
+
+        let response: ProgressResponse = serde_json::from_str(json).unwrap();
+        assert!(response.photoscene.is_none());
+        assert!(response.error.is_some());
+        let err = response.error.unwrap();
+        assert_eq!(err.code.unwrap(), "ERR-001");
+        assert_eq!(err.msg.unwrap(), "Scene not found");
     }
 }
 

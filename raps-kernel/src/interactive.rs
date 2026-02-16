@@ -6,6 +6,7 @@
 //! Provides functions to check if interactive mode is enabled and handle
 //! prompts appropriately based on the --non-interactive flag.
 
+use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static NON_INTERACTIVE: AtomicBool = AtomicBool::new(false);
@@ -17,9 +18,9 @@ pub fn init(non_interactive: bool, yes: bool) {
     YES.store(yes, Ordering::Relaxed);
 }
 
-/// Check if non-interactive mode is enabled
+/// Check if non-interactive mode is enabled (explicit flag or no TTY detected)
 pub fn is_non_interactive() -> bool {
-    NON_INTERACTIVE.load(Ordering::Relaxed)
+    NON_INTERACTIVE.load(Ordering::Relaxed) || !std::io::stdin().is_terminal()
 }
 
 /// Check if --yes flag is set (auto-confirm)

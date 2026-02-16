@@ -154,7 +154,9 @@ impl TranslateCommands {
                 guid,
                 out_dir,
                 all,
-            } => download_derivatives(client, &urn, format, guid, out_dir, all, output_format).await,
+            } => {
+                download_derivatives(client, &urn, format, guid, out_dir, all, output_format).await
+            }
             TranslateCommands::Preset(cmd) => cmd.execute(client, output_format).await,
         }
     }

@@ -308,23 +308,13 @@ impl DerivativeClient {
         logging::log_request("POST", &job_url);
 
         // Use retry logic for translation requests
-        let http_config = HttpClientConfig::default();
-        let response = raps_kernel::http::execute_with_retry(&http_config, || {
-            let client = self.http_client.clone();
-            let url = job_url.clone();
-            let token = token.clone();
-            let request_json = serde_json::to_value(&request).ok();
-            Box::pin(async move {
-                let mut req = client
-                    .post(&url)
-                    .bearer_auth(&token)
-                    .header("Content-Type", "application/json")
-                    .header("x-ads-force", "true");
-                if let Some(json) = request_json {
-                    req = req.json(&json);
-                }
-                req.send().await.context("Failed to start translation")
-            })
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&job_url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .header("x-ads-force", "true")
+                .json(&request)
         })
         .await?;
 
@@ -354,13 +344,10 @@ impl DerivativeClient {
             urn
         );
 
-        let response = self
-            .http_client
-            .get(&manifest_url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get manifest")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&manifest_url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -386,13 +373,10 @@ impl DerivativeClient {
             urn
         );
 
-        let response = self
-            .http_client
-            .delete(&manifest_url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete manifest")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&manifest_url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -511,13 +495,10 @@ impl DerivativeClient {
 
         logging::log_request("GET", &download_url);
 
-        let response = self
-            .http_client
-            .get(&download_url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to download derivative")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&download_url).bearer_auth(&token)
+        })
+        .await?;
 
         logging::log_response(response.status().as_u16(), &download_url);
 

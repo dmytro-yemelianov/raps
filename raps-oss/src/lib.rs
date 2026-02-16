@@ -389,23 +389,13 @@ impl OssClient {
         logging::log_request("POST", &url);
 
         // Use retry logic for bucket creation
-        let response = raps_kernel::http::execute_with_retry(&self.config.http_config, || {
-            let client = self.http_client.clone();
-            let url = url.clone();
-            let token = token.clone();
-            let region_str = region.to_string();
-            let request_json = serde_json::to_value(&request).ok();
-            Box::pin(async move {
-                let mut req = client
-                    .post(&url)
-                    .bearer_auth(&token)
-                    .header("x-ads-region", region_str)
-                    .header("Content-Type", "application/json");
-                if let Some(json) = request_json {
-                    req = req.json(&json);
-                }
-                req.send().await.context("Failed to create bucket")
-            })
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("x-ads-region", region.to_string())
+                .header("Content-Type", "application/json")
+                .json(&request)
         })
         .await?;
 
@@ -443,7 +433,10 @@ impl OssClient {
         // Query both regions concurrently
         let (us_result, emea_result) = tokio::join!(
             tokio::time::timeout(per_region_timeout, self.list_buckets_in_region(Region::US)),
-            tokio::time::timeout(per_region_timeout, self.list_buckets_in_region(Region::EMEA)),
+            tokio::time::timeout(
+                per_region_timeout,
+                self.list_buckets_in_region(Region::EMEA)
+            ),
         );
 
         let mut all_buckets = Vec::new();
@@ -460,7 +453,9 @@ impl OssClient {
                 eprintln!("Warning: failed to list US buckets: {e}");
             }
             Err(_) => {
-                eprintln!("Warning: US region bucket listing timed out after {per_region_timeout:?}");
+                eprintln!(
+                    "Warning: US region bucket listing timed out after {per_region_timeout:?}"
+                );
             }
         }
 
@@ -476,7 +471,9 @@ impl OssClient {
                 eprintln!("Warning: failed to list EMEA buckets: {e}");
             }
             Err(_) => {
-                eprintln!("Warning: EMEA region bucket listing timed out after {per_region_timeout:?}");
+                eprintln!(
+                    "Warning: EMEA region bucket listing timed out after {per_region_timeout:?}"
+                );
             }
         }
 
@@ -496,20 +493,11 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = raps_kernel::http::execute_with_retry(&self.config.http_config, || {
-                let client = self.http_client.clone();
-                let url = url.clone();
-                let token = token.clone();
-                let region = region.to_string();
-                Box::pin(async move {
-                    client
-                        .get(&url)
-                        .bearer_auth(&token)
-                        .header("x-ads-region", region)
-                        .send()
-                        .await
-                        .context("Failed to list buckets")
-                })
+            let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+                self.http_client
+                    .get(&url)
+                    .bearer_auth(&token)
+                    .header("x-ads-region", region.to_string())
             })
             .await?;
 
@@ -543,13 +531,10 @@ impl OssClient {
         // Log request in verbose/debug mode
         logging::log_request("GET", &url);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get bucket details")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);
@@ -573,13 +558,10 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}", self.config.oss_url(), bucket_key);
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete bucket")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1052,16 +1034,8 @@ impl OssClient {
             .ok_or_else(|| anyhow::anyhow!("No download URL returned"))?;
 
         // Step 2: Download from S3 with retry logic
-        let response = raps_kernel::http::execute_with_retry(&self.config.http_config, || {
-            let client = self.http_client.clone();
-            let url = download_url.clone();
-            Box::pin(async move {
-                client
-                    .get(&url)
-                    .send()
-                    .await
-                    .context("Failed to download from S3")
-            })
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&download_url)
         })
         .await?;
 
@@ -1111,18 +1085,8 @@ impl OssClient {
                 url = format!("{}?startAt={}", url, start);
             }
 
-            let response = raps_kernel::http::execute_with_retry(&self.config.http_config, || {
-                let client = self.http_client.clone();
-                let url = url.clone();
-                let token = token.clone();
-                Box::pin(async move {
-                    client
-                        .get(&url)
-                        .bearer_auth(&token)
-                        .send()
-                        .await
-                        .context("Failed to list objects")
-                })
+            let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
             })
             .await?;
 
@@ -1161,13 +1125,10 @@ impl OssClient {
             object_key
         );
 
-        let response = self
-            .http_client
-            .delete(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to delete object")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1198,13 +1159,10 @@ impl OssClient {
         // Log request in verbose/debug mode
         logging::log_request("GET", &url);
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get object details")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         // Log response in verbose/debug mode
         logging::log_response(response.status().as_u16(), &url);
@@ -1251,13 +1209,10 @@ impl OssClient {
             url = format!("{}?minutesExpiration={}", url, mins);
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get signed download URL")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1307,13 +1262,10 @@ impl OssClient {
             url = format!("{}?{}", url, params.join("&"));
         }
 
-        let response = self
-            .http_client
-            .get(&url)
-            .bearer_auth(&token)
-            .send()
-            .await
-            .context("Failed to get signed upload URL")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1352,15 +1304,14 @@ impl OssClient {
             "uploadKey": upload_key
         });
 
-        let response = self
-            .http_client
-            .post(&url)
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await
-            .context("Failed to complete signed upload")?;
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&body)
+        })
+        .await?;
 
         if !response.status().is_success() {
             let status = response.status();
