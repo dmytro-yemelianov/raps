@@ -389,8 +389,7 @@ impl OssClient {
         logging::log_request("POST", &url);
 
         // Use retry logic for bucket creation
-        let http_config = HttpClientConfig::default();
-        let response = raps_kernel::http::execute_with_retry(&http_config, || {
+        let response = raps_kernel::http::execute_with_retry(&self.config.http_config, || {
             let client = self.http_client.clone();
             let url = url.clone();
             let token = token.clone();
@@ -428,17 +427,57 @@ impl OssClient {
     }
 
     /// List all buckets from all regions
+    ///
+    /// Queries US and EMEA regions concurrently with a per-region timeout
+    /// to avoid hanging when one region is slow or unreachable.
     pub async fn list_buckets(&self) -> Result<Vec<BucketItem>> {
+        use std::time::Duration;
+
+        let per_region_timeout = Duration::from_secs(
+            std::env::var("RAPS_REGION_TIMEOUT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10),
+        );
+
+        // Query both regions concurrently
+        let (us_result, emea_result) = tokio::join!(
+            tokio::time::timeout(per_region_timeout, self.list_buckets_in_region(Region::US)),
+            tokio::time::timeout(per_region_timeout, self.list_buckets_in_region(Region::EMEA)),
+        );
+
         let mut all_buckets = Vec::new();
 
-        // Query both US and EMEA regions
-        for region in Region::all() {
-            let mut region_buckets = self.list_buckets_in_region(region).await?;
-            // Tag each bucket with its region
-            for bucket in &mut region_buckets {
-                bucket.region = Some(region.to_string());
+        // Process US region
+        match us_result {
+            Ok(Ok(mut buckets)) => {
+                for bucket in &mut buckets {
+                    bucket.region = Some("US".to_string());
+                }
+                all_buckets.extend(buckets);
             }
-            all_buckets.extend(region_buckets);
+            Ok(Err(e)) => {
+                eprintln!("Warning: failed to list US buckets: {e}");
+            }
+            Err(_) => {
+                eprintln!("Warning: US region bucket listing timed out after {per_region_timeout:?}");
+            }
+        }
+
+        // Process EMEA region
+        match emea_result {
+            Ok(Ok(mut buckets)) => {
+                for bucket in &mut buckets {
+                    bucket.region = Some("EMEA".to_string());
+                }
+                all_buckets.extend(buckets);
+            }
+            Ok(Err(e)) => {
+                eprintln!("Warning: failed to list EMEA buckets: {e}");
+            }
+            Err(_) => {
+                eprintln!("Warning: EMEA region bucket listing timed out after {per_region_timeout:?}");
+            }
         }
 
         Ok(all_buckets)
@@ -449,8 +488,9 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let mut buckets = Vec::new();
         let mut start_at: Option<String> = None;
+        const MAX_PAGES: usize = 100;
 
-        loop {
+        for _page in 0..MAX_PAGES {
             let mut url = format!("{}/buckets", self.config.oss_url());
             if let Some(ref start) = start_at {
                 url = format!("{}?startAt={}", url, start);
