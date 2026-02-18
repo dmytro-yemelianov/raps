@@ -6,7 +6,7 @@
 //! Commands for testing authentication, logging in with 3-legged OAuth, and logging out.
 
 use anyhow::Result;
-use clap::Subcommand;
+use clap::{Subcommand, ValueEnum};
 use colored::Colorize;
 use raps_kernel::prompts;
 use serde::Serialize;
@@ -37,6 +37,21 @@ const AVAILABLE_SCOPES: &[(&str, &str)] = &[
     ("openid", "OpenID Connect identity"),
 ];
 
+/// Preset scope collections for `--preset`
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum LoginPreset {
+    /// All available scopes
+    All,
+}
+
+impl LoginPreset {
+    fn scopes(&self) -> Vec<&'static str> {
+        match self {
+            LoginPreset::All => AVAILABLE_SCOPES.iter().map(|(s, _)| *s).collect(),
+        }
+    }
+}
+
 /// Default scopes for login
 const DEFAULT_SCOPES: &[&str] = &[
     "data:read",
@@ -62,8 +77,11 @@ pub enum AuthCommands {
     /// Login with 3-legged OAuth (opens browser)
     Login {
         /// Use default scopes without prompting
-        #[arg(short, long)]
+        #[arg(short, long, conflicts_with = "preset")]
         default: bool,
+        /// Use a preset scope collection (e.g. "all" for every scope)
+        #[arg(long, value_enum, conflicts_with = "default")]
+        preset: Option<LoginPreset>,
         /// Use device code flow instead of browser (headless-friendly)
         #[arg(long)]
         device: bool,
@@ -105,6 +123,7 @@ impl AuthCommands {
             AuthCommands::Test => test_auth(auth_client, output_format).await,
             AuthCommands::Login {
                 default,
+                preset,
                 device,
                 token,
                 refresh_token,
@@ -113,6 +132,7 @@ impl AuthCommands {
                 login(
                     auth_client,
                     default,
+                    preset,
                     device,
                     token,
                     refresh_token,
@@ -174,6 +194,7 @@ struct LoginOutput {
 async fn login(
     auth_client: &AuthClient,
     use_defaults: bool,
+    preset: Option<LoginPreset>,
     device: bool,
     token: Option<String>,
     refresh_token: Option<String>,
@@ -204,10 +225,10 @@ async fn login(
                 .dimmed()
         );
 
-        let scopes = if use_defaults {
-            DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect()
+        let scopes: Vec<String> = if let Some(p) = preset {
+            p.scopes().iter().map(|s| s.to_string()).collect()
         } else {
-            DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect() // Default scopes for token login
+            DEFAULT_SCOPES.iter().map(|s| s.to_string()).collect()
         };
 
         let stored = auth_client
@@ -239,7 +260,9 @@ async fn login(
     }
 
     // Select scopes
-    let scopes: Vec<&str> = if use_defaults {
+    let scopes: Vec<&str> = if let Some(p) = preset {
+        p.scopes()
+    } else if use_defaults {
         DEFAULT_SCOPES.to_vec()
     } else {
         let scope_labels: Vec<String> = AVAILABLE_SCOPES
