@@ -42,12 +42,66 @@ const AVAILABLE_SCOPES: &[(&str, &str)] = &[
 pub enum LoginPreset {
     /// All available scopes
     All,
+    /// Read-only access (data, buckets, account, viewables)
+    Viewer,
+    /// Read + write access (no delete, no admin write)
+    Editor,
+    /// Object Storage Service (buckets and objects)
+    Storage,
+    /// Design Automation (engines, activities, work items)
+    Automation,
+    /// Account administration (read/write accounts and users)
+    Admin,
 }
 
 impl LoginPreset {
     fn scopes(&self) -> Vec<&'static str> {
         match self {
             LoginPreset::All => AVAILABLE_SCOPES.iter().map(|(s, _)| *s).collect(),
+            LoginPreset::Viewer => vec![
+                "data:read",
+                "data:search",
+                "bucket:read",
+                "account:read",
+                "user:read",
+                "viewables:read",
+            ],
+            LoginPreset::Editor => vec![
+                "data:read",
+                "data:write",
+                "data:create",
+                "data:search",
+                "bucket:read",
+                "bucket:create",
+                "bucket:update",
+                "account:read",
+                "user:read",
+                "viewables:read",
+            ],
+            LoginPreset::Storage => vec![
+                "data:read",
+                "data:write",
+                "data:create",
+                "bucket:create",
+                "bucket:read",
+                "bucket:update",
+                "bucket:delete",
+            ],
+            LoginPreset::Automation => vec![
+                "code:all",
+                "data:read",
+                "data:write",
+                "data:create",
+                "bucket:read",
+                "bucket:create",
+            ],
+            LoginPreset::Admin => vec![
+                "account:read",
+                "account:write",
+                "user:read",
+                "user:write",
+                "data:read",
+            ],
         }
     }
 }
@@ -80,7 +134,7 @@ pub enum AuthCommands {
         #[arg(short, long, conflicts_with = "preset")]
         default: bool,
         /// Use a preset scope collection (e.g. "all" for every scope)
-        #[arg(long, value_enum, conflicts_with = "default")]
+        #[arg(short = 'p', long, value_enum, conflicts_with = "default")]
         preset: Option<LoginPreset>,
         /// Use device code flow instead of browser (headless-friendly)
         #[arg(long)]

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-02-19
+
+### Added
+- **Auth Login Presets**: 5 new scope presets for `raps auth login -p <preset>`: `viewer`, `editor`, `storage`, `automation`, `admin`.
+- **Preset Short Flag**: `-p` as short alias for `--preset`.
+
 ## [4.6.0] - 2026-02-19
 
 ### Added
