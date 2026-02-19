@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.6.0] - 2026-02-19
+
+### Added
+- **Auth Preset Scopes**: `raps auth login --preset all` for non-interactive scope selection.
+- **DA Auto-Qualification**: Bare app bundle and activity names are automatically qualified with your DA nickname.
+- **DA Auto-Alias**: A "default" alias is automatically created after `appbundle-create` and `activity-create`.
+
+### Fixed
+- DA `appbundle-create` deserialization error (made `endpointUrl` and `formData` Optional).
+- DA `activity-create` "Cannot parse id" error for bare names.
+- Pipeline sample template using incorrect `bucket create` syntax (added `-k` flag).
+- DA `workitems` `startAfterTime` format (millisecond precision).
+
+## [4.5.0] - 2026-02-10
+
+### Added
+- **HTTP Retry**: Automatic retry on 429/5xx with exponential backoff across all service crates.
+- **New Docs Pages**: api, report, and template command documentation on rapscli.xyz.
+- **Company List**: `raps admin company-list` command.
+
+### Changed
+- Reduced bucket list per-region timeout from 30s to 10s for faster responses.
+- Simplified report.rs and admin.rs modules.
+
+### Fixed
+- Clap `-o`/`--output` flag conflict causing panics in `api` and `translate` commands.
+- Status counting bug in admin operations.
+
+## [4.4.0] - 2026-01-20
+
+### Added
+- **14 New MCP Tools**: Bringing total to 51 tools for AI assistant integration.
+- **Bulk Folder Permissions**: `admin_folder_rights` MCP tool.
+- **Operation Lifecycle**: `admin_operation_resume`, `admin_operation_cancel` MCP tools.
+- **Full RFI CRUD**: `rfi_create`, `rfi_update` MCP tools.
+- **Full Assets CRUD**: `asset_create`, `asset_update`, `asset_delete` MCP tools.
+- **Full Submittals CRUD**: `submittal_create`, `submittal_update` MCP tools.
+- **Full Checklists CRUD**: `checklist_create`, `checklist_update` MCP tools.
+
+### Changed
+- Enhanced `admin_project_list` with advanced filter expressions.
+- Improved auth guidance for new MCP tool categories.
+
 ## [4.3.0] - 2026-01-18
 
 ### Added
