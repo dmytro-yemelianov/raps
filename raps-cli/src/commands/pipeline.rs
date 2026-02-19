@@ -228,8 +228,10 @@ async fn run_pipeline(
         skipped: usize,
     }
 
+    // If we reach here, all failures were from continue_on_error steps
+    // (hard failures bail immediately above), so the pipeline succeeded.
     let result = PipelineResult {
-        success: failed == 0,
+        success: true,
         passed,
         failed,
         skipped,
@@ -237,10 +239,6 @@ async fn run_pipeline(
 
     if !matches!(output_format, OutputFormat::Table) {
         output_format.write(&result)?;
-    }
-
-    if failed > 0 {
-        anyhow::bail!("Pipeline completed with {failed} failed step(s)");
     }
 
     Ok(())
@@ -329,11 +327,16 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
 }
 
 fn generate_sample(output: &PathBuf, output_format: OutputFormat) -> Result<()> {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let bucket_name = format!("raps-sample-{ts}");
     let sample = Pipeline {
         name: "Sample Pipeline".to_string(),
         description: Some("Example pipeline demonstrating raps automation".to_string()),
         variables: [
-            ("BUCKET".to_string(), "my-bucket".to_string()),
+            ("BUCKET".to_string(), bucket_name),
             ("PROJECT_ID".to_string(), "12345".to_string()),
         ]
         .into_iter()
@@ -347,7 +350,7 @@ fn generate_sample(output: &PathBuf, output_format: OutputFormat) -> Result<()> 
             },
             PipelineStep {
                 name: "Create bucket".to_string(),
-                command: "bucket create ${BUCKET}".to_string(),
+                command: "bucket create -k ${BUCKET} -p transient -r US".to_string(),
                 continue_on_error: true,
                 condition: None,
             },
@@ -355,6 +358,12 @@ fn generate_sample(output: &PathBuf, output_format: OutputFormat) -> Result<()> 
                 name: "List objects".to_string(),
                 command: "object list ${BUCKET}".to_string(),
                 continue_on_error: false,
+                condition: None,
+            },
+            PipelineStep {
+                name: "Delete bucket".to_string(),
+                command: "bucket delete ${BUCKET} -y".to_string(),
+                continue_on_error: true,
                 condition: None,
             },
         ],

@@ -1057,7 +1057,7 @@ impl UserCommands {
                 }
 
                 let request = raps_acc::users::AddProjectUserRequest {
-                    user_id: email.clone(),
+                    email: email.clone(),
                     role_id: role_id.clone(),
                     products: vec![],
                 };

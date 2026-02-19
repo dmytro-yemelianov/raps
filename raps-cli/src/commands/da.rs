@@ -405,9 +405,32 @@ async fn create_appbundle(
     println!("  {} {}", "Engine:".bold(), bundle.engine.cyan());
     println!("  {} {}", "Version:".bold(), bundle.version);
 
+    // Auto-create a "default" alias so the bundle can be referenced
+    match client
+        .create_appbundle_alias(&bundle_id, "default", bundle.version)
+        .await
+    {
+        Ok(()) => {
+            println!(
+                "  {} Alias '{}' created",
+                "✓".green(),
+                "default".cyan()
+            );
+        }
+        Err(e) => {
+            println!(
+                "  {} Could not create alias: {}",
+                "!".yellow(),
+                e
+            );
+        }
+    }
+
     if let Some(upload) = bundle.upload_parameters {
-        println!("\n{}", "Upload your bundle ZIP to:".yellow());
-        println!("  {}", upload.endpoint_url);
+        if let Some(ref url) = upload.endpoint_url {
+            println!("\n{}", "Upload your bundle ZIP to:".yellow());
+            println!("  {}", url);
+        }
     }
 
     Ok(())
@@ -640,16 +663,57 @@ async fn create_activity(
         })
         .collect();
 
+    // Qualify bare appbundle names with nickname.name+default
+    let nickname = client.effective_nickname().await?;
+    let qualified_bundles: Vec<String> = activity_def
+        .app_bundles
+        .into_iter()
+        .map(|b| {
+            if b.contains('.') || b.contains('+') {
+                b // Already qualified
+            } else {
+                format!("{nickname}.{b}+default")
+            }
+        })
+        .collect();
+
     let request = CreateActivityRequest {
         id: activity_def.id.clone(),
         engine: activity_def.engine,
         command_line: activity_def.command_line,
-        app_bundles: activity_def.app_bundles,
+        app_bundles: qualified_bundles,
         parameters,
         description: activity_def.description,
     };
 
     let activity = client.create_activity(request).await?;
+
+    // Auto-create a "default" alias so the activity can be referenced
+    if let Some(version) = activity.version {
+        match client
+            .create_activity_alias(&activity_def.id, "default", version)
+            .await
+        {
+            Ok(()) => {
+                if output_format.supports_colors() {
+                    println!(
+                        "  {} Alias '{}' created",
+                        "✓".green(),
+                        "default".cyan()
+                    );
+                }
+            }
+            Err(e) => {
+                if output_format.supports_colors() {
+                    println!(
+                        "  {} Could not create alias: {}",
+                        "!".yellow(),
+                        e
+                    );
+                }
+            }
+        }
+    }
 
     #[derive(Serialize)]
     struct CreateActivityOutput {
@@ -733,7 +797,17 @@ async fn run_workitem(
         );
     }
 
-    let workitem = client.create_workitem(activity_id, arguments).await?;
+    // Qualify bare activity ID with nickname.name+default
+    let qualified_activity = if activity_id.contains('.') || activity_id.contains('+') {
+        activity_id.to_string()
+    } else {
+        let nickname = client.effective_nickname().await?;
+        format!("{nickname}.{activity_id}+default")
+    };
+
+    let workitem = client
+        .create_workitem(&qualified_activity, arguments)
+        .await?;
 
     #[derive(Serialize)]
     struct RunOutput {

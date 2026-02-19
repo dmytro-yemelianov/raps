@@ -169,7 +169,9 @@ impl TemplateCommands {
 
                 let request = raps_acc::admin::CreateProjectRequest {
                     name,
-                    classification: Some(raps_acc::types::ProjectClassification::Template),
+                    r#type: Some("Office".to_string()),
+                    // Note: APS API rejects classification:"template" on creation.
+                    // Template classification must be set via ACC admin UI after creation.
                     ..Default::default()
                 };
 

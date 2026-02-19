@@ -50,8 +50,8 @@ pub struct AppBundleDetails {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadParameters {
-    pub endpoint_url: String,
-    pub form_data: std::collections::HashMap<String, String>,
+    pub endpoint_url: Option<String>,
+    pub form_data: Option<std::collections::HashMap<String, String>>,
 }
 
 /// Activity information
@@ -179,9 +179,34 @@ impl DesignAutomationClient {
         }
     }
 
-    /// Get the nickname for this client (or "default")
-    fn nickname(&self) -> &str {
+    /// Get the configured nickname (or "default")
+    pub fn nickname(&self) -> &str {
         self.config.da_nickname.as_deref().unwrap_or("default")
+    }
+
+    /// Fetch the effective nickname from the DA API.
+    ///
+    /// Returns the configured nickname if set, otherwise calls
+    /// `GET /forgeapps/me` to get the actual owner name (usually the client_id).
+    pub async fn effective_nickname(&self) -> Result<String> {
+        if let Some(ref nick) = self.config.da_nickname {
+            return Ok(nick.clone());
+        }
+        let token = self.auth.get_token().await?;
+        let url = format!("{}/forgeapps/me", self.config.da_url());
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+        if response.status().is_success() {
+            let text = response.text().await.unwrap_or_default();
+            // Response is a plain string (the nickname) wrapped in quotes
+            let trimmed = text.trim().trim_matches('"');
+            if !trimmed.is_empty() {
+                return Ok(trimmed.to_string());
+            }
+        }
+        Ok("default".to_string())
     }
 
     /// List available engines
@@ -274,6 +299,49 @@ impl DesignAutomationClient {
         Ok(appbundle)
     }
 
+    /// Create an alias for an app bundle
+    pub async fn create_appbundle_alias(
+        &self,
+        bundle_id: &str,
+        alias: &str,
+        version: i32,
+    ) -> Result<()> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/appbundles/{}/aliases",
+            self.config.da_url(),
+            bundle_id
+        );
+
+        #[derive(Serialize)]
+        struct AliasRequest {
+            id: String,
+            version: i32,
+        }
+
+        let request = AliasRequest {
+            id: alias.to_string(),
+            version,
+        };
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create appbundle alias ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
     /// Delete an app bundle
     pub async fn delete_appbundle(&self, id: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
@@ -345,6 +413,49 @@ impl DesignAutomationClient {
         Ok(activity)
     }
 
+    /// Create an alias for an activity
+    pub async fn create_activity_alias(
+        &self,
+        activity_id: &str,
+        alias: &str,
+        version: i32,
+    ) -> Result<()> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/activities/{}/aliases",
+            self.config.da_url(),
+            activity_id
+        );
+
+        #[derive(Serialize)]
+        struct AliasRequest {
+            id: String,
+            version: i32,
+        }
+
+        let request = AliasRequest {
+            id: alias.to_string(),
+            version,
+        };
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create activity alias ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
+
     /// Delete an activity
     pub async fn delete_activity(&self, id: &str) -> Result<()> {
         let token = self.auth.get_token().await?;
@@ -409,14 +520,15 @@ impl DesignAutomationClient {
         let token = self.auth.get_token().await?;
         // DA API requires startAfterTime — default to 24h ago
         let start_after = chrono::Utc::now() - chrono::Duration::hours(24);
-        let url = format!(
-            "{}/workitems?startAfterTime={}",
-            self.config.da_url(),
-            start_after.format("%Y-%m-%dT%H:%M:%SZ")
-        );
+        let url = format!("{}/workitems", self.config.da_url());
+        // DA v3 API (.NET backend) — include fractional seconds
+        let start_after_str = start_after.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
 
         let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
+            self.http_client
+                .get(&url)
+                .bearer_auth(&token)
+                .query(&[("startAfterTime", &start_after_str)])
         })
         .await?;
 

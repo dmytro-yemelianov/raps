@@ -25,8 +25,8 @@ pub struct ProjectUsersClient {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddProjectUserRequest {
-    /// User ID (Autodesk user identifier)
-    pub user_id: String,
+    /// User email address
+    pub email: String,
     /// Role ID to assign (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role_id: Option<String>,
@@ -380,7 +380,7 @@ impl ProjectUsersClient {
             // The import_users tool in MCP will need to look up user IDs by email first.
             // For now, we'll attempt to use email as user_id (the caller should resolve this)
             let request = AddProjectUserRequest {
-                user_id: user.email.clone(), // Caller should provide actual user ID
+                email: user.email.clone(),
                 role_id: user.role_id,
                 products: user.products.unwrap_or_default(),
             };
@@ -428,7 +428,7 @@ mod tests {
     #[test]
     fn test_add_request_serialization() {
         let request = AddProjectUserRequest {
-            user_id: "user-123".to_string(),
+            email: "user@example.com".to_string(),
             role_id: Some("role-456".to_string()),
             products: vec![ProductAccess {
                 key: "docs".to_string(),
@@ -437,7 +437,7 @@ mod tests {
         };
 
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains("user-123"));
+        assert!(json.contains("\"email\":\"user@example.com\""));
         assert!(json.contains("role-456"));
         assert!(json.contains("docs"));
     }

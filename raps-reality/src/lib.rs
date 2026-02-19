@@ -40,7 +40,7 @@ pub struct Photoscene {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ListPhotoscenesResponse {
-    #[serde(default)]
+    #[serde(default, alias = "photoscenes")]
     pub photoscenes: PhotoscenesList,
 }
 
@@ -54,6 +54,7 @@ pub struct PhotoscenesList {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct CreatePhotosceneResponse {
+    #[serde(alias = "photoscene")]
     pub photoscene: Photoscene,
 }
 
@@ -92,7 +93,9 @@ pub struct RcApiError {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ProgressResponse {
+    #[serde(alias = "photoscene")]
     pub photoscene: Option<PhotosceneProgress>,
+    #[serde(alias = "error")]
     pub error: Option<RcApiError>,
 }
 
@@ -111,7 +114,9 @@ pub struct PhotosceneProgress {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct ResultResponse {
+    #[serde(alias = "photoscene")]
     pub photoscene: Option<PhotosceneResult>,
+    #[serde(alias = "error")]
     pub error: Option<RcApiError>,
 }
 

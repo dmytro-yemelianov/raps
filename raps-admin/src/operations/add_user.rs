@@ -184,7 +184,7 @@ async fn add_user_to_project(
 
     // Add the user to the project
     let request = AddProjectUserRequest {
-        user_id: user_id.to_string(),
+        email: user_id.to_string(),
         role_id: role_id.map(|s| s.to_string()),
         products: vec![], // Default product access
     };

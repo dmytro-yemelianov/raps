@@ -4,7 +4,19 @@
 //! Shared types for ACC/BIM 360 API responses
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+/// Deserialize a field as Option<String>, gracefully handling non-string values
+/// (e.g., objects, arrays) by returning None instead of failing.
+/// This is needed because APS API responses sometimes return objects where the
+/// OpenAPI spec says string.
+fn string_or_none<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    let value: Option<serde_json::Value> = Option::deserialize(d)?;
+    Ok(value.and_then(|v| match v {
+        serde_json::Value::String(s) => Some(s),
+        _ => None,
+    }))
+}
 
 // ============================================================================
 // PAGINATION
@@ -142,13 +154,13 @@ pub struct AccountProject {
     /// Project name
     pub name: String,
     /// Project status (active, inactive, archived)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_or_none")]
     pub status: Option<String>,
     /// Platform type (ACC or BIM360)
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_or_none")]
     pub platform: Option<String>,
     /// Account ID this project belongs to
-    #[serde(default)]
+    #[serde(default, deserialize_with = "string_or_none")]
     pub account_id: Option<String>,
     /// Project creation date
     #[serde(default)]
@@ -157,7 +169,7 @@ pub struct AccountProject {
     #[serde(default)]
     pub updated_at: Option<DateTime<Utc>>,
     /// Project type (e.g., "ACC", "BIM 360")
-    #[serde(default, alias = "projectType")]
+    #[serde(default, deserialize_with = "string_or_none", alias = "projectType")]
     pub project_type: Option<String>,
     /// Project classification (production, template, etc.)
     #[serde(default)]

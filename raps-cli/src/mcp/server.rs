@@ -2339,10 +2339,8 @@ impl RapsServer {
 
         let client = self.get_users_client().await;
 
-        // Note: The API expects user_id, not email. The MCP tool description should clarify this.
-        // In practice, the caller should look up the user ID from email first.
         let request = AddProjectUserRequest {
-            user_id: email.clone(), // Using email as placeholder - caller should resolve to user_id
+            email: email.clone(),
             role_id,
             products: vec![],
         };
