@@ -98,7 +98,7 @@ pub enum DaCommands {
         input: Vec<(String, String)>,
 
         /// Output arguments as key=value pairs (local file paths)
-        #[arg(short = 'o', long = "out-arg", value_parser = parse_argument)]
+        #[arg(long = "out-arg", value_parser = parse_argument)]
         out_arg: Vec<(String, String)>,
 
         /// Wait for completion and download results

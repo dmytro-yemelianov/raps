@@ -78,7 +78,7 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short = 'o', long = "out-file")]
+        #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
         /// Show response headers and status
@@ -108,7 +108,7 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short = 'o', long = "out-file")]
+        #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
         /// Show response headers and status
@@ -138,7 +138,7 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short = 'o', long = "out-file")]
+        #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
         /// Show response headers and status
@@ -168,7 +168,7 @@ pub enum ApiCommands {
         header: Vec<(String, String)>,
 
         /// Save response to file
-        #[arg(short = 'o', long = "out-file")]
+        #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
         /// Show response headers and status

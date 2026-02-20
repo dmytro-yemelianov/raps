@@ -40,7 +40,7 @@ pub enum PipelineCommands {
     /// Generate a sample pipeline file
     Sample {
         /// Output file path
-        #[arg(short = 'o', long = "out-file", default_value = "pipeline.yaml")]
+        #[arg(long = "out-file", default_value = "pipeline.yaml")]
         out_file: PathBuf,
     },
 }

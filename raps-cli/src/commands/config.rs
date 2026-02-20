@@ -96,7 +96,7 @@ pub enum ProfileCommands {
     /// Export profiles to a file
     Export {
         /// Output file path
-        #[arg(short = 'o', long = "out-file", default_value = "profiles-export.json")]
+        #[arg(long = "out-file", default_value = "profiles-export.json")]
         out_file: std::path::PathBuf,
 
         /// Include secrets (client_id, client_secret) - use with caution

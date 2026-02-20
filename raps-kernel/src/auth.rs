@@ -431,7 +431,11 @@ impl AuthClient {
 
     /// Get user info with a provided token (for validation)
     async fn get_user_info_with_token(&self, token: &str) -> Result<UserInfo> {
-        let url = "https://api.userprofile.autodesk.com/userinfo";
+        let url = if self.config.base_url != "https://developer.api.autodesk.com" {
+            format!("{}/userinfo", self.config.base_url)
+        } else {
+            "https://api.userprofile.autodesk.com/userinfo".to_string()
+        };
         let response = self
             .http_client
             .get(url)

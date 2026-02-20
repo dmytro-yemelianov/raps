@@ -612,6 +612,9 @@ async fn update_issue(
     let new_status = match status {
         Some(s) => Some(s),
         None if title.is_none() => {
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Status is required in non-interactive mode. Use --status <open|answered|closed>.");
+            }
             // Prompt for status if no updates provided
             let statuses = vec!["open", "answered", "closed"];
             let selection = Select::new()

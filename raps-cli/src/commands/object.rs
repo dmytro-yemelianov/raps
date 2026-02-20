@@ -64,7 +64,7 @@ pub enum ObjectCommands {
         object: Option<String>,
 
         /// Output file path (defaults to object key)
-        #[arg(short = 'o', long = "out-file")]
+        #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
     },
 

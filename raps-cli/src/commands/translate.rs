@@ -77,7 +77,7 @@ pub enum TranslateCommands {
         guid: Option<String>,
 
         /// Output directory (defaults to current directory)
-        #[arg(short = 'o', long = "out-dir")]
+        #[arg(long = "out-dir")]
         out_dir: Option<PathBuf>,
 
         /// Download all available derivatives

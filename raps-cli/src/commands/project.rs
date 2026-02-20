@@ -11,6 +11,7 @@ use colored::Colorize;
 use dialoguer::Select;
 #[allow(unused_imports)]
 use raps_kernel::prompts;
+use raps_kernel::interactive;
 use serde::Serialize;
 
 use crate::output::OutputFormat;
@@ -66,6 +67,10 @@ async fn list_projects(
     let hub = match hub_id {
         Some(h) => h,
         None => {
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Hub ID is required in non-interactive mode. Use 'raps project list <hub_id>'.");
+            }
+
             println!("{}", "Fetching hubs...".dimmed());
             let hubs = client
                 .list_hubs()

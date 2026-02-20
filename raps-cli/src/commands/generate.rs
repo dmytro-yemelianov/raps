@@ -23,7 +23,7 @@ pub enum GenerateCommands {
         count: u32,
 
         /// Output directory
-        #[arg(short = 'o', long = "out-dir", default_value = "./generated-files")]
+        #[arg(long = "out-dir", default_value = "./generated-files")]
         out_dir: PathBuf,
 
         /// Complexity level: simple, medium, complex
