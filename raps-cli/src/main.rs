@@ -337,12 +337,12 @@ async fn run(cli: Cli) -> Result<()> {
         let history_path = ".raps_history";
         let _ = rl.load_history(history_path);
 
-        // Use colored prompt
+        // Plain prompt — coloring is handled by Highlighter::highlight_prompt
+        // so rustyline calculates cursor position correctly.
         let prompt = "raps> ";
-        let colored_prompt = format!("\x1b[1;33m{}\x1b[0m", prompt);
 
         loop {
-            let readline = rl.readline(&colored_prompt);
+            let readline = rl.readline(prompt);
             match readline {
                 Ok(line) => {
                     let _ = rl.add_history_entry(line.as_str());

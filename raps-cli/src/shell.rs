@@ -989,6 +989,20 @@ impl Hinter for RapsHelper {
 }
 
 impl Highlighter for RapsHelper {
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        default: bool,
+    ) -> Cow<'b, str> {
+        if default {
+            // Bold yellow prompt — applied here so rustyline calculates
+            // cursor position from the plain prompt width, not the ANSI bytes.
+            Owned(format!("\x1b[1;33m{}\x1b[0m", prompt))
+        } else {
+            Borrowed(prompt)
+        }
+    }
+
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
         // Use dim + italic for better visibility across terminals
         // \x1b[2m = dim, \x1b[3m = italic, \x1b[36m = cyan (for dark terminals)
@@ -1002,7 +1016,8 @@ impl Highlighter for RapsHelper {
     }
 
     fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
-        false
+        // Must return true so rustyline calls highlight_prompt / highlight_hint
+        true
     }
 }
 
