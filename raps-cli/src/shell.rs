@@ -100,7 +100,7 @@ impl Default for RapsCompleter {
 
 impl Completer for RapsCompleter {
     fn complete(&mut self, line: &str, pos: usize) -> Vec<Suggestion> {
-        let input = &line[..pos];
+        let input = line.get(..pos).unwrap_or(line);
         let raw = get_completions_raw(&self.commands, &self.command_map, input);
 
         let start = if input.ends_with(' ') {

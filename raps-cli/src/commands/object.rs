@@ -945,7 +945,7 @@ enum BatchFileStatus {
 
 /// Get the path to the batch upload state file
 fn batch_state_path() -> Result<PathBuf> {
-    let proj_dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")
+    let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
         .ok_or_else(|| anyhow::anyhow!("Failed to determine project directories"))?;
     Ok(proj_dirs.data_dir().join("batch_upload_state.json"))
 }

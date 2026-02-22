@@ -462,8 +462,12 @@ async fn execute_request(
             tracing::warn!("Ignoring attempt to override Authorization header");
             continue;
         }
-        if let (Ok(name), Ok(val)) = (HeaderName::from_str(key), HeaderValue::from_str(value)) {
-            request = request.header(name, val);
+        match (HeaderName::from_str(key), HeaderValue::from_str(value)) {
+            (Ok(name), Ok(val)) => {
+                request = request.header(name, val);
+            }
+            (Err(e), _) => tracing::warn!("Skipping invalid header name '{}': {}", key, e),
+            (_, Err(e)) => tracing::warn!("Skipping invalid header value for '{}': {}", key, e),
         }
     }
 

@@ -66,7 +66,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         .without_time()
         .with_filter(console_filter);
 
-    let log_dir = directories::ProjectDirs::from("xyz", "rapscli", "raps")
+    let log_dir = directories::ProjectDirs::from("com", "autodesk", "raps")
         .map(|dirs| dirs.data_local_dir().join("logs"))
         .unwrap_or_else(|| {
             std::env::current_dir()

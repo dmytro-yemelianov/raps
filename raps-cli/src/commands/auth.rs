@@ -617,7 +617,7 @@ async fn inspect_token(
         let scopes: Vec<String> = data.scopes.clone();
 
         // Check if expiring soon
-        let warn_threshold = warn_expiry_seconds.unwrap_or(300) as i64; // Default 5 minutes
+        let warn_threshold = warn_expiry_seconds.unwrap_or(300).min(86400) as i64; // Default 5 min, cap 1 day
         let is_expiring_soon = expires_in > 0 && expires_in < warn_threshold;
         let is_expired = expires_in <= 0;
 

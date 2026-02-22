@@ -100,7 +100,7 @@ impl TokenStorage {
 
     /// Get the file path for file-based storage
     fn token_file_path() -> Result<PathBuf> {
-        let dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")
+        let dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
             .ok_or_else(|| anyhow::anyhow!("Failed to determine project directories (no home directory?)"))?;
         Ok(dirs.config_dir().join("tokens.json"))
     }

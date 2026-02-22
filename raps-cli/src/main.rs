@@ -253,7 +253,7 @@ async fn main() -> Result<()> {
                 _ => 2,
             };
 
-            e.print().unwrap();
+            let _ = e.print();
             std::process::exit(exit_code);
         }
     };
@@ -353,12 +353,18 @@ async fn run(cli: Cli) -> Result<()> {
         );
         println!();
 
-        // History file
-        let history_path = ".raps_history";
-        let history = Box::new(
-            FileBackedHistory::with_file(1000, history_path.into())
-                .expect("Error configuring history"),
-        );
+        // History file — stored in config directory, fallback to CWD
+        let history_path = directories::ProjectDirs::from("com", "autodesk", "raps")
+            .map(|d| d.config_dir().join("history"))
+            .unwrap_or_else(|| std::path::PathBuf::from(".raps_history"));
+        let history: Box<dyn reedline::History> =
+            match FileBackedHistory::with_file(1000, history_path) {
+                Ok(h) => Box::new(h),
+                Err(e) => {
+                    tracing::warn!("Could not initialize command history: {e}");
+                    Box::new(FileBackedHistory::default())
+                }
+            };
 
         // Keybindings: Tab -> completion menu
         let mut keybindings = default_emacs_keybindings();
@@ -460,13 +466,22 @@ async fn run(cli: Cli) -> Result<()> {
                         continue;
                     }
 
-                    let mut args = shlex::split(line).unwrap_or_default();
+                    let mut args = match shlex::split(line) {
+                        Some(args) => args,
+                        None => {
+                            println!(
+                                "{} Unmatched quote or escape character",
+                                "Error:".red().bold()
+                            );
+                            continue;
+                        }
+                    };
                     args.insert(0, "raps".to_string());
 
                     let sub_cli = match Cli::try_parse_from(&args) {
                         Ok(c) => c,
                         Err(e) => {
-                            e.print().unwrap();
+                            let _ = e.print();
                             continue;
                         }
                     };
@@ -752,7 +767,7 @@ async fn execute_command(
             // Execute plugin will return the exit code
             let code = pm.execute_plugin(plugin_name, &exec_args)?;
             if code != 0 {
-                std::process::exit(code);
+                anyhow::bail!("Plugin '{}' exited with code {}", plugin_name, code);
             }
         }
     }

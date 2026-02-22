@@ -189,7 +189,7 @@ fn create_progress_bar(
     pb.set_style(
         ProgressStyle::default_bar()
             .template(&template)
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("=>-"),
     );
     Some(pb)

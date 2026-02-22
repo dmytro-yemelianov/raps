@@ -110,7 +110,7 @@ impl StateManager {
     /// Get the default state directory based on platform
     fn default_state_dir() -> Result<PathBuf, AdminError> {
         let base_dirs =
-            directories::ProjectDirs::from("xyz", "rapscli", "raps").ok_or_else(|| {
+            directories::ProjectDirs::from("com", "autodesk", "raps").ok_or_else(|| {
                 AdminError::StateError(std::io::Error::new(
                     std::io::ErrorKind::NotFound,
                     "Could not determine user data directory",

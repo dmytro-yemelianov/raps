@@ -61,9 +61,9 @@ pub fn require_value<T>(value: Option<T>, name: &str) -> Result<T, anyhow::Error
 
 /// Check if a destructive action should proceed
 ///
-/// Returns true if --yes is set or if interactive mode allows confirmation
-#[allow(dead_code)] // May be used in future
-pub fn should_proceed_destructive(_action: &str) -> bool {
+/// Returns true if --yes is set or if the user confirms interactively.
+/// Returns false in non-interactive mode without --yes.
+pub fn should_proceed_destructive(action: &str) -> bool {
     if is_yes() {
         return true;
     }
@@ -72,8 +72,12 @@ pub fn should_proceed_destructive(_action: &str) -> bool {
         return false; // Fail in non-interactive mode without --yes
     }
 
-    // In interactive mode, return false to trigger confirmation prompt
-    false
+    // In interactive mode, prompt the user for confirmation
+    dialoguer::Confirm::new()
+        .with_prompt(format!("Are you sure you want to {}?", action))
+        .default(false)
+        .interact()
+        .unwrap_or(false)
 }
 
 #[cfg(test)]

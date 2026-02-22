@@ -30,9 +30,12 @@ pub fn is_allowed_url(url: &str) -> bool {
         Ok(parsed) => {
             if let Some(host) = parsed.host_str() {
                 // Check if host matches any allowed domain
-                ALLOWED_DOMAINS
-                    .iter()
-                    .any(|domain| host == *domain || host.ends_with(&format!(".{}", domain)))
+                ALLOWED_DOMAINS.iter().any(|domain| {
+                    host == *domain
+                        || (host.len() > domain.len()
+                            && host.ends_with(domain)
+                            && host.as_bytes()[host.len() - domain.len() - 1] == b'.')
+                })
             } else {
                 false
             }

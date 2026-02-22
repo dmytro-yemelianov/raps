@@ -509,7 +509,7 @@ fn create_bulk_progress_bar(output_format: OutputFormat) -> Option<ProgressBar> 
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("=>-"),
     );
     Some(pb)

@@ -824,7 +824,8 @@ impl OssClient {
 
                 async move {
                     // Acquire semaphore permit to limit concurrency
-                    let _permit = semaphore.acquire().await.unwrap();
+                    let _permit = semaphore.acquire().await
+                        .map_err(|_| anyhow::anyhow!("Upload cancelled"))?;
 
                     // Read file chunk
                     let buffer = {

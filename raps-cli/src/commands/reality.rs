@@ -338,7 +338,7 @@ async fn upload_photos(
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{msg} [{bar:40.cyan/blue}] {pos}/{len}")
-            .unwrap()
+            .expect("valid progress template")
             .progress_chars("█▓░"),
     );
     pb.set_message("Uploading photos");
@@ -385,7 +385,7 @@ async fn check_status(
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
-                .unwrap(),
+                .expect("valid progress template"),
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
 

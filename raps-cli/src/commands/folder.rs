@@ -128,6 +128,10 @@ impl FolderCommands {
             } => {
                 let (p_id, f_id) =
                     resolve_folder_args(client, hub_id, project_id, folder_id).await?;
+                if !raps_kernel::interactive::should_proceed_destructive("delete this folder") {
+                    println!("Operation cancelled.");
+                    return Ok(());
+                }
                 delete_folder(client, &p_id, &f_id, output_format).await
             }
             FolderCommands::Rights {

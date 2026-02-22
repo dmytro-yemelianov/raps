@@ -1082,7 +1082,7 @@ async fn create_submittals_from_csv(
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                .unwrap()
+                .expect("valid progress template")
                 .progress_chars("=>-"),
         );
         Some(pb)

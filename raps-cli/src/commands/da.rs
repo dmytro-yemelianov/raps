@@ -837,8 +837,19 @@ async fn check_status(
     if wait {
         // Spinner hidden in non-interactive mode
         let spinner = progress::spinner("Checking work item status...");
+        let timeout = Duration::from_secs(1800); // 30-minute timeout
+        let start = std::time::Instant::now();
 
         loop {
+            if start.elapsed() > timeout {
+                spinner.finish_with_message(format!(
+                    "{} Timed out after {} seconds waiting for work item",
+                    "X".red().bold(),
+                    timeout.as_secs()
+                ));
+                break;
+            }
+
             let workitem = client.get_workitem_status(workitem_id).await?;
             let progress = workitem.progress.as_deref().unwrap_or("");
             spinner.set_message(format!("Status: {} {}", workitem.status, progress));
