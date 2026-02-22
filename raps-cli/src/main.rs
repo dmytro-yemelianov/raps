@@ -274,6 +274,9 @@ async fn main() -> Result<()> {
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
 
+        // Log errors to file log for diagnostics
+        tracing::error!(error = %err, exit_code = exit_code as i32, "Command failed");
+
         // Only print errors if not in quiet mode
         if !logging::quiet() {
             eprintln!("{} {}", "Error:".red().bold(), err);
@@ -326,10 +329,10 @@ async fn run(cli: Cli) -> Result<()> {
     // Determine output format
     let output_format = OutputFormat::determine(cli.output);
 
-    // Log startup info in verbose/debug mode
-    if logging::verbose() || logging::debug() {
-        tracing::info!("RAPS CLI starting...");
-    }
+    tracing::info!(
+        version = env!("CARGO_PKG_VERSION"),
+        "RAPS CLI starting"
+    );
 
     // Load configuration leniently — missing credentials default to empty strings.
     // Commands that need credentials will fail with a clear API error when they
@@ -515,6 +518,38 @@ async fn run(cli: Cli) -> Result<()> {
     Ok(())
 }
 
+fn command_name(cmd: &Commands) -> &'static str {
+    match cmd {
+        Commands::Auth(_) => "auth",
+        Commands::Bucket(_) => "bucket",
+        Commands::Object(_) => "object",
+        Commands::Translate(_) => "translate",
+        Commands::Hub(_) => "hub",
+        Commands::Project(_) => "project",
+        Commands::Folder(_) => "folder",
+        Commands::Item(_) => "item",
+        Commands::Webhook(_) => "webhook",
+        Commands::Da(_) => "da",
+        Commands::Issue(_) => "issue",
+        Commands::Acc(_) => "acc",
+        Commands::Admin(_) => "admin",
+        Commands::Api(_) => "api",
+        Commands::Rfi(_) => "rfi",
+        Commands::Report(_) => "report",
+        Commands::Template(_) => "template",
+        Commands::Reality(_) => "reality",
+        Commands::Plugin(_) => "plugin",
+        Commands::Generate(_) => "generate",
+        Commands::Demo(_) => "demo",
+        Commands::Config(_) => "config",
+        Commands::Pipeline(_) => "pipeline",
+        Commands::Completions { .. } => "completions",
+        Commands::Shell => "shell",
+        Commands::Serve => "serve",
+        Commands::External(_) => "external",
+    }
+}
+
 async fn execute_command(
     command: Commands,
     config: &Config,
@@ -522,6 +557,10 @@ async fn execute_command(
     output_format: OutputFormat,
     concurrency: usize,
 ) -> Result<()> {
+    // Log command name for diagnostics
+    let cmd_name = command_name(&command);
+    tracing::info!(command = cmd_name, "Executing command");
+
     // Helper closure to create clients on demand
     let get_auth_client =
         || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };

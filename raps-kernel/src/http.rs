@@ -137,17 +137,24 @@ where
         let start = std::time::Instant::now();
         match build_request().send().await {
             Ok(response) => {
-                crate::profiler::record_http_request(start.elapsed());
+                let elapsed = start.elapsed();
+                crate::profiler::record_http_request(elapsed);
                 let status = response.status().as_u16();
+                tracing::debug!(
+                    http.status = status,
+                    url = %response.url(),
+                    elapsed_ms = elapsed.as_millis() as u64,
+                    "HTTP response"
+                );
                 if is_retryable_status(status) && attempt < config.max_retries {
                     let delay = retry_delay_from_response(&response, attempt, config);
                     attempt += 1;
-                    tracing::info!(
-                        "HTTP {} (attempt {}/{}), retrying in {:.1}s...",
-                        status,
+                    tracing::warn!(
+                        http.status = status,
                         attempt,
-                        config.max_retries,
-                        delay.as_secs_f64()
+                        max_retries = config.max_retries,
+                        delay_secs = delay.as_secs_f64(),
+                        "Retryable HTTP status, retrying"
                     );
                     sleep(delay).await;
                     continue;
@@ -158,15 +165,17 @@ where
                 crate::profiler::record_http_request(start.elapsed());
                 let retriable = err.is_timeout() || err.is_connect() || err.is_request();
                 if !retriable || attempt >= config.max_retries {
+                    tracing::error!(error = %err, attempt, "HTTP request failed");
                     return Err(err).context("HTTP request failed");
                 }
                 attempt += 1;
                 let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
-                tracing::info!(
-                    "Network error (attempt {}/{}), retrying in {:.1}s...",
+                tracing::warn!(
+                    error = %err,
                     attempt,
-                    config.max_retries,
-                    delay.as_secs_f64()
+                    max_retries = config.max_retries,
+                    delay_secs = delay.as_secs_f64(),
+                    "Network error, retrying"
                 );
                 sleep(delay).await;
             }

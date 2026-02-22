@@ -449,12 +449,10 @@ impl OssClient {
                 all_buckets.extend(buckets);
             }
             Ok(Err(e)) => {
-                eprintln!("Warning: failed to list US buckets: {e}");
+                tracing::warn!(region = "US", error = %e, "Failed to list buckets");
             }
             Err(_) => {
-                eprintln!(
-                    "Warning: US region bucket listing timed out after {per_region_timeout:?}"
-                );
+                tracing::warn!(region = "US", timeout = ?per_region_timeout, "Region listing timed out");
             }
         }
 
@@ -467,12 +465,10 @@ impl OssClient {
                 all_buckets.extend(buckets);
             }
             Ok(Err(e)) => {
-                eprintln!("Warning: failed to list EMEA buckets: {e}");
+                tracing::warn!(region = "EMEA", error = %e, "Failed to list buckets");
             }
             Err(_) => {
-                eprintln!(
-                    "Warning: EMEA region bucket listing timed out after {per_region_timeout:?}"
-                );
+                tracing::warn!(region = "EMEA", timeout = ?per_region_timeout, "Region listing timed out");
             }
         }
 
@@ -931,7 +927,7 @@ impl OssClient {
                                     state_guard.completed_parts.push(part_num);
                                     state_guard.part_etags.insert(part_num, etag);
                                     if let Err(e) = state_guard.save() {
-                                        eprintln!("Warning: Failed to save upload state: {}", e);
+                                        tracing::warn!(error = %e, "Failed to save upload state");
                                     }
                                 }
 

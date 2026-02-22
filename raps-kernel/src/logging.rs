@@ -83,12 +83,32 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         *lock = Some(guard);
     }
 
-    let file_filter = EnvFilter::new("raps=debug,raps_kernel=debug,raps_cli=debug,info");
+    // File log filter: configurable via RAPS_FILE_LOG env var
+    let file_filter = std::env::var("RAPS_FILE_LOG")
+        .map(EnvFilter::new)
+        .unwrap_or_else(|_| EnvFilter::new("raps=debug,info"));
 
-    let file_layer = tracing_subscriber::fmt::layer()
-        .with_writer(non_blocking_appender)
-        .with_ansi(false)
-        .with_filter(file_filter);
+    // File log format: JSON if RAPS_FILE_FORMAT=json, plain text otherwise
+    let use_json = std::env::var("RAPS_FILE_FORMAT")
+        .map(|v| v.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+
+    let file_layer: Box<dyn Layer<_> + Send + Sync> = if use_json {
+        Box::new(
+            tracing_subscriber::fmt::layer()
+                .json()
+                .with_writer(non_blocking_appender)
+                .with_current_span(true)
+                .with_filter(file_filter),
+        )
+    } else {
+        Box::new(
+            tracing_subscriber::fmt::layer()
+                .with_writer(non_blocking_appender)
+                .with_ansi(false)
+                .with_filter(file_filter),
+        )
+    };
 
     let _ = tracing_subscriber::registry()
         .with(stderr_layer)
@@ -133,7 +153,7 @@ pub fn redact_secrets(text: &str) -> String {
         static PAT: OnceLock<Regex> = OnceLock::new();
         PAT.get_or_init(|| {
             Regex::new(
-                r"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*[:=]\s*([A-Za-z0-9_-]{20,})",
+                r#"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*"?\s*[:=]\s*"?\s*([A-Za-z0-9_\-\.]{20,})"#,
             )
             .expect("token_pattern regex is valid")
         })
@@ -146,8 +166,11 @@ pub fn redact_secrets(text: &str) -> String {
         .into_owned()
 }
 
-/// Remove old log files, keeping only the most recent `keep` files.
-fn cleanup_old_logs(log_dir: &std::path::Path, keep: usize) {
+/// Maximum total log size in bytes (50 MB).
+const MAX_LOG_BYTES: u64 = 50 * 1024 * 1024;
+
+/// Remove old log files, keeping at most `max_files` and staying under `MAX_LOG_BYTES`.
+fn cleanup_old_logs(log_dir: &std::path::Path, max_files: usize) {
     let Ok(entries) = std::fs::read_dir(log_dir) else {
         return;
     };
@@ -159,9 +182,15 @@ fn cleanup_old_logs(log_dir: &std::path::Path, keep: usize) {
                 .starts_with("raps.log")
         })
         .collect();
+    // Most recent first
     files.sort_by_key(|e| std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).ok()));
-    for old in files.into_iter().skip(keep) {
-        let _ = std::fs::remove_file(old.path());
+    let mut total_size = 0u64;
+    for (i, file) in files.iter().enumerate() {
+        let size = file.metadata().map(|m| m.len()).unwrap_or(0);
+        total_size += size;
+        if i >= max_files || total_size > MAX_LOG_BYTES {
+            let _ = std::fs::remove_file(file.path());
+        }
     }
 }
 
@@ -288,5 +317,12 @@ mod tests {
         let text = "";
         let redacted = redact_secrets(text);
         assert_eq!(redacted, "");
+    }
+
+    #[test]
+    fn test_redact_json_access_token() {
+        let text = r#""access_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.abc123""#;
+        let redacted = redact_secrets(text);
+        assert!(!redacted.contains("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"));
     }
 }

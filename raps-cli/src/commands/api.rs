@@ -445,9 +445,9 @@ async fn execute_request(
     body: Option<&Value>,
 ) -> Result<Response> {
     tracing::info!(
-        "{} {}",
-        method.as_reqwest_method(),
-        raps_kernel::logging::redact_secrets(url)
+        method = %method.as_reqwest_method(),
+        url = %raps_kernel::logging::redact_secrets(url),
+        "HTTP request"
     );
 
     let mut request = client.request(method.as_reqwest_method(), url);

@@ -220,10 +220,7 @@ impl TokenStorage {
             Ok(e) => e,
             Err(e) => {
                 // If keyring is not available, fall back to file storage
-                tracing::info!(
-                    "Keychain not available ({}), falling back to file storage",
-                    e
-                );
+                tracing::warn!(error = %e, "Keychain not available, falling back to file storage");
                 return self.save_file(token);
             }
         };
@@ -232,7 +229,7 @@ impl TokenStorage {
             Ok(()) => Ok(()),
             Err(e) => {
                 // If keychain save fails, fall back to file storage
-                tracing::info!("Keychain save failed ({}), falling back to file storage", e);
+                tracing::warn!(error = %e, "Keychain save failed, falling back to file storage");
                 self.save_file(token)
             }
         }
@@ -243,10 +240,7 @@ impl TokenStorage {
         let entry = match keyring::Entry::new(&self.service_name, &self.username) {
             Ok(e) => e,
             Err(e) => {
-                tracing::info!(
-                    "Keychain not available ({}), falling back to file storage",
-                    e
-                );
+                tracing::warn!(error = %e, "Keychain not available, falling back to file storage");
                 return self.load_file();
             }
         };
@@ -262,10 +256,7 @@ impl TokenStorage {
                 self.load_file()
             }
             Err(e) => {
-                tracing::info!(
-                    "Failed to load token from keychain ({}), falling back to file storage",
-                    e
-                );
+                tracing::warn!(error = %e, "Keychain load failed, falling back to file storage");
                 self.load_file()
             }
         }
@@ -293,7 +284,7 @@ impl TokenStorage {
             }
             Err(e) => {
                 // If keychain delete fails, try file storage
-                tracing::info!("Keychain delete failed ({}), trying file storage", e);
+                tracing::warn!(error = %e, "Keychain delete failed, trying file storage");
                 self.delete_file()
             }
         }

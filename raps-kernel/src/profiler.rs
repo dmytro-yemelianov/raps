@@ -113,6 +113,19 @@ pub fn report() {
         "Unknown".to_string()
     };
 
+    // Structured log for file log / aggregation
+    tracing::info!(
+        total_ms = total_time.as_millis() as u64,
+        kernel_ms = kernel_time.as_millis() as u64,
+        plugins_ms = plugins_time.as_millis() as u64,
+        network_ms = network_time.as_millis() as u64,
+        local_ms = local_time.as_millis() as u64,
+        http_requests = req_count,
+        memory = %memory_str,
+        "Performance profile"
+    );
+
+    // Human-readable output to stderr
     eprintln!("\n=== RAPS Performance Profile ===");
     eprintln!(
         "{:<22} {:.3}s",
