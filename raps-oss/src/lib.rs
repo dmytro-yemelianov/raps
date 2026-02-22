@@ -711,14 +711,14 @@ impl OssClient {
         let (mut state, initial_urls) = if resume {
             if let Some(existing_state) = MultipartUploadState::load(bucket_key, object_key)? {
                 if existing_state.can_resume(file_path) {
-                    logging::log_verbose(&format!(
+                    tracing::info!(
                         "Resuming upload: {}/{} completed parts",
                         existing_state.completed_parts.len(),
                         existing_state.total_parts
-                    ));
+                    );
                     (existing_state, None)
                 } else {
-                    logging::log_verbose("File changed since last upload, starting fresh");
+                    tracing::info!("File changed since last upload, starting fresh");
                     MultipartUploadState::delete(bucket_key, object_key)?;
                     let signed = self
                         .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)

@@ -44,8 +44,6 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use raps_kernel::logging;
-
 /// Plugin configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PluginConfig {
@@ -139,33 +137,44 @@ impl PluginManager {
 
     /// Discover plugins in PATH
     pub fn discover_plugins(&self) -> Vec<DiscoveredPlugin> {
+        let start = std::time::Instant::now();
         let mut plugins = Vec::new();
 
         // Get PATH environment variable
-        if let Ok(path_var) = std::env::var("PATH") {
-            let paths: Vec<&str> = if cfg!(windows) {
-                path_var.split(';').collect()
+        let mut paths: Vec<String> = if let Ok(path_var) = std::env::var("PATH") {
+            if cfg!(windows) {
+                path_var.split(';').map(|s| s.to_string()).collect()
             } else {
-                path_var.split(':').collect()
-            };
+                path_var.split(':').map(|s| s.to_string()).collect()
+            }
+        } else {
+            Vec::new()
+        };
 
-            for dir in paths {
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        if let Some(plugin) = self.check_plugin_entry(&entry.path()) {
-                            // Avoid duplicates
-                            if !plugins
-                                .iter()
-                                .any(|p: &DiscoveredPlugin| p.name == plugin.name)
-                            {
-                                plugins.push(plugin);
-                            }
+        // Also check the directory where the current executable is located
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                paths.push(parent.to_string_lossy().to_string());
+            }
+        }
+
+        for dir in paths {
+            if let Ok(entries) = std::fs::read_dir(dir) {
+                for entry in entries.flatten() {
+                    if let Some(plugin) = self.check_plugin_entry(&entry.path()) {
+                        // Avoid duplicates
+                        if !plugins
+                            .iter()
+                            .any(|p: &DiscoveredPlugin| p.name == plugin.name)
+                        {
+                            plugins.push(plugin);
                         }
                     }
                 }
             }
         }
 
+        raps_kernel::profiler::mark_plugins_loaded(start.elapsed());
         plugins
     }
 
@@ -259,17 +268,10 @@ impl PluginManager {
 
                 match cmd.status() {
                     Ok(s) if !s.success() => {
-                        logging::log_verbose(&format!(
-                            "Hook '{}' failed with exit code {:?}",
-                            hook_cmd,
-                            s.code()
-                        ));
+                        tracing::info!("Hook '{}' failed with exit code {:?}", hook_cmd, s.code());
                     }
                     Err(e) => {
-                        logging::log_verbose(&format!(
-                            "Hook '{}' failed to execute: {}",
-                            hook_cmd, e
-                        ));
+                        tracing::info!("Hook '{}' failed to execute: {}", hook_cmd, e);
                     }
                     _ => {}
                 }
@@ -347,10 +349,10 @@ impl PluginManager {
             Ok(())
         } else if command.contains('/') || command.contains('\\') {
             // Allow absolute paths but warn about them
-            logging::log_verbose(&format!(
+            tracing::info!(
                 "Warning: Hook uses absolute path: {}. Consider adding to allowed commands.",
                 command
-            ));
+            );
             Ok(())
         } else {
             anyhow::bail!(
@@ -451,7 +453,9 @@ mod tests {
 
     #[test]
     fn test_plugin_manager_default() {
-        let manager = PluginManager::default();
+        let manager = PluginManager {
+            config: PluginConfig::default(),
+        };
         // Should not panic
         assert!(manager.config.plugins.is_empty());
     }

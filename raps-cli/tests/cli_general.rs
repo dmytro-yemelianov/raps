@@ -54,7 +54,9 @@ fn test_unknown_command() {
         .arg("unknown-command")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("error"));
+        .stderr(predicate::str::contains(
+            "Plugin 'unknown-command' not found",
+        ));
 }
 
 // ==================== Global Options ====================

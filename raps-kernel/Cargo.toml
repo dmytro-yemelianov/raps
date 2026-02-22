@@ -70,6 +70,10 @@ indicatif.workspace = true
 
 # Interactive prompts
 dialoguer.workspace = true
+memory-stats = "1.2.0"
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
 
 [dev-dependencies]
 raps-mock.workspace = true

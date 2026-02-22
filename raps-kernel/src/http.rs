@@ -11,8 +11,6 @@ use std::time::Duration;
 use tokio::time::sleep;
 use url::Url;
 
-use crate::logging::log_verbose;
-
 /// Allowed domains for custom API calls (APS domains only)
 pub const ALLOWED_DOMAINS: &[&str] = &[
     "developer.api.autodesk.com",
@@ -136,37 +134,40 @@ where
 {
     let mut attempt = 0;
     loop {
+        let start = std::time::Instant::now();
         match build_request().send().await {
             Ok(response) => {
+                crate::profiler::record_http_request(start.elapsed());
                 let status = response.status().as_u16();
                 if is_retryable_status(status) && attempt < config.max_retries {
                     let delay = retry_delay_from_response(&response, attempt, config);
                     attempt += 1;
-                    log_verbose(&format!(
+                    tracing::info!(
                         "HTTP {} (attempt {}/{}), retrying in {:.1}s...",
                         status,
                         attempt,
                         config.max_retries,
                         delay.as_secs_f64()
-                    ));
+                    );
                     sleep(delay).await;
                     continue;
                 }
                 return Ok(response);
             }
             Err(err) => {
+                crate::profiler::record_http_request(start.elapsed());
                 let retriable = err.is_timeout() || err.is_connect() || err.is_request();
                 if !retriable || attempt >= config.max_retries {
                     return Err(err).context("HTTP request failed");
                 }
                 attempt += 1;
                 let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
-                log_verbose(&format!(
+                tracing::info!(
                     "Network error (attempt {}/{}), retrying in {:.1}s...",
                     attempt,
                     config.max_retries,
                     delay.as_secs_f64()
-                ));
+                );
                 sleep(delay).await;
             }
         }

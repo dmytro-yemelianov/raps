@@ -245,6 +245,7 @@ struct LoginOutput {
     scopes: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn login(
     auth_client: &AuthClient,
     use_defaults: bool,
@@ -316,7 +317,7 @@ async fn login(
     // Select scopes
     let scopes: Vec<&str> = if let Some(p) = preset {
         p.scopes()
-    } else if use_defaults {
+    } else if use_defaults || raps_kernel::interactive::is_non_interactive() {
         DEFAULT_SCOPES.to_vec()
     } else {
         let scope_labels: Vec<String> = AVAILABLE_SCOPES
@@ -707,9 +708,9 @@ async fn inspect_token(
         }
     }
 
-    // Exit with code 1 if token is expiring soon (for CI)
+    // Exit with code 3 (AuthFailure) if token is expiring soon (for CI)
     if warn_expiry_seconds.is_some() && output.is_expiring_soon {
-        std::process::exit(1);
+        raps_kernel::error::ExitCode::AuthFailure.exit();
     }
 
     Ok(())

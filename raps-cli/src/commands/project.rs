@@ -8,12 +8,11 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-use dialoguer::Select;
 #[allow(unused_imports)]
 use raps_kernel::prompts;
-use raps_kernel::interactive;
 use serde::Serialize;
 
+use crate::commands::interactive;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
 // use raps_kernel::output::OutputFormat;
@@ -28,10 +27,10 @@ pub enum ProjectCommands {
 
     /// Get project details
     Info {
-        /// Hub ID
-        hub_id: String,
-        /// Project ID
-        project_id: String,
+        /// Hub ID (interactive if not provided)
+        hub_id: Option<String>,
+        /// Project ID (interactive if not provided)
+        project_id: Option<String>,
     },
 }
 
@@ -66,33 +65,7 @@ async fn list_projects(
     // Get hub ID interactively if not provided
     let hub = match hub_id {
         Some(h) => h,
-        None => {
-            if interactive::is_non_interactive() {
-                anyhow::bail!("Hub ID is required in non-interactive mode. Use 'raps project list <hub_id>'.");
-            }
-
-            println!("{}", "Fetching hubs...".dimmed());
-            let hubs = client
-                .list_hubs()
-                .await
-                .context("Failed to list hubs. This requires 3-legged auth \u{2014} run 'raps auth login' first")?;
-
-            if hubs.is_empty() {
-                anyhow::bail!("No hubs found. Make sure you're logged in with 3-legged auth.");
-            }
-
-            let hub_names: Vec<String> = hubs
-                .iter()
-                .map(|h| format!("{} ({})", h.attributes.name, h.id))
-                .collect();
-
-            let selection = Select::new()
-                .with_prompt("Select a hub")
-                .items(&hub_names)
-                .interact()?;
-
-            hubs[selection].id.clone()
-        }
+        None => interactive::prompt_for_hub(client).await?,
     };
 
     if output_format.supports_colors() {
@@ -168,23 +141,32 @@ struct FolderOutput {
 
 async fn project_info(
     client: &DataManagementClient,
-    hub_id: &str,
-    project_id: &str,
+    opt_hub_id: &Option<String>,
+    opt_project_id: &Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
+    let hub_id = match opt_hub_id {
+        Some(h) => h.clone(),
+        None => interactive::prompt_for_hub(client).await?,
+    };
+
+    let project_id = match opt_project_id {
+        Some(p) => p.clone(),
+        None => interactive::prompt_for_project(client, &hub_id).await?,
+    };
     if output_format.supports_colors() {
         println!("{}", "Fetching project details...".dimmed());
     }
 
     let project = client
-        .get_project(hub_id, project_id)
+        .get_project(&hub_id, &project_id)
         .await
         .context(format!(
             "Failed to get project '{}'. Verify the project ID and your permissions",
             project_id
         ))?;
     let folders = client
-        .get_top_folders(hub_id, project_id)
+        .get_top_folders(&hub_id, &project_id)
         .await
         .context(format!(
             "Failed to get top folders for project '{}'. You may lack folder-level permissions",

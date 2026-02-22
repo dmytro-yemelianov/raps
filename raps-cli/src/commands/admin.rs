@@ -791,7 +791,7 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(1); // Partial success
+                    std::process::exit(5); // Partial success
                 }
 
                 Ok(())
@@ -869,7 +869,7 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(1); // Partial success
+                    std::process::exit(5); // Partial success
                 }
 
                 Ok(())
@@ -1028,7 +1028,7 @@ impl UserCommands {
 
                     // Exit with appropriate code
                     if result.failed > 0 {
-                        std::process::exit(1);
+                        std::process::exit(5);
                     }
                 }
 
@@ -1292,7 +1292,7 @@ impl FolderCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(1); // Partial success
+                    std::process::exit(5); // Partial success
                 }
 
                 Ok(())
@@ -2057,7 +2057,7 @@ async fn execute_csv_update(
     }
 
     if output.failed > 0 {
-        std::process::exit(1);
+        std::process::exit(5);
     }
 
     Ok(())
@@ -2666,7 +2666,7 @@ async fn execute_csv_import(
     }
 
     if output.failed > 0 {
-        std::process::exit(1);
+        std::process::exit(5);
     }
 
     Ok(())

@@ -139,6 +139,7 @@ mod tests {
 
     fn reset_interactive_state() {
         interactive::init(false, false);
+        interactive::MOCK_IS_TERMINAL.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn set_non_interactive() {

@@ -9,7 +9,10 @@
 //! - --verbose: Show request summaries
 //! - --debug: Include full trace (redacts secrets)
 
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Global logging state
 static NO_COLOR: AtomicBool = AtomicBool::new(false);
@@ -17,7 +20,16 @@ static QUIET: AtomicBool = AtomicBool::new(false);
 static VERBOSE: AtomicBool = AtomicBool::new(false);
 static DEBUG: AtomicBool = AtomicBool::new(false);
 
-/// Initialize logging flags
+static WORKER_GUARD: Mutex<Option<WorkerGuard>> = Mutex::new(None);
+
+/// Flush background logs by dropping the WorkerGuard
+pub fn flush() {
+    if let Ok(mut guard) = WORKER_GUARD.lock() {
+        let _ = guard.take(); // dropping the guard flushes the async logger
+    }
+}
+
+/// Initialize logging flags and tracing
 pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
     NO_COLOR.store(no_color, Ordering::Relaxed);
     QUIET.store(quiet, Ordering::Relaxed);
@@ -28,6 +40,47 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
     if no_color {
         colored::control::set_override(false);
     }
+
+    let console_filter = if debug {
+        EnvFilter::new("debug")
+    } else if verbose {
+        EnvFilter::new("info")
+    } else if quiet {
+        EnvFilter::new("error")
+    } else {
+        EnvFilter::new("warn")
+    };
+
+    let stderr_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_ansi(!no_color)
+        .with_target(debug)
+        .without_time()
+        .with_filter(console_filter);
+
+    let log_dir = directories::ProjectDirs::from("xyz", "rapscli", "raps")
+        .map(|dirs| dirs.data_local_dir().join("logs"))
+        .unwrap_or_else(|| std::env::current_dir().unwrap().join(".raps-logs"));
+
+    let _ = std::fs::create_dir_all(&log_dir);
+
+    let file_appender = tracing_appender::rolling::daily(log_dir, "raps.log");
+    let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
+    if let Ok(mut lock) = WORKER_GUARD.lock() {
+        *lock = Some(guard);
+    }
+
+    let file_filter = EnvFilter::new("raps=debug,raps_kernel=debug,raps_cli=debug,info");
+
+    let file_layer = tracing_subscriber::fmt::layer()
+        .with_writer(non_blocking_appender)
+        .with_ansi(false)
+        .with_filter(file_filter);
+
+    let _ = tracing_subscriber::registry()
+        .with(stderr_layer)
+        .with(file_layer)
+        .try_init();
 }
 
 /// Check if colors should be disabled
@@ -51,32 +104,24 @@ pub fn debug() -> bool {
     DEBUG.load(Ordering::Relaxed)
 }
 
-/// Log a verbose message (only shown if --verbose or --debug)
+/// Log a verbose message
 pub fn log_verbose(message: &str) {
-    if verbose() || debug() {
-        eprintln!("{}", redact_secrets(message));
-    }
+    tracing::info!("{}", redact_secrets(message));
 }
 
-/// Log a debug message (only shown if --debug)
+/// Log a debug message
 pub fn log_debug(message: &str) {
-    if debug() {
-        eprintln!("[DEBUG] {}", redact_secrets(message));
-    }
+    tracing::debug!("{}", redact_secrets(message));
 }
 
-/// Log an HTTP request (only shown if --verbose or --debug)
+/// Log an HTTP request
 pub fn log_request(method: &str, url: &str) {
-    if verbose() || debug() {
-        eprintln!("{} {}", method, redact_secrets(url));
-    }
+    tracing::info!("{} {}", method, redact_secrets(url));
 }
 
-/// Log an HTTP response (only shown if --verbose or --debug)
+/// Log an HTTP response
 pub fn log_response(status: u16, url: &str) {
-    if verbose() || debug() {
-        eprintln!("{} {}", status, redact_secrets(url));
-    }
+    tracing::info!("{} {}", status, redact_secrets(url));
 }
 
 /// Redact secrets from debug output

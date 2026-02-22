@@ -6,11 +6,15 @@
 //! Provides functions to check if interactive mode is enabled and handle
 //! prompts appropriately based on the --non-interactive flag.
 
+#[cfg(not(test))]
 use std::io::IsTerminal;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static NON_INTERACTIVE: AtomicBool = AtomicBool::new(false);
 static YES: AtomicBool = AtomicBool::new(false);
+
+#[cfg(test)]
+pub(crate) static MOCK_IS_TERMINAL: AtomicBool = AtomicBool::new(true);
 
 /// Initialize interactive mode flags
 pub fn init(non_interactive: bool, yes: bool) {
@@ -20,7 +24,12 @@ pub fn init(non_interactive: bool, yes: bool) {
 
 /// Check if non-interactive mode is enabled (explicit flag or no TTY detected)
 pub fn is_non_interactive() -> bool {
-    NON_INTERACTIVE.load(Ordering::Relaxed) || !std::io::stdin().is_terminal()
+    #[cfg(test)]
+    let is_term = MOCK_IS_TERMINAL.load(Ordering::Relaxed);
+    #[cfg(not(test))]
+    let is_term = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+
+    NON_INTERACTIVE.load(Ordering::Relaxed) || !is_term
 }
 
 /// Check if --yes flag is set (auto-confirm)
@@ -76,6 +85,7 @@ mod tests {
 
     fn reset_state() {
         init(false, false);
+        MOCK_IS_TERMINAL.store(true, Ordering::Relaxed);
     }
 
     #[test]

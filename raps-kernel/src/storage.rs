@@ -220,10 +220,10 @@ impl TokenStorage {
             Ok(e) => e,
             Err(e) => {
                 // If keyring is not available, fall back to file storage
-                crate::logging::log_verbose(&format!(
+                tracing::info!(
                     "Keychain not available ({}), falling back to file storage",
                     e
-                ));
+                );
                 return self.save_file(token);
             }
         };
@@ -232,10 +232,7 @@ impl TokenStorage {
             Ok(()) => Ok(()),
             Err(e) => {
                 // If keychain save fails, fall back to file storage
-                crate::logging::log_verbose(&format!(
-                    "Keychain save failed ({}), falling back to file storage",
-                    e
-                ));
+                tracing::info!("Keychain save failed ({}), falling back to file storage", e);
                 self.save_file(token)
             }
         }
@@ -243,8 +240,16 @@ impl TokenStorage {
 
     /// Load token from OS keychain
     fn load_keychain(&self) -> Result<Option<StoredToken>> {
-        let entry = keyring::Entry::new(&self.service_name, &self.username)
-            .context("Failed to create keyring entry")?;
+        let entry = match keyring::Entry::new(&self.service_name, &self.username) {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::info!(
+                    "Keychain not available ({}), falling back to file storage",
+                    e
+                );
+                return self.load_file();
+            }
+        };
 
         match entry.get_password() {
             Ok(json) => {
@@ -252,8 +257,17 @@ impl TokenStorage {
                     serde_json::from_str(&json).context("Failed to parse token from keychain")?;
                 Ok(Some(token))
             }
-            Err(keyring::Error::NoEntry) => Ok(None),
-            Err(e) => Err(anyhow::anyhow!("Failed to load token from keychain: {}", e)),
+            Err(keyring::Error::NoEntry) => {
+                // If not in keychain, it might be in the file fallback
+                self.load_file()
+            }
+            Err(e) => {
+                tracing::info!(
+                    "Failed to load token from keychain ({}), falling back to file storage",
+                    e
+                );
+                self.load_file()
+            }
         }
     }
 
@@ -279,10 +293,7 @@ impl TokenStorage {
             }
             Err(e) => {
                 // If keychain delete fails, try file storage
-                crate::logging::log_verbose(&format!(
-                    "Keychain delete failed ({}), trying file storage",
-                    e
-                ));
+                tracing::info!("Keychain delete failed ({}), trying file storage", e);
                 self.delete_file()
             }
         }

@@ -13,16 +13,17 @@ use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
+use crate::commands::interactive;
 use crate::output::OutputFormat;
 use raps_acc::{CreateRfiRequest, RfiClient, UpdateRfiRequest};
-// use raps_kernel::output::OutputFormat;
+use raps_dm::DataManagementClient;
 
 #[derive(Debug, Subcommand)]
 pub enum RfiCommands {
     /// List RFIs in a project
     List {
         /// Project ID (without "b." prefix)
-        project_id: String,
+        project_id: Option<String>,
 
         /// Filter by status (open, answered, closed, void)
         #[arg(long)]
@@ -31,21 +32,29 @@ pub enum RfiCommands {
         /// Only show RFIs created after this date (YYYY-MM-DD)
         #[arg(long)]
         since: Option<String>,
+
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Get details of a specific RFI
     Get {
         /// Project ID (without "b." prefix)
-        project_id: String,
+        project_id: Option<String>,
 
         /// RFI ID
-        rfi_id: String,
+        rfi_id: Option<String>,
+
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Create a new RFI
     Create {
         /// Project ID (without "b." prefix)
-        project_id: String,
+        project_id: Option<String>,
 
         /// RFI title
         #[arg(long)]
@@ -78,15 +87,19 @@ pub enum RfiCommands {
         /// Create RFIs from CSV file (columns: title, description, assigned_to)
         #[arg(long, value_name = "FILE")]
         from_csv: Option<PathBuf>,
+
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Update an existing RFI
     Update {
         /// Project ID (without "b." prefix)
-        project_id: String,
+        project_id: Option<String>,
 
         /// RFI ID
-        rfi_id: String,
+        rfi_id: Option<String>,
 
         /// New title
         #[arg(long)]
@@ -119,28 +132,58 @@ pub enum RfiCommands {
         /// Update location
         #[arg(long)]
         location: Option<String>,
+
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Delete an RFI
     Delete {
         /// Project ID (without "b." prefix)
-        project_id: String,
+        project_id: Option<String>,
 
         /// RFI ID
-        rfi_id: String,
+        rfi_id: Option<String>,
+
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 }
 
 impl RfiCommands {
-    pub async fn execute(self, client: &RfiClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &RfiClient,
+        dm_client: &DataManagementClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             RfiCommands::List {
                 project_id,
                 status,
                 since,
-            } => list_rfis(client, &project_id, status.as_deref(), since, output_format).await,
-            RfiCommands::Get { project_id, rfi_id } => {
-                get_rfi(client, &project_id, &rfi_id, output_format).await
+                hub_id,
+            } => {
+                let (p_id, _) = resolve_rfi_args(
+                    dm_client,
+                    client,
+                    hub_id,
+                    project_id,
+                    Some("ignore".to_string()),
+                )
+                .await?;
+                list_rfis(client, &p_id, status.as_deref(), since, output_format).await
+            }
+            RfiCommands::Get {
+                project_id,
+                rfi_id,
+                hub_id,
+            } => {
+                let (p_id, r_id) =
+                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
+                get_rfi(client, &p_id, &r_id, output_format).await
             }
             RfiCommands::Create {
                 project_id,
@@ -152,10 +195,19 @@ impl RfiCommands {
                 location,
                 discipline,
                 from_csv,
+                hub_id,
             } => {
+                let (p_id, _) = resolve_rfi_args(
+                    dm_client,
+                    client,
+                    hub_id,
+                    project_id,
+                    Some("ignore".to_string()),
+                )
+                .await?;
                 create_rfi(
                     client,
-                    &project_id,
+                    &p_id,
                     title,
                     question,
                     &priority,
@@ -179,11 +231,14 @@ impl RfiCommands {
                 due_date,
                 assigned_to,
                 location,
+                hub_id,
             } => {
+                let (p_id, r_id) =
+                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
                 update_rfi(
                     client,
-                    &project_id,
-                    &rfi_id,
+                    &p_id,
+                    &r_id,
                     title,
                     question,
                     answer,
@@ -196,11 +251,44 @@ impl RfiCommands {
                 )
                 .await
             }
-            RfiCommands::Delete { project_id, rfi_id } => {
-                delete_rfi(client, &project_id, &rfi_id, output_format).await
+            RfiCommands::Delete {
+                project_id,
+                rfi_id,
+                hub_id,
+            } => {
+                let (p_id, r_id) =
+                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
+                delete_rfi(client, &p_id, &r_id, output_format).await
             }
         }
     }
+}
+
+async fn resolve_rfi_args(
+    dm_client: &DataManagementClient,
+    rfi_client: &RfiClient,
+    opt_hub_id: Option<String>,
+    opt_project_id: Option<String>,
+    opt_rfi_id: Option<String>,
+) -> Result<(String, String)> {
+    let hub_id = match (&opt_hub_id, &opt_project_id, &opt_rfi_id) {
+        (Some(h), _, _) => h.clone(),
+        (None, Some(_), Some(_)) => String::new(), // Not needed if both P and R are provided
+        (None, _, _) => interactive::prompt_for_hub(dm_client).await?,
+    };
+
+    let project_id = match opt_project_id {
+        Some(p) => p,
+        None => interactive::prompt_for_project(dm_client, &hub_id).await?,
+    };
+
+    let rfi_id = match opt_rfi_id {
+        Some(r) if r == "ignore" => String::new(),
+        Some(r) => r,
+        None => interactive::prompt_for_rfi(rfi_client, &project_id).await?,
+    };
+
+    Ok((project_id, rfi_id))
 }
 
 #[derive(Serialize)]

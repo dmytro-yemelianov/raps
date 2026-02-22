@@ -411,26 +411,18 @@ async fn create_appbundle(
         .await
     {
         Ok(()) => {
-            println!(
-                "  {} Alias '{}' created",
-                "✓".green(),
-                "default".cyan()
-            );
+            println!("  {} Alias '{}' created", "✓".green(), "default".cyan());
         }
         Err(e) => {
-            println!(
-                "  {} Could not create alias: {}",
-                "!".yellow(),
-                e
-            );
+            println!("  {} Could not create alias: {}", "!".yellow(), e);
         }
     }
 
-    if let Some(upload) = bundle.upload_parameters {
-        if let Some(ref url) = upload.endpoint_url {
-            println!("\n{}", "Upload your bundle ZIP to:".yellow());
-            println!("  {}", url);
-        }
+    if let Some(upload) = bundle.upload_parameters
+        && let Some(ref url) = upload.endpoint_url
+    {
+        println!("\n{}", "Upload your bundle ZIP to:".yellow());
+        println!("  {}", url);
     }
 
     Ok(())
@@ -696,20 +688,12 @@ async fn create_activity(
         {
             Ok(()) => {
                 if output_format.supports_colors() {
-                    println!(
-                        "  {} Alias '{}' created",
-                        "✓".green(),
-                        "default".cyan()
-                    );
+                    println!("  {} Alias '{}' created", "✓".green(), "default".cyan());
                 }
             }
             Err(e) => {
                 if output_format.supports_colors() {
-                    println!(
-                        "  {} Could not create alias: {}",
-                        "!".yellow(),
-                        e
-                    );
+                    println!("  {} Could not create alias: {}", "!".yellow(), e);
                 }
             }
         }

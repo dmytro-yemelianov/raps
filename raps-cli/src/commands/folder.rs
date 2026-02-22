@@ -13,10 +13,11 @@ use dialoguer::Input;
 use raps_kernel::prompts;
 use serde::Serialize;
 
+use crate::commands::interactive;
+
 use crate::output::OutputFormat;
 use raps_acc::permissions::FolderPermissionsClient;
 use raps_dm::DataManagementClient;
-use raps_kernel::interactive;
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -24,47 +25,62 @@ pub enum FolderCommands {
     /// List folder contents
     List {
         /// Project ID
-        project_id: String,
+        project_id: Option<String>,
         /// Folder ID
-        folder_id: String,
+        folder_id: Option<String>,
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Create a new folder
     Create {
         /// Project ID
-        project_id: String,
+        project_id: Option<String>,
         /// Parent folder ID
-        parent_folder_id: String,
+        parent_folder_id: Option<String>,
         /// Folder name (interactive if not provided)
         #[arg(short, long)]
         name: Option<String>,
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Rename a folder
     Rename {
         /// Project ID
-        project_id: String,
+        project_id: Option<String>,
         /// Folder ID
-        folder_id: String,
-        /// New folder name
+        folder_id: Option<String>,
+        /// New folder name (interactive if not provided)
         #[arg(short, long)]
-        name: String,
+        name: Option<String>,
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Delete a folder
     Delete {
         /// Project ID
-        project_id: String,
+        project_id: Option<String>,
         /// Folder ID
-        folder_id: String,
+        folder_id: Option<String>,
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 
     /// Show permissions (rights) for a folder
     Rights {
         /// Project ID
-        project_id: String,
+        project_id: Option<String>,
         /// Folder ID
-        folder_id: String,
+        folder_id: Option<String>,
+        /// Hub ID (for interactive mode)
+        #[arg(long, hide = true)]
+        hub_id: Option<String>,
     },
 }
 
@@ -79,27 +95,77 @@ impl FolderCommands {
             FolderCommands::List {
                 project_id,
                 folder_id,
-            } => list_folder_contents(client, &project_id, &folder_id, output_format).await,
+                hub_id,
+            } => {
+                let (p_id, f_id) =
+                    resolve_folder_args(client, hub_id, project_id, folder_id).await?;
+                list_folder_contents(client, &p_id, &f_id, output_format).await
+            }
             FolderCommands::Create {
                 project_id,
                 parent_folder_id,
                 name,
-            } => create_folder(client, &project_id, &parent_folder_id, name, output_format).await,
+                hub_id,
+            } => {
+                let (p_id, f_id) =
+                    resolve_folder_args(client, hub_id, project_id, parent_folder_id).await?;
+                create_folder(client, &p_id, &f_id, name, output_format).await
+            }
             FolderCommands::Rename {
                 project_id,
                 folder_id,
                 name,
-            } => rename_folder(client, &project_id, &folder_id, &name, output_format).await,
+                hub_id,
+            } => {
+                let (p_id, f_id) =
+                    resolve_folder_args(client, hub_id, project_id, folder_id).await?;
+                rename_folder(client, &p_id, &f_id, name, output_format).await
+            }
             FolderCommands::Delete {
                 project_id,
                 folder_id,
-            } => delete_folder(client, &project_id, &folder_id, output_format).await,
+                hub_id,
+            } => {
+                let (p_id, f_id) =
+                    resolve_folder_args(client, hub_id, project_id, folder_id).await?;
+                delete_folder(client, &p_id, &f_id, output_format).await
+            }
             FolderCommands::Rights {
                 project_id,
                 folder_id,
-            } => folder_rights(permissions_client, &project_id, &folder_id, output_format).await,
+                hub_id,
+            } => {
+                let (p_id, f_id) =
+                    resolve_folder_args(client, hub_id, project_id, folder_id).await?;
+                folder_rights(permissions_client, &p_id, &f_id, output_format).await
+            }
         }
     }
+}
+
+async fn resolve_folder_args(
+    client: &DataManagementClient,
+    opt_hub_id: Option<String>,
+    opt_project_id: Option<String>,
+    opt_folder_id: Option<String>,
+) -> Result<(String, String)> {
+    let hub_id = match (&opt_hub_id, &opt_project_id, &opt_folder_id) {
+        (Some(h), _, _) => h.clone(),
+        (None, Some(_), Some(_)) => String::new(), // Not needed if both P and F are provided
+        (None, _, _) => interactive::prompt_for_hub(client).await?,
+    };
+
+    let project_id = match opt_project_id {
+        Some(p) => p,
+        None => interactive::prompt_for_project(client, &hub_id).await?,
+    };
+
+    let folder_id = match opt_folder_id {
+        Some(f) => f,
+        None => interactive::prompt_for_folder(client, &hub_id, &project_id).await?,
+    };
+
+    Ok((project_id, folder_id))
 }
 
 #[derive(Serialize)]
@@ -259,15 +325,27 @@ async fn rename_folder(
     client: &DataManagementClient,
     project_id: &str,
     folder_id: &str,
-    new_name: &str,
+    new_name: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
+    let name_str = match new_name {
+        Some(n) => n,
+        None => {
+            if interactive::is_non_interactive() {
+                anyhow::bail!("Folder name is required in non-interactive mode. Use --name flag.");
+            }
+            Input::new()
+                .with_prompt("Enter new folder name")
+                .interact_text()?
+        }
+    };
+
     if output_format.supports_colors() {
         println!("{}", "Renaming folder...".dimmed());
     }
 
     let folder = client
-        .rename_folder(project_id, folder_id, new_name)
+        .rename_folder(project_id, folder_id, &name_str)
         .await
         .context(format!(
             "Failed to rename folder '{}'. Check permissions and that folder exists",

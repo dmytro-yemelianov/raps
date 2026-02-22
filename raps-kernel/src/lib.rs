@@ -19,6 +19,7 @@ pub mod http;
 pub mod interactive;
 pub mod logging;
 pub mod output;
+pub mod profiler;
 pub mod progress;
 pub mod prompts;
 pub mod storage;

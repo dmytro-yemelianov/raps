@@ -21,7 +21,6 @@ use crate::output::OutputFormat;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::{HttpClientConfig, is_allowed_url};
-use raps_kernel::logging;
 
 /// HTTP methods supported by the custom API command
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -445,7 +444,11 @@ async fn execute_request(
     custom_headers: &[(String, String)],
     body: Option<&Value>,
 ) -> Result<Response> {
-    logging::log_verbose(&format!("{} {}", method.as_reqwest_method(), url));
+    tracing::info!(
+        "{} {}",
+        method.as_reqwest_method(),
+        raps_kernel::logging::redact_secrets(url)
+    );
 
     let mut request = client.request(method.as_reqwest_method(), url);
 
@@ -455,7 +458,7 @@ async fn execute_request(
     // Add custom headers (but prevent overriding Authorization)
     for (key, value) in custom_headers {
         if key.to_lowercase() == "authorization" {
-            logging::log_verbose("Warning: Cannot override Authorization header, ignoring");
+            tracing::info!("Warning: Cannot override Authorization header, ignoring");
             continue;
         }
         if let (Ok(name), Ok(val)) = (HeaderName::from_str(key), HeaderValue::from_str(value)) {
@@ -658,9 +661,11 @@ fn extract_error_message(value: &Value, status: StatusCode) -> String {
 /// Map HTTP status code to exit code
 fn map_exit_code(status_code: u16) -> i32 {
     match status_code {
-        200..=299 => 0,  // Success
-        401 | 403 => 10, // Authentication error
-        400 | 422 => 2,  // Validation/client error
-        _ => 1,          // General error
+        200..=299 => 0, // Success
+        401 | 403 => 3, // AuthFailure
+        404 => 4,       // NotFound
+        400 | 422 => 2, // InvalidArguments
+        500..=599 => 5, // RemoteError
+        _ => 6,         // InternalError
     }
 }
