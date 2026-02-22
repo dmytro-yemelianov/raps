@@ -944,15 +944,15 @@ enum BatchFileStatus {
 }
 
 /// Get the path to the batch upload state file
-fn batch_state_path() -> PathBuf {
+fn batch_state_path() -> Result<PathBuf> {
     let proj_dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")
-        .expect("Failed to get project directories");
-    proj_dirs.data_dir().join("batch_upload_state.json")
+        .ok_or_else(|| anyhow::anyhow!("Failed to determine project directories"))?;
+    Ok(proj_dirs.data_dir().join("batch_upload_state.json"))
 }
 
 /// Save batch upload state to disk
 fn save_batch_state(state: &BatchUploadState) -> Result<()> {
-    let path = batch_state_path();
+    let path = batch_state_path()?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
@@ -963,7 +963,7 @@ fn save_batch_state(state: &BatchUploadState) -> Result<()> {
 
 /// Load batch upload state from disk
 fn load_batch_state() -> Result<Option<BatchUploadState>> {
-    let path = batch_state_path();
+    let path = batch_state_path()?;
     if !path.exists() {
         return Ok(None);
     }
@@ -974,7 +974,7 @@ fn load_batch_state() -> Result<Option<BatchUploadState>> {
 
 /// Remove batch upload state file
 fn clear_batch_state() -> Result<()> {
-    let path = batch_state_path();
+    let path = batch_state_path()?;
     if path.exists() {
         std::fs::remove_file(&path)?;
     }

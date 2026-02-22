@@ -344,7 +344,8 @@ fn parse_header(s: &str) -> Result<(String, String), String> {
     Ok((parts[0].trim().to_string(), parts[1].trim().to_string()))
 }
 
-/// Build full URL from base URL, endpoint, and query parameters
+/// Build full URL from base URL, endpoint, and query parameters.
+/// IMPORTANT: Callers must validate the result with `is_allowed_url` before use.
 fn build_url(base_url: &str, endpoint: &str, query_params: &[(String, String)]) -> Result<String> {
     // Handle relative vs absolute endpoints
     let mut url = if endpoint.starts_with("http://") || endpoint.starts_with("https://") {
@@ -548,7 +549,7 @@ async fn handle_response(
                         details: Some(value),
                     };
                     output_format.write(&error)?;
-                    std::process::exit(map_exit_code(status_code));
+                    bail!("API error ({}): {}", status_code, extract_error_message(&error.details.as_ref().unwrap_or(&Value::Null), status));
                 }
             }
             Err(_) => {
@@ -562,8 +563,7 @@ async fn handle_response(
                     }
                     Ok(())
                 } else {
-                    eprintln!("{} {} - {}", "Error:".red(), status_code, body_text);
-                    std::process::exit(map_exit_code(status_code));
+                    bail!("API error ({}): {}", status_code, body_text);
                 }
             }
         }
@@ -583,8 +583,7 @@ async fn handle_response(
             }
             Ok(())
         } else {
-            eprintln!("{} {} - {}", "Error:".red(), status_code, body_text);
-            std::process::exit(map_exit_code(status_code));
+            bail!("API error ({}): {}", status_code, body_text);
         }
     } else {
         // Binary response
@@ -612,13 +611,7 @@ async fn handle_response(
                 );
             }
         } else {
-            eprintln!(
-                "{} {} - Binary error response ({} bytes)",
-                "Error:".red(),
-                status_code,
-                bytes.len()
-            );
-            std::process::exit(map_exit_code(status_code));
+            bail!("API error ({}): binary error response ({} bytes)", status_code, bytes.len());
         }
     }
 }
@@ -656,16 +649,4 @@ fn extract_error_message(value: &Value, status: StatusCode) -> String {
         .canonical_reason()
         .unwrap_or("Request failed")
         .to_string()
-}
-
-/// Map HTTP status code to exit code
-fn map_exit_code(status_code: u16) -> i32 {
-    match status_code {
-        200..=299 => 0, // Success
-        401 | 403 => 3, // AuthFailure
-        404 => 4,       // NotFound
-        400 | 422 => 2, // InvalidArguments
-        500..=599 => 5, // RemoteError
-        _ => 6,         // InternalError
-    }
 }

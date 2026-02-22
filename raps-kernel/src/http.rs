@@ -192,17 +192,21 @@ where
 fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
     use rand::Rng;
 
-    // Exponential backoff: base_delay * 2^attempt
-    let exponential_delay = base_delay * 2_u64.pow(attempt);
+    // Exponential backoff: base_delay * 2^attempt (saturating to avoid overflow)
+    let exponential_delay = base_delay.saturating_mul(1_u64.checked_shl(attempt).unwrap_or(u64::MAX));
 
     // Cap at max_wait
     let capped_delay = exponential_delay.min(max_wait);
 
     // Add jitter (random 0-25% of delay)
     let mut rng = rand::thread_rng();
-    let jitter = rng.gen_range(0..=(capped_delay / 4));
+    let jitter = if capped_delay > 0 {
+        rng.gen_range(0..=(capped_delay / 4))
+    } else {
+        0
+    };
 
-    Duration::from_secs(capped_delay + jitter)
+    Duration::from_secs(capped_delay.saturating_add(jitter))
 }
 
 #[cfg(test)]

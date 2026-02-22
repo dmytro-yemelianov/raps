@@ -791,7 +791,7 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(5); // Partial success
+                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
                 }
 
                 Ok(())
@@ -869,7 +869,7 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(5); // Partial success
+                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
                 }
 
                 Ok(())
@@ -1028,7 +1028,7 @@ impl UserCommands {
 
                     // Exit with appropriate code
                     if result.failed > 0 {
-                        std::process::exit(5);
+                        anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
                     }
                 }
 
@@ -1292,7 +1292,7 @@ impl FolderCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    std::process::exit(5); // Partial success
+                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
                 }
 
                 Ok(())
@@ -2057,7 +2057,7 @@ async fn execute_csv_update(
     }
 
     if output.failed > 0 {
-        std::process::exit(5);
+        anyhow::bail!("Bulk operation partially failed: {} items failed", output.failed);
     }
 
     Ok(())
@@ -2666,7 +2666,7 @@ async fn execute_csv_import(
     }
 
     if output.failed > 0 {
-        std::process::exit(5);
+        anyhow::bail!("Bulk operation partially failed: {} items failed", output.failed);
     }
 
     Ok(())

@@ -67,38 +67,40 @@ impl ExitCode {
             return ExitCode::NotFound;
         }
 
-        // Check for validation/argument errors
-        if error_string.contains("invalid")
-            || error_string.contains("validation")
-            || error_string.contains("required")
-            || error_string.contains("missing")
-            || error_string.contains("cannot be empty")
-            || error_string.contains("must be")
-        {
-            return ExitCode::InvalidArguments;
-        }
-
-        // Check for remote/API errors (5xx, network errors, etc.)
-        if error_string.contains("500")
-            || error_string.contains("502")
-            || error_string.contains("503")
-            || error_string.contains("504")
-            || error_string.contains("timeout")
-            || error_string.contains("connection")
-            || error_string.contains("network")
-            || error_string.contains("api")
-            || error_string.contains("remote")
+        // Check for remote/API errors (5xx, network errors, bulk partial failures)
+        if error_string.contains("partially failed")
+            || error_string.contains("api error")
+            || error_string.contains("remote error")
             || error_string.contains("server error")
+            || error_string.contains("timeout")
+            || error_string.contains("connection refused")
+            || error_string.contains("connection reset")
             || error_chain.iter().any(|e| {
                 e.contains("500")
                     || e.contains("502")
                     || e.contains("503")
                     || e.contains("504")
                     || e.contains("timeout")
-                    || e.contains("connection")
             })
         {
             return ExitCode::RemoteError;
+        }
+
+        // Check for validation/argument errors (more specific patterns to avoid false positives)
+        if error_string.contains("invalid argument")
+            || error_string.contains("invalid option")
+            || error_string.contains("invalid value")
+            || error_string.contains("invalid format")
+            || error_string.contains("validation failed")
+            || error_string.contains("validation error")
+            || error_string.contains("cannot be empty")
+            || error_string.contains("must be")
+            || error_string.contains("missing required")
+            || error_string.contains("is required")
+            || error_string.contains("required field")
+            || error_string.contains("required parameter")
+        {
+            return ExitCode::InvalidArguments;
         }
 
         // Default to internal error for unknown errors

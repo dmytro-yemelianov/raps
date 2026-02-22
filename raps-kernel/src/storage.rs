@@ -99,11 +99,10 @@ impl TokenStorage {
     }
 
     /// Get the file path for file-based storage
-    fn token_file_path() -> PathBuf {
-        directories::ProjectDirs::from("com", "autodesk", "raps")
-            .expect("Failed to get project directories")
-            .config_dir()
-            .join("tokens.json")
+    fn token_file_path() -> Result<PathBuf> {
+        let dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")
+            .ok_or_else(|| anyhow::anyhow!("Failed to determine project directories (no home directory?)"))?;
+        Ok(dirs.config_dir().join("tokens.json"))
     }
 
     /// Save token using the configured backend
@@ -133,7 +132,7 @@ impl TokenStorage {
     /// Save token to file (INSECURE - logs warning)
     fn save_file(&self, token: &StoredToken) -> Result<()> {
         tracing::warn!("Storing token in plaintext file. Use keychain for better security.");
-        let path = Self::token_file_path();
+        let path = Self::token_file_path()?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
@@ -164,7 +163,7 @@ impl TokenStorage {
 
     /// Load token from file
     fn load_file(&self) -> Result<Option<StoredToken>> {
-        let path = Self::token_file_path();
+        let path = Self::token_file_path()?;
         if !path.exists() {
             return Ok(None);
         }
@@ -203,7 +202,7 @@ impl TokenStorage {
 
     /// Delete token file
     fn delete_file(&self) -> Result<()> {
-        let path = Self::token_file_path();
+        let path = Self::token_file_path()?;
         if path.exists() {
             std::fs::remove_file(&path)?;
         }
@@ -370,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_token_file_path_exists() {
-        let path = TokenStorage::token_file_path();
+        let path = TokenStorage::token_file_path().expect("should resolve project dirs");
         assert!(path.ends_with("tokens.json"));
         assert!(path.to_string_lossy().contains("raps"));
     }

@@ -261,7 +261,8 @@ impl AuthClient {
         let url = format!("{}/authentication/v2/device", self.config.base_url);
 
         // Request device code
-        let params = [("client_id", &self.config.client_id)];
+        let scope_str = scopes.join(" ");
+        let params = [("client_id", self.config.client_id.as_str()), ("scope", scope_str.as_str())];
         let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
@@ -504,11 +505,12 @@ impl AuthClient {
             )
         })?;
 
-        println!("Callback server started on port {}", actual_port);
+        tracing::info!(port = actual_port, "Callback server started");
         if actual_port != preferred_port {
-            println!(
-                "  (Using fallback port {} - preferred port {} was unavailable)",
-                actual_port, preferred_port
+            tracing::info!(
+                fallback_port = actual_port,
+                preferred_port,
+                "Using fallback port"
             );
         }
 
@@ -525,28 +527,31 @@ impl AuthClient {
             urlencoding::encode(&state)
         );
 
-        println!("Opening browser for authentication...");
-        println!("If the browser doesn't open, visit this URL:");
-        println!("{}", auth_url);
+        eprintln!("Opening browser for authentication...");
+        eprintln!("If the browser doesn't open, visit this URL:");
+        eprintln!("{}", auth_url);
 
         // Open browser
         if webbrowser::open(&auth_url).is_err() {
-            println!("Failed to open browser automatically.");
+            eprintln!("Failed to open browser automatically.");
         }
 
-        println!("\nWaiting for authentication callback...");
+        eprintln!("\nWaiting for authentication callback...");
 
         // Wait for callback
         #[allow(unused_assignments)]
         let mut auth_code: Option<String> = None;
 
+        let server = std::sync::Arc::new(server);
         loop {
-            let request = server
-                .recv()
+            let server_clone = server.clone();
+            let request = tokio::task::spawn_blocking(move || server_clone.recv())
+                .await
+                .context("Callback server thread panicked")?
                 .map_err(|e| anyhow::anyhow!("Failed to receive callback: {}", e))?;
 
             let url = request.url().to_string();
-            println!("Received request: {}", url);
+            tracing::debug!("Received callback request");
 
             // Skip non-callback requests (like favicon)
             if !url.starts_with("/callback") && !url.contains("code=") {
@@ -570,7 +575,7 @@ impl AuthClient {
                     error, desc
                 ))
                 .with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).expect("Content-Type: text/html is a valid header"),
                 );
                 request.respond(response).ok();
                 anyhow::bail!("Authorization error: {error} - {desc}");
@@ -594,7 +599,7 @@ impl AuthClient {
                 let response = Response::from_string(
                     "<html><body><h1>Login Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>"
                 ).with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap()
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).expect("Content-Type: text/html is a valid header")
                 );
                 request.respond(response).ok();
                 break;
@@ -695,12 +700,16 @@ impl AuthClient {
             .await
             .context("Failed to parse refresh response")?;
 
-        // Update stored token
+        // Update stored token, preserving scopes from the original
+        let original_scopes = {
+            let cache = self.cached_3leg_token.read().await;
+            cache.as_ref().map(|t| t.scopes.clone()).unwrap_or_default()
+        };
         let stored = StoredToken {
             access_token: token.access_token.clone(),
             refresh_token: token.refresh_token.or(Some(refresh_token)),
             expires_at: chrono::Utc::now().timestamp() + token.expires_in as i64,
-            scopes: vec![], // Preserve from original
+            scopes: original_scopes,
         };
 
         self.save_token(&stored)?;

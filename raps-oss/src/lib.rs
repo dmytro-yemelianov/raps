@@ -384,10 +384,6 @@ impl OssClient {
             policy_key: policy.to_string(),
         };
 
-        // Log request in verbose/debug mode
-        tracing::info!(method = "POST", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
-
-        // Use retry logic for bucket creation
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client
                 .post(&url)
@@ -397,9 +393,6 @@ impl OssClient {
                 .json(&request)
         })
         .await?;
-
-        // Log response in verbose/debug mode
-        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -523,16 +516,10 @@ impl OssClient {
         let token = self.auth.get_token().await?;
         let url = format!("{}/buckets/{}/details", self.config.oss_url(), bucket_key);
 
-        // Log request in verbose/debug mode
-        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
-
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
-
-        // Log response in verbose/debug mode
-        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -683,6 +670,40 @@ impl OssClient {
         Ok(object_info)
     }
 
+    /// Create a fresh multipart upload state with signed URLs
+    async fn start_fresh_upload(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &Path,
+        total_parts: u32,
+        file_size: u64,
+        chunk_size: u64,
+        file_mtime: i64,
+    ) -> Result<(MultipartUploadState, Option<Vec<String>>)> {
+        let signed = self
+            .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
+            .await?;
+        if signed.urls.len() != total_parts as usize {
+            anyhow::bail!("Expected {} URLs but got {}", total_parts, signed.urls.len());
+        }
+        let new_state = MultipartUploadState {
+            bucket_key: bucket_key.to_string(),
+            object_key: object_key.to_string(),
+            file_path: file_path.to_string_lossy().to_string(),
+            file_size,
+            chunk_size,
+            total_parts,
+            completed_parts: Vec::new(),
+            part_etags: std::collections::HashMap::new(),
+            upload_key: signed.upload_key,
+            started_at: chrono::Utc::now().timestamp(),
+            file_mtime,
+        };
+        new_state.save()?;
+        Ok((new_state, Some(signed.urls)))
+    }
+
     /// Upload a large file using multipart upload with resume capability
     pub async fn upload_multipart(
         &self,
@@ -705,7 +726,7 @@ impl OssClient {
         let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
         let total_parts = file_size.div_ceil(chunk_size) as u32;
 
-        let (mut state, initial_urls) = if resume {
+        let (state, initial_urls) = if resume {
             if let Some(existing_state) = MultipartUploadState::load(bucket_key, object_key)? {
                 if existing_state.can_resume(file_path) {
                     tracing::info!(
@@ -717,95 +738,14 @@ impl OssClient {
                 } else {
                     tracing::info!("File changed since last upload, starting fresh");
                     MultipartUploadState::delete(bucket_key, object_key)?;
-                    let signed = self
-                        .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
-                        .await?;
-
-                    if signed.urls.len() != total_parts as usize {
-                        anyhow::bail!(
-                            "Expected {} URLs but got {}",
-                            total_parts,
-                            signed.urls.len()
-                        );
-                    }
-
-                    let new_state = MultipartUploadState {
-                        bucket_key: bucket_key.to_string(),
-                        object_key: object_key.to_string(),
-                        file_path: file_path.to_string_lossy().to_string(),
-                        file_size,
-                        chunk_size,
-                        total_parts,
-                        completed_parts: Vec::new(),
-                        part_etags: std::collections::HashMap::new(),
-                        upload_key: signed.upload_key,
-                        started_at: chrono::Utc::now().timestamp(),
-                        file_mtime,
-                    };
-                    new_state.save()?;
-                    (new_state, Some(signed.urls))
+                    self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
                 }
             } else {
-                // No state, start fresh
-                let signed = self
-                    .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
-                    .await?;
-
-                if signed.urls.len() != total_parts as usize {
-                    anyhow::bail!(
-                        "Expected {} URLs but got {}",
-                        total_parts,
-                        signed.urls.len()
-                    );
-                }
-
-                let new_state = MultipartUploadState {
-                    bucket_key: bucket_key.to_string(),
-                    object_key: object_key.to_string(),
-                    file_path: file_path.to_string_lossy().to_string(),
-                    file_size,
-                    chunk_size,
-                    total_parts,
-                    completed_parts: Vec::new(),
-                    part_etags: std::collections::HashMap::new(),
-                    upload_key: signed.upload_key,
-                    started_at: chrono::Utc::now().timestamp(),
-                    file_mtime,
-                };
-                new_state.save()?;
-                (new_state, Some(signed.urls))
+                self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
             }
         } else {
-            // Not resuming, clear any existing state
             MultipartUploadState::delete(bucket_key, object_key)?;
-
-            let signed = self
-                .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
-                .await?;
-
-            if signed.urls.len() != total_parts as usize {
-                anyhow::bail!(
-                    "Expected {} URLs but got {}",
-                    total_parts,
-                    signed.urls.len()
-                );
-            }
-
-            let new_state = MultipartUploadState {
-                bucket_key: bucket_key.to_string(),
-                object_key: object_key.to_string(),
-                file_path: file_path.to_string_lossy().to_string(),
-                file_size,
-                chunk_size,
-                total_parts,
-                completed_parts: Vec::new(),
-                part_etags: std::collections::HashMap::new(),
-                upload_key: signed.upload_key,
-                started_at: chrono::Utc::now().timestamp(),
-                file_mtime,
-            };
-            new_state.save()?;
-            (new_state, Some(signed.urls))
+            self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
         };
 
         // Create progress bar (hidden in non-interactive mode)
@@ -862,7 +802,7 @@ impl OssClient {
         const MAX_CONCURRENT_UPLOADS: usize = 5;
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
         let upload_key = state.upload_key.clone();
-        let state_mutex = Arc::new(Mutex::new(&mut state));
+        let state_mutex = Arc::new(Mutex::new(state));
         let pb_arc = Arc::new(Mutex::new(pb));
         let file_path_clone = file_path.to_path_buf();
 
@@ -1006,7 +946,10 @@ impl OssClient {
         }
 
         // Get the progress bar back from the Arc<Mutex<>>
-        let pb = Arc::try_unwrap(pb_arc).unwrap().into_inner();
+        let pb = match Arc::try_unwrap(pb_arc) {
+            Ok(mutex) => mutex.into_inner(),
+            Err(arc) => arc.lock().await.clone(),
+        };
 
         // Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
@@ -1080,11 +1023,18 @@ impl OssClient {
 
     /// List objects in a bucket
     pub async fn list_objects(&self, bucket_key: &str) -> Result<Vec<ObjectItem>> {
+        const MAX_PAGES: usize = 100;
         let token = self.auth.get_token().await?;
         let mut all_objects = Vec::new();
         let mut start_at: Option<String> = None;
+        let mut page = 0;
 
         loop {
+            page += 1;
+            if page > MAX_PAGES {
+                tracing::warn!(pages = MAX_PAGES, objects = all_objects.len(), "Reached maximum page limit for object listing");
+                break;
+            }
             let mut url = format!("{}/buckets/{}/objects", self.config.oss_url(), bucket_key);
             if let Some(ref start) = start_at {
                 url = format!("{}?startAt={}", url, start);
@@ -1161,16 +1111,10 @@ impl OssClient {
             urlencoding::encode(object_key)
         );
 
-        // Log request in verbose/debug mode
-        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
-
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
-
-        // Log response in verbose/debug mode
-        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();

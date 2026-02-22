@@ -576,10 +576,13 @@ async fn whoami(auth_client: &AuthClient, output_format: OutputFormat) -> Result
 
 /// Mask a string for display (show first 4 and last 4 characters)
 fn mask_string(s: &str) -> String {
-    if s.len() <= 8 {
-        "*".repeat(s.len())
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() <= 8 {
+        "*".repeat(chars.len())
     } else {
-        format!("{}...{}", &s[..4], &s[s.len() - 4..])
+        let prefix: String = chars[..4].iter().collect();
+        let suffix: String = chars[chars.len() - 4..].iter().collect();
+        format!("{}...{}", prefix, suffix)
     }
 }
 
