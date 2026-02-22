@@ -271,6 +271,8 @@ async fn main() -> Result<()> {
     // Setup interactive shell check flags
     interactive::init(cli.non_interactive, cli.yes);
 
+    let cmd_name = command_name(&cli.command);
+
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
 
@@ -289,12 +291,12 @@ async fn main() -> Result<()> {
             }
         }
 
-        raps_kernel::profiler::report();
+        raps_kernel::profiler::report(Some(cmd_name), Some(exit_code as i32));
         raps_kernel::logging::flush();
         exit_code.exit();
     }
 
-    raps_kernel::profiler::report();
+    raps_kernel::profiler::report(Some(cmd_name), Some(0));
     raps_kernel::logging::flush();
     Ok(())
 }

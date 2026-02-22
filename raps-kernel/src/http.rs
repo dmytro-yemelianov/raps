@@ -133,12 +133,13 @@ where
     F: Fn() -> reqwest::RequestBuilder,
 {
     let mut attempt = 0;
+    let mut total_network_time = std::time::Duration::ZERO;
     loop {
         let start = std::time::Instant::now();
         match build_request().send().await {
             Ok(response) => {
                 let elapsed = start.elapsed();
-                crate::profiler::record_http_request(elapsed);
+                total_network_time += elapsed;
                 let status = response.status().as_u16();
                 tracing::debug!(
                     http.status = status,
@@ -149,6 +150,7 @@ where
                 if is_retryable_status(status) && attempt < config.max_retries {
                     let delay = retry_delay_from_response(&response, attempt, config);
                     attempt += 1;
+                    crate::profiler::record_http_retry();
                     tracing::warn!(
                         http.status = status,
                         attempt,
@@ -159,16 +161,19 @@ where
                     sleep(delay).await;
                     continue;
                 }
+                crate::profiler::record_http_request(total_network_time);
                 return Ok(response);
             }
             Err(err) => {
-                crate::profiler::record_http_request(start.elapsed());
+                total_network_time += start.elapsed();
                 let retriable = err.is_timeout() || err.is_connect() || err.is_request();
                 if !retriable || attempt >= config.max_retries {
+                    crate::profiler::record_http_request(total_network_time);
                     tracing::error!(error = %err, attempt, "HTTP request failed");
                     return Err(err).context("HTTP request failed");
                 }
                 attempt += 1;
+                crate::profiler::record_http_retry();
                 let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
                 tracing::warn!(
                     error = %err,

@@ -652,6 +652,7 @@ impl OssClient {
 
         let body = reqwest::Body::wrap_stream(file_stream);
 
+        let _upload_start = std::time::Instant::now();
         let response = self
             .http_client
             .put(s3_url)
@@ -661,6 +662,7 @@ impl OssClient {
             .send()
             .await
             .context("Failed to upload to S3")?;
+        raps_kernel::profiler::record_http_request(_upload_start.elapsed());
 
         if !response.status().is_success() {
             let status = response.status();
@@ -899,10 +901,12 @@ impl OssClient {
                     // Upload part with retry logic
                     let mut attempts = 0;
                     const MAX_RETRIES: usize = 3;
+                    let mut total_part_network_time = std::time::Duration::ZERO;
 
                     loop {
                         attempts += 1;
 
+                        let _part_start = std::time::Instant::now();
                         let response = client
                             .put(&s3_url)
                             .header("Content-Type", "application/octet-stream")
@@ -910,6 +914,7 @@ impl OssClient {
                             .body(buffer.clone())
                             .send()
                             .await;
+                        total_part_network_time += _part_start.elapsed();
 
                         match response {
                             Ok(resp) if resp.status().is_success() => {
@@ -941,12 +946,14 @@ impl OssClient {
                                     ));
                                 }
 
+                                raps_kernel::profiler::record_http_request(total_part_network_time);
                                 return Ok::<_, anyhow::Error>(part_num);
                             }
                             Ok(resp) => {
                                 let status = resp.status();
                                 let error_text = resp.text().await.unwrap_or_default();
                                 if attempts >= MAX_RETRIES {
+                                    raps_kernel::profiler::record_http_request(total_part_network_time);
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts ({}): {}",
                                         part_num,
@@ -955,6 +962,7 @@ impl OssClient {
                                         error_text
                                     );
                                 }
+                                raps_kernel::profiler::record_http_retry();
                                 // Wait before retry with exponential backoff
                                 let delay =
                                     std::time::Duration::from_millis(100 * (1 << (attempts - 1)));
@@ -962,6 +970,7 @@ impl OssClient {
                             }
                             Err(e) => {
                                 if attempts >= MAX_RETRIES {
+                                    raps_kernel::profiler::record_http_request(total_part_network_time);
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts: {}",
                                         part_num,
@@ -969,6 +978,7 @@ impl OssClient {
                                         e
                                     );
                                 }
+                                raps_kernel::profiler::record_http_retry();
                                 // Wait before retry
                                 let delay =
                                     std::time::Duration::from_millis(100 * (1 << (attempts - 1)));

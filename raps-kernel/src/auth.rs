@@ -227,6 +227,7 @@ impl AuthClient {
             ),
         ];
 
+        let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
             .post(&url)
@@ -235,6 +236,7 @@ impl AuthClient {
             .send()
             .await
             .context("Failed to send authentication request")?;
+        crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
             let status = response.status();
@@ -260,6 +262,7 @@ impl AuthClient {
 
         // Request device code
         let params = [("client_id", &self.config.client_id)];
+        let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
             .post(&url)
@@ -267,6 +270,7 @@ impl AuthClient {
             .send()
             .await
             .context("Failed to request device code")?;
+        crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
             let status = response.status();
@@ -336,6 +340,7 @@ impl AuthClient {
                 ("client_secret", &self.config.client_secret),
             ];
 
+            let _auth_start = std::time::Instant::now();
             let poll_response = self
                 .http_client
                 .post(&token_url)
@@ -343,6 +348,7 @@ impl AuthClient {
                 .send()
                 .await
                 .context("Failed to poll for token")?;
+            crate::profiler::record_http_request(_auth_start.elapsed());
 
             if poll_response.status().is_success() {
                 let token: TokenResponse = poll_response
@@ -436,6 +442,7 @@ impl AuthClient {
         } else {
             "https://api.userprofile.autodesk.com/userinfo".to_string()
         };
+        let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
             .get(url)
@@ -443,6 +450,7 @@ impl AuthClient {
             .send()
             .await
             .context("Failed to fetch user info")?;
+        crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
             let status = response.status();
@@ -629,6 +637,7 @@ impl AuthClient {
             ("redirect_uri", redirect_uri),
         ];
 
+        let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
             .post(&url)
@@ -637,6 +646,7 @@ impl AuthClient {
             .send()
             .await
             .context("Failed to exchange authorization code")?;
+        crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
             let status = response.status();
@@ -661,6 +671,7 @@ impl AuthClient {
             ("refresh_token", &refresh_token),
         ];
 
+        let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
             .post(&url)
@@ -669,6 +680,7 @@ impl AuthClient {
             .send()
             .await
             .context("Failed to refresh token")?;
+        crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
             // Refresh failed, clear stored token
