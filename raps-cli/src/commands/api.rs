@@ -458,7 +458,7 @@ async fn execute_request(
     // Add custom headers (but prevent overriding Authorization)
     for (key, value) in custom_headers {
         if key.to_lowercase() == "authorization" {
-            tracing::info!("Warning: Cannot override Authorization header, ignoring");
+            tracing::warn!("Ignoring attempt to override Authorization header");
             continue;
         }
         if let (Ok(name), Ok(val)) = (HeaderName::from_str(key), HeaderValue::from_str(value)) {

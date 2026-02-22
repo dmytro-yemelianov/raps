@@ -6068,14 +6068,15 @@ impl ServerHandler for RapsServer {
 
 /// Run the MCP server using stdio transport
 pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing for debugging (optional, outputs to stderr)
-    tracing_subscriber::fmt()
+    // logging::init() in main.rs already set up a global subscriber.
+    // Only attempt init if running standalone (e.g. tests).
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive(tracing::Level::WARN.into()),
         )
         .with_writer(std::io::stderr)
-        .init();
+        .try_init();
 
     let server = RapsServer::new()?;
     let service = server.serve(stdio()).await?;

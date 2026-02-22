@@ -21,7 +21,6 @@ use tokio::io::AsyncWriteExt;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
-use raps_kernel::logging;
 
 /// Supported output formats for translation
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -305,7 +304,7 @@ impl DerivativeClient {
         };
 
         // Log request in verbose/debug mode
-        logging::log_request("POST", &job_url);
+        tracing::info!(method = "POST", url = %raps_kernel::logging::redact_secrets(&job_url), "HTTP request");
 
         // Use retry logic for translation requests
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
@@ -319,7 +318,7 @@ impl DerivativeClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &job_url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&job_url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -493,14 +492,14 @@ impl DerivativeClient {
             encoded_derivative_urn
         );
 
-        logging::log_request("GET", &download_url);
+        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&download_url).bearer_auth(&token)
         })
         .await?;
 
-        logging::log_response(response.status().as_u16(), &download_url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();

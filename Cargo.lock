@@ -2473,6 +2473,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tokio-util",
+ "tracing",
  "urlencoding",
 ]
 
@@ -2490,6 +2491,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-test",
+ "tracing",
 ]
 
 [[package]]

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
-use raps_kernel::logging;
+
 
 /// Hub information
 #[derive(Debug, Clone, Deserialize)]
@@ -245,7 +245,7 @@ impl DataManagementClient {
         let url = format!("{}/hubs", self.config.project_url());
 
         // Log request in verbose/debug mode
-        logging::log_request("GET", &url);
+        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         // Use retry logic for API requests
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
@@ -254,7 +254,7 @@ impl DataManagementClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -633,7 +633,7 @@ impl DataManagementClient {
         );
 
         // Log request in verbose/debug mode
-        logging::log_request("DELETE", &url);
+        tracing::info!(method = "DELETE", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.delete(&url).bearer_auth(&token)
@@ -641,7 +641,7 @@ impl DataManagementClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -684,7 +684,7 @@ impl DataManagementClient {
         });
 
         // Log request in verbose/debug mode
-        logging::log_request("PATCH", &url);
+        tracing::info!(method = "PATCH", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client
@@ -696,7 +696,7 @@ impl DataManagementClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -725,7 +725,7 @@ impl DataManagementClient {
         );
 
         // Log request in verbose/debug mode
-        logging::log_request("DELETE", &url);
+        tracing::info!(method = "DELETE", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.delete(&url).bearer_auth(&token)
@@ -733,7 +733,7 @@ impl DataManagementClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -776,7 +776,7 @@ impl DataManagementClient {
         });
 
         // Log request in verbose/debug mode
-        logging::log_request("PATCH", &url);
+        tracing::info!(method = "PATCH", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client
@@ -788,7 +788,7 @@ impl DataManagementClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();

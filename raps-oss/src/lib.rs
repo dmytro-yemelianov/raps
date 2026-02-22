@@ -21,7 +21,6 @@ use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
-use raps_kernel::logging;
 use raps_kernel::progress;
 
 /// Bucket retention policy
@@ -386,7 +385,7 @@ impl OssClient {
         };
 
         // Log request in verbose/debug mode
-        logging::log_request("POST", &url);
+        tracing::info!(method = "POST", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         // Use retry logic for bucket creation
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
@@ -400,7 +399,7 @@ impl OssClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -529,7 +528,7 @@ impl OssClient {
         let url = format!("{}/buckets/{}/details", self.config.oss_url(), bucket_key);
 
         // Log request in verbose/debug mode
-        logging::log_request("GET", &url);
+        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
@@ -537,7 +536,7 @@ impl OssClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();
@@ -1157,7 +1156,7 @@ impl OssClient {
         );
 
         // Log request in verbose/debug mode
-        logging::log_request("GET", &url);
+        tracing::info!(method = "GET", url = %raps_kernel::logging::redact_secrets(&url), "HTTP request");
 
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
@@ -1165,7 +1164,7 @@ impl OssClient {
         .await?;
 
         // Log response in verbose/debug mode
-        logging::log_response(response.status().as_u16(), &url);
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
             let status = response.status();

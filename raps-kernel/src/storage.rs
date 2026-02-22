@@ -23,10 +23,11 @@ impl StorageBackend {
     pub fn from_env() -> Self {
         // First check profile configuration
         if is_keychain_disabled_in_profile() {
-            eprintln!(
-                "WARNING: File-based token storage enabled in profile. Tokens will be stored in plaintext."
+            tracing::warn!(
+                "File-based token storage enabled in profile. \
+                 Tokens will be stored in plaintext. \
+                 Consider: raps config set use_keychain true"
             );
-            eprintln!("Consider enabling keychain storage: raps config set use_keychain true");
             return StorageBackend::File;
         }
 
@@ -37,11 +38,10 @@ impl StorageBackend {
             .unwrap_or(false);
 
         if use_file {
-            eprintln!(
-                "WARNING: Using file-based token storage. Tokens will be stored in plaintext."
-            );
-            eprintln!(
-                "Consider using keychain storage for better security (remove RAPS_USE_FILE_STORAGE env var)."
+            tracing::warn!(
+                "File-based token storage via RAPS_USE_FILE_STORAGE. \
+                 Tokens will be stored in plaintext. \
+                 Remove the env var to use keychain storage."
             );
             StorageBackend::File
         } else {
@@ -132,7 +132,7 @@ impl TokenStorage {
 
     /// Save token to file (INSECURE - logs warning)
     fn save_file(&self, token: &StoredToken) -> Result<()> {
-        eprintln!("Storing token in plaintext file. Use keychain for better security.");
+        tracing::warn!("Storing token in plaintext file. Use keychain for better security.");
         let path = Self::token_file_path();
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -169,7 +169,7 @@ impl TokenStorage {
             return Ok(None);
         }
 
-        eprintln!("Loading token from plaintext file. Consider migrating to keychain storage.");
+        tracing::warn!("Loading token from plaintext file. Consider migrating to keychain storage.");
 
         let contents = std::fs::read_to_string(&path)?;
 

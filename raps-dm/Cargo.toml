@@ -24,6 +24,9 @@ reqwest.workspace = true
 # Async runtime
 tokio.workspace = true
 
+# Logging
+tracing.workspace = true
+
 # Date/time handling
 chrono.workspace = true
 

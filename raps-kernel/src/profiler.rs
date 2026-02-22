@@ -92,14 +92,17 @@ pub fn report() {
     let kernel_time = GLOBAL_PROFILER
         .kernel_load_duration
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .unwrap_or_default();
     let plugins_time = GLOBAL_PROFILER
         .plugins_load_duration
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .unwrap_or_default();
-    let network_time = *GLOBAL_PROFILER.total_http_duration.lock().unwrap();
+    let network_time = *GLOBAL_PROFILER
+        .total_http_duration
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let req_count = GLOBAL_PROFILER.http_requests_count.load(Ordering::Relaxed);
 
     let local_time = total_time.saturating_sub(network_time);

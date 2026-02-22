@@ -10,7 +10,9 @@
 //! - --debug: Include full trace (redacts secrets)
 
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use regex::Regex;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -41,15 +43,21 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         colored::control::set_override(false);
     }
 
-    let console_filter = if debug {
-        EnvFilter::new("debug")
-    } else if verbose {
-        EnvFilter::new("info")
-    } else if quiet {
-        EnvFilter::new("error")
-    } else {
-        EnvFilter::new("warn")
-    };
+    // Allow RAPS_LOG or RUST_LOG env vars to override CLI flags
+    let console_filter = std::env::var("RAPS_LOG")
+        .or_else(|_| std::env::var("RUST_LOG"))
+        .map(EnvFilter::new)
+        .unwrap_or_else(|_| {
+            if debug {
+                EnvFilter::new("debug")
+            } else if verbose {
+                EnvFilter::new("info")
+            } else if quiet {
+                EnvFilter::new("error")
+            } else {
+                EnvFilter::new("warn")
+            }
+        });
 
     let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(std::io::stderr)
@@ -60,11 +68,16 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
 
     let log_dir = directories::ProjectDirs::from("xyz", "rapscli", "raps")
         .map(|dirs| dirs.data_local_dir().join("logs"))
-        .unwrap_or_else(|| std::env::current_dir().unwrap().join(".raps-logs"));
+        .unwrap_or_else(|| {
+            std::env::current_dir()
+                .unwrap_or_else(|_| std::path::PathBuf::from("."))
+                .join(".raps-logs")
+        });
 
     let _ = std::fs::create_dir_all(&log_dir);
+    cleanup_old_logs(&log_dir, 7);
 
-    let file_appender = tracing_appender::rolling::daily(log_dir, "raps.log");
+    let file_appender = tracing_appender::rolling::daily(&log_dir, "raps.log");
     let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
     if let Ok(mut lock) = WORKER_GUARD.lock() {
         *lock = Some(guard);
@@ -104,49 +117,52 @@ pub fn debug() -> bool {
     DEBUG.load(Ordering::Relaxed)
 }
 
-/// Log a verbose message
-pub fn log_verbose(message: &str) {
-    tracing::info!("{}", redact_secrets(message));
-}
-
-/// Log a debug message
-pub fn log_debug(message: &str) {
-    tracing::debug!("{}", redact_secrets(message));
-}
-
-/// Log an HTTP request
-pub fn log_request(method: &str, url: &str) {
-    tracing::info!("{} {}", method, redact_secrets(url));
-}
-
-/// Log an HTTP response
-pub fn log_response(status: u16, url: &str) {
-    tracing::info!("{} {}", status, redact_secrets(url));
-}
-
 /// Redact secrets from debug output
 pub fn redact_secrets(text: &str) -> String {
-    // Redact common secret patterns
-    let mut redacted = text.to_string();
+    fn secret_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(
+                r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+",
+            )
+            .expect("secret_pattern regex is valid")
+        })
+    }
 
-    // Redact client secrets - match patterns like "client_secret: value" or "api-key=value"
-    let secret_pattern =
-        regex::Regex::new(r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+")
-            .unwrap();
-    redacted = secret_pattern
+    fn token_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(
+                r"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*[:=]\s*([A-Za-z0-9_-]{20,})",
+            )
+            .expect("token_pattern regex is valid")
+        })
+    }
+
+    let redacted = secret_pattern()
+        .replace_all(text, "$1: [REDACTED]");
+    token_pattern()
         .replace_all(&redacted, "$1: [REDACTED]")
-        .to_string();
+        .into_owned()
+}
 
-    // Redact tokens (JWT-like strings) - match patterns like "token: abc123..." or "bearer=xyz..."
-    let token_pattern = regex::Regex::new(
-        r"(?i)(token|access[_-]?token|refresh[_-]?token|bearer)\s*[:=]\s*([A-Za-z0-9_-]{20,})",
-    )
-    .unwrap();
-    redacted = token_pattern
-        .replace_all(&redacted, "$1: [REDACTED]")
-        .to_string();
-
-    redacted
+/// Remove old log files, keeping only the most recent `keep` files.
+fn cleanup_old_logs(log_dir: &std::path::Path, keep: usize) {
+    let Ok(entries) = std::fs::read_dir(log_dir) else {
+        return;
+    };
+    let mut files: Vec<_> = entries
+        .flatten()
+        .filter(|e| {
+            e.file_name()
+                .to_string_lossy()
+                .starts_with("raps.log")
+        })
+        .collect();
+    files.sort_by_key(|e| std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).ok()));
+    for old in files.into_iter().skip(keep) {
+        let _ = std::fs::remove_file(old.path());
+    }
 }
 
 #[cfg(test)]

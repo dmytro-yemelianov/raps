@@ -268,10 +268,10 @@ impl PluginManager {
 
                 match cmd.status() {
                     Ok(s) if !s.success() => {
-                        tracing::info!("Hook '{}' failed with exit code {:?}", hook_cmd, s.code());
+                        tracing::warn!("Hook '{}' failed with exit code {:?}", hook_cmd, s.code());
                     }
                     Err(e) => {
-                        tracing::info!("Hook '{}' failed to execute: {}", hook_cmd, e);
+                        tracing::warn!("Hook '{}' failed to execute: {}", hook_cmd, e);
                     }
                     _ => {}
                 }
@@ -349,8 +349,8 @@ impl PluginManager {
             Ok(())
         } else if command.contains('/') || command.contains('\\') {
             // Allow absolute paths but warn about them
-            tracing::info!(
-                "Warning: Hook uses absolute path: {}. Consider adding to allowed commands.",
+            tracing::warn!(
+                "Hook uses absolute path '{}'. Consider adding to the allowed commands list.",
                 command
             );
             Ok(())
