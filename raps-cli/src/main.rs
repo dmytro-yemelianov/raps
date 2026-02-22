@@ -41,10 +41,10 @@ use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
-use rustyline::Editor;
-use rustyline::config::{CompletionType, Config as EditorConfig, EditMode};
-use rustyline::error::ReadlineError;
-use rustyline::history::DefaultHistory;
+use reedline::{
+    default_emacs_keybindings, ColumnarMenu, Emacs, FileBackedHistory, KeyCode, KeyModifiers,
+    Reedline, ReedlineEvent, ReedlineMenu, Signal, MenuBuilder,
+};
 use std::io;
 
 use commands::{
@@ -101,6 +101,10 @@ struct Cli {
     /// Show debug output (full trace, secrets redacted)
     #[arg(long, global = true)]
     debug: bool,
+
+    /// Profile performance (execution time, HTTP network time)
+    #[arg(long, global = true)]
+    profile: bool,
 
     /// Non-interactive mode: fail if prompts would be required
     #[arg(long, global = true)]
@@ -225,12 +229,21 @@ enum Commands {
     /// Start an interactive shell session
     Shell,
 
+    // [DISABLED] Dashboard is excluded from build temporarily
+    // /// Open the terminal dashboard
+    // Dashboard,
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
+
+    /// External plugins and custom commands
+    #[command(external_subcommand)]
+    External(Vec<String>),
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
+    raps_kernel::profiler::init();
+
     // Handle clap errors (invalid arguments) - clap already exits with code 2
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
@@ -245,10 +258,17 @@ async fn main() {
         }
     };
 
-    // Initialize logging flags
+    // Initialize logging
     logging::init(cli.no_color, cli.quiet, cli.verbose, cli.debug);
 
-    // Initialize interactive mode flags
+    if cli.profile {
+        raps_kernel::profiler::enable();
+    }
+
+    // Kernel base is successfully loaded and initialized
+    raps_kernel::profiler::mark_kernel_loaded();
+
+    // Setup interactive shell check flags
     interactive::init(cli.non_interactive, cli.yes);
 
     if let Err(err) = run(cli).await {
@@ -266,8 +286,14 @@ async fn main() {
             }
         }
 
+        raps_kernel::profiler::report();
+        raps_kernel::logging::flush();
         exit_code.exit();
     }
+
+    raps_kernel::profiler::report();
+    raps_kernel::logging::flush();
+    Ok(())
 }
 
 async fn run(cli: Cli) -> Result<()> {
@@ -302,7 +328,7 @@ async fn run(cli: Cli) -> Result<()> {
 
     // Log startup info in verbose/debug mode
     if logging::verbose() || logging::debug() {
-        logging::log_verbose("RAPS CLI starting...");
+        tracing::info!("RAPS CLI starting...");
     }
 
     // Load configuration leniently — missing credentials default to empty strings.
@@ -322,30 +348,44 @@ async fn run(cli: Cli) -> Result<()> {
         );
         println!();
 
-        // Create editor with custom helper for completions and hints
-        let editor_config = EditorConfig::builder()
-            .completion_type(CompletionType::List)
-            .edit_mode(EditMode::Emacs)
-            .auto_add_history(true)
-            .completion_prompt_limit(50) // Show up to 50 completions before prompting
-            .build();
-
-        let helper = shell::RapsHelper::new();
-        let mut rl: Editor<shell::RapsHelper, DefaultHistory> = Editor::with_config(editor_config)?;
-        rl.set_helper(Some(helper));
-
+        // History file
         let history_path = ".raps_history";
-        let _ = rl.load_history(history_path);
+        let history = Box::new(
+            FileBackedHistory::with_file(1000, history_path.into())
+                .expect("Error configuring history"),
+        );
 
-        // Plain prompt — coloring is handled by Highlighter::highlight_prompt
-        // so rustyline calculates cursor position correctly.
-        let prompt = "raps> ";
+        // Keybindings: Tab -> completion menu
+        let mut keybindings = default_emacs_keybindings();
+        keybindings.add_binding(
+            KeyModifiers::NONE,
+            KeyCode::Tab,
+            ReedlineEvent::UntilFound(vec![
+                ReedlineEvent::Menu("completion_menu".to_string()),
+                ReedlineEvent::MenuNext,
+            ]),
+        );
+
+        let edit_mode = Box::new(Emacs::new(keybindings));
+        let completer = Box::new(shell::RapsCompleter::new());
+        let hinter = Box::new(shell::RapsHinter::new());
+        let highlighter = Box::new(shell::RapsHighlighter::new());
+        let completion_menu =
+            Box::new(ColumnarMenu::default().with_name("completion_menu"));
+
+        let mut editor = Reedline::create()
+            .with_history(history)
+            .with_completer(completer)
+            .with_hinter(hinter)
+            .with_highlighter(highlighter)
+            .with_edit_mode(edit_mode)
+            .with_menu(ReedlineMenu::EngineCompleter(completion_menu));
+
+        let prompt = shell::RapsPrompt;
 
         loop {
-            let readline = rl.readline(prompt);
-            match readline {
-                Ok(line) => {
-                    let _ = rl.add_history_entry(line.as_str());
+            match editor.read_line(&prompt) {
+                Ok(Signal::Success(line)) => {
                     let line = line.trim();
 
                     if line.is_empty() {
@@ -446,21 +486,20 @@ async fn run(cli: Cli) -> Result<()> {
                         }
                     }
                 }
-                Err(ReadlineError::Interrupted) => {
+                Ok(Signal::CtrlC) => {
                     println!("CTRL-C");
                     break;
                 }
-                Err(ReadlineError::Eof) => {
+                Ok(Signal::CtrlD) => {
                     println!("CTRL-D");
                     break;
                 }
                 Err(err) => {
-                    println!("Error: {:?}", err);
+                    eprintln!("Error: {:?}", err);
                     break;
                 }
             }
         }
-        rl.save_history(history_path).unwrap();
         return Ok(());
     }
 
@@ -604,7 +643,8 @@ async fn execute_command(
             let auth_client = get_auth_client();
             let rfi_client =
                 RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
-            cmd.execute(&rfi_client, output_format).await?;
+            cmd.execute(&rfi_client, &get_dm_client(), output_format)
+                .await?;
         }
 
         Commands::Report(cmd) => {
@@ -648,6 +688,31 @@ async fn execute_command(
 
         Commands::Serve => {
             unreachable!()
+        }
+
+        // Commands::Dashboard => {
+        //     commands::dashboard::execute().await?;
+        // }
+        Commands::External(args) => {
+            if args.is_empty() {
+                anyhow::bail!("No plugin name provided");
+            }
+            let plugin_name = &args[0];
+            let mut plugin_args = vec![];
+            for arg in &args[1..] {
+                plugin_args.push(arg.clone());
+            }
+
+            // We need to pass global flags to the plugin if necessary,
+            // but for now we just pass what was given to the external subcommand.
+            let pm = crate::plugins::PluginManager::new()?;
+            let exec_args: Vec<&str> = plugin_args.iter().map(|s| s.as_str()).collect();
+
+            // Execute plugin will return the exit code
+            let code = pm.execute_plugin(plugin_name, &exec_args)?;
+            if code != 0 {
+                std::process::exit(code);
+            }
         }
     }
 
