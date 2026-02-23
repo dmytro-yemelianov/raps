@@ -114,6 +114,7 @@ pub struct WebhooksLinks {
 }
 
 /// Webhooks API client
+#[derive(Clone)]
 pub struct WebhooksClient {
     config: Config,
     auth: AuthClient,

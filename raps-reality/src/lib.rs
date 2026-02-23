@@ -190,6 +190,7 @@ impl std::fmt::Display for SceneType {
 }
 
 /// Reality Capture API client
+#[derive(Clone)]
 pub struct RealityCaptureClient {
     config: Config,
     auth: AuthClient,

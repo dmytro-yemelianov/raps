@@ -249,6 +249,7 @@ pub struct AccProject {
 }
 
 /// Issues API client
+#[derive(Clone)]
 pub struct IssuesClient {
     config: Config,
     auth: AuthClient,
@@ -755,6 +756,7 @@ pub struct UpdateRfiRequest {
 }
 
 /// RFI API client
+#[derive(Clone)]
 pub struct RfiClient {
     config: Config,
     auth: AuthClient,
@@ -1011,6 +1013,7 @@ pub struct Pagination {
 }
 
 /// ACC Extended API client
+#[derive(Clone)]
 pub struct AccClient {
     config: Config,
     auth: AuthClient,
