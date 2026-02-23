@@ -12,7 +12,8 @@ pub mod auth;
 pub mod bucket;
 pub mod config;
 pub mod da;
-// pub mod dashboard;
+#[cfg(feature = "dashboard")]
+pub mod dashboard;
 pub mod demo;
 pub mod folder;
 pub mod generate;

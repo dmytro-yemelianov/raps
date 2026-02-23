@@ -149,6 +149,7 @@ pub struct PaginatedResponse<T> {
 }
 
 /// Design Automation API client
+#[derive(Clone)]
 pub struct DesignAutomationClient {
     config: Config,
     auth: AuthClient,
@@ -234,6 +235,63 @@ impl DesignAutomationClient {
             .context("Failed to parse engines response")?;
 
         Ok(paginated.data)
+    }
+
+    /// List all engines with pagination, returning structured Engine objects.
+    ///
+    /// The API returns engine IDs as strings. This method parses the ID to
+    /// extract product name and version as the description.
+    pub async fn list_engines_detailed(&self) -> Result<Vec<Engine>> {
+        let token = self.auth.get_token().await?;
+        let base_url = format!("{}/engines", self.config.da_url());
+        let mut all_engines = Vec::new();
+        let mut page_token: Option<String> = None;
+
+        loop {
+            let url = match &page_token {
+                Some(tok) => format!("{base_url}?page={tok}"),
+                None => base_url.clone(),
+            };
+
+            let token_clone = token.clone();
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token_clone)
+            })
+            .await?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                anyhow::bail!("Failed to list engines ({status}): {error_text}");
+            }
+
+            let paginated: PaginatedResponse<String> = response
+                .json()
+                .await
+                .context("Failed to parse engines response")?;
+
+            // Convert string IDs to Engine structs, parsing description from the ID.
+            // Format: "Autodesk.ProductName+VersionNumber"
+            for id in paginated.data {
+                let description = id
+                    .split('.')
+                    .last()
+                    .map(|s| s.replace('+', " "))
+                    .unwrap_or_default();
+                all_engines.push(Engine {
+                    id,
+                    description: Some(description),
+                    product_version: None,
+                });
+            }
+
+            match paginated.pagination_token {
+                Some(tok) if !tok.is_empty() => page_token = Some(tok),
+                _ => break,
+            }
+        }
+
+        Ok(all_engines)
     }
 
     /// List all app bundles
@@ -521,8 +579,8 @@ impl DesignAutomationClient {
         // DA API requires startAfterTime — default to 24h ago
         let start_after = chrono::Utc::now() - chrono::Duration::hours(24);
         let url = format!("{}/workitems", self.config.da_url());
-        // DA v3 API (.NET backend) — include fractional seconds
-        let start_after_str = start_after.format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
+        // DA v3 API expects Unix epoch seconds, not ISO 8601
+        let start_after_str = start_after.timestamp().to_string();
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client

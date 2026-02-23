@@ -38,6 +38,9 @@ pub enum ConfigCommands {
     /// Set or show the current working context (hub, project, account)
     #[command(subcommand)]
     Context(ContextCommands),
+
+    /// Migrate tokens from plaintext file to OS keychain
+    MigrateTokens,
 }
 
 #[derive(Debug, Subcommand)]
@@ -134,6 +137,9 @@ impl ConfigCommands {
             ConfigCommands::Get { key } => get_config(&key, output_format).await,
             ConfigCommands::Set { key, value } => set_config(&key, &value, output_format).await,
             ConfigCommands::Context(cmd) => cmd.execute(output_format).await,
+            ConfigCommands::MigrateTokens => {
+                raps_kernel::storage::TokenStorage::migrate_to_keychain()
+            }
         }
     }
 }

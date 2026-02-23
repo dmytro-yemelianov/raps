@@ -123,7 +123,7 @@ struct Cli {
     concurrency: Option<usize>,
 
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -229,9 +229,10 @@ enum Commands {
     /// Start an interactive shell session
     Shell,
 
-    // [DISABLED] Dashboard is excluded from build temporarily
-    // /// Open the terminal dashboard
-    // Dashboard,
+    /// Open the interactive TUI dashboard (requires --features dashboard)
+    #[cfg(feature = "dashboard")]
+    Dashboard,
+
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 
@@ -271,7 +272,7 @@ async fn main() -> Result<()> {
     // Setup interactive shell check flags
     interactive::init(cli.non_interactive, cli.yes);
 
-    let cmd_name = command_name(&cli.command);
+    let cmd_name = cli.command.as_ref().map(command_name).unwrap_or("shell");
 
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
@@ -302,15 +303,41 @@ async fn main() -> Result<()> {
 }
 
 async fn run(cli: Cli) -> Result<()> {
+    // Default behaviour when no subcommand is given
+    let command = match cli.command {
+        Some(cmd) => cmd,
+        None => {
+            #[cfg(feature = "dashboard")]
+            {
+                let config = Config::from_env_lenient()?;
+                let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
+                return commands::dashboard::run_dashboard(config, http_config).await;
+            }
+            #[cfg(not(feature = "dashboard"))]
+            {
+                Cli::command().print_help()?;
+                return Ok(());
+            }
+        }
+    };
+
     // Handle completions command first (doesn't need config/auth)
-    if let Commands::Completions { shell } = &cli.command {
+    if let Commands::Completions { shell } = &command {
         let mut cmd = Cli::command();
         generate(*shell, &mut cmd, "raps", &mut io::stdout());
         return Ok(());
     }
 
+    // Handle dashboard command (before config loading, it manages its own setup)
+    #[cfg(feature = "dashboard")]
+    if let Commands::Dashboard = &command {
+        let config = Config::from_env_lenient()?;
+        let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
+        return commands::dashboard::run_dashboard(config, http_config).await;
+    }
+
     // Handle MCP server command
-    if let Commands::Serve = &cli.command {
+    if let Commands::Serve = &command {
         mcp::server::run_server()
             .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -318,11 +345,11 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     // Handle config commands (they don't need authentication)
-    if let Commands::Config(_) = &cli.command {
+    if let Commands::Config(_) = &command {
         // Determine output format for config commands
         let output_format = OutputFormat::determine(cli.output);
         // Extract and execute the config command
-        if let Commands::Config(cmd) = cli.command {
+        if let Commands::Config(cmd) = command {
             return cmd.execute(output_format).await;
         }
         unreachable!()
@@ -344,7 +371,7 @@ async fn run(cli: Cli) -> Result<()> {
     // Create HTTP client with shared config
     let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
 
-    if let Commands::Shell = cli.command {
+    if let Commands::Shell = command {
         println!("{}", "Welcome to the RAPS interactive shell!".bold());
         println!("Type 'help' for a list of commands, 'exit' to quit.");
         println!(
@@ -489,8 +516,16 @@ async fn run(cli: Cli) -> Result<()> {
                     let sub_output_format = OutputFormat::determine(sub_cli.output);
                     let sub_http_config = HttpClientConfig::from_cli_and_env(sub_cli.timeout);
 
+                    let sub_command = match sub_cli.command {
+                        Some(cmd) => cmd,
+                        None => {
+                            println!("Use 'help' for available commands, 'exit' to quit.");
+                            continue;
+                        }
+                    };
+
                     if let Err(err) = execute_command(
-                        sub_cli.command,
+                        sub_command,
                         &config,
                         &sub_http_config,
                         sub_output_format,
@@ -524,7 +559,7 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     execute_command(
-        cli.command,
+        command,
         &config,
         &http_config,
         output_format,
@@ -562,6 +597,8 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Pipeline(_) => "pipeline",
         Commands::Completions { .. } => "completions",
         Commands::Shell => "shell",
+        #[cfg(feature = "dashboard")]
+        Commands::Dashboard => "dashboard",
         Commands::Serve => "serve",
         Commands::External(_) => "external",
     }
@@ -746,9 +783,11 @@ async fn execute_command(
             unreachable!()
         }
 
-        // Commands::Dashboard => {
-        //     commands::dashboard::execute().await?;
-        // }
+        #[cfg(feature = "dashboard")]
+        Commands::Dashboard => {
+            unreachable!()
+        }
+
         Commands::External(args) => {
             if args.is_empty() {
                 anyhow::bail!("No plugin name provided");

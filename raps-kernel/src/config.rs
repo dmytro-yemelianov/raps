@@ -247,6 +247,11 @@ impl Config {
     pub fn checklists_url(&self) -> String {
         format!("{}/construction/checklists/v1", self.base_url)
     }
+
+    /// Get the AEC Data Model GraphQL API endpoint
+    pub fn aec_graphql_url(&self) -> String {
+        format!("{}/aec/graphql", self.base_url)
+    }
 }
 
 /// Load profiles from disk
@@ -486,6 +491,7 @@ mod tests {
         assert!(config.assets_url().starts_with(base));
         assert!(config.submittals_url().starts_with(base));
         assert!(config.checklists_url().starts_with(base));
+        assert!(config.aec_graphql_url().starts_with(base));
     }
 
     #[test]

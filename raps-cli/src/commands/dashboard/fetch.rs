@@ -273,7 +273,14 @@ async fn fetch_data(
             Ok(ResourceData::ObjectDetail(fields))
         }
         ViewKind::HubList => {
-            let hubs = clients.dm.list_hubs().await?;
+            // Try AEC Data Model GraphQL first (faster), fall back to REST
+            let hubs = match clients.dm.list_hubs_graphql().await {
+                Ok(h) => h,
+                Err(gql_err) => {
+                    tracing::info!("GraphQL hubs failed, falling back to REST: {gql_err:#}");
+                    clients.dm.list_hubs().await?
+                }
+            };
             let rows: Vec<HubRow> = hubs
                 .into_iter()
                 .map(|h| HubRow {
@@ -285,7 +292,14 @@ async fn fetch_data(
             Ok(ResourceData::Hubs(rows))
         }
         ViewKind::ProjectList { hub_id } => {
-            let projects = clients.dm.list_projects(hub_id).await?;
+            // Try AEC Data Model GraphQL first (faster), fall back to REST
+            let projects = match clients.dm.list_projects_graphql(hub_id).await {
+                Ok(p) => p,
+                Err(gql_err) => {
+                    tracing::info!("GraphQL projects failed, falling back to REST: {gql_err:#}");
+                    clients.dm.list_projects(hub_id).await?
+                }
+            };
             let rows: Vec<ProjectRow> = projects
                 .into_iter()
                 .map(|p| ProjectRow {
