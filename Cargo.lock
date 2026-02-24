@@ -2362,7 +2362,7 @@ dependencies = [
 
 [[package]]
 name = "raps-acc"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2381,7 +2381,7 @@ dependencies = [
 
 [[package]]
 name = "raps-admin"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2404,7 +2404,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cli"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2455,7 +2455,7 @@ dependencies = [
 
 [[package]]
 name = "raps-da"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2474,7 +2474,7 @@ dependencies = [
 
 [[package]]
 name = "raps-derivative"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2495,7 +2495,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2512,7 +2512,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2575,7 +2575,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2598,7 +2598,7 @@ dependencies = [
 
 [[package]]
 name = "raps-reality"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2616,7 +2616,7 @@ dependencies = [
 
 [[package]]
 name = "raps-webhooks"
-version = "4.12.0"
+version = "4.13.0"
 dependencies = [
  "anyhow",
  "raps-kernel",
