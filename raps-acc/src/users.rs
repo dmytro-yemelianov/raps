@@ -3,8 +3,11 @@
 
 //! Project Users API client for ACC/BIM 360
 
+use std::sync::Arc;
+
 use anyhow::{Context, Result};
 use serde::Serialize;
+use tokio::sync::Semaphore;
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
@@ -15,6 +18,7 @@ use crate::types::{PaginatedResponse, ProductAccess, ProjectUser};
 /// Client for ACC Project Users API
 ///
 /// Provides operations for managing users within individual projects.
+#[derive(Clone)]
 pub struct ProjectUsersClient {
     config: Config,
     auth: AuthClient,
@@ -119,7 +123,7 @@ impl ProjectUsersClient {
 
     /// Get the base URL for Project Admin API
     fn project_url(&self, project_id: &str) -> String {
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::strip_project_prefix(project_id);
         format!(
             "{}/construction/admin/v1/projects/{}",
             self.config.base_url, project_id
@@ -349,11 +353,10 @@ impl ProjectUsersClient {
         Ok(all_users)
     }
 
-    /// Import multiple users to a project at once
+    /// Import multiple users to a project concurrently
     ///
-    /// Attempts to add each user individually and collects results.
-    /// This method does not use a bulk API endpoint (which doesn't exist for project users),
-    /// but instead calls add_user for each user and aggregates the results.
+    /// Adds each user individually via concurrent requests bounded by a semaphore
+    /// (max 10 concurrent) for rate-limit safety. Collects per-user results.
     ///
     /// # Arguments
     /// * `project_id` - The project ID
@@ -367,37 +370,53 @@ impl ProjectUsersClient {
         users: Vec<ImportUserRequest>,
     ) -> Result<ImportUsersResult> {
         let total = users.len();
+        let semaphore = Arc::new(Semaphore::new(10));
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for user in users {
+            let client = self.clone();
+            let sem = semaphore.clone();
+            let pid = project_id.to_string();
+            let email = user.email.clone();
+
+            join_set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
+                let request = AddProjectUserRequest {
+                    email: user.email.clone(),
+                    role_id: user.role_id,
+                    products: user.products.unwrap_or_default(),
+                };
+                let result = client.add_user(&pid, request).await;
+                (email, result)
+            });
+        }
+
         let mut imported = 0;
         let mut failed = 0;
         let mut errors = Vec::new();
         let mut successes = Vec::new();
 
-        for user in users {
-            let email = user.email.clone();
-
-            // Build the add user request
-            // Note: We need the user_id, not email, for the API.
-            // The import_users tool in MCP will need to look up user IDs by email first.
-            // For now, we'll attempt to use email as user_id (the caller should resolve this)
-            let request = AddProjectUserRequest {
-                email: user.email.clone(),
-                role_id: user.role_id,
-                products: user.products.unwrap_or_default(),
-            };
-
-            match self.add_user(project_id, request).await {
-                Ok(project_user) => {
+        while let Some(join_result) = join_set.join_next().await {
+            match join_result {
+                Ok((email, Ok(project_user))) => {
                     imported += 1;
                     successes.push(ImportUserSuccess {
                         email,
                         user_id: Some(project_user.id),
                     });
                 }
-                Err(e) => {
+                Ok((email, Err(e))) => {
                     failed += 1;
                     errors.push(ImportUserError {
                         email,
                         error: e.to_string(),
+                    });
+                }
+                Err(e) => {
+                    failed += 1;
+                    errors.push(ImportUserError {
+                        email: "unknown".to_string(),
+                        error: format!("Task join error: {e}"),
                     });
                 }
             }
@@ -411,14 +430,6 @@ impl ProjectUsersClient {
             successes,
         })
     }
-}
-
-/// Remove "b." prefix from project ID if present
-fn normalize_project_id(project_id: &str) -> String {
-    project_id
-        .strip_prefix("b.")
-        .unwrap_or(project_id)
-        .to_string()
 }
 
 #[cfg(test)]
@@ -453,5 +464,45 @@ mod tests {
         assert!(json.contains("new-role"));
         // products should be skipped when None
         assert!(!json.contains("products"));
+    }
+
+    #[test]
+    fn test_import_users_result_aggregation() {
+        let result = ImportUsersResult {
+            total: 5,
+            imported: 3,
+            failed: 2,
+            errors: vec![
+                ImportUserError {
+                    email: "bad1@test.com".to_string(),
+                    error: "Not found".to_string(),
+                },
+                ImportUserError {
+                    email: "bad2@test.com".to_string(),
+                    error: "Conflict".to_string(),
+                },
+            ],
+            successes: vec![
+                ImportUserSuccess {
+                    email: "ok1@test.com".to_string(),
+                    user_id: Some("u1".to_string()),
+                },
+                ImportUserSuccess {
+                    email: "ok2@test.com".to_string(),
+                    user_id: Some("u2".to_string()),
+                },
+                ImportUserSuccess {
+                    email: "ok3@test.com".to_string(),
+                    user_id: Some("u3".to_string()),
+                },
+            ],
+        };
+
+        assert_eq!(result.total, 5);
+        assert_eq!(result.imported + result.failed, result.total);
+        assert_eq!(result.errors.len(), 2);
+        assert_eq!(result.successes.len(), 3);
+        assert_eq!(result.errors[0].email, "bad1@test.com");
+        assert_eq!(result.successes[0].email, "ok1@test.com");
     }
 }

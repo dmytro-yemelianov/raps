@@ -9,6 +9,7 @@
 //! components that may be useful for testing or programmatic usage.
 
 pub mod commands;
+pub mod credits;
 pub mod mcp;
 pub mod output;
 pub mod plugins;

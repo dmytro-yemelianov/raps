@@ -791,7 +791,10 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
+                    anyhow::bail!(
+                        "Bulk operation partially failed: {} items failed",
+                        result.failed
+                    );
                 }
 
                 Ok(())
@@ -869,7 +872,10 @@ impl UserCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
+                    anyhow::bail!(
+                        "Bulk operation partially failed: {} items failed",
+                        result.failed
+                    );
                 }
 
                 Ok(())
@@ -1028,7 +1034,10 @@ impl UserCommands {
 
                     // Exit with appropriate code
                     if result.failed > 0 {
-                        anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
+                        anyhow::bail!(
+                            "Bulk operation partially failed: {} items failed",
+                            result.failed
+                        );
                     }
                 }
 
@@ -1292,7 +1301,10 @@ impl FolderCommands {
 
                 // Exit with appropriate code
                 if result.failed > 0 {
-                    anyhow::bail!("Bulk operation partially failed: {} items failed", result.failed);
+                    anyhow::bail!(
+                        "Bulk operation partially failed: {} items failed",
+                        result.failed
+                    );
                 }
 
                 Ok(())
@@ -2057,7 +2069,10 @@ async fn execute_csv_update(
     }
 
     if output.failed > 0 {
-        anyhow::bail!("Bulk operation partially failed: {} items failed", output.failed);
+        anyhow::bail!(
+            "Bulk operation partially failed: {} items failed",
+            output.failed
+        );
     }
 
     Ok(())
@@ -2588,22 +2603,31 @@ async fn execute_csv_import(
 
     let total = users.len();
 
-    let progress_bar = create_bulk_progress_bar(output_format);
-    if let Some(ref pb) = progress_bar {
-        pb.set_length(total as u64);
-    }
+    // Show spinner during concurrent import (up to 10 parallel requests)
+    let spinner = if output_format.supports_colors() {
+        let sp = ProgressBar::new_spinner();
+        sp.set_style(
+            ProgressStyle::with_template("{spinner:.cyan} {msg}")
+                .unwrap()
+                .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
+        );
+        sp.set_message(format!("Importing {} users concurrently...", total));
+        sp.enable_steady_tick(std::time::Duration::from_millis(100));
+        Some(sp)
+    } else {
+        None
+    };
 
-    // Create users client and call import_users
+    // Create users client and call import_users (concurrent with semaphore)
     let http_config = HttpClientConfig::default();
     let users_client =
         ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
 
     let result = users_client.import_users(project_id, users).await?;
 
-    // Finish progress bar
-    if let Some(pb) = progress_bar {
-        pb.set_position(total as u64);
-        pb.finish_and_clear();
+    // Finish spinner
+    if let Some(sp) = spinner {
+        sp.finish_and_clear();
     }
 
     let errors: Vec<CsvImportErrorOutput> = result
@@ -2666,7 +2690,10 @@ async fn execute_csv_import(
     }
 
     if output.failed > 0 {
-        anyhow::bail!("Bulk operation partially failed: {} items failed", output.failed);
+        anyhow::bail!(
+            "Bulk operation partially failed: {} items failed",
+            output.failed
+        );
     }
 
     Ok(())

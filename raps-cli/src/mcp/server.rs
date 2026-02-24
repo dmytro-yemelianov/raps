@@ -441,7 +441,16 @@ impl RapsServer {
             }
         };
 
-        match client.translate(&urn, output_format, None).await {
+        match client
+            .translate(
+                &urn,
+                output_format,
+                None,
+                raps_derivative::MdRegion::default(),
+                false,
+            )
+            .await
+        {
             Ok(result) => format!(
                 "Translation job started:\n* Result: {}\n* URN: {}",
                 result.result, result.urn

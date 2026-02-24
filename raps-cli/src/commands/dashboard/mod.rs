@@ -34,13 +34,11 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState, Wrap,
-    },
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table, TableState, Wrap},
 };
 use tokio::sync::mpsc;
 
-use raps_acc::{AccClient, IssuesClient, RfiClient, Rfi};
+use raps_acc::{AccClient, IssuesClient, Rfi, RfiClient};
 use raps_da::DesignAutomationClient;
 use raps_derivative::DerivativeClient;
 use raps_dm::DataManagementClient;
@@ -121,44 +119,108 @@ impl ResourceTab {
 enum ViewKind {
     // Buckets tab (F1)
     BucketList,
-    BucketDetail { bucket_key: String },
-    ObjectList { bucket_key: String },
-    ObjectDetail { bucket_key: String, object_key: String },
+    BucketDetail {
+        bucket_key: String,
+    },
+    ObjectList {
+        bucket_key: String,
+    },
+    ObjectDetail {
+        bucket_key: String,
+        object_key: String,
+    },
     // Data Management tab (F2)
     HubList,
-    ProjectList { hub_id: String },
-    FolderList { project_id: String, folder_id: String },
-    ItemDetail { project_id: String, item_id: String },
+    ProjectList {
+        hub_id: String,
+    },
+    FolderList {
+        project_id: String,
+        folder_id: String,
+    },
+    ItemDetail {
+        project_id: String,
+        item_id: String,
+    },
     // ACC tab (F3) — Issues, RFIs, Assets, Submittals, Checklists
-    IssueList { project_id: String },
-    IssueDetail { project_id: String, issue_id: String },
-    IssueCommentList { project_id: String, issue_id: String },
-    IssueAttachmentList { project_id: String, issue_id: String },
-    IssueTypeList { project_id: String },
-    RfiList { project_id: String },
-    RfiDetail { project_id: String, rfi_id: String },
-    AssetList { project_id: String },
-    AssetDetail { project_id: String, asset_id: String },
-    SubmittalList { project_id: String },
-    SubmittalDetail { project_id: String, submittal_id: String },
-    ChecklistList { project_id: String },
-    ChecklistDetail { project_id: String, checklist_id: String },
+    IssueList {
+        project_id: String,
+    },
+    IssueDetail {
+        project_id: String,
+        issue_id: String,
+    },
+    IssueCommentList {
+        project_id: String,
+        issue_id: String,
+    },
+    IssueAttachmentList {
+        project_id: String,
+        issue_id: String,
+    },
+    IssueTypeList {
+        project_id: String,
+    },
+    RfiList {
+        project_id: String,
+    },
+    RfiDetail {
+        project_id: String,
+        rfi_id: String,
+    },
+    AssetList {
+        project_id: String,
+    },
+    AssetDetail {
+        project_id: String,
+        asset_id: String,
+    },
+    SubmittalList {
+        project_id: String,
+    },
+    SubmittalDetail {
+        project_id: String,
+        submittal_id: String,
+    },
+    ChecklistList {
+        project_id: String,
+    },
+    ChecklistDetail {
+        project_id: String,
+        checklist_id: String,
+    },
     // DA tab (F4)
     EngineList,
     ActivityList,
     WorkItemList,
-    WorkItemDetail { id: String },
+    WorkItemDetail {
+        id: String,
+    },
     AppBundleList,
     // Model Derivative tab (F5)
-    ManifestView { urn: String },
-    DerivativeList { urn: String },
-    DerivativeDetail { urn: String, deriv_urn: String, name: String },
+    ManifestView {
+        urn: String,
+    },
+    DerivativeList {
+        urn: String,
+    },
+    DerivativeDetail {
+        urn: String,
+        deriv_urn: String,
+        name: String,
+    },
     // Webhooks tab (F6)
     WebhookList,
-    WebhookDetail { system: String, event: String, hook_id: String },
+    WebhookDetail {
+        system: String,
+        event: String,
+        hook_id: String,
+    },
     // Reality Capture tab (F7)
     PhotosceneList,
-    PhotosceneDetail { id: String },
+    PhotosceneDetail {
+        id: String,
+    },
 }
 
 impl ViewKind {
@@ -488,13 +550,13 @@ impl App {
         Self {
             tab: ResourceTab::Buckets,
             nav_stacks: [
-                vec![ViewKind::BucketList],       // Tab 0: Buckets
-                vec![ViewKind::HubList],           // Tab 1: Data Mgmt
-                vec![ViewKind::HubList],           // Tab 2: ACC (navigate Hub > Project > Issues)
-                vec![ViewKind::EngineList],        // Tab 3: Design Automation
-                vec![],                            // Tab 4: Model Derivative (empty until :urn)
-                vec![ViewKind::WebhookList],       // Tab 5: Webhooks
-                vec![ViewKind::PhotosceneList],    // Tab 6: Reality Capture
+                vec![ViewKind::BucketList],     // Tab 0: Buckets
+                vec![ViewKind::HubList],        // Tab 1: Data Mgmt
+                vec![ViewKind::HubList],        // Tab 2: ACC (navigate Hub > Project > Issues)
+                vec![ViewKind::EngineList],     // Tab 3: Design Automation
+                vec![],                         // Tab 4: Model Derivative (empty until :urn)
+                vec![ViewKind::WebhookList],    // Tab 5: Webhooks
+                vec![ViewKind::PhotosceneList], // Tab 6: Reality Capture
             ],
             table_state: TableState::default(),
             data: None,
@@ -558,8 +620,7 @@ impl App {
             if let Some(entry) = self.cache.get(&view) {
                 self.data = Some(entry.data.clone());
                 self.last_refresh = Some(entry.fetched_at);
-                self.table_state
-                    .select(entry.table_selection.or(Some(0)));
+                self.table_state.select(entry.table_selection.or(Some(0)));
                 let count = self.row_count();
                 self.status_msg = format!("{count} items (cached)");
             } else {
@@ -579,8 +640,7 @@ impl App {
 
     /// Whether the status message is still fresh (within TTL).
     fn status_is_active(&self) -> bool {
-        self.status_at
-            .is_some_and(|t| t.elapsed() < STATUS_MSG_TTL)
+        self.status_at.is_some_and(|t| t.elapsed() < STATUS_MSG_TTL)
     }
 
     fn push_log(&mut self, msg: String) {
@@ -610,84 +670,190 @@ impl App {
         let filter = self.filter_text.to_lowercase();
         match data {
             ResourceData::Buckets(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.key.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Objects(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.key.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Hubs(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Projects(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::FolderContents(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Issues(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.title.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Rfis(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.title.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Assets(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| {
+                            r.id.to_lowercase().contains(&filter)
+                                || r.description.to_lowercase().contains(&filter)
+                        })
+                        .count()
+                }
             }
             ResourceData::Submittals(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.title.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Checklists(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.title.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::IssueComments(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.body.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.body.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Engines(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.id.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Activities(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.id.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::WorkItems(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.id.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::AppBundles(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.id.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Derivatives(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::Webhooks(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.event.to_lowercase().contains(&filter) || r.callback_url.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| {
+                            r.event.to_lowercase().contains(&filter)
+                                || r.callback_url.to_lowercase().contains(&filter)
+                        })
+                        .count()
+                }
             }
             ResourceData::Photoscenes(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::IssueAttachments(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.name.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             ResourceData::IssueTypes(v) => {
-                if filter.is_empty() { v.len() }
-                else { v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count() }
+                if filter.is_empty() {
+                    v.len()
+                } else {
+                    v.iter()
+                        .filter(|r| r.title.to_lowercase().contains(&filter))
+                        .count()
+                }
             }
             // Detail views
             ResourceData::BucketDetail(v)

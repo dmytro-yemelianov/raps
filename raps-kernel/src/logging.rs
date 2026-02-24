@@ -9,10 +9,10 @@
 //! - --verbose: Show request summaries
 //! - --debug: Include full trace (redacts secrets)
 
+use regex::Regex;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use regex::Regex;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{EnvFilter, Layer, layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -142,10 +142,8 @@ pub fn redact_secrets(text: &str) -> String {
     fn secret_pattern() -> &'static Regex {
         static PAT: OnceLock<Regex> = OnceLock::new();
         PAT.get_or_init(|| {
-            Regex::new(
-                r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+",
-            )
-            .expect("secret_pattern regex is valid")
+            Regex::new(r"(?i)(client[_-]?secret|secret[_-]?key|api[_-]?key)\s*[:=]\s*[^\s]+")
+                .expect("secret_pattern regex is valid")
         })
     }
 
@@ -159,8 +157,7 @@ pub fn redact_secrets(text: &str) -> String {
         })
     }
 
-    let redacted = secret_pattern()
-        .replace_all(text, "$1: [REDACTED]");
+    let redacted = secret_pattern().replace_all(text, "$1: [REDACTED]");
     token_pattern()
         .replace_all(&redacted, "$1: [REDACTED]")
         .into_owned()
@@ -176,11 +173,7 @@ fn cleanup_old_logs(log_dir: &std::path::Path, max_files: usize) {
     };
     let mut files: Vec<_> = entries
         .flatten()
-        .filter(|e| {
-            e.file_name()
-                .to_string_lossy()
-                .starts_with("raps.log")
-        })
+        .filter(|e| e.file_name().to_string_lossy().starts_with("raps.log"))
         .collect();
     // Most recent first
     files.sort_by_key(|e| std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).ok()));

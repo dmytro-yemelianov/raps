@@ -79,6 +79,13 @@ impl CachedToken {
     }
 }
 
+/// Cached 3-legged token with refresh coordination
+#[derive(Debug, Clone)]
+struct TokenCache {
+    token: Option<StoredToken>,
+    refreshing: bool,
+}
+
 /// Authentication client for APS
 ///
 /// Handles OAuth 2.0 token acquisition for both 2-legged and 3-legged flows.
@@ -87,7 +94,7 @@ pub struct AuthClient {
     config: Config,
     http_client: reqwest::Client,
     cached_2leg_token: Arc<RwLock<Option<CachedToken>>>,
-    cached_3leg_token: Arc<RwLock<Option<StoredToken>>>,
+    cached_3leg_token: Arc<tokio::sync::Mutex<TokenCache>>,
 }
 
 impl AuthClient {
@@ -110,7 +117,10 @@ impl AuthClient {
             config,
             http_client,
             cached_2leg_token: Arc::new(RwLock::new(None)),
-            cached_3leg_token: Arc::new(RwLock::new(stored_token)),
+            cached_3leg_token: Arc::new(tokio::sync::Mutex::new(TokenCache {
+                token: stored_token,
+                refreshing: false,
+            })),
         }
     }
 
@@ -176,34 +186,48 @@ impl AuthClient {
     }
 
     /// Get a valid 3-legged access token (requires prior login)
+    ///
+    /// Uses Mutex-based coordination to ensure only one refresh occurs at a time.
+    /// Concurrent callers wait and receive the newly refreshed token.
     pub async fn get_3leg_token(&self) -> Result<String> {
-        // Check cached token
-        let refresh_token_to_use: Option<String>;
-        {
-            let cache = self.cached_3leg_token.read().await;
-            if let Some(ref token) = *cache {
-                if token.is_valid() {
-                    return Ok(token.access_token.clone());
+        loop {
+            let refresh_token_to_use: Option<String>;
+            {
+                let cache = self.cached_3leg_token.lock().await;
+                if let Some(ref token) = cache.token {
+                    if token.is_valid() {
+                        return Ok(token.access_token.clone());
+                    }
+                    if cache.refreshing {
+                        // Another task is already refreshing; drop lock and wait
+                        drop(cache);
+                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        continue;
+                    }
+                    refresh_token_to_use = token.refresh_token.clone();
+                } else {
+                    refresh_token_to_use = None;
                 }
-                // Get refresh token for later use
-                refresh_token_to_use = token.refresh_token.clone();
-            } else {
-                refresh_token_to_use = None;
             }
-        }
 
-        // Try to refresh if we have a refresh token
-        if let Some(refresh) = refresh_token_to_use {
-            return self.refresh_token(refresh).await;
-        }
+            // Try to refresh if we have a refresh token
+            if let Some(refresh) = refresh_token_to_use {
+                // Mark as refreshing
+                {
+                    let mut cache = self.cached_3leg_token.lock().await;
+                    cache.refreshing = true;
+                }
+                return self.refresh_token(refresh).await;
+            }
 
-        anyhow::bail!("Not logged in. Please run 'raps auth login' first.")
+            anyhow::bail!("Not logged in. Please run 'raps auth login' first.")
+        }
     }
 
     /// Check if user is logged in with 3-legged OAuth
     pub async fn is_logged_in(&self) -> bool {
-        let cache = self.cached_3leg_token.read().await;
-        if let Some(ref token) = *cache {
+        let cache = self.cached_3leg_token.lock().await;
+        if let Some(ref token) = cache.token {
             if token.is_valid() {
                 return true;
             }
@@ -262,7 +286,10 @@ impl AuthClient {
 
         // Request device code
         let scope_str = scopes.join(" ");
-        let params = [("client_id", self.config.client_id.as_str()), ("scope", scope_str.as_str())];
+        let params = [
+            ("client_id", self.config.client_id.as_str()),
+            ("scope", scope_str.as_str()),
+        ];
         let _auth_start = std::time::Instant::now();
         let response = self
             .http_client
@@ -371,8 +398,8 @@ impl AuthClient {
 
                 // Update cache
                 {
-                    let mut cache = self.cached_3leg_token.write().await;
-                    *cache = Some(stored.clone());
+                    let mut cache = self.cached_3leg_token.lock().await;
+                    cache.token = Some(stored.clone());
                 }
 
                 return Ok(stored);
@@ -429,8 +456,8 @@ impl AuthClient {
 
         // Update cache
         {
-            let mut cache = self.cached_3leg_token.write().await;
-            *cache = Some(stored.clone());
+            let mut cache = self.cached_3leg_token.lock().await;
+            cache.token = Some(stored.clone());
         }
 
         Ok(stored)
@@ -575,7 +602,8 @@ impl AuthClient {
                     error, desc
                 ))
                 .with_header(
-                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).expect("Content-Type: text/html is a valid header"),
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..])
+                        .expect("Content-Type: text/html is a valid header"),
                 );
                 request.respond(response).ok();
                 anyhow::bail!("Authorization error: {error} - {desc}");
@@ -625,8 +653,8 @@ impl AuthClient {
 
         // Update cache
         {
-            let mut cache = self.cached_3leg_token.write().await;
-            *cache = Some(stored.clone());
+            let mut cache = self.cached_3leg_token.lock().await;
+            cache.token = Some(stored.clone());
         }
 
         Ok(stored)
@@ -668,6 +696,9 @@ impl AuthClient {
     }
 
     /// Refresh an expired access token
+    ///
+    /// On failure: preserves cached token (does not clear it), resets refreshing flag.
+    /// On success: updates cached token, resets refreshing flag.
     async fn refresh_token(&self, refresh_token: String) -> Result<String> {
         let url = self.config.auth_url();
 
@@ -688,10 +719,11 @@ impl AuthClient {
         crate::profiler::record_http_request(_auth_start.elapsed());
 
         if !response.status().is_success() {
-            // Refresh failed, clear stored token
-            self.delete_stored_token().ok();
-            let mut cache = self.cached_3leg_token.write().await;
-            *cache = None;
+            // Refresh failed — preserve cached token, just reset refreshing flag
+            {
+                let mut cache = self.cached_3leg_token.lock().await;
+                cache.refreshing = false;
+            }
             anyhow::bail!("Token refresh failed. Please login again with 'raps auth login'");
         }
 
@@ -702,8 +734,12 @@ impl AuthClient {
 
         // Update stored token, preserving scopes from the original
         let original_scopes = {
-            let cache = self.cached_3leg_token.read().await;
-            cache.as_ref().map(|t| t.scopes.clone()).unwrap_or_default()
+            let cache = self.cached_3leg_token.lock().await;
+            cache
+                .token
+                .as_ref()
+                .map(|t| t.scopes.clone())
+                .unwrap_or_default()
         };
         let stored = StoredToken {
             access_token: token.access_token.clone(),
@@ -715,8 +751,9 @@ impl AuthClient {
         self.save_token(&stored)?;
 
         {
-            let mut cache = self.cached_3leg_token.write().await;
-            *cache = Some(stored);
+            let mut cache = self.cached_3leg_token.lock().await;
+            cache.token = Some(stored);
+            cache.refreshing = false;
         }
 
         Ok(token.access_token)
@@ -725,8 +762,9 @@ impl AuthClient {
     /// Logout - clear stored tokens
     pub async fn logout(&self) -> Result<()> {
         self.delete_stored_token()?;
-        let mut cache = self.cached_3leg_token.write().await;
-        *cache = None;
+        let mut cache = self.cached_3leg_token.lock().await;
+        cache.token = None;
+        cache.refreshing = false;
         Ok(())
     }
 
@@ -756,16 +794,16 @@ impl AuthClient {
 
     /// Get token expiry timestamp
     pub async fn get_token_expiry(&self) -> Option<i64> {
-        let cache = self.cached_3leg_token.read().await;
-        cache.as_ref().map(|t| t.expires_at)
+        let cache = self.cached_3leg_token.lock().await;
+        cache.token.as_ref().map(|t| t.expires_at)
     }
 
     /// Set a 3-legged token for testing purposes
     /// This allows integration tests to simulate a logged-in state
     #[cfg(any(test, feature = "test-utils"))]
     pub async fn set_3leg_token_for_testing(&self, token: StoredToken) {
-        let mut cache = self.cached_3leg_token.write().await;
-        *cache = Some(token);
+        let mut cache = self.cached_3leg_token.lock().await;
+        cache.token = Some(token);
     }
 
     /// Set a 2-legged token for testing purposes

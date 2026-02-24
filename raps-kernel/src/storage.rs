@@ -100,8 +100,9 @@ impl TokenStorage {
 
     /// Get the file path for file-based storage
     fn token_file_path() -> Result<PathBuf> {
-        let dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
-            .ok_or_else(|| anyhow::anyhow!("Failed to determine project directories (no home directory?)"))?;
+        let dirs = directories::ProjectDirs::from("com", "autodesk", "raps").ok_or_else(|| {
+            anyhow::anyhow!("Failed to determine project directories (no home directory?)")
+        })?;
         Ok(dirs.config_dir().join("tokens.json"))
     }
 
@@ -130,6 +131,10 @@ impl TokenStorage {
     }
 
     /// Save token to file (INSECURE - logs warning)
+    ///
+    /// Uses synchronous I/O intentionally: token files are ~200 bytes and written
+    /// at most once per CLI invocation. The sub-microsecond I/O cost is far less
+    /// than the overhead of `spawn_blocking` thread-pool scheduling.
     fn save_file(&self, token: &StoredToken) -> Result<()> {
         tracing::warn!("Storing token in plaintext file. Use keychain for better security.");
         let path = Self::token_file_path()?;
@@ -168,7 +173,9 @@ impl TokenStorage {
             return Ok(None);
         }
 
-        tracing::warn!("Loading token from plaintext file. Consider migrating to keychain storage.");
+        tracing::warn!(
+            "Loading token from plaintext file. Consider migrating to keychain storage."
+        );
 
         let contents = std::fs::read_to_string(&path)?;
 

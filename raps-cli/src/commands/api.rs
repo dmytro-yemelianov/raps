@@ -553,7 +553,14 @@ async fn handle_response(
                         details: Some(value),
                     };
                     output_format.write(&error)?;
-                    bail!("API error ({}): {}", status_code, extract_error_message(&error.details.as_ref().unwrap_or(&Value::Null), status));
+                    bail!(
+                        "API error ({}): {}",
+                        status_code,
+                        extract_error_message(
+                            error.details.as_ref().unwrap_or(&Value::Null),
+                            status
+                        )
+                    );
                 }
             }
             Err(_) => {
@@ -615,7 +622,11 @@ async fn handle_response(
                 );
             }
         } else {
-            bail!("API error ({}): binary error response ({} bytes)", status_code, bytes.len());
+            bail!(
+                "API error ({}): binary error response ({} bytes)",
+                status_code,
+                bytes.len()
+            );
         }
     }
 }

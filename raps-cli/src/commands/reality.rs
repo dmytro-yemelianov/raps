@@ -389,7 +389,21 @@ async fn check_status(
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
 
+        // 4-hour timeout — photogrammetry processing can legitimately take hours
+        let timeout = Duration::from_secs(4 * 60 * 60);
+        let start = std::time::Instant::now();
+
         loop {
+            if start.elapsed() > timeout {
+                spinner.finish_with_message(format!(
+                    "{} Timed out after {} hours. Use 'raps reality status {}' to check later.",
+                    "⏱".yellow().bold(),
+                    timeout.as_secs() / 3600,
+                    photoscene_id
+                ));
+                break;
+            }
+
             let progress = client.get_progress(photoscene_id).await?;
             let msg = progress.progress_msg.as_deref().unwrap_or("");
             spinner.set_message(format!("Progress: {}% - {}", progress.progress, msg));
@@ -454,7 +468,18 @@ async fn get_result(
         );
     }
 
-    if let Some(ref size) = result.file_size {
+    if let Some(bytes) = result.filesize_bytes() {
+        let display = if bytes >= 1_073_741_824 {
+            format!("{:.2} GB", bytes as f64 / 1_073_741_824.0)
+        } else if bytes >= 1_048_576 {
+            format!("{:.2} MB", bytes as f64 / 1_048_576.0)
+        } else if bytes >= 1024 {
+            format!("{:.2} KB", bytes as f64 / 1024.0)
+        } else {
+            format!("{bytes} B")
+        };
+        println!("  {} {}", "File Size:".bold(), display);
+    } else if let Some(ref size) = result.file_size {
         println!("  {} {}", "File Size:".bold(), size);
     }
 

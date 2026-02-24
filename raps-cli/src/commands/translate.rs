@@ -13,9 +13,15 @@ use std::time::Duration;
 use std::{path::PathBuf, str::FromStr};
 
 use crate::output::OutputFormat;
-use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
+use raps_derivative::{
+    DerivativeClient, MdRegion, OutputFormat as DerivativeOutputFormat, PropertyQuery,
+};
 // use raps_kernel::output::OutputFormat;
 use raps_kernel::{progress, prompts};
+
+/// Client-side polling timeout for translations (2 hours).
+/// Translations typically complete within minutes, but complex models can take longer.
+const TRANSLATE_POLL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 
 #[derive(Debug, Subcommand)]
 pub enum TranslateCommands {
@@ -35,6 +41,16 @@ pub enum TranslateCommands {
         /// Wait for translation to complete (polls until done)
         #[arg(short, long)]
         wait: bool,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long, default_value = "US")]
+        region: String,
+
+        /// Force re-translation by deleting existing manifest.
+        /// Note: Prior versions always forced re-translation. The default is now
+        /// to preserve existing manifests.
+        #[arg(long)]
+        force: bool,
     },
 
     /// Check translation status
@@ -83,6 +99,84 @@ pub enum TranslateCommands {
         /// Download all available derivatives
         #[arg(short, long)]
         all: bool,
+    },
+
+    /// List model views/viewables (metadata)
+    Metadata {
+        /// Base64-encoded URN of the source file
+        urn: String,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long)]
+        region: Option<String>,
+
+        /// Output format
+        #[arg(short, long, default_value = "table")]
+        output: String,
+    },
+
+    /// Get object tree hierarchy for a model view
+    Tree {
+        /// Base64-encoded URN of the source file
+        urn: String,
+
+        /// Model view GUID (from metadata command)
+        guid: String,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long)]
+        region: Option<String>,
+
+        /// Output format
+        #[arg(short, long, default_value = "table")]
+        output: String,
+    },
+
+    /// Get properties for a model view
+    Properties {
+        /// Base64-encoded URN of the source file
+        urn: String,
+
+        /// Model view GUID (from metadata command)
+        guid: String,
+
+        /// Filter by object ID
+        #[arg(long = "object-id")]
+        object_id: Option<i64>,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long)]
+        region: Option<String>,
+
+        /// Output format
+        #[arg(short, long, default_value = "table")]
+        output: String,
+    },
+
+    /// Query specific properties by object IDs
+    #[command(name = "query-properties")]
+    QueryProperties {
+        /// Base64-encoded URN of the source file
+        urn: String,
+
+        /// Model view GUID (from metadata command)
+        guid: String,
+
+        /// Comma-separated object IDs to filter (e.g., "1,2,3")
+        #[arg(short, long)]
+        filter: String,
+
+        /// Comma-separated field names to return
+        #[arg(long)]
+        fields: Option<String>,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long)]
+        region: Option<String>,
+
+        /// Output format
+        #[arg(short, long, default_value = "table")]
+        output: String,
     },
 
     /// Manage translation presets
@@ -140,7 +234,21 @@ impl TranslateCommands {
                 format,
                 root_filename,
                 wait,
-            } => start_translation(client, urn, format, root_filename, wait, output_format).await,
+                region,
+                force,
+            } => {
+                start_translation(
+                    client,
+                    urn,
+                    format,
+                    root_filename,
+                    wait,
+                    output_format,
+                    region,
+                    force,
+                )
+                .await
+            }
             TranslateCommands::Status { urn, wait } => {
                 check_status(client, &urn, wait, output_format).await
             }
@@ -157,6 +265,32 @@ impl TranslateCommands {
             } => {
                 download_derivatives(client, &urn, format, guid, out_dir, all, output_format).await
             }
+            TranslateCommands::Metadata {
+                urn,
+                region,
+                output,
+            } => show_metadata(client, &urn, region, &output).await,
+            TranslateCommands::Tree {
+                urn,
+                guid,
+                region,
+                output,
+            } => show_object_tree(client, &urn, &guid, region, &output).await,
+            TranslateCommands::Properties {
+                urn,
+                guid,
+                object_id,
+                region,
+                output,
+            } => show_properties(client, &urn, &guid, object_id, region, &output).await,
+            TranslateCommands::QueryProperties {
+                urn,
+                guid,
+                filter,
+                fields,
+                region,
+                output,
+            } => query_properties(client, &urn, &guid, &filter, fields, region, &output).await,
             TranslateCommands::Preset(cmd) => cmd.execute(client, output_format).await,
         }
     }
@@ -192,6 +326,7 @@ struct TranslationStartOutput {
     accepted_formats: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_translation(
     client: &DerivativeClient,
     urn: Option<String>,
@@ -199,7 +334,10 @@ async fn start_translation(
     root_filename: Option<String>,
     wait: bool,
     output_format: OutputFormat,
+    region_str: String,
+    force: bool,
 ) -> Result<()> {
+    let region: raps_derivative::MdRegion = region_str.parse().context("Invalid --region value")?;
     // Get URN interactively if not provided
     let source_urn = match urn {
         Some(u) => u,
@@ -250,7 +388,13 @@ async fn start_translation(
     }
 
     let response = client
-        .translate(&source_urn, derivative_format, root_filename.as_deref())
+        .translate(
+            &source_urn,
+            derivative_format,
+            root_filename.as_deref(),
+            region,
+            force,
+        )
         .await?;
 
     let accepted_formats: Vec<String> = response
@@ -322,7 +466,20 @@ async fn check_status(
         // Poll until complete (spinner hidden in non-interactive mode)
         let spinner = progress::spinner("Checking translation status...");
 
+        let timeout = TRANSLATE_POLL_TIMEOUT;
+        let start = std::time::Instant::now();
+
         loop {
+            if start.elapsed() > timeout {
+                spinner.finish_with_message(format!(
+                    "{} Timed out after {} hours. Check status: raps translate status {}",
+                    "⏱".yellow().bold(),
+                    timeout.as_secs() / 3600,
+                    urn
+                ));
+                break;
+            }
+
             let (status, progress) = client.get_status(urn).await?;
             spinner.set_message(format!("Translation: {} ({})", status, progress));
 
@@ -373,6 +530,213 @@ async fn check_status(
             _ => {
                 output_format.write(&output)?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+// ============== METADATA HANDLERS ==============
+
+fn parse_region(region: Option<String>) -> Result<Option<MdRegion>> {
+    match region {
+        Some(r) => Ok(Some(r.parse::<MdRegion>()?)),
+        None => Ok(None),
+    }
+}
+
+async fn show_metadata(
+    client: &DerivativeClient,
+    urn: &str,
+    region: Option<String>,
+    output: &str,
+) -> Result<()> {
+    let region = parse_region(region)?;
+    let output_format: OutputFormat = output.parse().unwrap_or(OutputFormat::Table);
+
+    println!("{}", "Fetching model metadata...".dimmed());
+    let response = client.get_metadata(urn, region).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Model Views / Viewables".bold());
+            println!("{}", "─".repeat(70));
+            for view in &response.data.metadata {
+                let role_icon = match view.role.as_str() {
+                    "3d" => "🧊",
+                    "2d" => "📐",
+                    _ => "📄",
+                };
+                println!(
+                    "  {} {} {}",
+                    role_icon,
+                    view.name.bold(),
+                    format!("({})", view.role).dimmed()
+                );
+                println!("    {} {}", "GUID:".dimmed(), view.guid);
+                if let Some(ref mime) = view.mime_type {
+                    println!("    {} {}", "MIME:".dimmed(), mime);
+                }
+                if let Some(ref progress) = view.progress {
+                    println!("    {} {}", "Progress:".dimmed(), progress);
+                }
+            }
+            if response.data.metadata.is_empty() {
+                println!("  {}", "No views found.".dimmed());
+            }
+        }
+        _ => {
+            output_format.write(&response)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn show_object_tree(
+    client: &DerivativeClient,
+    urn: &str,
+    guid: &str,
+    region: Option<String>,
+    output: &str,
+) -> Result<()> {
+    let region = parse_region(region)?;
+    let output_format: OutputFormat = output.parse().unwrap_or(OutputFormat::Table);
+
+    println!("{}", "Fetching object tree...".dimmed());
+    let response = client.get_object_tree(urn, guid, region).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Object Tree".bold());
+            println!("{}", "─".repeat(70));
+            for node in &response.data.objects {
+                print_tree_node(node, 0);
+            }
+        }
+        _ => {
+            output_format.write(&response)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn print_tree_node(node: &raps_derivative::ObjectTreeNode, depth: usize) {
+    let indent = "  ".repeat(depth + 1);
+    let connector = if depth > 0 { "├─ " } else { "" };
+    println!(
+        "{}{}[{}] {}",
+        indent,
+        connector,
+        node.object_id.to_string().dimmed(),
+        node.name
+    );
+    for child in &node.objects {
+        print_tree_node(child, depth + 1);
+    }
+}
+
+async fn show_properties(
+    client: &DerivativeClient,
+    urn: &str,
+    guid: &str,
+    object_id: Option<i64>,
+    region: Option<String>,
+    output: &str,
+) -> Result<()> {
+    let region = parse_region(region)?;
+    let output_format: OutputFormat = output.parse().unwrap_or(OutputFormat::Table);
+
+    println!("{}", "Fetching properties...".dimmed());
+    let response = client.get_properties(urn, guid, object_id, region).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Properties".bold());
+            println!("{}", "─".repeat(70));
+            for obj in &response.data.collection {
+                println!(
+                    "\n  {} [{}]",
+                    obj.name.bold(),
+                    obj.object_id.to_string().dimmed()
+                );
+                for (category, props) in &obj.properties {
+                    println!("    {}:", category.cyan());
+                    if let Some(map) = props.as_object() {
+                        for (key, value) in map {
+                            println!("      {} {}", format!("{}:", key).dimmed(), value);
+                        }
+                    }
+                }
+            }
+            if response.data.collection.is_empty() {
+                println!("  {}", "No properties found.".dimmed());
+            }
+        }
+        _ => {
+            output_format.write(&response)?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn query_properties(
+    client: &DerivativeClient,
+    urn: &str,
+    guid: &str,
+    filter: &str,
+    fields: Option<String>,
+    region: Option<String>,
+    output: &str,
+) -> Result<()> {
+    let region = parse_region(region)?;
+    let output_format: OutputFormat = output.parse().unwrap_or(OutputFormat::Table);
+
+    // Parse comma-separated object IDs
+    let ids: Vec<i64> = filter
+        .split(',')
+        .map(|s| {
+            s.trim()
+                .parse::<i64>()
+                .context(format!("Invalid object ID: '{}'", s.trim()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let mut query = PropertyQuery::by_object_ids(ids);
+    if let Some(ref f) = fields {
+        query.fields = Some(f.split(',').map(|s| s.trim().to_string()).collect());
+    }
+
+    println!("{}", "Querying properties...".dimmed());
+    let response = client.query_properties(urn, guid, query, region).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Query Results".bold());
+            println!("{}", "─".repeat(70));
+            for obj in &response.data.collection {
+                println!(
+                    "\n  {} [{}]",
+                    obj.name.bold(),
+                    obj.object_id.to_string().dimmed()
+                );
+                for (category, props) in &obj.properties {
+                    println!("    {}:", category.cyan());
+                    if let Some(map) = props.as_object() {
+                        for (key, value) in map {
+                            println!("      {} {}", format!("{}:", key).dimmed(), value);
+                        }
+                    }
+                }
+            }
+            if response.data.collection.is_empty() {
+                println!("  {}", "No matching properties found.".dimmed());
+            }
+        }
+        _ => {
+            output_format.write(&response)?;
         }
     }
 
@@ -970,7 +1334,15 @@ async fn use_preset(
     }
 
     // Start translation using the preset format
-    let response = client.translate(urn, format, None).await?;
+    let response = client
+        .translate(
+            urn,
+            format,
+            None,
+            raps_derivative::MdRegion::default(),
+            false,
+        )
+        .await?;
 
     #[derive(Serialize)]
     struct UsePresetOutput {
@@ -1009,4 +1381,15 @@ async fn use_preset(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_translate_poll_timeout_is_two_hours() {
+        assert_eq!(TRANSLATE_POLL_TIMEOUT, Duration::from_secs(7200));
+        assert_eq!(TRANSLATE_POLL_TIMEOUT.as_secs() / 3600, 2);
+    }
 }

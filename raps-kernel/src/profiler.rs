@@ -72,12 +72,11 @@ pub fn mark_kernel_loaded() {
     if !is_enabled() {
         return;
     }
-    if let Some(start) = GLOBAL_PROFILER.start_time.get() {
-        if let Ok(mut kernel_dur) = GLOBAL_PROFILER.kernel_load_duration.lock() {
-            if kernel_dur.is_none() {
-                *kernel_dur = Some(start.elapsed());
-            }
-        }
+    if let Some(start) = GLOBAL_PROFILER.start_time.get()
+        && let Ok(mut kernel_dur) = GLOBAL_PROFILER.kernel_load_duration.lock()
+        && kernel_dur.is_none()
+    {
+        *kernel_dur = Some(start.elapsed());
     }
 }
 
@@ -86,10 +85,10 @@ pub fn mark_plugins_loaded(duration: Duration) {
     if !is_enabled() {
         return;
     }
-    if let Ok(mut plugins_dur) = GLOBAL_PROFILER.plugins_load_duration.lock() {
-        if plugins_dur.is_none() {
-            *plugins_dur = Some(duration);
-        }
+    if let Ok(mut plugins_dur) = GLOBAL_PROFILER.plugins_load_duration.lock()
+        && plugins_dur.is_none()
+    {
+        *plugins_dur = Some(duration);
     }
 }
 
@@ -198,11 +197,7 @@ pub fn report(command: Option<&str>, exit_code: Option<i32>) {
     if retry_count > 0 {
         eprintln!("{:<22} {}", "HTTP Retries:", retry_count);
     }
-    eprintln!(
-        "{:<22} {:.3}s",
-        "Other Time:",
-        other_time.as_secs_f64()
-    );
+    eprintln!("{:<22} {:.3}s", "Other Time:", other_time.as_secs_f64());
     eprintln!("{:<22} {}", "Memory (at exit):", memory_str);
     eprintln!("================================");
 }

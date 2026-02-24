@@ -22,6 +22,57 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
+/// APS data center regions for Model Derivative service
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MdRegion {
+    #[default]
+    US,
+    EMEA,
+    AUS,
+    CAN,
+    DEU,
+    IND,
+    JPN,
+    GBR,
+}
+
+impl std::fmt::Display for MdRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            MdRegion::US => "US",
+            MdRegion::EMEA => "EMEA",
+            MdRegion::AUS => "AUS",
+            MdRegion::CAN => "CAN",
+            MdRegion::DEU => "DEU",
+            MdRegion::IND => "IND",
+            MdRegion::JPN => "JPN",
+            MdRegion::GBR => "GBR",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for MdRegion {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_ascii_uppercase().as_str() {
+            "US" => Ok(MdRegion::US),
+            "EMEA" => Ok(MdRegion::EMEA),
+            "AUS" => Ok(MdRegion::AUS),
+            "CAN" => Ok(MdRegion::CAN),
+            "DEU" => Ok(MdRegion::DEU),
+            "IND" => Ok(MdRegion::IND),
+            "JPN" => Ok(MdRegion::JPN),
+            "GBR" => Ok(MdRegion::GBR),
+            _ => anyhow::bail!(
+                "Invalid region '{}'. Valid values: US, EMEA, AUS, CAN, DEU, IND, JPN, GBR",
+                s
+            ),
+        }
+    }
+}
+
 /// Supported output formats for translation
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum OutputFormat {
@@ -240,6 +291,116 @@ pub struct DownloadableDerivative {
     pub size: Option<u64>,
 }
 
+// ============== METADATA TYPES ==============
+
+/// Response from GET /metadata — list model views/viewables
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MetadataResponse {
+    pub data: MetadataData,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MetadataData {
+    #[serde(rename = "type")]
+    pub data_type: Option<String>,
+    pub metadata: Vec<ModelView>,
+}
+
+/// A single view/viewable within a translated model
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelView {
+    pub guid: String,
+    pub name: String,
+    pub role: String,
+    #[serde(rename = "mime")]
+    pub mime_type: Option<String>,
+    pub has_thumbnail: Option<String>,
+    pub progress: Option<String>,
+}
+
+/// Response from GET /metadata/{guid} — object tree hierarchy
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ObjectTreeResponse {
+    pub data: ObjectTreeData,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ObjectTreeData {
+    #[serde(rename = "type")]
+    pub data_type: Option<String>,
+    pub objects: Vec<ObjectTreeNode>,
+}
+
+/// A node in the model's object tree
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ObjectTreeNode {
+    #[serde(rename = "objectid")]
+    pub object_id: i64,
+    pub name: String,
+    #[serde(default)]
+    pub objects: Vec<ObjectTreeNode>,
+}
+
+/// Response from GET/POST /metadata/{guid}/properties
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PropertiesResponse {
+    pub data: PropertiesData,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PropertiesData {
+    #[serde(rename = "type")]
+    pub data_type: Option<String>,
+    pub collection: Vec<PropertyObject>,
+}
+
+/// A single object's properties
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PropertyObject {
+    #[serde(rename = "objectid")]
+    pub object_id: i64,
+    pub name: String,
+    pub external_id: Option<String>,
+    #[serde(default)]
+    pub properties: std::collections::HashMap<String, serde_json::Value>,
+}
+
+/// Request body for POST /metadata/{guid}/properties:query
+#[derive(Debug, Serialize)]
+pub struct PropertyQuery {
+    pub query: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fields: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pagination: Option<PropertyPagination>,
+}
+
+impl PropertyQuery {
+    /// Create a query filtering by object IDs
+    pub fn by_object_ids(ids: Vec<i64>) -> Self {
+        let mut filter: Vec<serde_json::Value> =
+            vec![serde_json::Value::String("objectid".to_string())];
+        filter.extend(
+            ids.into_iter()
+                .map(|id| serde_json::Value::Number(serde_json::Number::from(id))),
+        );
+        Self {
+            query: serde_json::json!({ "$in": filter }),
+            fields: None,
+            pagination: None,
+        }
+    }
+}
+
+/// Pagination for property queries
+#[derive(Debug, Serialize)]
+pub struct PropertyPagination {
+    pub offset: usize,
+    pub limit: usize,
+}
+
 /// Model Derivative API client
 #[derive(Clone)]
 pub struct DerivativeClient {
@@ -278,6 +439,8 @@ impl DerivativeClient {
         urn: &str,
         format: OutputFormat,
         root_filename: Option<&str>,
+        region: MdRegion,
+        force: bool,
     ) -> Result<TranslationResponse> {
         let token = self.auth.get_token().await?;
         let job_url = format!("{}/designdata/job", self.config.derivative_url());
@@ -290,7 +453,7 @@ impl DerivativeClient {
             },
             output: TranslationOutput {
                 destination: OutputDestination {
-                    region: "us".to_string(),
+                    region: region.to_string().to_lowercase(),
                 },
                 formats: vec![OutputFormatSpec {
                     format_type: format.type_name().to_string(),
@@ -308,12 +471,16 @@ impl DerivativeClient {
 
         // Use retry logic for translation requests
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
-            self.http_client
+            let mut req = self
+                .http_client
                 .post(&job_url)
                 .bearer_auth(&token)
                 .header("Content-Type", "application/json")
-                .header("x-ads-force", "true")
-                .json(&request)
+                .header("x-ads-region", region.to_string());
+            if force {
+                req = req.header("x-ads-force", "true");
+            }
+            req.json(&request)
         })
         .await?;
 
@@ -549,6 +716,164 @@ impl DerivativeClient {
         pb.finish_with_message(format!("Downloaded {}", filename));
 
         Ok(downloaded)
+    }
+
+    // ============== METADATA METHODS ==============
+
+    /// Get metadata (list of model views/viewables) for a translated model
+    pub async fn get_metadata(
+        &self,
+        urn: &str,
+        region: Option<MdRegion>,
+    ) -> Result<MetadataResponse> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/designdata/{}/metadata",
+            self.config.derivative_url(),
+            urn
+        );
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            let mut req = self.http_client.get(&url).bearer_auth(&token);
+            if let Some(region) = region {
+                req = req.header("x-ads-region", region.to_string());
+            }
+            req
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get metadata ({status}): {error_text}");
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse metadata response")
+    }
+
+    /// Get object tree hierarchy for a specific model view
+    pub async fn get_object_tree(
+        &self,
+        urn: &str,
+        model_guid: &str,
+        region: Option<MdRegion>,
+    ) -> Result<ObjectTreeResponse> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/designdata/{}/metadata/{}",
+            self.config.derivative_url(),
+            urn,
+            model_guid
+        );
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            let mut req = self.http_client.get(&url).bearer_auth(&token);
+            if let Some(region) = region {
+                req = req.header("x-ads-region", region.to_string());
+            }
+            req
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get object tree ({status}): {error_text}");
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse object tree response")
+    }
+
+    /// Get all properties for a specific model view
+    pub async fn get_properties(
+        &self,
+        urn: &str,
+        model_guid: &str,
+        object_id: Option<i64>,
+        region: Option<MdRegion>,
+    ) -> Result<PropertiesResponse> {
+        let token = self.auth.get_token().await?;
+        let mut url = format!(
+            "{}/designdata/{}/metadata/{}/properties",
+            self.config.derivative_url(),
+            urn,
+            model_guid
+        );
+
+        if let Some(id) = object_id {
+            url = format!("{}?objectid={}", url, id);
+        }
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            let mut req = self.http_client.get(&url).bearer_auth(&token);
+            if let Some(region) = region {
+                req = req.header("x-ads-region", region.to_string());
+            }
+            req
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to get properties ({status}): {error_text}");
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse properties response")
+    }
+
+    /// Query specific properties by object IDs (POST endpoint)
+    pub async fn query_properties(
+        &self,
+        urn: &str,
+        model_guid: &str,
+        query: PropertyQuery,
+        region: Option<MdRegion>,
+    ) -> Result<PropertiesResponse> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/designdata/{}/metadata/{}/properties:query",
+            self.config.derivative_url(),
+            urn,
+            model_guid
+        );
+
+        let query_json =
+            serde_json::to_value(&query).context("Failed to serialize property query")?;
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            let mut req = self
+                .http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&query_json);
+            if let Some(region) = region {
+                req = req.header("x-ads-region", region.to_string());
+            }
+            req
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to query properties ({status}): {error_text}");
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse query properties response")
     }
 
     /// Download all derivatives matching a format
@@ -846,6 +1171,138 @@ mod tests {
         let derivatives: Vec<DownloadableDerivative> = vec![];
         let filtered = DerivativeClient::filter_by_format(&derivatives, "obj");
         assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_md_region_display() {
+        assert_eq!(MdRegion::US.to_string(), "US");
+        assert_eq!(MdRegion::EMEA.to_string(), "EMEA");
+        assert_eq!(MdRegion::AUS.to_string(), "AUS");
+        assert_eq!(MdRegion::CAN.to_string(), "CAN");
+        assert_eq!(MdRegion::DEU.to_string(), "DEU");
+        assert_eq!(MdRegion::IND.to_string(), "IND");
+        assert_eq!(MdRegion::JPN.to_string(), "JPN");
+        assert_eq!(MdRegion::GBR.to_string(), "GBR");
+    }
+
+    #[test]
+    fn test_md_region_from_str() {
+        assert_eq!(MdRegion::from_str("emea").unwrap(), MdRegion::EMEA);
+        assert_eq!(MdRegion::from_str("US").unwrap(), MdRegion::US);
+        assert_eq!(MdRegion::from_str("aus").unwrap(), MdRegion::AUS);
+        assert_eq!(MdRegion::from_str("Can").unwrap(), MdRegion::CAN);
+        assert_eq!(MdRegion::from_str("deu").unwrap(), MdRegion::DEU);
+        assert_eq!(MdRegion::from_str("ind").unwrap(), MdRegion::IND);
+        assert_eq!(MdRegion::from_str("jpn").unwrap(), MdRegion::JPN);
+        assert_eq!(MdRegion::from_str("gbr").unwrap(), MdRegion::GBR);
+        let err = MdRegion::from_str("invalid");
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("Valid values"));
+    }
+
+    #[test]
+    fn test_md_region_default_is_us() {
+        assert_eq!(MdRegion::default(), MdRegion::US);
+    }
+
+    #[test]
+    fn test_metadata_response_deserialization() {
+        let json = r#"{
+            "data": {
+                "type": "metadata",
+                "metadata": [
+                    {
+                        "guid": "abc-123",
+                        "name": "3D View",
+                        "role": "3d",
+                        "mime": "application/autodesk-svf2",
+                        "hasThumbnail": "true",
+                        "progress": "complete"
+                    }
+                ]
+            }
+        }"#;
+        let resp: MetadataResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.data.metadata.len(), 1);
+        assert_eq!(resp.data.metadata[0].guid, "abc-123");
+        assert_eq!(resp.data.metadata[0].role, "3d");
+    }
+
+    #[test]
+    fn test_object_tree_deserialization() {
+        let json = r#"{
+            "data": {
+                "type": "objects",
+                "objects": [
+                    {
+                        "objectid": 1,
+                        "name": "Root",
+                        "objects": [
+                            {
+                                "objectid": 2,
+                                "name": "Child",
+                                "objects": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        }"#;
+        let resp: ObjectTreeResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.data.objects.len(), 1);
+        assert_eq!(resp.data.objects[0].object_id, 1);
+        assert_eq!(resp.data.objects[0].objects.len(), 1);
+        assert_eq!(resp.data.objects[0].objects[0].name, "Child");
+    }
+
+    #[test]
+    fn test_properties_response_deserialization() {
+        let json = r#"{
+            "data": {
+                "type": "properties",
+                "collection": [
+                    {
+                        "objectid": 42,
+                        "name": "Wall",
+                        "externalId": "ext-42",
+                        "properties": {
+                            "Dimensions": {
+                                "Width": "300mm"
+                            }
+                        }
+                    }
+                ]
+            }
+        }"#;
+        let resp: PropertiesResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.data.collection.len(), 1);
+        assert_eq!(resp.data.collection[0].object_id, 42);
+        assert_eq!(resp.data.collection[0].name, "Wall");
+        assert!(
+            resp.data.collection[0]
+                .properties
+                .contains_key("Dimensions")
+        );
+    }
+
+    #[test]
+    fn test_property_query_by_object_ids() {
+        let query = PropertyQuery::by_object_ids(vec![1, 2, 3]);
+        let json = serde_json::to_value(&query).unwrap();
+        let filter = &json["query"]["$in"];
+        assert_eq!(filter[0], "objectid");
+        assert_eq!(filter[1], 1);
+        assert_eq!(filter[2], 2);
+        assert_eq!(filter[3], 3);
+        assert!(json.get("fields").is_none());
+        assert!(json.get("pagination").is_none());
+    }
+
+    #[test]
+    fn test_metadata_response_empty() {
+        let json = r#"{"data": {"type": "metadata", "metadata": []}}"#;
+        let resp: MetadataResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.data.metadata.is_empty());
     }
 }
 

@@ -272,8 +272,7 @@ fn get_completions_raw(
                 // Command is complete, suggest subcommands
                 if let Some(cmd) = commands.iter().find(|c| c.name == partial) {
                     for subcmd in cmd.subcommands {
-                        completions
-                            .push((subcmd.name.to_string(), subcmd.description.to_string()));
+                        completions.push((subcmd.name.to_string(), subcmd.description.to_string()));
                     }
                 }
             } else {
@@ -296,8 +295,7 @@ fn get_completions_raw(
                     if let Some(subcmd) = cmd.subcommands.iter().find(|s| s.name == partial) {
                         for flag in subcmd.flags {
                             let flag_name = flag.split_whitespace().next().unwrap_or(flag);
-                            completions
-                                .push((flag_name.to_string(), "(optional)".to_string()));
+                            completions.push((flag_name.to_string(), "(optional)".to_string()));
                         }
                     }
                 } else {
@@ -325,8 +323,7 @@ fn get_completions_raw(
                     for flag in cmd.flags {
                         let flag_name = flag.split_whitespace().next().unwrap_or(flag);
                         if trailing_space || flag_name.starts_with(last) {
-                            completions
-                                .push((flag_name.to_string(), "(optional)".to_string()));
+                            completions.push((flag_name.to_string(), "(optional)".to_string()));
                         }
                     }
                 }
@@ -431,8 +428,7 @@ fn get_hint_raw(
 
             if let Some(cmd) = command_map.get(&key) {
                 // Count how many positional args we have (excluding flags)
-                let positional_count =
-                    parts[2..].iter().filter(|p| !p.starts_with('-')).count();
+                let positional_count = parts[2..].iter().filter(|p| !p.starts_with('-')).count();
 
                 if positional_count < cmd.params.len() {
                     let remaining: Vec<&str> =
@@ -1189,6 +1185,13 @@ pub fn build_command_tree() -> Vec<CommandInfo> {
             description: "Start MCP server for AI integration",
             params: &[],
             flags: &[],
+            subcommands: &[],
+        },
+        CommandInfo {
+            name: "man",
+            description: "Generate man pages",
+            params: &[],
+            flags: &["--output-dir <DIR>"],
             subcommands: &[],
         },
         CommandInfo {

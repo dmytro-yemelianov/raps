@@ -952,7 +952,7 @@ impl Client {
                     .map_err(|e| ValidationError::new_err(e))?;
 
                 derivative
-                    .translate(&urn, output_format, None)
+                    .translate(&urn, output_format, None, raps_derivative::MdRegion::default(), false)
                     .await
                     .map_err(to_py_err)?;
 

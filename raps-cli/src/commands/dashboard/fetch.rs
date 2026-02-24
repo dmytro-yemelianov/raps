@@ -23,8 +23,7 @@ pub(super) fn load_view(
                 // Cache hit — restore data + cursor instantly
                 app.data = Some(entry.data.clone());
                 app.last_refresh = Some(entry.fetched_at);
-                app.table_state
-                    .select(entry.table_selection.or(Some(0)));
+                app.table_state.select(entry.table_selection.or(Some(0)));
                 let count = app.row_count();
                 app.set_status(format!("{count} items (cached)"));
                 app.loading = false;
@@ -32,8 +31,7 @@ pub(super) fn load_view(
             }
             // Stale cache — show stale data immediately while refetching
             app.data = Some(entry.data.clone());
-            app.table_state
-                .select(entry.table_selection.or(Some(0)));
+            app.table_state.select(entry.table_selection.or(Some(0)));
             app.set_status("Refreshing stale data...");
         } else {
             // No cache at all
@@ -48,10 +46,7 @@ pub(super) fn load_view(
     // Throttle API calls — skip if we just fetched (unless force).
     // Exception: never throttle when there's no data to display (new uncached view),
     // because the user would see "Loading..." forever until the throttle expires.
-    if !force
-        && app.data.is_some()
-        && app.last_fetch.is_some_and(|t| t.elapsed() < API_THROTTLE)
-    {
+    if !force && app.data.is_some() && app.last_fetch.is_some_and(|t| t.elapsed() < API_THROTTLE) {
         return;
     }
 
@@ -144,9 +139,7 @@ async fn resolve_acc_project_id(
     hub_context: Option<&str>,
 ) -> Result<String> {
     // First try: strip "b." prefix (standard ACC pattern)
-    let stripped = project_id
-        .strip_prefix("b.")
-        .unwrap_or(project_id);
+    let stripped = project_id.strip_prefix("b.").unwrap_or(project_id);
 
     if is_guid(stripped) {
         tracing::info!("ACC project ID (stripped): {stripped}");
@@ -164,9 +157,7 @@ async fn resolve_acc_project_id(
                 return Ok(container_id);
             }
             Ok(Some(non_guid)) => {
-                tracing::warn!(
-                    "Issues container is not a GUID: {non_guid}"
-                );
+                tracing::warn!("Issues container is not a GUID: {non_guid}");
             }
             Ok(None) => {
                 tracing::info!("No issues container in project relationships");
@@ -236,11 +227,26 @@ async fn fetch_data(
         ViewKind::BucketDetail { bucket_key } => {
             let detail = clients.oss.get_bucket_details(bucket_key).await?;
             let fields = vec![
-                DetailField { label: "Bucket Key".into(), value: detail.bucket_key },
-                DetailField { label: "Owner".into(), value: detail.bucket_owner },
-                DetailField { label: "Policy".into(), value: detail.policy_key },
-                DetailField { label: "Created".into(), value: util::format_timestamp(detail.created_date) },
-                DetailField { label: "Permissions".into(), value: format!("{:?}", detail.permissions) },
+                DetailField {
+                    label: "Bucket Key".into(),
+                    value: detail.bucket_key,
+                },
+                DetailField {
+                    label: "Owner".into(),
+                    value: detail.bucket_owner,
+                },
+                DetailField {
+                    label: "Policy".into(),
+                    value: detail.policy_key,
+                },
+                DetailField {
+                    label: "Created".into(),
+                    value: util::format_timestamp(detail.created_date),
+                },
+                DetailField {
+                    label: "Permissions".into(),
+                    value: format!("{:?}", detail.permissions),
+                },
             ];
             Ok(ResourceData::BucketDetail(fields))
         }
@@ -260,15 +266,39 @@ async fn fetch_data(
             bucket_key,
             object_key,
         } => {
-            let detail = clients.oss.get_object_details(bucket_key, object_key).await?;
+            let detail = clients
+                .oss
+                .get_object_details(bucket_key, object_key)
+                .await?;
             let fields = vec![
-                DetailField { label: "Bucket".into(), value: detail.bucket_key },
-                DetailField { label: "Object Key".into(), value: detail.object_key },
-                DetailField { label: "Object ID".into(), value: detail.object_id },
-                DetailField { label: "Size".into(), value: util::format_size(detail.size) },
-                DetailField { label: "SHA1".into(), value: detail.sha1 },
-                DetailField { label: "Content Type".into(), value: detail.content_type },
-                DetailField { label: "Location".into(), value: detail.location.unwrap_or_default() },
+                DetailField {
+                    label: "Bucket".into(),
+                    value: detail.bucket_key,
+                },
+                DetailField {
+                    label: "Object Key".into(),
+                    value: detail.object_key,
+                },
+                DetailField {
+                    label: "Object ID".into(),
+                    value: detail.object_id,
+                },
+                DetailField {
+                    label: "Size".into(),
+                    value: util::format_size(detail.size),
+                },
+                DetailField {
+                    label: "SHA1".into(),
+                    value: detail.sha1,
+                },
+                DetailField {
+                    label: "Content Type".into(),
+                    value: detail.content_type,
+                },
+                DetailField {
+                    label: "Location".into(),
+                    value: detail.location.unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::ObjectDetail(fields))
         }
@@ -371,11 +401,26 @@ async fn fetch_data(
         } => {
             let item = clients.dm.get_item(project_id, item_id).await?;
             let mut fields = vec![
-                DetailField { label: "ID".into(), value: item.id },
-                DetailField { label: "Name".into(), value: item.attributes.display_name },
-                DetailField { label: "Type".into(), value: item.item_type },
-                DetailField { label: "Created".into(), value: item.attributes.create_time.unwrap_or_default() },
-                DetailField { label: "Modified".into(), value: item.attributes.last_modified_time.unwrap_or_default() },
+                DetailField {
+                    label: "ID".into(),
+                    value: item.id,
+                },
+                DetailField {
+                    label: "Name".into(),
+                    value: item.attributes.display_name,
+                },
+                DetailField {
+                    label: "Type".into(),
+                    value: item.item_type,
+                },
+                DetailField {
+                    label: "Created".into(),
+                    value: item.attributes.create_time.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Modified".into(),
+                    value: item.attributes.last_modified_time.unwrap_or_default(),
+                },
             ];
             if let Ok(versions) = clients.dm.get_item_versions(project_id, item_id).await {
                 fields.push(DetailField {
@@ -410,7 +455,10 @@ async fn fetch_data(
         }
         ViewKind::IssueList { project_id } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
-            let issues = clients.issues.list_issues(&acc_pid, None).await
+            let issues = clients
+                .issues
+                .list_issues(&acc_pid, None)
+                .await
                 .map_err(|e| anyhow::anyhow!("Issues API (pid={acc_pid}): {e:#}"))?;
             let rows: Vec<IssueRow> = issues
                 .into_iter()
@@ -431,18 +479,45 @@ async fn fetch_data(
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let issue = clients.issues.get_issue(&acc_pid, issue_id).await?;
             let fields = vec![
-                DetailField { label: "ID".into(), value: issue.id },
-                DetailField { label: "Title".into(), value: issue.title },
-                DetailField { label: "Status".into(), value: issue.status },
-                DetailField { label: "Description".into(), value: issue.description.unwrap_or_default() },
-                DetailField { label: "Assigned To".into(), value: issue.assigned_to.unwrap_or_default() },
-                DetailField { label: "Due Date".into(), value: issue.due_date.unwrap_or_default() },
-                DetailField { label: "Created At".into(), value: issue.created_at.unwrap_or_default() },
-                DetailField { label: "Created By".into(), value: issue.created_by.unwrap_or_default() },
+                DetailField {
+                    label: "ID".into(),
+                    value: issue.id,
+                },
+                DetailField {
+                    label: "Title".into(),
+                    value: issue.title,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: issue.status,
+                },
+                DetailField {
+                    label: "Description".into(),
+                    value: issue.description.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Assigned To".into(),
+                    value: issue.assigned_to.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Due Date".into(),
+                    value: issue.due_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created At".into(),
+                    value: issue.created_at.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created By".into(),
+                    value: issue.created_by.unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::IssueDetail(fields))
         }
-        ViewKind::IssueCommentList { project_id, issue_id } => {
+        ViewKind::IssueCommentList {
+            project_id,
+            issue_id,
+        } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let comments = clients.issues.list_comments(&acc_pid, issue_id).await?;
             let rows: Vec<IssueCommentRow> = comments
@@ -456,7 +531,10 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::IssueComments(rows))
         }
-        ViewKind::IssueAttachmentList { project_id, issue_id } => {
+        ViewKind::IssueAttachmentList {
+            project_id,
+            issue_id,
+        } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let attachments = clients.issues.list_attachments(&acc_pid, issue_id).await?;
             let rows: Vec<IssueAttachmentRow> = attachments
@@ -477,14 +555,22 @@ async fn fetch_data(
                 .map(|t| IssueTypeRow {
                     id: t.id,
                     title: t.title,
-                    is_active: if t.is_active.unwrap_or(false) { "Yes" } else { "No" }.into(),
+                    is_active: if t.is_active.unwrap_or(false) {
+                        "Yes"
+                    } else {
+                        "No"
+                    }
+                    .into(),
                 })
                 .collect();
             Ok(ResourceData::IssueTypes(rows))
         }
         ViewKind::RfiList { project_id } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
-            let rfis = clients.rfi.list_rfis(&acc_pid).await
+            let rfis = clients
+                .rfi
+                .list_rfis(&acc_pid)
+                .await
                 .map_err(|e| anyhow::anyhow!("RFI API (pid={acc_pid}): {e:#}"))?;
             let rows: Vec<RfiRow> = rfis
                 .into_iter()
@@ -498,23 +584,50 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Rfis(rows))
         }
-        ViewKind::RfiDetail {
-            project_id,
-            rfi_id,
-        } => {
+        ViewKind::RfiDetail { project_id, rfi_id } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let rfi = clients.rfi.get_rfi(&acc_pid, rfi_id).await?;
             let fields = vec![
-                DetailField { label: "ID".into(), value: rfi.id },
-                DetailField { label: "Title".into(), value: rfi.title },
-                DetailField { label: "Status".into(), value: rfi.status },
-                DetailField { label: "Priority".into(), value: rfi.priority.unwrap_or_default() },
-                DetailField { label: "Question".into(), value: rfi.question.unwrap_or_default() },
-                DetailField { label: "Answer".into(), value: rfi.answer.unwrap_or_default() },
-                DetailField { label: "Assigned To".into(), value: rfi.assigned_to_name.unwrap_or_default() },
-                DetailField { label: "Due Date".into(), value: rfi.due_date.unwrap_or_default() },
-                DetailField { label: "Created At".into(), value: rfi.created_at.unwrap_or_default() },
-                DetailField { label: "Created By".into(), value: rfi.created_by_name.unwrap_or_default() },
+                DetailField {
+                    label: "ID".into(),
+                    value: rfi.id,
+                },
+                DetailField {
+                    label: "Title".into(),
+                    value: rfi.title,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: rfi.status,
+                },
+                DetailField {
+                    label: "Priority".into(),
+                    value: rfi.priority.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Question".into(),
+                    value: rfi.question.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Answer".into(),
+                    value: rfi.answer.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Assigned To".into(),
+                    value: rfi.assigned_to_name.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Due Date".into(),
+                    value: rfi.due_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created At".into(),
+                    value: rfi.created_at.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created By".into(),
+                    value: rfi.created_by_name.unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::RfiDetail(fields))
         }
@@ -532,20 +645,47 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Assets(rows))
         }
-        ViewKind::AssetDetail { project_id, asset_id } => {
+        ViewKind::AssetDetail {
+            project_id,
+            asset_id,
+        } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let assets = clients.acc.list_assets(&acc_pid).await?;
             let asset = assets.into_iter().find(|a| a.id == *asset_id);
             if let Some(a) = asset {
                 let fields = vec![
-                    DetailField { label: "ID".into(), value: a.id },
-                    DetailField { label: "Client Asset ID".into(), value: a.client_asset_id.unwrap_or_default() },
-                    DetailField { label: "Category ID".into(), value: a.category_id.unwrap_or_default() },
-                    DetailField { label: "Status ID".into(), value: a.status_id.unwrap_or_default() },
-                    DetailField { label: "Description".into(), value: a.description.unwrap_or_default() },
-                    DetailField { label: "Barcode".into(), value: a.barcode.unwrap_or_default() },
-                    DetailField { label: "Created At".into(), value: a.created_at.unwrap_or_default() },
-                    DetailField { label: "Updated At".into(), value: a.updated_at.unwrap_or_default() },
+                    DetailField {
+                        label: "ID".into(),
+                        value: a.id,
+                    },
+                    DetailField {
+                        label: "Client Asset ID".into(),
+                        value: a.client_asset_id.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Category ID".into(),
+                        value: a.category_id.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Status ID".into(),
+                        value: a.status_id.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Description".into(),
+                        value: a.description.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Barcode".into(),
+                        value: a.barcode.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Created At".into(),
+                        value: a.created_at.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Updated At".into(),
+                        value: a.updated_at.unwrap_or_default(),
+                    },
                 ];
                 Ok(ResourceData::AssetDetail(fields))
             } else {
@@ -567,20 +707,47 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Submittals(rows))
         }
-        ViewKind::SubmittalDetail { project_id, submittal_id } => {
+        ViewKind::SubmittalDetail {
+            project_id,
+            submittal_id,
+        } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let submittals = clients.acc.list_submittals(&acc_pid).await?;
             let sub = submittals.into_iter().find(|s| s.id == *submittal_id);
             if let Some(s) = sub {
                 let fields = vec![
-                    DetailField { label: "ID".into(), value: s.id },
-                    DetailField { label: "Title".into(), value: s.title },
-                    DetailField { label: "Number".into(), value: s.number.unwrap_or_default() },
-                    DetailField { label: "Status".into(), value: s.status },
-                    DetailField { label: "Spec Section".into(), value: s.spec_section.unwrap_or_default() },
-                    DetailField { label: "Due Date".into(), value: s.due_date.unwrap_or_default() },
-                    DetailField { label: "Created At".into(), value: s.created_at.unwrap_or_default() },
-                    DetailField { label: "Updated At".into(), value: s.updated_at.unwrap_or_default() },
+                    DetailField {
+                        label: "ID".into(),
+                        value: s.id,
+                    },
+                    DetailField {
+                        label: "Title".into(),
+                        value: s.title,
+                    },
+                    DetailField {
+                        label: "Number".into(),
+                        value: s.number.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Status".into(),
+                        value: s.status,
+                    },
+                    DetailField {
+                        label: "Spec Section".into(),
+                        value: s.spec_section.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Due Date".into(),
+                        value: s.due_date.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Created At".into(),
+                        value: s.created_at.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Updated At".into(),
+                        value: s.updated_at.unwrap_or_default(),
+                    },
                 ];
                 Ok(ResourceData::SubmittalDetail(fields))
             } else {
@@ -602,21 +769,51 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Checklists(rows))
         }
-        ViewKind::ChecklistDetail { project_id, checklist_id } => {
+        ViewKind::ChecklistDetail {
+            project_id,
+            checklist_id,
+        } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let checklists = clients.acc.list_checklists(&acc_pid).await?;
             let cl = checklists.into_iter().find(|c| c.id == *checklist_id);
             if let Some(c) = cl {
                 let fields = vec![
-                    DetailField { label: "ID".into(), value: c.id },
-                    DetailField { label: "Title".into(), value: c.title },
-                    DetailField { label: "Status".into(), value: c.status },
-                    DetailField { label: "Template ID".into(), value: c.template_id.unwrap_or_default() },
-                    DetailField { label: "Assignee ID".into(), value: c.assignee_id.unwrap_or_default() },
-                    DetailField { label: "Location".into(), value: c.location.unwrap_or_default() },
-                    DetailField { label: "Due Date".into(), value: c.due_date.unwrap_or_default() },
-                    DetailField { label: "Created At".into(), value: c.created_at.unwrap_or_default() },
-                    DetailField { label: "Updated At".into(), value: c.updated_at.unwrap_or_default() },
+                    DetailField {
+                        label: "ID".into(),
+                        value: c.id,
+                    },
+                    DetailField {
+                        label: "Title".into(),
+                        value: c.title,
+                    },
+                    DetailField {
+                        label: "Status".into(),
+                        value: c.status,
+                    },
+                    DetailField {
+                        label: "Template ID".into(),
+                        value: c.template_id.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Assignee ID".into(),
+                        value: c.assignee_id.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Location".into(),
+                        value: c.location.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Due Date".into(),
+                        value: c.due_date.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Created At".into(),
+                        value: c.created_at.unwrap_or_default(),
+                    },
+                    DetailField {
+                        label: "Updated At".into(),
+                        value: c.updated_at.unwrap_or_default(),
+                    },
                 ];
                 Ok(ResourceData::ChecklistDetail(fields))
             } else {
@@ -636,8 +833,10 @@ async fn fetch_data(
         }
         ViewKind::ActivityList => {
             let activities = clients.da.list_activities().await?;
-            let rows: Vec<ActivityRow> =
-                activities.into_iter().map(|id| ActivityRow { id }).collect();
+            let rows: Vec<ActivityRow> = activities
+                .into_iter()
+                .map(|id| ActivityRow { id })
+                .collect();
             Ok(ResourceData::Activities(rows))
         }
         ViewKind::WorkItemList => {
@@ -655,44 +854,96 @@ async fn fetch_data(
         ViewKind::WorkItemDetail { id } => {
             let wi = clients.da.get_workitem_status(id).await?;
             let mut fields = vec![
-                DetailField { label: "ID".into(), value: wi.id },
-                DetailField { label: "Status".into(), value: wi.status },
-                DetailField { label: "Progress".into(), value: wi.progress.unwrap_or_default() },
-                DetailField { label: "Report URL".into(), value: wi.report_url.unwrap_or_default() },
+                DetailField {
+                    label: "ID".into(),
+                    value: wi.id,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: wi.status,
+                },
+                DetailField {
+                    label: "Progress".into(),
+                    value: wi.progress.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Report URL".into(),
+                    value: wi.report_url.unwrap_or_default(),
+                },
             ];
             if let Some(stats) = wi.stats {
-                fields.push(DetailField { label: "Time Queued".into(), value: stats.time_queued.unwrap_or_default() });
-                fields.push(DetailField { label: "Download Started".into(), value: stats.time_download_started.unwrap_or_default() });
-                fields.push(DetailField { label: "Instruction Started".into(), value: stats.time_instruction_started.unwrap_or_default() });
-                fields.push(DetailField { label: "Instruction Ended".into(), value: stats.time_instruction_ended.unwrap_or_default() });
-                fields.push(DetailField { label: "Upload Ended".into(), value: stats.time_upload_ended.unwrap_or_default() });
+                fields.push(DetailField {
+                    label: "Time Queued".into(),
+                    value: stats.time_queued.unwrap_or_default(),
+                });
+                fields.push(DetailField {
+                    label: "Download Started".into(),
+                    value: stats.time_download_started.unwrap_or_default(),
+                });
+                fields.push(DetailField {
+                    label: "Instruction Started".into(),
+                    value: stats.time_instruction_started.unwrap_or_default(),
+                });
+                fields.push(DetailField {
+                    label: "Instruction Ended".into(),
+                    value: stats.time_instruction_ended.unwrap_or_default(),
+                });
+                fields.push(DetailField {
+                    label: "Upload Ended".into(),
+                    value: stats.time_upload_ended.unwrap_or_default(),
+                });
             }
             Ok(ResourceData::WorkItemDetail(fields))
         }
         ViewKind::AppBundleList => {
             let bundles = clients.da.list_appbundles().await?;
-            let rows: Vec<AppBundleRow> = bundles
-                .into_iter()
-                .map(|id| AppBundleRow { id })
-                .collect();
+            let rows: Vec<AppBundleRow> =
+                bundles.into_iter().map(|id| AppBundleRow { id }).collect();
             Ok(ResourceData::AppBundles(rows))
         }
         ViewKind::ManifestView { urn } => {
             let manifest = clients.derivative.get_manifest(urn).await?;
             let fields = vec![
-                DetailField { label: "URN".into(), value: manifest.urn },
-                DetailField { label: "Status".into(), value: manifest.status },
-                DetailField { label: "Progress".into(), value: manifest.progress },
-                DetailField { label: "Region".into(), value: manifest.region },
-                DetailField { label: "Type".into(), value: manifest.manifest_type },
-                DetailField { label: "Has Thumbnail".into(), value: manifest.has_thumbnail },
-                DetailField { label: "Derivatives".into(), value: format!("{}", manifest.derivatives.len()) },
-                DetailField { label: "Version".into(), value: manifest.version.unwrap_or_default() },
+                DetailField {
+                    label: "URN".into(),
+                    value: manifest.urn,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: manifest.status,
+                },
+                DetailField {
+                    label: "Progress".into(),
+                    value: manifest.progress,
+                },
+                DetailField {
+                    label: "Region".into(),
+                    value: manifest.region,
+                },
+                DetailField {
+                    label: "Type".into(),
+                    value: manifest.manifest_type,
+                },
+                DetailField {
+                    label: "Has Thumbnail".into(),
+                    value: manifest.has_thumbnail,
+                },
+                DetailField {
+                    label: "Derivatives".into(),
+                    value: format!("{}", manifest.derivatives.len()),
+                },
+                DetailField {
+                    label: "Version".into(),
+                    value: manifest.version.unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::Manifest(fields))
         }
         ViewKind::DerivativeList { urn } => {
-            let derivs = clients.derivative.list_downloadable_derivatives(urn).await?;
+            let derivs = clients
+                .derivative
+                .list_downloadable_derivatives(urn)
+                .await?;
             let rows: Vec<DerivativeRow> = derivs
                 .into_iter()
                 .map(|d| DerivativeRow {
@@ -706,11 +957,21 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Derivatives(rows))
         }
-        ViewKind::DerivativeDetail { urn: _, deriv_urn, name } => {
+        ViewKind::DerivativeDetail {
+            urn: _,
+            deriv_urn,
+            name,
+        } => {
             // Detail from cached derivative list
             let fields = vec![
-                DetailField { label: "Name".into(), value: name.clone() },
-                DetailField { label: "URN".into(), value: deriv_urn.clone() },
+                DetailField {
+                    label: "Name".into(),
+                    value: name.clone(),
+                },
+                DetailField {
+                    label: "URN".into(),
+                    value: deriv_urn.clone(),
+                },
             ];
             Ok(ResourceData::DerivativeDetail(fields))
         }
@@ -729,21 +990,64 @@ async fn fetch_data(
                 .collect();
             Ok(ResourceData::Webhooks(rows))
         }
-        ViewKind::WebhookDetail { system, event, hook_id } => {
+        ViewKind::WebhookDetail {
+            system,
+            event,
+            hook_id,
+        } => {
             let hook = clients.webhooks.get_webhook(system, event, hook_id).await?;
             let fields = vec![
-                DetailField { label: "Hook ID".into(), value: hook.hook_id },
-                DetailField { label: "System".into(), value: hook.system },
-                DetailField { label: "Event".into(), value: hook.event },
-                DetailField { label: "Callback URL".into(), value: hook.callback_url },
-                DetailField { label: "Status".into(), value: hook.status },
-                DetailField { label: "Created By".into(), value: hook.created_by.unwrap_or_default() },
-                DetailField { label: "Created".into(), value: hook.created_date.unwrap_or_default() },
-                DetailField { label: "Updated".into(), value: hook.last_updated_date.unwrap_or_default() },
-                DetailField { label: "Creator Type".into(), value: hook.creator_type.unwrap_or_default() },
-                DetailField { label: "Tenant".into(), value: hook.tenant.unwrap_or_default() },
-                DetailField { label: "URN".into(), value: hook.urn.unwrap_or_default() },
-                DetailField { label: "Auto Reactivate".into(), value: hook.auto_reactivate_hook.map(|b| b.to_string()).unwrap_or_default() },
+                DetailField {
+                    label: "Hook ID".into(),
+                    value: hook.hook_id,
+                },
+                DetailField {
+                    label: "System".into(),
+                    value: hook.system,
+                },
+                DetailField {
+                    label: "Event".into(),
+                    value: hook.event,
+                },
+                DetailField {
+                    label: "Callback URL".into(),
+                    value: hook.callback_url,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: hook.status,
+                },
+                DetailField {
+                    label: "Created By".into(),
+                    value: hook.created_by.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created".into(),
+                    value: hook.created_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Updated".into(),
+                    value: hook.last_updated_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Creator Type".into(),
+                    value: hook.creator_type.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Tenant".into(),
+                    value: hook.tenant.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "URN".into(),
+                    value: hook.urn.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Auto Reactivate".into(),
+                    value: hook
+                        .auto_reactivate_hook
+                        .map(|b| b.to_string())
+                        .unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::WebhookDetail(fields))
         }
@@ -764,10 +1068,22 @@ async fn fetch_data(
         ViewKind::PhotosceneDetail { id } => {
             let progress = clients.reality.get_progress(id).await?;
             let fields = vec![
-                DetailField { label: "ID".into(), value: progress.photoscene_id },
-                DetailField { label: "Progress".into(), value: progress.progress },
-                DetailField { label: "Status".into(), value: progress.status.unwrap_or_default() },
-                DetailField { label: "Message".into(), value: progress.progress_msg.unwrap_or_default() },
+                DetailField {
+                    label: "ID".into(),
+                    value: progress.photoscene_id,
+                },
+                DetailField {
+                    label: "Progress".into(),
+                    value: progress.progress,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: progress.status.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Message".into(),
+                    value: progress.progress_msg.unwrap_or_default(),
+                },
             ];
             Ok(ResourceData::PhotosceneDetail(fields))
         }

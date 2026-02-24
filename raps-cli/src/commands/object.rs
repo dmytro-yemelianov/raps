@@ -134,6 +134,34 @@ pub enum ObjectCommands {
         #[arg(long)]
         new_key: String,
     },
+
+    /// Batch copy objects from one bucket to another
+    #[command(name = "batch-copy")]
+    BatchCopy {
+        /// Source bucket key
+        source_bucket: String,
+        /// Destination bucket key
+        dest_bucket: String,
+        /// Filter objects by key prefix
+        #[arg(long)]
+        prefix: Option<String>,
+        /// Comma-separated specific object keys to copy
+        #[arg(long)]
+        keys: Option<String>,
+    },
+
+    /// Batch rename objects within a bucket
+    #[command(name = "batch-rename")]
+    BatchRename {
+        /// Bucket key
+        bucket: String,
+        /// Pattern to match in object keys
+        #[arg(long)]
+        from: String,
+        /// Replacement pattern for matched keys
+        #[arg(long)]
+        to: String,
+    },
 }
 
 impl ObjectCommands {
@@ -191,6 +219,25 @@ impl ObjectCommands {
                 object,
                 new_key,
             } => rename_object(client, &bucket, &object, &new_key, output_format).await,
+            ObjectCommands::BatchCopy {
+                source_bucket,
+                dest_bucket,
+                prefix,
+                keys,
+            } => {
+                batch_copy_objects(
+                    client,
+                    &source_bucket,
+                    &dest_bucket,
+                    prefix,
+                    keys,
+                    output_format,
+                )
+                .await
+            }
+            ObjectCommands::BatchRename { bucket, from, to } => {
+                batch_rename_objects(client, &bucket, &from, &to, output_format).await
+            }
         }
     }
 }
@@ -902,6 +949,158 @@ async fn rename_object(
         }
         _ => {
             output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ============== BATCH OPERATIONS ==============
+
+async fn batch_copy_objects(
+    client: &OssClient,
+    source_bucket: &str,
+    dest_bucket: &str,
+    prefix: Option<String>,
+    keys: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Determine which keys to copy
+    let object_keys = if let Some(keys_str) = keys {
+        keys_str.split(',').map(|s| s.trim().to_string()).collect()
+    } else {
+        // List objects from source bucket, optionally filtered by prefix
+        let objects = client.list_objects(source_bucket).await?;
+        let filtered: Vec<String> = objects
+            .into_iter()
+            .filter(|o| {
+                prefix
+                    .as_ref()
+                    .is_none_or(|p| o.object_key.starts_with(p.as_str()))
+            })
+            .map(|o| o.object_key)
+            .collect();
+        filtered
+    };
+
+    if object_keys.is_empty() {
+        println!("{}", "No objects to copy.".dimmed());
+        return Ok(());
+    }
+
+    println!(
+        "{} {} objects from {} to {}...",
+        "Copying".dimmed(),
+        object_keys.len(),
+        source_bucket.cyan(),
+        dest_bucket.cyan()
+    );
+
+    let result = client
+        .batch_copy_objects(source_bucket, dest_bucket, &object_keys)
+        .await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            for item in &result.results {
+                match &item.result {
+                    Ok(_) => println!("  {} {}", "✓".green().bold(), item.key),
+                    Err(e) => println!("  {} {} ({})", "✗".red().bold(), item.key, e),
+                }
+            }
+            println!(
+                "\n{} copied, {} failed (of {} total)",
+                result.succeeded.to_string().green(),
+                result.failed.to_string().red(),
+                result.total
+            );
+        }
+        _ => {
+            #[derive(Serialize)]
+            struct BatchSummary {
+                total: usize,
+                succeeded: usize,
+                failed: usize,
+            }
+            output_format.write(&BatchSummary {
+                total: result.total,
+                succeeded: result.succeeded,
+                failed: result.failed,
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn batch_rename_objects(
+    client: &OssClient,
+    bucket: &str,
+    from_pattern: &str,
+    to_pattern: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // List objects and find those matching the pattern
+    let objects = client.list_objects(bucket).await?;
+    let renames: Vec<(String, String)> = objects
+        .into_iter()
+        .filter(|o| o.object_key.contains(from_pattern))
+        .map(|o| {
+            let new_key = o.object_key.replace(from_pattern, to_pattern);
+            (o.object_key, new_key)
+        })
+        .collect();
+
+    if renames.is_empty() {
+        println!(
+            "{} No objects match pattern '{}'.",
+            "⚠".yellow(),
+            from_pattern
+        );
+        return Ok(());
+    }
+
+    println!(
+        "{} {} objects in {}...",
+        "Renaming".dimmed(),
+        renames.len(),
+        bucket.cyan()
+    );
+
+    let result = client.batch_rename_objects(bucket, &renames).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            for item in &result.results {
+                let new_key = renames
+                    .iter()
+                    .find(|(old, _)| old == &item.key)
+                    .map(|(_, new)| new.as_str())
+                    .unwrap_or("?");
+                match &item.result {
+                    Ok(_) => println!("  {} {} → {}", "✓".green().bold(), item.key, new_key),
+                    Err(e) => println!("  {} {} ({})", "✗".red().bold(), item.key, e),
+                }
+            }
+            println!(
+                "\n{} renamed, {} failed (of {} total)",
+                result.succeeded.to_string().green(),
+                result.failed.to_string().red(),
+                result.total
+            );
+        }
+        _ => {
+            #[derive(Serialize)]
+            struct BatchSummary {
+                total: usize,
+                succeeded: usize,
+                failed: usize,
+            }
+            output_format.write(&BatchSummary {
+                total: result.total,
+                succeeded: result.succeeded,
+                failed: result.failed,
+            })?;
         }
     }
 

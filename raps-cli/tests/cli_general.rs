@@ -29,7 +29,7 @@ fn test_help() {
         .arg("--help")
         .assert()
         .success()
-        .stdout(predicate::str::contains("RAPS"))
+        .stdout(predicate::str::contains("raps"))
         .stdout(predicate::str::contains("bucket"))
         .stdout(predicate::str::contains("object"))
         .stdout(predicate::str::contains("auth"))
@@ -43,7 +43,7 @@ fn test_help_short() {
         .arg("-h")
         .assert()
         .success()
-        .stdout(predicate::str::contains("RAPS"));
+        .stdout(predicate::str::contains("raps"));
 }
 
 // ==================== Top Level Commands ====================

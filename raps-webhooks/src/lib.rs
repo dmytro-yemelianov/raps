@@ -114,6 +114,10 @@ pub struct WebhooksLinks {
 }
 
 /// Webhooks API client
+///
+/// Uses 2-legged OAuth (client credentials) via [`AuthClient::get_token()`] for all
+/// operations, as required by the APS Webhooks API. This is distinct from 3-legged
+/// OAuth used by Data Management endpoints that operate in a user context.
 #[derive(Clone)]
 pub struct WebhooksClient {
     config: Config,
@@ -349,6 +353,11 @@ impl WebhooksClient {
     pub fn available_events(&self) -> &[(&str, &str)] {
         WEBHOOK_EVENTS
     }
+
+    /// Check if an event type is a known webhook event
+    pub fn is_valid_event(event: &str) -> bool {
+        WEBHOOK_EVENTS.iter().any(|(e, _)| *e == event)
+    }
 }
 
 #[cfg(test)]
@@ -365,6 +374,14 @@ mod tests {
         assert!(events.contains(&"dm.version.added"));
         assert!(events.contains(&"dm.folder.added"));
         assert!(events.contains(&"extraction.finished"));
+    }
+
+    #[test]
+    fn test_is_valid_event() {
+        assert!(WebhooksClient::is_valid_event("dm.version.added"));
+        assert!(WebhooksClient::is_valid_event("extraction.finished"));
+        assert!(!WebhooksClient::is_valid_event("nonexistent.event"));
+        assert!(!WebhooksClient::is_valid_event(""));
     }
 
     #[test]

@@ -15,8 +15,10 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt, SeekFrom};
+use tokio::sync::Semaphore;
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
@@ -335,6 +337,25 @@ pub struct ObjectItem {
     #[serde(default)]
     pub sha1: Option<String>,
     pub size: u64,
+}
+
+// ============== BATCH OPERATION TYPES ==============
+
+/// Result of a batch operation with per-item tracking
+#[derive(Debug, Serialize)]
+pub struct BatchResult<T: std::fmt::Debug> {
+    pub total: usize,
+    pub succeeded: usize,
+    pub failed: usize,
+    pub results: Vec<BatchItemResult<T>>,
+}
+
+/// Result of a single item within a batch operation
+#[derive(Debug, Serialize)]
+pub struct BatchItemResult<T: std::fmt::Debug> {
+    pub key: String,
+    #[serde(skip)]
+    pub result: std::result::Result<T, String>,
 }
 
 /// OSS API client
@@ -671,6 +692,7 @@ impl OssClient {
     }
 
     /// Create a fresh multipart upload state with signed URLs
+    #[allow(clippy::too_many_arguments)]
     async fn start_fresh_upload(
         &self,
         bucket_key: &str,
@@ -685,7 +707,11 @@ impl OssClient {
             .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
             .await?;
         if signed.urls.len() != total_parts as usize {
-            anyhow::bail!("Expected {} URLs but got {}", total_parts, signed.urls.len());
+            anyhow::bail!(
+                "Expected {} URLs but got {}",
+                total_parts,
+                signed.urls.len()
+            );
         }
         let new_state = MultipartUploadState {
             bucket_key: bucket_key.to_string(),
@@ -738,14 +764,41 @@ impl OssClient {
                 } else {
                     tracing::info!("File changed since last upload, starting fresh");
                     MultipartUploadState::delete(bucket_key, object_key)?;
-                    self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+                    self.start_fresh_upload(
+                        bucket_key,
+                        object_key,
+                        file_path,
+                        total_parts,
+                        file_size,
+                        chunk_size,
+                        file_mtime,
+                    )
+                    .await?
                 }
             } else {
-                self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+                self.start_fresh_upload(
+                    bucket_key,
+                    object_key,
+                    file_path,
+                    total_parts,
+                    file_size,
+                    chunk_size,
+                    file_mtime,
+                )
+                .await?
             }
         } else {
             MultipartUploadState::delete(bucket_key, object_key)?;
-            self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+            self.start_fresh_upload(
+                bucket_key,
+                object_key,
+                file_path,
+                total_parts,
+                file_size,
+                chunk_size,
+                file_mtime,
+            )
+            .await?
         };
 
         // Create progress bar (hidden in non-interactive mode)
@@ -824,7 +877,9 @@ impl OssClient {
 
                 async move {
                     // Acquire semaphore permit to limit concurrency
-                    let _permit = semaphore.acquire().await
+                    let _permit = semaphore
+                        .acquire()
+                        .await
                         .map_err(|_| anyhow::anyhow!("Upload cancelled"))?;
 
                     // Read file chunk
@@ -894,7 +949,9 @@ impl OssClient {
                                 let status = resp.status();
                                 let error_text = resp.text().await.unwrap_or_default();
                                 if attempts >= MAX_RETRIES {
-                                    raps_kernel::profiler::record_http_request(total_part_network_time);
+                                    raps_kernel::profiler::record_http_request(
+                                        total_part_network_time,
+                                    );
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts ({}): {}",
                                         part_num,
@@ -911,7 +968,9 @@ impl OssClient {
                             }
                             Err(e) => {
                                 if attempts >= MAX_RETRIES {
-                                    raps_kernel::profiler::record_http_request(total_part_network_time);
+                                    raps_kernel::profiler::record_http_request(
+                                        total_part_network_time,
+                                    );
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts: {}",
                                         part_num,
@@ -1033,7 +1092,11 @@ impl OssClient {
         loop {
             page += 1;
             if page > MAX_PAGES {
-                tracing::warn!(pages = MAX_PAGES, objects = all_objects.len(), "Reached maximum page limit for object listing");
+                tracing::warn!(
+                    pages = MAX_PAGES,
+                    objects = all_objects.len(),
+                    "Reached maximum page limit for object listing"
+                );
                 break;
             }
             let mut url = format!("{}/buckets/{}/objects", self.config.oss_url(), bucket_key);
@@ -1288,6 +1351,197 @@ impl OssClient {
         })?;
 
         Ok(object_info)
+    }
+
+    // ============== COPY & BATCH OPERATIONS ==============
+
+    /// Server-side copy of an object using `x-ads-copy-from` header.
+    /// Much more efficient than download+re-upload for same-region copies.
+    pub async fn copy_object(
+        &self,
+        src_bucket: &str,
+        object_key: &str,
+        dest_bucket: &str,
+        dest_key: Option<&str>,
+    ) -> Result<ObjectDetails> {
+        let token = self.auth.get_token().await?;
+        let destination_key = dest_key.unwrap_or(object_key);
+        let url = format!(
+            "{}/buckets/{}/objects/{}",
+            self.config.oss_url(),
+            dest_bucket,
+            urlencoding::encode(destination_key)
+        );
+        let copy_from = format!("{}/objects/{}", src_bucket, urlencoding::encode(object_key));
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .put(&url)
+                .bearer_auth(&token)
+                .header("x-ads-copy-from", &copy_from)
+                .header("Content-Length", "0")
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!(
+                "Failed to copy '{}/{}' to '{}/{}' ({status}): {error_text}",
+                src_bucket,
+                object_key,
+                dest_bucket,
+                destination_key
+            );
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse copy response")
+    }
+
+    /// Batch copy objects from one bucket to another with concurrent execution.
+    /// Uses a semaphore to limit concurrency to 10 concurrent requests.
+    pub async fn batch_copy_objects(
+        &self,
+        src_bucket: &str,
+        dest_bucket: &str,
+        object_keys: &[String],
+    ) -> Result<BatchResult<ObjectDetails>> {
+        let semaphore = Arc::new(Semaphore::new(10));
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for key in object_keys {
+            let client = self.clone();
+            let src = src_bucket.to_string();
+            let dest = dest_bucket.to_string();
+            let key = key.clone();
+            let sem = semaphore.clone();
+
+            join_set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
+                let result = client.copy_object(&src, &key, &dest, None).await;
+                (key, result)
+            });
+        }
+
+        let mut results = Vec::new();
+        let mut succeeded = 0;
+        let mut failed = 0;
+
+        while let Some(res) = join_set.join_next().await {
+            match res {
+                Ok((key, Ok(details))) => {
+                    succeeded += 1;
+                    results.push(BatchItemResult {
+                        key,
+                        result: Ok(details),
+                    });
+                }
+                Ok((key, Err(e))) => {
+                    failed += 1;
+                    results.push(BatchItemResult {
+                        key,
+                        result: Err(e.to_string()),
+                    });
+                }
+                Err(e) => {
+                    failed += 1;
+                    results.push(BatchItemResult {
+                        key: "<unknown>".to_string(),
+                        result: Err(format!("Task join error: {}", e)),
+                    });
+                }
+            }
+        }
+
+        Ok(BatchResult {
+            total: object_keys.len(),
+            succeeded,
+            failed,
+            results,
+        })
+    }
+
+    /// Batch rename objects within a bucket (copy to new key, then delete old key).
+    /// Uses a semaphore to limit concurrency to 10 concurrent requests.
+    pub async fn batch_rename_objects(
+        &self,
+        bucket: &str,
+        renames: &[(String, String)],
+    ) -> Result<BatchResult<ObjectDetails>> {
+        let semaphore = Arc::new(Semaphore::new(10));
+        let mut join_set = tokio::task::JoinSet::new();
+
+        for (old_key, new_key) in renames {
+            let client = self.clone();
+            let bucket = bucket.to_string();
+            let old = old_key.clone();
+            let new = new_key.clone();
+            let sem = semaphore.clone();
+
+            join_set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
+                // Copy to new key
+                let copy_result = client.copy_object(&bucket, &old, &bucket, Some(&new)).await;
+                match copy_result {
+                    Ok(details) => {
+                        // Delete old key on successful copy
+                        if let Err(e) = client.delete_object(&bucket, &old).await {
+                            // Copy succeeded but delete failed — partial success
+                            return (
+                                old,
+                                Err(anyhow::anyhow!(
+                                    "Copied to '{}' but failed to delete original: {}",
+                                    new,
+                                    e
+                                )),
+                            );
+                        }
+                        (old, Ok(details))
+                    }
+                    Err(e) => (old, Err(e)),
+                }
+            });
+        }
+
+        let mut results = Vec::new();
+        let mut succeeded = 0;
+        let mut failed = 0;
+
+        while let Some(res) = join_set.join_next().await {
+            match res {
+                Ok((key, Ok(details))) => {
+                    succeeded += 1;
+                    results.push(BatchItemResult {
+                        key,
+                        result: Ok(details),
+                    });
+                }
+                Ok((key, Err(e))) => {
+                    failed += 1;
+                    results.push(BatchItemResult {
+                        key,
+                        result: Err(e.to_string()),
+                    });
+                }
+                Err(e) => {
+                    failed += 1;
+                    results.push(BatchItemResult {
+                        key: "<unknown>".to_string(),
+                        result: Err(format!("Task join error: {}", e)),
+                    });
+                }
+            }
+        }
+
+        Ok(BatchResult {
+            total: renames.len(),
+            succeeded,
+            failed,
+            results,
+        })
     }
 }
 
@@ -1628,6 +1882,35 @@ mod tests {
         let region = Region::EMEA;
         let json = serde_json::to_value(region).unwrap();
         assert_eq!(json, "EMEA");
+    }
+
+    #[test]
+    fn test_batch_result_summary() {
+        let result: BatchResult<ObjectDetails> = BatchResult {
+            total: 3,
+            succeeded: 2,
+            failed: 1,
+            results: vec![],
+        };
+        assert_eq!(result.total, 3);
+        assert_eq!(result.succeeded, 2);
+        assert_eq!(result.failed, 1);
+    }
+
+    #[test]
+    fn test_batch_item_result_success_and_failure() {
+        let success: BatchItemResult<String> = BatchItemResult {
+            key: "file.txt".to_string(),
+            result: Ok("done".to_string()),
+        };
+        assert!(success.result.is_ok());
+
+        let failure: BatchItemResult<String> = BatchItemResult {
+            key: "missing.txt".to_string(),
+            result: Err("not found".to_string()),
+        };
+        assert!(failure.result.is_err());
+        assert_eq!(failure.result.unwrap_err(), "not found");
     }
 }
 
