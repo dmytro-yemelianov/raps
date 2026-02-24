@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.13.0] - 2026-02-24
+
+### Added
+- **Model Derivative Metadata Endpoints**: 4 new CLI commands for translation output inspection.
+  - `raps translate metadata <URN>`: List viewable GUIDs from a completed translation.
+  - `raps translate tree <URN> <GUID>`: Show the object tree hierarchy.
+  - `raps translate properties <URN> <GUID>`: Retrieve all object properties.
+  - `raps translate query-properties <URN> <GUID> --filter <IDs>`: Filter properties by object IDs.
+- **OSS Server-Side Copy**: Copy objects between buckets without re-uploading.
+  - `raps object copy <SRC> <DEST>`: Single object copy via `x-ads-copy-from` header.
+  - `raps object batch-copy`: Batch copy with Semaphore(10) concurrency.
+  - `raps object batch-rename`: Batch rename objects within a bucket.
+- **DA Appbundle Upload**: Upload appbundles to pre-signed S3 URLs.
+  - `raps da appbundle-upload <ID> --file <ZIP>`: Multipart POST to pre-signed URL from bundle creation response.
+- **Demoscene-Style Credits**: `raps --version` now displays a branded ASCII art credits block with rapeseed flower logo, version info, and feature stats.
+
+### Fixed
+- REST pagination for `list_projects()`, `list_folder_contents()`, `get_item_versions()` in raps-dm (100-page safety cap).
+- Model Derivative region support: `MdRegion` enum (8 regions) with `--region`/`--force` CLI flags.
+- Token refresh race condition: replaced `RwLock` with `Mutex`-based `TokenCache` with coordinated refresh.
+- MIME type detection in raps-reality: extension-based detection supporting 8 formats instead of hardcoded `image/jpeg`.
+- Contradictory `normalize_project_id()` functions consolidated into shared `strip_project_prefix()`/`ensure_project_prefix()`.
+- 2-hour polling timeout for `translate`, 4-hour for reality capture commands.
+- Webhook event validation with `is_valid_event()`.
+- BIM360 folder auto-detection via `b.` prefix.
+
+## [4.12.0] - 2026-02-23
+
+### Added
+- **AEC GraphQL Integration**: `raps dm hubs` and `raps dm projects` now use the AEC Data Model GraphQL API for ACC/BIM 360 projects.
+- **TUI Dashboard Expansion**: Expanded from 4 to 7 tabs with 33 views across Storage, Translation, Projects, Webhooks, Design Automation, ACC, and Admin.
+
+### Changed
+- Dashboard is now an optional compile-time feature (`--features dashboard`).
+
+## [4.11.0] - 2026-02-22
+
+### Fixed
+- Replace 7 marketplace `.unwrap()` panics with contextual error messages.
+- Implement actual confirmation prompt in `should_proceed_destructive()`.
+- Add folder delete confirmation guard.
+- Move shell history to config directory with graceful fallback.
+- Add 30-minute timeout to DA work item polling loop.
+- Replace `process::exit` with `bail!` in plugin exit and clap error paths.
+- Standardize `ProjectDirs` qualifiers to `("com","autodesk","raps")`.
+- Replace semaphore `.unwrap()` with cancellation-safe error handling.
+- Show clear error on malformed shell input (unmatched quotes).
+- Warn on invalid custom API headers instead of silent drop.
+- Replace dashboard `event::read().unwrap()` with `.ok()`.
+- Safe UTF-8 slicing in shell completer.
+- Cap `warn_expiry_seconds` to prevent `i64` overflow.
+- Replace `process::exit` with `bail!` for proper async cleanup in api.rs and admin.rs.
+- Fix overflow in retry backoff with `saturating_mul`/`checked_shl`.
+- Handle `Arc::try_unwrap` failure with fallback clone in raps-oss.
+- Make `token_file_path`/`batch_state_path` return `Result` for CI/Docker safety.
+- Wrap blocking `tiny_http::recv` in `spawn_blocking`.
+- Preserve original scopes on token refresh.
+- Add scope parameter to device code authorization.
+- Fix UTF-8 safety in `mask_string` with char-based indexing.
+- Add `MAX_PAGES` guard to `list_objects` pagination in raps-oss.
+
+## [4.10.0] - 2026-02-22
+
+### Fixed
+- Error handling hardening and auth safety improvements across codebase (18 findings).
+- Remove duplicate HTTP log lines from raps-oss.
+
+## [4.9.0] - 2026-02-22
+
+### Fixed
+- **Profiler Accuracy**: Fix HTTP double-counting on retries; track auth and S3 upload calls; switch to `AtomicU64` for lock-free recording.
+- **Structured Logging**: Configurable file filter (`RAPS_FILE_LOG`), optional JSON format (`RAPS_FILE_FORMAT=json`), 50MB size cap.
+- Replace `eprintln` with `tracing::warn` across raps-oss and kernel storage.
+- Add tracing dependency to raps-acc, raps-da, raps-webhooks, raps-reality, raps-admin.
+
+## [4.8.0] - 2026-02-22
+
+### Added
+- **Reedline Shell**: Replace rustyline with reedline (nushell's line editor) fixing cursor-out-of-sync on Windows.
+  - Yellow styled prompt with proper width tracking.
+  - Tab completion via columnar menu.
+  - Command syntax highlighting (known commands in green).
+  - History hints with fish-style inline suggestions.
+- **Tracing-Based Logging**: Migrate from manual `eprintln` to `tracing-subscriber` with stderr console output and daily rolling file logs.
+- **Performance Profiler**: Track execution time, HTTP requests, memory usage with `--profile` flag.
+- **Interactive Mode**: Optional ID arguments for folder, project, and RFI commands with fuzzy-select prompts when omitted.
+- **Resilient Keychain**: Graceful fallback to file storage on all keychain error paths.
+
+### Changed
+- Standardized exit codes across admin, api, and auth commands.
+
 ## [4.7.0] - 2026-02-19
 
 ### Added
