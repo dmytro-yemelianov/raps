@@ -196,7 +196,8 @@ fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
     use rand::Rng;
 
     // Exponential backoff: base_delay * 2^attempt (saturating to avoid overflow)
-    let exponential_delay = base_delay.saturating_mul(1_u64.checked_shl(attempt).unwrap_or(u64::MAX));
+    let exponential_delay =
+        base_delay.saturating_mul(1_u64.checked_shl(attempt).unwrap_or(u64::MAX));
 
     // Cap at max_wait
     let capped_delay = exponential_delay.min(max_wait);

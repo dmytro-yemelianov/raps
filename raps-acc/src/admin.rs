@@ -215,7 +215,7 @@ impl AccountAdminClient {
     pub async fn get_project(&self, account_id: &str, project_id: &str) -> Result<AccountProject> {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::strip_project_prefix(project_id);
 
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
@@ -535,7 +535,7 @@ impl AccountAdminClient {
     ) -> Result<AccountProject> {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::strip_project_prefix(project_id);
 
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
@@ -816,14 +816,6 @@ fn base64_decode(input: &str) -> Result<Vec<u8>, ()> {
     STANDARD.decode(input).map_err(|_| ())
 }
 
-/// Remove "b." prefix from project ID if present
-fn normalize_project_id(project_id: &str) -> String {
-    project_id
-        .strip_prefix("b.")
-        .unwrap_or(project_id)
-        .to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -843,9 +835,9 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_project_id() {
-        assert_eq!(normalize_project_id("b.proj-123"), "proj-123");
-        assert_eq!(normalize_project_id("proj-123"), "proj-123");
+    fn test_strip_project_prefix_in_admin() {
+        assert_eq!(crate::strip_project_prefix("b.proj-123"), "proj-123");
+        assert_eq!(crate::strip_project_prefix("proj-123"), "proj-123");
     }
 
     #[test]

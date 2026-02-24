@@ -298,7 +298,7 @@ impl RealityCaptureClient {
             for (i, (filename, buffer)) in file_parts.iter().enumerate() {
                 let part = reqwest::multipart::Part::bytes(buffer.clone())
                     .file_name(filename.clone())
-                    .mime_str("image/jpeg")
+                    .mime_str(mime_type_from_extension(filename))
                     .expect("valid MIME type");
 
                 form = form.part(format!("file[{}]", i), part);
@@ -480,6 +480,24 @@ impl RealityCaptureClient {
     /// Get available output formats
     pub fn available_formats(&self) -> Vec<OutputFormat> {
         OutputFormat::all()
+    }
+}
+
+/// Determine MIME type from a filename's extension
+fn mime_type_from_extension(filename: &str) -> &'static str {
+    let ext = filename
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "tiff" | "tif" => "image/tiff",
+        "bmp" => "image/bmp",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        _ => "application/octet-stream",
     }
 }
 
@@ -697,6 +715,41 @@ mod tests {
         let err = response.error.unwrap();
         assert_eq!(err.code.unwrap(), "ERR-001");
         assert_eq!(err.msg.unwrap(), "Scene not found");
+    }
+
+    #[test]
+    fn test_mime_type_from_extension() {
+        assert_eq!(mime_type_from_extension("photo.jpg"), "image/jpeg");
+        assert_eq!(mime_type_from_extension("photo.jpeg"), "image/jpeg");
+        assert_eq!(mime_type_from_extension("photo.png"), "image/png");
+        assert_eq!(mime_type_from_extension("photo.tiff"), "image/tiff");
+        assert_eq!(mime_type_from_extension("photo.tif"), "image/tiff");
+        assert_eq!(mime_type_from_extension("photo.bmp"), "image/bmp");
+        assert_eq!(mime_type_from_extension("photo.webp"), "image/webp");
+        assert_eq!(mime_type_from_extension("photo.gif"), "image/gif");
+    }
+
+    #[test]
+    fn test_mime_fallback() {
+        assert_eq!(
+            mime_type_from_extension("photo.raw"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            mime_type_from_extension("photo.xyz"),
+            "application/octet-stream"
+        );
+        assert_eq!(
+            mime_type_from_extension("photo.RAW"),
+            "application/octet-stream"
+        );
+    }
+
+    #[test]
+    fn test_mime_case_insensitive() {
+        assert_eq!(mime_type_from_extension("photo.PNG"), "image/png");
+        assert_eq!(mime_type_from_extension("photo.JPEG"), "image/jpeg");
+        assert_eq!(mime_type_from_extension("photo.Tiff"), "image/tiff");
     }
 }
 

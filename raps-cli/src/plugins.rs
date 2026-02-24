@@ -152,10 +152,10 @@ impl PluginManager {
         };
 
         // Also check the directory where the current executable is located
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                paths.push(parent.to_string_lossy().to_string());
-            }
+        if let Ok(exe_path) = std::env::current_exe()
+            && let Some(parent) = exe_path.parent()
+        {
+            paths.push(parent.to_string_lossy().to_string());
         }
 
         for dir in paths {

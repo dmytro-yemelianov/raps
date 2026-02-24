@@ -671,6 +671,7 @@ impl OssClient {
     }
 
     /// Create a fresh multipart upload state with signed URLs
+    #[allow(clippy::too_many_arguments)]
     async fn start_fresh_upload(
         &self,
         bucket_key: &str,
@@ -685,7 +686,11 @@ impl OssClient {
             .get_signed_upload_url(bucket_key, object_key, Some(total_parts), None)
             .await?;
         if signed.urls.len() != total_parts as usize {
-            anyhow::bail!("Expected {} URLs but got {}", total_parts, signed.urls.len());
+            anyhow::bail!(
+                "Expected {} URLs but got {}",
+                total_parts,
+                signed.urls.len()
+            );
         }
         let new_state = MultipartUploadState {
             bucket_key: bucket_key.to_string(),
@@ -738,14 +743,41 @@ impl OssClient {
                 } else {
                     tracing::info!("File changed since last upload, starting fresh");
                     MultipartUploadState::delete(bucket_key, object_key)?;
-                    self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+                    self.start_fresh_upload(
+                        bucket_key,
+                        object_key,
+                        file_path,
+                        total_parts,
+                        file_size,
+                        chunk_size,
+                        file_mtime,
+                    )
+                    .await?
                 }
             } else {
-                self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+                self.start_fresh_upload(
+                    bucket_key,
+                    object_key,
+                    file_path,
+                    total_parts,
+                    file_size,
+                    chunk_size,
+                    file_mtime,
+                )
+                .await?
             }
         } else {
             MultipartUploadState::delete(bucket_key, object_key)?;
-            self.start_fresh_upload(bucket_key, object_key, file_path, total_parts, file_size, chunk_size, file_mtime).await?
+            self.start_fresh_upload(
+                bucket_key,
+                object_key,
+                file_path,
+                total_parts,
+                file_size,
+                chunk_size,
+                file_mtime,
+            )
+            .await?
         };
 
         // Create progress bar (hidden in non-interactive mode)
@@ -824,7 +856,9 @@ impl OssClient {
 
                 async move {
                     // Acquire semaphore permit to limit concurrency
-                    let _permit = semaphore.acquire().await
+                    let _permit = semaphore
+                        .acquire()
+                        .await
                         .map_err(|_| anyhow::anyhow!("Upload cancelled"))?;
 
                     // Read file chunk
@@ -894,7 +928,9 @@ impl OssClient {
                                 let status = resp.status();
                                 let error_text = resp.text().await.unwrap_or_default();
                                 if attempts >= MAX_RETRIES {
-                                    raps_kernel::profiler::record_http_request(total_part_network_time);
+                                    raps_kernel::profiler::record_http_request(
+                                        total_part_network_time,
+                                    );
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts ({}): {}",
                                         part_num,
@@ -911,7 +947,9 @@ impl OssClient {
                             }
                             Err(e) => {
                                 if attempts >= MAX_RETRIES {
-                                    raps_kernel::profiler::record_http_request(total_part_network_time);
+                                    raps_kernel::profiler::record_http_request(
+                                        total_part_network_time,
+                                    );
                                     anyhow::bail!(
                                         "Failed to upload part {} after {} attempts: {}",
                                         part_num,
@@ -1033,7 +1071,11 @@ impl OssClient {
         loop {
             page += 1;
             if page > MAX_PAGES {
-                tracing::warn!(pages = MAX_PAGES, objects = all_objects.len(), "Reached maximum page limit for object listing");
+                tracing::warn!(
+                    pages = MAX_PAGES,
+                    objects = all_objects.len(),
+                    "Reached maximum page limit for object listing"
+                );
                 break;
             }
             let mut url = format!("{}/buckets/{}/objects", self.config.oss_url(), bucket_key);

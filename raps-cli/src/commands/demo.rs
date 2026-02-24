@@ -405,7 +405,16 @@ f 5//6 1//6 4//6 8//6
     // Step 3: Start translation
     println!("\n{}", "[3/5] Starting translation...".yellow());
     let output_format = OutputFormat::from_str(&args.format).unwrap_or(OutputFormat::Svf2);
-    match derivative.translate(&urn, output_format, None).await {
+    match derivative
+        .translate(
+            &urn,
+            output_format,
+            None,
+            raps_derivative::MdRegion::default(),
+            false,
+        )
+        .await
+    {
         Ok(_) => println!("  Translation job submitted"),
         Err(e) => println!("  Translation request: {}", e),
     }
@@ -816,7 +825,13 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
                     let urn = oss_clone.get_urn(&bucket_prefix_clone, &file_name);
 
                     match derivative_clone
-                        .translate(&urn, output_format_clone, None)
+                        .translate(
+                            &urn,
+                            output_format_clone,
+                            None,
+                            raps_derivative::MdRegion::default(),
+                            false,
+                        )
                         .await
                     {
                         Ok(_) => {

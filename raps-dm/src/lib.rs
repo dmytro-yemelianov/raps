@@ -16,7 +16,6 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
-
 /// Hub information
 #[derive(Debug, Clone, Deserialize)]
 pub struct Hub {
@@ -156,6 +155,19 @@ pub enum JsonApiLink {
     Simple(String),
     Complex { href: String },
 }
+
+impl JsonApiLink {
+    /// Get the URL from the link
+    pub fn href(&self) -> &str {
+        match self {
+            JsonApiLink::Simple(url) => url,
+            JsonApiLink::Complex { href } => href,
+        }
+    }
+}
+
+/// Maximum pages to follow during pagination (safety cap)
+const MAX_PAGINATION_PAGES: usize = 100;
 
 /// Request to create a folder
 #[derive(Debug, Serialize)]
@@ -360,9 +372,7 @@ impl DataManagementClient {
         let mut cursor: Option<String> = None;
 
         loop {
-            let vars = cursor
-                .as_ref()
-                .map(|c| serde_json::json!({ "cursor": c }));
+            let vars = cursor.as_ref().map(|c| serde_json::json!({ "cursor": c }));
 
             let data: GqlHubsData = self.gql_query(QUERY, vars).await?;
 
@@ -503,27 +513,48 @@ impl DataManagementClient {
     }
 
     /// List projects in a hub
+    ///
+    /// Follows pagination links to return complete result set (max 100 pages).
     pub async fn list_projects(&self, hub_id: &str) -> Result<Vec<Project>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/hubs/{}/projects", self.config.project_url(), hub_id);
+        let mut next_url = Some(format!(
+            "{}/hubs/{}/projects",
+            self.config.project_url(),
+            hub_id
+        ));
+        let mut all_items = Vec::new();
 
-        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+        for _page in 0..MAX_PAGINATION_PAGES {
+            let url = match next_url.take() {
+                Some(u) => u,
+                None => break,
+            };
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            }
+
+            let api_response: JsonApiResponse<Vec<Project>> = response
+                .json()
+                .await
+                .context("Failed to parse projects response")?;
+
+            all_items.extend(api_response.data);
+
+            next_url = api_response
+                .links
+                .and_then(|l| l.next)
+                .map(|link| link.href().to_string());
         }
 
-        let api_response: JsonApiResponse<Vec<Project>> = response
-            .json()
-            .await
-            .context("Failed to parse projects response")?;
-
-        Ok(api_response.data)
+        Ok(all_items)
     }
 
     /// Get project details
@@ -629,40 +660,57 @@ impl DataManagementClient {
     }
 
     /// List folder contents
+    ///
+    /// Follows pagination links to return complete result set (max 100 pages).
     pub async fn list_folder_contents(
         &self,
         project_id: &str,
         folder_id: &str,
     ) -> Result<Vec<serde_json::Value>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!(
+        let mut next_url = Some(format!(
             "{}/projects/{}/folders/{}/contents",
             self.config.data_url(),
             project_id,
             folder_id
-        );
+        ));
+        let mut all_items = Vec::new();
 
-        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+        for _page in 0..MAX_PAGINATION_PAGES {
+            let url = match next_url.take() {
+                Some(u) => u,
+                None => break,
+            };
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to list folder contents ({}): {}",
-                status,
-                error_text
-            );
+            let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                anyhow::bail!(
+                    "Failed to list folder contents ({}): {}",
+                    status,
+                    error_text
+                );
+            }
+
+            let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
+                .json()
+                .await
+                .context("Failed to parse folder contents")?;
+
+            all_items.extend(api_response.data);
+
+            next_url = api_response
+                .links
+                .and_then(|l| l.next)
+                .map(|link| link.href().to_string());
         }
 
-        let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
-            .json()
-            .await
-            .context("Failed to parse folder contents")?;
-
-        Ok(api_response.data)
+        Ok(all_items)
     }
 
     /// Create a new folder
@@ -754,30 +802,45 @@ impl DataManagementClient {
     /// Get item versions
     pub async fn get_item_versions(&self, project_id: &str, item_id: &str) -> Result<Vec<Version>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!(
+        let mut next_url = Some(format!(
             "{}/projects/{}/items/{}/versions",
             self.config.data_url(),
             project_id,
             item_id
-        );
+        ));
+        let mut all_items = Vec::new();
 
-        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+        for _page in 0..MAX_PAGINATION_PAGES {
+            let url = match next_url.take() {
+                Some(u) => u,
+                None => break,
+            };
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item versions ({status}): {error_text}");
+            let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let error_text = response.text().await.unwrap_or_default();
+                anyhow::bail!("Failed to get item versions ({status}): {error_text}");
+            }
+
+            let api_response: JsonApiResponse<Vec<Version>> = response
+                .json()
+                .await
+                .context("Failed to parse versions response")?;
+
+            all_items.extend(api_response.data);
+
+            next_url = api_response
+                .links
+                .and_then(|l| l.next)
+                .map(|link| link.href().to_string());
         }
 
-        let api_response: JsonApiResponse<Vec<Version>> = response
-            .json()
-            .await
-            .context("Failed to parse versions response")?;
-
-        Ok(api_response.data)
+        Ok(all_items)
     }
 
     /// Create an item from OSS storage object
@@ -1442,6 +1505,102 @@ mod tests {
             version.attributes.create_time,
             Some("2024-01-15T10:00:00Z".to_string())
         );
+    }
+
+    #[test]
+    fn test_pagination_follows_next_links() {
+        // Simulate 3 pages of JSON:API responses with links.next
+        let page1_json = r#"{
+            "data": [{"type": "projects", "id": "p1", "attributes": {"name": "P1"}}],
+            "links": {"next": {"href": "https://api.example.com/projects?page=2"}}
+        }"#;
+        let page2_json = r#"{
+            "data": [{"type": "projects", "id": "p2", "attributes": {"name": "P2"}}],
+            "links": {"next": "https://api.example.com/projects?page=3"}
+        }"#;
+        let page3_json = r#"{
+            "data": [{"type": "projects", "id": "p3", "attributes": {"name": "P3"}}],
+            "links": {"self": "https://api.example.com/projects?page=3"}
+        }"#;
+
+        let r1: JsonApiResponse<Vec<Project>> = serde_json::from_str(page1_json).unwrap();
+        let r2: JsonApiResponse<Vec<Project>> = serde_json::from_str(page2_json).unwrap();
+        let r3: JsonApiResponse<Vec<Project>> = serde_json::from_str(page3_json).unwrap();
+
+        // Accumulate items following next links (simulating the pagination loop)
+        let mut all_items = Vec::new();
+        let pages = [r1, r2, r3];
+        let mut next_url: Option<String> = Some("start".to_string());
+
+        for page in &pages {
+            if next_url.is_none() {
+                break;
+            }
+            all_items.extend(page.data.iter().map(|p| p.id.clone()));
+            next_url = page
+                .links
+                .as_ref()
+                .and_then(|l| l.next.as_ref())
+                .map(|link| link.href().to_string());
+        }
+
+        assert_eq!(all_items.len(), 3);
+        assert_eq!(all_items, vec!["p1", "p2", "p3"]);
+    }
+
+    #[test]
+    fn test_pagination_stops_when_no_next() {
+        let json = r#"{
+            "data": [{"type": "projects", "id": "p1", "attributes": {"name": "P1"}}],
+            "links": {"self": "https://api.example.com/projects"}
+        }"#;
+
+        let response: JsonApiResponse<Vec<Project>> = serde_json::from_str(json).unwrap();
+        let next = response
+            .links
+            .and_then(|l| l.next)
+            .map(|link| link.href().to_string());
+        assert!(next.is_none(), "Should stop when no next link present");
+    }
+
+    #[test]
+    fn test_pagination_continues_on_empty_page() {
+        // Page with zero items but links.next still present — pagination must continue
+        let json = r#"{
+            "data": [],
+            "links": {"next": {"href": "https://api.example.com/projects?page=3"}}
+        }"#;
+
+        let response: JsonApiResponse<Vec<Project>> = serde_json::from_str(json).unwrap();
+        assert!(response.data.is_empty(), "Page should have zero items");
+        let next = response
+            .links
+            .and_then(|l| l.next)
+            .map(|link| link.href().to_string());
+        assert!(
+            next.is_some(),
+            "Should continue when next link is present even with empty data"
+        );
+        assert_eq!(next.unwrap(), "https://api.example.com/projects?page=3");
+    }
+
+    #[test]
+    fn test_pagination_max_page_cap() {
+        assert_eq!(MAX_PAGINATION_PAGES, 100, "Safety cap should be 100 pages");
+    }
+
+    #[test]
+    fn test_json_api_link_href_simple() {
+        let link = JsonApiLink::Simple("https://example.com/page".to_string());
+        assert_eq!(link.href(), "https://example.com/page");
+    }
+
+    #[test]
+    fn test_json_api_link_href_complex() {
+        let link = JsonApiLink::Complex {
+            href: "https://example.com/page2".to_string(),
+        };
+        assert_eq!(link.href(), "https://example.com/page2");
     }
 }
 

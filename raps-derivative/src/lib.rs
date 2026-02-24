@@ -22,6 +22,57 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
+/// APS data center regions for Model Derivative service
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MdRegion {
+    #[default]
+    US,
+    EMEA,
+    AUS,
+    CAN,
+    DEU,
+    IND,
+    JPN,
+    GBR,
+}
+
+impl std::fmt::Display for MdRegion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            MdRegion::US => "US",
+            MdRegion::EMEA => "EMEA",
+            MdRegion::AUS => "AUS",
+            MdRegion::CAN => "CAN",
+            MdRegion::DEU => "DEU",
+            MdRegion::IND => "IND",
+            MdRegion::JPN => "JPN",
+            MdRegion::GBR => "GBR",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for MdRegion {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_ascii_uppercase().as_str() {
+            "US" => Ok(MdRegion::US),
+            "EMEA" => Ok(MdRegion::EMEA),
+            "AUS" => Ok(MdRegion::AUS),
+            "CAN" => Ok(MdRegion::CAN),
+            "DEU" => Ok(MdRegion::DEU),
+            "IND" => Ok(MdRegion::IND),
+            "JPN" => Ok(MdRegion::JPN),
+            "GBR" => Ok(MdRegion::GBR),
+            _ => anyhow::bail!(
+                "Invalid region '{}'. Valid values: US, EMEA, AUS, CAN, DEU, IND, JPN, GBR",
+                s
+            ),
+        }
+    }
+}
+
 /// Supported output formats for translation
 #[derive(Debug, Clone, Copy, Serialize)]
 pub enum OutputFormat {
@@ -278,6 +329,8 @@ impl DerivativeClient {
         urn: &str,
         format: OutputFormat,
         root_filename: Option<&str>,
+        region: MdRegion,
+        force: bool,
     ) -> Result<TranslationResponse> {
         let token = self.auth.get_token().await?;
         let job_url = format!("{}/designdata/job", self.config.derivative_url());
@@ -290,7 +343,7 @@ impl DerivativeClient {
             },
             output: TranslationOutput {
                 destination: OutputDestination {
-                    region: "us".to_string(),
+                    region: region.to_string().to_lowercase(),
                 },
                 formats: vec![OutputFormatSpec {
                     format_type: format.type_name().to_string(),
@@ -308,12 +361,16 @@ impl DerivativeClient {
 
         // Use retry logic for translation requests
         let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
-            self.http_client
+            let mut req = self
+                .http_client
                 .post(&job_url)
                 .bearer_auth(&token)
                 .header("Content-Type", "application/json")
-                .header("x-ads-force", "true")
-                .json(&request)
+                .header("x-ads-region", region.to_string());
+            if force {
+                req = req.header("x-ads-force", "true");
+            }
+            req.json(&request)
         })
         .await?;
 
@@ -846,6 +903,38 @@ mod tests {
         let derivatives: Vec<DownloadableDerivative> = vec![];
         let filtered = DerivativeClient::filter_by_format(&derivatives, "obj");
         assert!(filtered.is_empty());
+    }
+
+    #[test]
+    fn test_md_region_display() {
+        assert_eq!(MdRegion::US.to_string(), "US");
+        assert_eq!(MdRegion::EMEA.to_string(), "EMEA");
+        assert_eq!(MdRegion::AUS.to_string(), "AUS");
+        assert_eq!(MdRegion::CAN.to_string(), "CAN");
+        assert_eq!(MdRegion::DEU.to_string(), "DEU");
+        assert_eq!(MdRegion::IND.to_string(), "IND");
+        assert_eq!(MdRegion::JPN.to_string(), "JPN");
+        assert_eq!(MdRegion::GBR.to_string(), "GBR");
+    }
+
+    #[test]
+    fn test_md_region_from_str() {
+        assert_eq!(MdRegion::from_str("emea").unwrap(), MdRegion::EMEA);
+        assert_eq!(MdRegion::from_str("US").unwrap(), MdRegion::US);
+        assert_eq!(MdRegion::from_str("aus").unwrap(), MdRegion::AUS);
+        assert_eq!(MdRegion::from_str("Can").unwrap(), MdRegion::CAN);
+        assert_eq!(MdRegion::from_str("deu").unwrap(), MdRegion::DEU);
+        assert_eq!(MdRegion::from_str("ind").unwrap(), MdRegion::IND);
+        assert_eq!(MdRegion::from_str("jpn").unwrap(), MdRegion::JPN);
+        assert_eq!(MdRegion::from_str("gbr").unwrap(), MdRegion::GBR);
+        let err = MdRegion::from_str("invalid");
+        assert!(err.is_err());
+        assert!(err.unwrap_err().to_string().contains("Valid values"));
+    }
+
+    #[test]
+    fn test_md_region_default_is_us() {
+        assert_eq!(MdRegion::default(), MdRegion::US);
     }
 }
 

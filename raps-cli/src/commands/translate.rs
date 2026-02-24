@@ -35,6 +35,16 @@ pub enum TranslateCommands {
         /// Wait for translation to complete (polls until done)
         #[arg(short, long)]
         wait: bool,
+
+        /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
+        #[arg(long, default_value = "US")]
+        region: String,
+
+        /// Force re-translation by deleting existing manifest.
+        /// Note: Prior versions always forced re-translation. The default is now
+        /// to preserve existing manifests.
+        #[arg(long)]
+        force: bool,
     },
 
     /// Check translation status
@@ -140,7 +150,21 @@ impl TranslateCommands {
                 format,
                 root_filename,
                 wait,
-            } => start_translation(client, urn, format, root_filename, wait, output_format).await,
+                region,
+                force,
+            } => {
+                start_translation(
+                    client,
+                    urn,
+                    format,
+                    root_filename,
+                    wait,
+                    output_format,
+                    region,
+                    force,
+                )
+                .await
+            }
             TranslateCommands::Status { urn, wait } => {
                 check_status(client, &urn, wait, output_format).await
             }
@@ -192,6 +216,7 @@ struct TranslationStartOutput {
     accepted_formats: Vec<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn start_translation(
     client: &DerivativeClient,
     urn: Option<String>,
@@ -199,7 +224,10 @@ async fn start_translation(
     root_filename: Option<String>,
     wait: bool,
     output_format: OutputFormat,
+    region_str: String,
+    force: bool,
 ) -> Result<()> {
+    let region: raps_derivative::MdRegion = region_str.parse().context("Invalid --region value")?;
     // Get URN interactively if not provided
     let source_urn = match urn {
         Some(u) => u,
@@ -250,7 +278,13 @@ async fn start_translation(
     }
 
     let response = client
-        .translate(&source_urn, derivative_format, root_filename.as_deref())
+        .translate(
+            &source_urn,
+            derivative_format,
+            root_filename.as_deref(),
+            region,
+            force,
+        )
         .await?;
 
     let accepted_formats: Vec<String> = response
@@ -970,7 +1004,15 @@ async fn use_preset(
     }
 
     // Start translation using the preset format
-    let response = client.translate(urn, format, None).await?;
+    let response = client
+        .translate(
+            urn,
+            format,
+            None,
+            raps_derivative::MdRegion::default(),
+            false,
+        )
+        .await?;
 
     #[derive(Serialize)]
     struct UsePresetOutput {

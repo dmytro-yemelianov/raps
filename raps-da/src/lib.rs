@@ -275,7 +275,7 @@ impl DesignAutomationClient {
             for id in paginated.data {
                 let description = id
                     .split('.')
-                    .last()
+                    .next_back()
                     .map(|s| s.replace('+', " "))
                     .unwrap_or_default();
                 all_engines.push(Engine {
@@ -365,11 +365,7 @@ impl DesignAutomationClient {
         version: i32,
     ) -> Result<()> {
         let token = self.auth.get_token().await?;
-        let url = format!(
-            "{}/appbundles/{}/aliases",
-            self.config.da_url(),
-            bundle_id
-        );
+        let url = format!("{}/appbundles/{}/aliases", self.config.da_url(), bundle_id);
 
         #[derive(Serialize)]
         struct AliasRequest {

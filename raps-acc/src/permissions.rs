@@ -93,7 +93,7 @@ impl FolderPermissionsClient {
         folder_id: &str,
     ) -> Result<Vec<FolderPermission>> {
         let token = self.auth.get_3leg_token().await?;
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::ensure_project_prefix(project_id);
 
         let url = format!(
             "{}/data/v1/projects/{}/folders/{}/permissions",
@@ -149,7 +149,7 @@ impl FolderPermissionsClient {
         request: BatchUpdatePermissionsRequest,
     ) -> Result<()> {
         let token = self.auth.get_3leg_token().await?;
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::ensure_project_prefix(project_id);
 
         let url = format!(
             "{}/data/v1/projects/{}/folders/{}/permissions:batch-update",
@@ -182,7 +182,7 @@ impl FolderPermissionsClient {
     /// * `project_id` - The project ID
     pub async fn get_project_files_folder_id(&self, project_id: &str) -> Result<String> {
         let token = self.auth.get_3leg_token().await?;
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::ensure_project_prefix(project_id);
 
         // Get top-level folders
         let url = format!(
@@ -247,7 +247,7 @@ impl FolderPermissionsClient {
     /// * `project_id` - The project ID
     pub async fn get_plans_folder_id(&self, project_id: &str) -> Result<String> {
         let token = self.auth.get_3leg_token().await?;
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::ensure_project_prefix(project_id);
 
         // Get top-level folders
         let url = format!(
@@ -320,23 +320,14 @@ impl FolderPermissionsClient {
     }
 }
 
-/// Normalize project ID (ensure "b." prefix)
-fn normalize_project_id(project_id: &str) -> String {
-    if project_id.starts_with("b.") {
-        project_id.to_string()
-    } else {
-        format!("b.{}", project_id)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_normalize_project_id() {
-        assert_eq!(normalize_project_id("b.123-456"), "b.123-456");
-        assert_eq!(normalize_project_id("123-456"), "b.123-456");
+    fn test_ensure_project_prefix_in_permissions() {
+        assert_eq!(crate::ensure_project_prefix("b.123-456"), "b.123-456");
+        assert_eq!(crate::ensure_project_prefix("123-456"), "b.123-456");
     }
 
     #[test]

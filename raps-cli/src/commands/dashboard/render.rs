@@ -25,7 +25,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         .constraints([
             Constraint::Length(1), // Tab bar (single line)
             Constraint::Length(1), // Breadcrumb
-            Constraint::Min(5),   // Content
+            Constraint::Min(5),    // Content
             Constraint::Length(1), // Status bar
         ])
         .split(size);
@@ -45,8 +45,7 @@ pub(super) fn ui(f: &mut Frame, app: &mut App) {
         };
         tab_spans.push(Span::styled(t.label(), style));
     }
-    let tab_line = Paragraph::new(Line::from(tab_spans))
-        .style(Style::default().bg(Color::Black));
+    let tab_line = Paragraph::new(Line::from(tab_spans)).style(Style::default().bg(Color::Black));
     f.render_widget(tab_line, chunks[0]);
 
     // Breadcrumb
@@ -76,9 +75,7 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
         "No context — use :urn <base64>".into()
     };
     // Single outer block for the content area — prevents double-border artifacts
-    let outer_block = Block::default()
-        .borders(Borders::ALL)
-        .title(title);
+    let outer_block = Block::default().borders(Borders::ALL).title(title);
     let inner = outer_block.inner(area);
     f.render_widget(outer_block, area);
 
@@ -113,10 +110,18 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                     .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Key", "Policy", "Created"],
-                &[Constraint::Percentage(50), Constraint::Percentage(20), Constraint::Percentage(30)],
-                filtered.iter().map(|r| vec![r.key.as_str(), r.policy.as_str(), r.created.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(30),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| vec![r.key.as_str(), r.policy.as_str(), r.created.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -124,13 +129,23 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&ObjectRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.key.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.key.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "Size", "SHA1"],
-                &[Constraint::Percentage(50), Constraint::Percentage(20), Constraint::Percentage(30)],
-                filtered.iter().map(|r| vec![r.key.as_str(), r.size.as_str(), r.sha1.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(30),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| vec![r.key.as_str(), r.size.as_str(), r.sha1.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -138,13 +153,23 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&HubRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "ID", "Region"],
-                &[Constraint::Percentage(40), Constraint::Percentage(40), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.name.as_str(), r.id.as_str(), r.region.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| vec![r.name.as_str(), r.id.as_str(), r.region.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -152,13 +177,19 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&ProjectRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "ID"],
                 &[Constraint::Percentage(50), Constraint::Percentage(50)],
-                filtered.iter().map(|r| vec![r.name.as_str(), r.id.as_str()]).collect(),
+                filtered
+                    .iter()
+                    .map(|r| vec![r.name.as_str(), r.id.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -166,7 +197,9 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&FolderContentRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
@@ -186,14 +219,26 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(50), Constraint::Percentage(15), Constraint::Percentage(35)],
+                [
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(35),
+                ],
             )
             .header(
                 Row::new(vec!["Name", "Type", "Modified"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -201,14 +246,19 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&IssueRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.title.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
                     Row::new(vec![
                         Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(r.status.as_str(), util::status_color(&r.status))),
+                        Cell::from(Span::styled(
+                            r.status.as_str(),
+                            util::status_color(&r.status),
+                        )),
                         Cell::from(r.assigned_to.as_str()),
                         Cell::from(r.created_at.as_str()),
                     ])
@@ -216,14 +266,27 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(40), Constraint::Percentage(15), Constraint::Percentage(20), Constraint::Percentage(25)],
+                [
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(25),
+                ],
             )
             .header(
                 Row::new(vec!["Title", "Status", "Assigned", "Created"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -231,14 +294,19 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&RfiRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.title.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
                     Row::new(vec![
                         Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(r.status.as_str(), util::status_color(&r.status))),
+                        Cell::from(Span::styled(
+                            r.status.as_str(),
+                            util::status_color(&r.status),
+                        )),
                         Cell::from(r.priority.as_str()),
                         Cell::from(r.created_at.as_str()),
                     ])
@@ -246,14 +314,27 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(40), Constraint::Percentage(15), Constraint::Percentage(15), Constraint::Percentage(30)],
+                [
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(30),
+                ],
             )
             .header(
                 Row::new(vec!["Title", "Status", "Priority", "Created"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -261,13 +342,34 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&AssetRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| {
+                        r.id.to_lowercase().contains(&filter)
+                            || r.description.to_lowercase().contains(&filter)
+                    })
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["ID", "ClientAssetId", "Description", "Status"],
-                &[Constraint::Percentage(25), Constraint::Percentage(20), Constraint::Percentage(35), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.id.as_str(), r.client_asset_id.as_str(), r.description.as_str(), r.status.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.id.as_str(),
+                            r.client_asset_id.as_str(),
+                            r.description.as_str(),
+                            r.status.as_str(),
+                        ]
+                    })
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -275,7 +377,9 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&SubmittalRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.title.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
@@ -283,21 +387,37 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                     Row::new(vec![
                         Cell::from(r.title.as_str()),
                         Cell::from(r.number.as_str()),
-                        Cell::from(Span::styled(r.status.as_str(), util::status_color(&r.status))),
+                        Cell::from(Span::styled(
+                            r.status.as_str(),
+                            util::status_color(&r.status),
+                        )),
                         Cell::from(r.due_date.as_str()),
                     ])
                 })
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(35), Constraint::Percentage(15), Constraint::Percentage(20), Constraint::Percentage(30)],
+                [
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(30),
+                ],
             )
             .header(
                 Row::new(vec!["Title", "Number", "Status", "Due Date"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -305,14 +425,19 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&ChecklistRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.title.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
                     Row::new(vec![
                         Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(r.status.as_str(), util::status_color(&r.status))),
+                        Cell::from(Span::styled(
+                            r.status.as_str(),
+                            util::status_color(&r.status),
+                        )),
                         Cell::from(r.location.as_str()),
                         Cell::from(r.due_date.as_str()),
                     ])
@@ -320,14 +445,27 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(35), Constraint::Percentage(15), Constraint::Percentage(25), Constraint::Percentage(25)],
+                [
+                    Constraint::Percentage(35),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                ],
             )
             .header(
                 Row::new(vec!["Title", "Status", "Location", "Due Date"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -335,13 +473,29 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&IssueCommentRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.body.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.body.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Body", "Created By", "Created At"],
-                &[Constraint::Percentage(50), Constraint::Percentage(25), Constraint::Percentage(25)],
-                filtered.iter().map(|r| vec![r.body.as_str(), r.created_by.as_str(), r.created_at.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.body.as_str(),
+                            r.created_by.as_str(),
+                            r.created_at.as_str(),
+                        ]
+                    })
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -349,13 +503,23 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&IssueAttachmentRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "URN", "ID"],
-                &[Constraint::Percentage(40), Constraint::Percentage(40), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.name.as_str(), r.urn.as_str(), r.id.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| vec![r.name.as_str(), r.urn.as_str(), r.id.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -363,13 +527,23 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&IssueTypeRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.title.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Title", "Active", "ID"],
-                &[Constraint::Percentage(50), Constraint::Percentage(15), Constraint::Percentage(35)],
-                filtered.iter().map(|r| vec![r.title.as_str(), r.is_active.as_str(), r.id.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(35),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| vec![r.title.as_str(), r.is_active.as_str(), r.id.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -377,13 +551,19 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&EngineRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.id.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.id.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["ID", "Description"],
                 &[Constraint::Percentage(60), Constraint::Percentage(40)],
-                filtered.iter().map(|r| vec![r.id.as_str(), r.description.as_str()]).collect(),
+                filtered
+                    .iter()
+                    .map(|r| vec![r.id.as_str(), r.description.as_str()])
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -391,10 +571,13 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&ActivityRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.id.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.id.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["ID"],
                 &[Constraint::Percentage(100)],
                 filtered.iter().map(|r| vec![r.id.as_str()]).collect(),
@@ -405,28 +588,45 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&WorkItemRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.id.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.id.to_lowercase().contains(&filter))
+                    .collect()
             };
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
                     Row::new(vec![
                         Cell::from(r.id.as_str()),
-                        Cell::from(Span::styled(r.status.as_str(), util::da_status_color(&r.status))),
+                        Cell::from(Span::styled(
+                            r.status.as_str(),
+                            util::da_status_color(&r.status),
+                        )),
                         Cell::from(r.progress.as_str()),
                     ])
                 })
                 .collect();
             let table = Table::new(
                 table_rows,
-                [Constraint::Percentage(40), Constraint::Percentage(30), Constraint::Percentage(30)],
+                [
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(30),
+                ],
             )
             .header(
                 Row::new(vec!["ID", "Status", "Progress"])
-                    .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    .style(
+                        Style::default()
+                            .fg(Color::Yellow)
+                            .add_modifier(Modifier::BOLD),
+                    )
                     .bottom_margin(1),
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -434,10 +634,13 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&AppBundleRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.id.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.id.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["ID"],
                 &[Constraint::Percentage(100)],
                 filtered.iter().map(|r| vec![r.id.as_str()]).collect(),
@@ -448,13 +651,33 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&DerivativeRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "OutputType", "Role", "MIME", "Size"],
-                &[Constraint::Percentage(30), Constraint::Percentage(15), Constraint::Percentage(15), Constraint::Percentage(20), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.name.as_str(), r.output_type.as_str(), r.role.as_str(), r.mime.as_str(), r.size.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.name.as_str(),
+                            r.output_type.as_str(),
+                            r.role.as_str(),
+                            r.mime.as_str(),
+                            r.size.as_str(),
+                        ]
+                    })
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -462,13 +685,36 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&WebhookRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.event.to_lowercase().contains(&filter) || r.callback_url.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| {
+                        r.event.to_lowercase().contains(&filter)
+                            || r.callback_url.to_lowercase().contains(&filter)
+                    })
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Event", "Callback URL", "Status", "System", "Created"],
-                &[Constraint::Percentage(20), Constraint::Percentage(30), Constraint::Percentage(15), Constraint::Percentage(15), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.event.as_str(), r.callback_url.as_str(), r.status.as_str(), r.system.as_str(), r.created.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(20),
+                    Constraint::Percentage(30),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.event.as_str(),
+                            r.callback_url.as_str(),
+                            r.status.as_str(),
+                            r.system.as_str(),
+                            r.created.as_str(),
+                        ]
+                    })
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -476,13 +722,33 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             let filtered: Vec<&PhotosceneRow> = if filter.is_empty() {
                 rows.iter().collect()
             } else {
-                rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).collect()
+                rows.iter()
+                    .filter(|r| r.name.to_lowercase().contains(&filter))
+                    .collect()
             };
             render_table(
-                f, inner,
+                f,
+                inner,
                 &["Name", "ID", "Type", "Format", "Status"],
-                &[Constraint::Percentage(25), Constraint::Percentage(25), Constraint::Percentage(15), Constraint::Percentage(15), Constraint::Percentage(20)],
-                filtered.iter().map(|r| vec![r.name.as_str(), r.id.as_str(), r.scene_type.as_str(), r.format.as_str(), r.status.as_str()]).collect(),
+                &[
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(15),
+                    Constraint::Percentage(20),
+                ],
+                filtered
+                    .iter()
+                    .map(|r| {
+                        vec![
+                            r.name.as_str(),
+                            r.id.as_str(),
+                            r.scene_type.as_str(),
+                            r.format.as_str(),
+                            r.status.as_str(),
+                        ]
+                    })
+                    .collect(),
                 &mut app.table_state,
             );
         }
@@ -506,7 +772,9 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                     Row::new(vec![
                         Cell::from(Span::styled(
                             field.label.as_str(),
-                            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+                            Style::default()
+                                .fg(Color::Cyan)
+                                .add_modifier(Modifier::BOLD),
                         )),
                         Cell::from(field.value.as_str()),
                     ])
@@ -516,7 +784,11 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 table_rows,
                 [Constraint::Percentage(25), Constraint::Percentage(75)],
             )
-            .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+            .row_highlight_style(
+                Style::default()
+                    .bg(Color::DarkGray)
+                    .add_modifier(Modifier::BOLD),
+            )
             .highlight_symbol("> ");
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
@@ -537,11 +809,19 @@ fn render_table(
         .map(|cells| Row::new(cells.iter().map(|c| Cell::from(*c)).collect::<Vec<_>>()))
         .collect();
     let header = Row::new(headers.iter().map(|h| Cell::from(*h)).collect::<Vec<_>>())
-        .style(Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+        .style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        )
         .bottom_margin(1);
     let table = Table::new(table_rows, widths)
         .header(header)
-        .row_highlight_style(Style::default().bg(Color::DarkGray).add_modifier(Modifier::BOLD))
+        .row_highlight_style(
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        )
         .highlight_symbol("> ");
     f.render_stateful_widget(table, area, table_state);
 }
@@ -557,7 +837,9 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
             ));
             spans.push(Span::styled(
                 "_",
-                Style::default().fg(Color::Yellow).add_modifier(Modifier::SLOW_BLINK),
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::SLOW_BLINK),
             ));
         }
         InputMode::Command(text) => {
@@ -567,7 +849,9 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
             ));
             spans.push(Span::styled(
                 "_",
-                Style::default().fg(Color::Green).add_modifier(Modifier::SLOW_BLINK),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::SLOW_BLINK),
             ));
         }
         InputMode::Confirm(msg) => {
@@ -706,9 +990,14 @@ fn shortcut_hints(app: &App) -> String {
     // Tab-specific list hints
     let tab_hint = match app.tab {
         ResourceTab::Issues => {
-            if matches!(view, ViewKind::IssueList { .. } | ViewKind::RfiList { .. }
-                | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. }
-                | ViewKind::ChecklistList { .. }) {
+            if matches!(
+                view,
+                ViewKind::IssueList { .. }
+                    | ViewKind::RfiList { .. }
+                    | ViewKind::AssetList { .. }
+                    | ViewKind::SubmittalList { .. }
+                    | ViewKind::ChecklistList { .. }
+            ) {
                 "i:Issues f:RFIs t:Assets s:Submittals c:Checklists  "
             } else {
                 ""

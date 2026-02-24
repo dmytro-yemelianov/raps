@@ -32,6 +32,7 @@
 //! - Reality Capture: Photogrammetry processing
 
 mod commands;
+mod credits;
 mod mcp;
 mod output;
 mod plugins;
@@ -42,10 +43,10 @@ use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
 use clap_complete::{Shell, generate};
 use colored::Colorize;
 use reedline::{
-    default_emacs_keybindings, ColumnarMenu, Emacs, FileBackedHistory, KeyCode, KeyModifiers,
-    Reedline, ReedlineEvent, ReedlineMenu, Signal, MenuBuilder,
+    ColumnarMenu, Emacs, FileBackedHistory, KeyCode, KeyModifiers, MenuBuilder, Reedline,
+    ReedlineEvent, ReedlineMenu, Signal, default_emacs_keybindings,
 };
-use std::io;
+use std::io::{self, IsTerminal};
 
 use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
@@ -74,6 +75,42 @@ use raps_oss::OssClient;
 use raps_reality::RealityCaptureClient;
 use raps_webhooks::WebhooksClient;
 
+/// Grouped commands help text, organized by authentication requirement
+const GROUPED_COMMANDS_HELP: &str = "\
+\x1b[1;33m2-Legged Auth (Client Credentials)\x1b[0m
+  auth          Authentication management (login, logout, test)
+  bucket        Manage OSS buckets
+  object        Manage objects in OSS buckets
+  translate     Translate files using Model Derivative API
+  webhook       Manage webhook subscriptions
+  da            Design Automation (engines, appbundles, activities, workitems)
+  reality       Reality Capture / Photogrammetry
+  api           Execute custom API calls to APS endpoints
+
+\x1b[1;36m3-Legged Auth (User Login)\x1b[0m
+  hub           List and manage hubs
+  project       List and manage projects
+  folder        List and manage folders
+  item          List and manage items/files
+  issue         ACC/BIM 360 Issues management
+  acc           ACC extended modules: Assets, Submittals, Checklists
+  rfi           ACC RFIs (Requests for Information)
+  admin         Account admin bulk management (add/remove users, update roles)
+  report        Portfolio reports (RFI summary, issues summary across projects)
+  template      Project templates management (create, list, update, archive)
+
+\x1b[1;32mUtility (No Auth Required)\x1b[0m
+  config        Configuration management (profiles, settings)
+  completions   Generate shell completions for bash, zsh, fish, PowerShell
+  shell         Start an interactive shell session
+  dashboard     Open the interactive TUI dashboard
+  serve         Start MCP server for AI assistant integration
+  generate      Generate synthetic engineering files for testing
+  demo          Run demo scenarios (bucket lifecycle, model pipeline, etc.)
+  pipeline      Run pipeline from YAML/JSON file
+  plugin        Manage plugins, hooks, and aliases
+  man           Generate man pages for raps and its subcommands";
+
 /// RAPS (rapeseed) - Rust Autodesk Platform Services CLI
 #[derive(Parser)]
 #[command(name = "raps")]
@@ -81,6 +118,13 @@ use raps_webhooks::WebhooksClient;
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "RAPS (rapeseed) - Rust Autodesk Platform Services CLI", long_about = None)]
 #[command(propagate_version = true)]
+#[command(help_template = concat!(
+    "\x1b[1;33mraps\x1b[0m v",
+    env!("CARGO_PKG_VERSION"),
+    " \x1b[32m·\x1b[0m Rust Autodesk Platform Services CLI\n",
+    "\n{usage-heading} {usage}\n\n{all-args}\n{after-help}"
+))]
+#[command(after_help = GROUPED_COMMANDS_HELP)]
 struct Cli {
     /// Output format: table, json, yaml, csv, or plain (default: auto-detect)
     #[arg(long, value_name = "FORMAT", global = true)]
@@ -144,19 +188,19 @@ enum Commands {
     #[command(subcommand)]
     Translate(TranslateCommands),
 
-    /// List and manage hubs (requires 3-legged auth)
+    /// List and manage hubs
     #[command(subcommand)]
     Hub(HubCommands),
 
-    /// List and manage projects (requires 3-legged auth)
+    /// List and manage projects
     #[command(subcommand)]
     Project(ProjectCommands),
 
-    /// List and manage folders (requires 3-legged auth)
+    /// List and manage folders
     #[command(subcommand)]
     Folder(FolderCommands),
 
-    /// List and manage items/files (requires 3-legged auth)
+    /// List and manage items/files
     #[command(subcommand)]
     Item(ItemCommands),
 
@@ -168,11 +212,11 @@ enum Commands {
     #[command(subcommand)]
     Da(DaCommands),
 
-    /// ACC/BIM 360 Issues management (requires 3-legged auth)
+    /// ACC/BIM 360 Issues management
     #[command(subcommand)]
     Issue(IssueCommands),
 
-    /// ACC extended modules: Assets, Submittals, Checklists (requires 3-legged auth)
+    /// ACC extended modules: Assets, Submittals, Checklists
     #[command(subcommand)]
     Acc(AccCommands),
 
@@ -184,7 +228,7 @@ enum Commands {
     #[command(subcommand)]
     Api(ApiCommands),
 
-    /// ACC RFIs (Requests for Information) (requires 3-legged auth)
+    /// ACC RFIs (Requests for Information)
     #[command(subcommand)]
     Rfi(RfiCommands),
 
@@ -236,6 +280,13 @@ enum Commands {
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 
+    /// Generate man pages for raps and its subcommands
+    Man {
+        /// Output directory for all man pages (default: print main page to stdout)
+        #[arg(long, value_name = "DIR")]
+        output_dir: Option<std::path::PathBuf>,
+    },
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -250,11 +301,19 @@ async fn main() -> Result<()> {
         Ok(cli) => cli,
         Err(e) => {
             let exit_code = match e.kind() {
-                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => 0,
-                _ => 2,
+                ErrorKind::DisplayVersion => {
+                    credits::print_version();
+                    0
+                }
+                ErrorKind::DisplayHelp => {
+                    let _ = e.print();
+                    0
+                }
+                _ => {
+                    let _ = e.print();
+                    2
+                }
             };
-
-            let _ = e.print();
             std::process::exit(exit_code);
         }
     };
@@ -328,6 +387,48 @@ async fn run(cli: Cli) -> Result<()> {
         return Ok(());
     }
 
+    // Handle man page generation (doesn't need config/auth)
+    if let Commands::Man { ref output_dir } = command {
+        let cmd = Cli::command();
+        if let Some(dir) = output_dir {
+            std::fs::create_dir_all(dir)?;
+            clap_mangen::generate_to(cmd, dir)?;
+            println!("Man pages generated in {}", dir.display());
+        } else if !io::stdout().is_terminal() {
+            // Piped: output raw troff (e.g. `raps man | man -l -`)
+            let man = clap_mangen::Man::new(cmd);
+            man.render(&mut io::stdout())?;
+        } else {
+            // Interactive terminal: show usage hints
+            #[cfg(windows)]
+            {
+                eprintln!(
+                    "{}",
+                    "Man pages use troff format (no native viewer on Windows).".yellow()
+                );
+                eprintln!();
+                eprintln!(
+                    "Generate to files:  {}",
+                    "raps man --output-dir ./man-pages".green()
+                );
+                eprintln!("Pipe via WSL:       {}", "raps man | wsl man -l -".green());
+                eprintln!("Raw troff to file:  {}", "raps man > raps.1".green());
+            }
+            #[cfg(not(windows))]
+            {
+                eprintln!("{}", "Hint: pipe to man for rendered output.".yellow());
+                eprintln!();
+                eprintln!("View now:           {}", "raps man | man -l -".green());
+                eprintln!(
+                    "Generate to files:  {}",
+                    "raps man --output-dir ./man-pages".green()
+                );
+                eprintln!("Save to file:       {}", "raps man > raps.1".green());
+            }
+        }
+        return Ok(());
+    }
+
     // Handle dashboard command (before config loading, it manages its own setup)
     #[cfg(feature = "dashboard")]
     if let Commands::Dashboard = &command {
@@ -358,10 +459,7 @@ async fn run(cli: Cli) -> Result<()> {
     // Determine output format
     let output_format = OutputFormat::determine(cli.output);
 
-    tracing::info!(
-        version = env!("CARGO_PKG_VERSION"),
-        "RAPS CLI starting"
-    );
+    tracing::info!(version = env!("CARGO_PKG_VERSION"), "RAPS CLI starting");
 
     // Load configuration leniently — missing credentials default to empty strings.
     // Commands that need credentials will fail with a clear API error when they
@@ -372,6 +470,7 @@ async fn run(cli: Cli) -> Result<()> {
     let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
 
     if let Commands::Shell = command {
+        credits::shell_welcome();
         println!("{}", "Welcome to the RAPS interactive shell!".bold());
         println!("Type 'help' for a list of commands, 'exit' to quit.");
         println!(
@@ -408,8 +507,7 @@ async fn run(cli: Cli) -> Result<()> {
         let completer = Box::new(shell::RapsCompleter::new());
         let hinter = Box::new(shell::RapsHinter::new());
         let highlighter = Box::new(shell::RapsHighlighter::new());
-        let completion_menu =
-            Box::new(ColumnarMenu::default().with_name("completion_menu"));
+        let completion_menu = Box::new(ColumnarMenu::default().with_name("completion_menu"));
 
         let mut editor = Reedline::create()
             .with_history(history)
@@ -436,7 +534,8 @@ async fn run(cli: Cli) -> Result<()> {
 
                     // Handle help command specially for shell context
                     if line == "help" || line == "?" {
-                        println!("{}", "Available commands:".bold());
+                        println!();
+                        println!("{}", "2-Legged Auth (Client Credentials)".yellow().bold());
                         println!(
                             "  {:<16} Authentication (login, logout, status, test, whoami)",
                             "auth".cyan()
@@ -453,13 +552,6 @@ async fn run(cli: Cli) -> Result<()> {
                             "  {:<16} Model Derivative (start, status, manifest, metadata)",
                             "translate".cyan()
                         );
-                        println!("  {:<16} Hub operations (list, get)", "hub".cyan());
-                        println!("  {:<16} Project operations (list, get)", "project".cyan());
-                        println!(
-                            "  {:<16} Folder operations (list, get, create)",
-                            "folder".cyan()
-                        );
-                        println!("  {:<16} Item operations (get, versions)", "item".cyan());
                         println!(
                             "  {:<16} Webhook management (list, create, get, delete)",
                             "webhook".cyan()
@@ -469,11 +561,52 @@ async fn run(cli: Cli) -> Result<()> {
                             "da".cyan()
                         );
                         println!(
+                            "  {:<16} Reality Capture / Photogrammetry",
+                            "reality".cyan()
+                        );
+                        println!(
+                            "  {:<16} Execute custom API calls to APS endpoints",
+                            "api".cyan()
+                        );
+                        println!();
+                        println!("{}", "3-Legged Auth (User Login)".cyan().bold());
+                        println!("  {:<16} Hub operations (list, get)", "hub".cyan());
+                        println!("  {:<16} Project operations (list, get)", "project".cyan());
+                        println!(
+                            "  {:<16} Folder operations (list, get, create)",
+                            "folder".cyan()
+                        );
+                        println!("  {:<16} Item operations (get, versions)", "item".cyan());
+                        println!(
                             "  {:<16} ACC/BIM 360 Issues (list, get, create)",
                             "issue".cyan()
                         );
+                        println!(
+                            "  {:<16} ACC extended modules (assets, submittals, checklists)",
+                            "acc".cyan()
+                        );
                         println!("  {:<16} ACC RFIs (list, get)", "rfi".cyan());
+                        println!("  {:<16} Account admin bulk management", "admin".cyan());
+                        println!(
+                            "  {:<16} Portfolio reports (RFI/issues summary)",
+                            "report".cyan()
+                        );
+                        println!("  {:<16} Project templates management", "template".cyan());
+                        println!();
+                        println!("{}", "Utility (No Auth Required)".green().bold());
                         println!("  {:<16} Configuration management", "config".cyan());
+                        println!("  {:<16} Generate shell completions", "completions".cyan());
+                        println!(
+                            "  {:<16} Generate synthetic files for testing",
+                            "generate".cyan()
+                        );
+                        println!("  {:<16} Run demo scenarios", "demo".cyan());
+                        println!("  {:<16} Run pipeline from YAML/JSON", "pipeline".cyan());
+                        println!(
+                            "  {:<16} Manage plugins, hooks, and aliases",
+                            "plugin".cyan()
+                        );
+                        println!("  {:<16} Generate man pages", "man".cyan());
                         println!("  {:<16} Exit the shell", "exit".cyan());
                         println!();
                         println!("{}", "Key bindings:".bold());
@@ -600,6 +733,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
         Commands::Serve => "serve",
+        Commands::Man { .. } => "man",
         Commands::External(_) => "external",
     }
 }
@@ -780,6 +914,10 @@ async fn execute_command(
         }
 
         Commands::Serve => {
+            unreachable!()
+        }
+
+        Commands::Man { .. } => {
             unreachable!()
         }
 

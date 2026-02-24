@@ -119,7 +119,7 @@ impl ProjectUsersClient {
 
     /// Get the base URL for Project Admin API
     fn project_url(&self, project_id: &str) -> String {
-        let project_id = normalize_project_id(project_id);
+        let project_id = crate::strip_project_prefix(project_id);
         format!(
             "{}/construction/admin/v1/projects/{}",
             self.config.base_url, project_id
@@ -411,14 +411,6 @@ impl ProjectUsersClient {
             successes,
         })
     }
-}
-
-/// Remove "b." prefix from project ID if present
-fn normalize_project_id(project_id: &str) -> String {
-    project_id
-        .strip_prefix("b.")
-        .unwrap_or(project_id)
-        .to_string()
 }
 
 #[cfg(test)]

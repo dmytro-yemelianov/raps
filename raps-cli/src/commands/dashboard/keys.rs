@@ -89,15 +89,25 @@ pub(super) fn handle_key(
     // tab switching, command mode, help, and quit.
     if !app.has_current_view() {
         match key.code {
-            KeyCode::Char('q') => { app.quit = true; }
-            KeyCode::Char('?') => { show_help(app); }
-            KeyCode::Char(':') => { app.input_mode = InputMode::Command(String::new()); }
+            KeyCode::Char('q') => {
+                app.quit = true;
+            }
+            KeyCode::Char('?') => {
+                show_help(app);
+            }
+            KeyCode::Char(':') => {
+                app.input_mode = InputMode::Command(String::new());
+            }
             KeyCode::F(n @ 1..=7) => {
                 let tab = ResourceTab::ALL[(n as usize) - 1];
                 switch_tab(app, tab, clients, tx);
             }
-            KeyCode::Tab => { cycle_tab(app, true, clients, tx); }
-            KeyCode::BackTab => { cycle_tab(app, false, clients, tx); }
+            KeyCode::Tab => {
+                cycle_tab(app, true, clients, tx);
+            }
+            KeyCode::BackTab => {
+                cycle_tab(app, false, clients, tx);
+            }
             _ => {}
         }
         return;
@@ -127,8 +137,12 @@ pub(super) fn handle_key(
         KeyCode::F(5) => switch_tab(app, ResourceTab::ModelDerivative, clients, tx),
         KeyCode::F(6) => switch_tab(app, ResourceTab::Webhooks, clients, tx),
         KeyCode::F(7) => switch_tab(app, ResourceTab::RealityCapture, clients, tx),
-        KeyCode::Tab => { cycle_tab(app, true, clients, tx); }
-        KeyCode::BackTab => { cycle_tab(app, false, clients, tx); }
+        KeyCode::Tab => {
+            cycle_tab(app, true, clients, tx);
+        }
+        KeyCode::BackTab => {
+            cycle_tab(app, false, clients, tx);
+        }
         KeyCode::Down | KeyCode::Char('j') => {
             let count = app.row_count();
             if count > 0 {
@@ -199,7 +213,16 @@ pub(super) fn handle_key(
             if let Some((pid, _)) = &app.project_context {
                 let pid = pid.clone();
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
-                if stack.last().is_some_and(|v| matches!(v, ViewKind::IssueList { .. } | ViewKind::RfiList { .. } | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. } | ViewKind::ChecklistList { .. })) {
+                if stack.last().is_some_and(|v| {
+                    matches!(
+                        v,
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
+                            | ViewKind::ChecklistList { .. }
+                    )
+                }) {
                     stack.pop();
                 }
                 stack.push(ViewKind::IssueList { project_id: pid });
@@ -214,7 +237,16 @@ pub(super) fn handle_key(
             if let Some((pid, _)) = &app.project_context {
                 let pid = pid.clone();
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
-                if stack.last().is_some_and(|v| matches!(v, ViewKind::IssueList { .. } | ViewKind::RfiList { .. } | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. } | ViewKind::ChecklistList { .. })) {
+                if stack.last().is_some_and(|v| {
+                    matches!(
+                        v,
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
+                            | ViewKind::ChecklistList { .. }
+                    )
+                }) {
                     stack.pop();
                 }
                 stack.push(ViewKind::RfiList { project_id: pid });
@@ -229,7 +261,16 @@ pub(super) fn handle_key(
             if let Some((pid, _)) = &app.project_context {
                 let pid = pid.clone();
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
-                if stack.last().is_some_and(|v| matches!(v, ViewKind::IssueList { .. } | ViewKind::RfiList { .. } | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. } | ViewKind::ChecklistList { .. })) {
+                if stack.last().is_some_and(|v| {
+                    matches!(
+                        v,
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
+                            | ViewKind::ChecklistList { .. }
+                    )
+                }) {
                     stack.pop();
                 }
                 stack.push(ViewKind::AssetList { project_id: pid });
@@ -244,7 +285,16 @@ pub(super) fn handle_key(
             if let Some((pid, _)) = &app.project_context {
                 let pid = pid.clone();
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
-                if stack.last().is_some_and(|v| matches!(v, ViewKind::IssueList { .. } | ViewKind::RfiList { .. } | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. } | ViewKind::ChecklistList { .. })) {
+                if stack.last().is_some_and(|v| {
+                    matches!(
+                        v,
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
+                            | ViewKind::ChecklistList { .. }
+                    )
+                }) {
                     stack.pop();
                 }
                 stack.push(ViewKind::SubmittalList { project_id: pid });
@@ -259,7 +309,16 @@ pub(super) fn handle_key(
             if let Some((pid, _)) = &app.project_context {
                 let pid = pid.clone();
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
-                if stack.last().is_some_and(|v| matches!(v, ViewKind::IssueList { .. } | ViewKind::RfiList { .. } | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. } | ViewKind::ChecklistList { .. })) {
+                if stack.last().is_some_and(|v| {
+                    matches!(
+                        v,
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
+                            | ViewKind::ChecklistList { .. }
+                    )
+                }) {
                     stack.pop();
                 }
                 stack.push(ViewKind::ChecklistList { project_id: pid });
@@ -272,8 +331,15 @@ pub(super) fn handle_key(
         }
         // F3 ACC: 'a' on IssueDetail → attachments
         KeyCode::Char('a') if app.tab == ResourceTab::Issues => {
-            if let ViewKind::IssueDetail { project_id, issue_id } = app.current_view().clone() {
-                app.push_view(ViewKind::IssueAttachmentList { project_id, issue_id });
+            if let ViewKind::IssueDetail {
+                project_id,
+                issue_id,
+            } = app.current_view().clone()
+            {
+                app.push_view(ViewKind::IssueAttachmentList {
+                    project_id,
+                    issue_id,
+                });
                 fetch::load_view(app, clients, tx, false);
             }
         }
@@ -385,11 +451,7 @@ fn switch_tab(
     }
 }
 
-fn handle_enter(
-    app: &mut App,
-    clients: &Arc<Clients>,
-    tx: &mpsc::UnboundedSender<BackgroundMsg>,
-) {
+fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSender<BackgroundMsg>) {
     let selected = match app.table_state.selected() {
         Some(i) => i,
         None => return,
@@ -473,9 +535,7 @@ fn handle_enter(
                 app.project_context = Some((project_id.clone(), project_name));
                 if app.tab == ResourceTab::Issues {
                     // Issues tab: selecting a project navigates to its issues
-                    app.push_view(ViewKind::IssueList {
-                        project_id,
-                    });
+                    app.push_view(ViewKind::IssueList { project_id });
                     fetch::load_view(app, clients, tx, false);
                 } else if let Some(hub_id) = &app.hub_context {
                     let hub_id = hub_id.clone();
@@ -532,8 +592,15 @@ fn handle_enter(
         }
         ResourceData::IssueDetail(_) => {
             // Enter on IssueDetail drills into comments
-            if let ViewKind::IssueDetail { project_id, issue_id } = app.current_view().clone() {
-                app.push_view(ViewKind::IssueCommentList { project_id, issue_id });
+            if let ViewKind::IssueDetail {
+                project_id,
+                issue_id,
+            } = app.current_view().clone()
+            {
+                app.push_view(ViewKind::IssueCommentList {
+                    project_id,
+                    issue_id,
+                });
                 fetch::load_view(app, clients, tx, false);
             }
         }
@@ -560,7 +627,10 @@ fn handle_enter(
                 rows.iter().collect()
             } else {
                 rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter))
+                    .filter(|r| {
+                        r.id.to_lowercase().contains(&filter)
+                            || r.description.to_lowercase().contains(&filter)
+                    })
                     .collect()
             };
             if let Some(row) = filtered.get(selected)
@@ -618,9 +688,7 @@ fn handle_enter(
                     .collect()
             };
             if let Some(row) = filtered.get(selected) {
-                app.push_view(ViewKind::WorkItemDetail {
-                    id: row.id.clone(),
-                });
+                app.push_view(ViewKind::WorkItemDetail { id: row.id.clone() });
                 fetch::load_view(app, clients, tx, false);
             }
         }
@@ -655,7 +723,10 @@ fn handle_enter(
                 rows.iter().collect()
             } else {
                 rows.iter()
-                    .filter(|r| r.event.to_lowercase().contains(&filter) || r.callback_url.to_lowercase().contains(&filter))
+                    .filter(|r| {
+                        r.event.to_lowercase().contains(&filter)
+                            || r.callback_url.to_lowercase().contains(&filter)
+                    })
                     .collect()
             };
             if let Some(row) = filtered.get(selected) {
@@ -676,9 +747,7 @@ fn handle_enter(
                     .collect()
             };
             if let Some(row) = filtered.get(selected) {
-                app.push_view(ViewKind::PhotosceneDetail {
-                    id: row.id.clone(),
-                });
+                app.push_view(ViewKind::PhotosceneDetail { id: row.id.clone() });
                 fetch::load_view(app, clients, tx, false);
             }
         }
@@ -709,8 +778,10 @@ fn execute_command(
                 if let Some(last) = stack.last() {
                     if matches!(
                         last,
-                        ViewKind::IssueList { .. } | ViewKind::RfiList { .. }
-                            | ViewKind::AssetList { .. } | ViewKind::SubmittalList { .. }
+                        ViewKind::IssueList { .. }
+                            | ViewKind::RfiList { .. }
+                            | ViewKind::AssetList { .. }
+                            | ViewKind::SubmittalList { .. }
                             | ViewKind::ChecklistList { .. }
                     ) {
                         stack.pop();
@@ -734,7 +805,10 @@ fn execute_command(
                 let urn = urn.trim().to_string();
                 app.nav_stacks[ResourceTab::ModelDerivative.index()] =
                     vec![ViewKind::ManifestView { urn: urn.clone() }];
-                app.set_status(format!("URN set: {}", if urn.len() > 30 { &urn[..30] } else { &urn }));
+                app.set_status(format!(
+                    "URN set: {}",
+                    if urn.len() > 30 { &urn[..30] } else { &urn }
+                ));
                 app.push_log(format!("Model Derivative URN: {urn}"));
                 // Switch to F5 and load
                 app.tab = ResourceTab::ModelDerivative;
@@ -751,7 +825,8 @@ fn execute_command(
             if app.logs.is_empty() {
                 app.error_msg = Some("No log messages yet.".into());
             } else {
-                let recent: Vec<&str> = app.logs.iter().rev().take(20).map(|s| s.as_str()).collect();
+                let recent: Vec<&str> =
+                    app.logs.iter().rev().take(20).map(|s| s.as_str()).collect();
                 app.error_msg = Some(recent.into_iter().rev().collect::<Vec<_>>().join("\n"));
             }
         }
@@ -770,7 +845,9 @@ fn execute_command(
             }
         }
         _ => {
-            app.set_status(format!("Unknown: :{cmd}  (try :q :r :p :l :urn :login :logout)"));
+            app.set_status(format!(
+                "Unknown: :{cmd}  (try :q :r :p :l :urn :login :logout)"
+            ));
         }
     }
 }
