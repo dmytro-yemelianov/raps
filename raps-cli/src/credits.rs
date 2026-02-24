@@ -46,12 +46,12 @@ pub fn print_version() {
     // Logo
     println!();
     println!(
-        "  {} {}",
-        "  ▄▄▄   ▄▄▄  ▄▄▄▄  ▄▄▄▄".yellow().bold(),
+        "   {} {}",
+        "▄▄▄  ▄▄▄  ▄▄▄▄ ▄▄▄▄".yellow().bold(),
         "✿".yellow()
     );
-    println!("   {}", "█▄▀█  █▄▄█ █▄▄▄▀ █▄▄▄▀".yellow().bold());
-    println!("   {}", "█  █  █  █ ▄▄▄█▀ ▄▄▄█▀".yellow().bold());
+    println!("   {}", "█▄▄▀ █▄▄█ █▄▄█ █▄▄▄".yellow().bold());
+    println!("   {}", "█  █ █  █ █    ▄▄▄█".yellow().bold());
 
     // Heavy separator
     println!("  {}", "═══════════════════════════════════".green());
