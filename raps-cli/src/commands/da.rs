@@ -49,6 +49,25 @@ pub enum DaCommands {
         id: String,
     },
 
+    /// Upload a .zip archive for an app bundle
+    #[command(name = "appbundle-upload")]
+    AppbundleUpload {
+        /// App bundle ID (must already exist — use appbundle-create first)
+        id: String,
+
+        /// Path to the .zip archive to upload
+        #[arg(short, long)]
+        file: PathBuf,
+
+        /// Engine ID (e.g., Autodesk.AutoCAD+24)
+        #[arg(short, long)]
+        engine: String,
+
+        /// Description for the new version
+        #[arg(short, long)]
+        description: Option<String>,
+    },
+
     /// List activities
     Activities,
 
@@ -179,6 +198,12 @@ impl DaCommands {
             DaCommands::AppbundleDelete { id } => {
                 delete_appbundle(client, &id, output_format).await
             }
+            DaCommands::AppbundleUpload {
+                id,
+                file,
+                engine,
+                description,
+            } => upload_appbundle(client, &id, &file, &engine, description, output_format).await,
             DaCommands::Activities => list_activities(client, output_format).await,
             DaCommands::ActivityCreate {
                 file,
@@ -438,6 +463,67 @@ async fn delete_appbundle(
     client.delete_appbundle(id).await?;
 
     println!("{} App bundle '{}' deleted!", "✓".green().bold(), id);
+    Ok(())
+}
+
+async fn upload_appbundle(
+    client: &DesignAutomationClient,
+    id: &str,
+    file: &std::path::Path,
+    engine: &str,
+    description: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Step 1: Create a new version of the app bundle to get upload parameters
+    if output_format.supports_colors() {
+        println!(
+            "{} Creating new version of app bundle '{}'...",
+            "→".cyan(),
+            id
+        );
+    }
+
+    let bundle_details = client
+        .create_appbundle(id, engine, description.as_deref())
+        .await?;
+
+    let upload_params = bundle_details
+        .upload_parameters
+        .ok_or_else(|| anyhow::anyhow!("No upload parameters returned for app bundle '{}'", id))?;
+
+    if output_format.supports_colors() {
+        println!(
+            "{} Version {} created. Uploading archive...",
+            "✓".green().bold(),
+            bundle_details.version
+        );
+    }
+
+    // Step 2: Upload the archive
+    client.upload_appbundle(&upload_params, file).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "{} Archive '{}' uploaded to app bundle '{}' (version {})",
+            "✓".green().bold(),
+            file.display(),
+            id,
+            bundle_details.version
+        );
+    } else {
+        #[derive(serde::Serialize)]
+        struct UploadResult {
+            id: String,
+            version: i32,
+            file: String,
+        }
+        output_format.write(&UploadResult {
+            id: id.to_string(),
+            version: bundle_details.version,
+            file: file.display().to_string(),
+        })?;
+    }
+
     Ok(())
 }
 

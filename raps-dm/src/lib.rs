@@ -732,7 +732,12 @@ impl DataManagementClient {
                 attributes: CreateFolderAttributes {
                     name: name.to_string(),
                     extension: CreateFolderExtension {
-                        ext_type: "folders:autodesk.core:Folder".to_string(),
+                        // BIM360 projects (b. prefix) require bim360 extension type
+                        ext_type: if project_id.starts_with("b.") {
+                            "folders:autodesk.bim360:Folder".to_string()
+                        } else {
+                            "folders:autodesk.core:Folder".to_string()
+                        },
                         version: "1.0".to_string(),
                     },
                 },

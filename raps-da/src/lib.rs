@@ -623,6 +623,84 @@ impl DesignAutomationClient {
 
         Ok(workitem)
     }
+
+    /// Upload an app bundle archive (.zip) using pre-signed S3 URL
+    ///
+    /// After creating an app bundle, the response includes `upload_parameters`
+    /// with an `endpoint_url` and `form_data` fields. This method POSTs the
+    /// archive file as multipart/form-data to that pre-signed URL.
+    ///
+    /// # Arguments
+    /// * `upload_params` - The upload parameters from the create_appbundle response
+    /// * `file_path` - Path to the .zip archive to upload
+    pub async fn upload_appbundle(
+        &self,
+        upload_params: &UploadParameters,
+        file_path: &std::path::Path,
+    ) -> Result<()> {
+        let endpoint_url = upload_params
+            .endpoint_url
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("Upload parameters missing endpoint URL"))?;
+
+        // Validate file exists and is a zip
+        if !file_path.exists() {
+            anyhow::bail!("File not found: {}", file_path.display());
+        }
+
+        let extension = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if extension != "zip" {
+            anyhow::bail!(
+                "Expected .zip archive, got .{} ({})",
+                extension,
+                file_path.display()
+            );
+        }
+
+        // Read the file
+        let file_bytes = tokio::fs::read(file_path)
+            .await
+            .with_context(|| format!("Failed to read file: {}", file_path.display()))?;
+
+        let file_name = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("bundle.zip")
+            .to_string();
+
+        // Build multipart form with form_data fields + the file
+        let mut form = reqwest::multipart::Form::new();
+
+        // Add all form_data fields first (required by S3 pre-signed POST)
+        if let Some(ref form_data) = upload_params.form_data {
+            for (key, value) in form_data {
+                form = form.text(key.clone(), value.clone());
+            }
+        }
+
+        // Add the file as the last field (S3 requires "file" to be last)
+        let file_part = reqwest::multipart::Part::bytes(file_bytes)
+            .file_name(file_name)
+            .mime_str("application/octet-stream")?;
+        form = form.part("file", file_part);
+
+        // POST to the pre-signed URL (no auth header needed — S3 pre-signed)
+        let response = self
+            .http_client
+            .post(endpoint_url)
+            .multipart(form)
+            .send()
+            .await
+            .context("Failed to upload app bundle archive")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to upload app bundle ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -927,6 +1005,61 @@ mod tests {
             stats.time_finished,
             Some("2024-01-01T00:01:06Z".to_string())
         );
+    }
+
+    #[test]
+    fn test_upload_parameters_deserialization() {
+        let json = r#"{
+            "endpointUrl": "https://s3.amazonaws.com/da-uploads",
+            "formData": {
+                "key": "apps/myapp/bundle.zip",
+                "policy": "base64-encoded-policy",
+                "x-amz-signature": "sig123",
+                "x-amz-credential": "cred456",
+                "x-amz-date": "20240101T000000Z"
+            }
+        }"#;
+
+        let params: UploadParameters = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            params.endpoint_url,
+            Some("https://s3.amazonaws.com/da-uploads".to_string())
+        );
+        let form_data = params.form_data.unwrap();
+        assert_eq!(form_data.len(), 5);
+        assert_eq!(
+            form_data.get("key"),
+            Some(&"apps/myapp/bundle.zip".to_string())
+        );
+    }
+
+    #[test]
+    fn test_upload_parameters_missing_endpoint() {
+        let json = r#"{}"#;
+        let params: UploadParameters = serde_json::from_str(json).unwrap();
+        assert!(params.endpoint_url.is_none());
+        assert!(params.form_data.is_none());
+    }
+
+    #[test]
+    fn test_appbundle_details_with_upload_params() {
+        let json = r#"{
+            "id": "myapp.MyBundle+dev",
+            "engine": "Autodesk.Revit+2024",
+            "version": 2,
+            "uploadParameters": {
+                "endpointUrl": "https://s3.amazonaws.com/upload",
+                "formData": {
+                    "key": "upload-key"
+                }
+            }
+        }"#;
+
+        let details: AppBundleDetails = serde_json::from_str(json).unwrap();
+        assert_eq!(details.version, 2);
+        assert!(details.upload_parameters.is_some());
+        let params = details.upload_parameters.unwrap();
+        assert!(params.endpoint_url.is_some());
     }
 }
 

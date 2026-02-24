@@ -131,6 +131,10 @@ impl TokenStorage {
     }
 
     /// Save token to file (INSECURE - logs warning)
+    ///
+    /// Uses synchronous I/O intentionally: token files are ~200 bytes and written
+    /// at most once per CLI invocation. The sub-microsecond I/O cost is far less
+    /// than the overhead of `spawn_blocking` thread-pool scheduling.
     fn save_file(&self, token: &StoredToken) -> Result<()> {
         tracing::warn!("Storing token in plaintext file. Use keychain for better security.");
         let path = Self::token_file_path()?;

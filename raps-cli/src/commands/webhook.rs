@@ -256,7 +256,17 @@ async fn create_webhook(
 
     // Get event type
     let event_type = match event {
-        Some(e) => e,
+        Some(e) => {
+            if !WebhooksClient::is_valid_event(&e) {
+                let known: Vec<&str> = WEBHOOK_EVENTS.iter().map(|(e, _)| *e).collect();
+                anyhow::bail!(
+                    "Unknown webhook event '{}'. Valid events: {}",
+                    e,
+                    known.join(", ")
+                );
+            }
+            e
+        }
         None => {
             let event_labels: Vec<String> = WEBHOOK_EVENTS
                 .iter()
