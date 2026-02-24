@@ -51,7 +51,7 @@ pub enum IssueCommands {
         #[arg(short, long)]
         description: Option<String>,
 
-        /// Create issues from CSV file (columns: title, description, status)
+        /// Create issues from CSV file or stdin (columns: title, description, status; use `-` for stdin)
         #[arg(long, value_name = "FILE")]
         from_csv: Option<PathBuf>,
     },
@@ -437,9 +437,20 @@ async fn create_issues_from_csv(
     csv_path: &PathBuf,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // Parse CSV file
-    let mut reader = csv::Reader::from_path(csv_path)
-        .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?;
+    // Parse CSV from file or stdin
+    let csv_content = if csv_path.as_os_str() == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin()
+            .lock()
+            .read_to_string(&mut buf)
+            .context("Failed to read CSV from stdin")?;
+        buf
+    } else {
+        std::fs::read_to_string(csv_path)
+            .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?
+    };
+    let mut reader = csv::Reader::from_reader(csv_content.as_bytes());
 
     let mut rows: Vec<CsvIssueRow> = Vec::new();
     let mut validation_errors: Vec<String> = Vec::new();

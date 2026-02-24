@@ -74,7 +74,7 @@ pub enum DaCommands {
     /// Create an activity from JSON or YAML definition
     #[command(name = "activity-create")]
     ActivityCreate {
-        /// Path to JSON or YAML activity definition file
+        /// Path to JSON or YAML activity definition file (use `-` for stdin, parsed as YAML)
         #[arg(short, long)]
         file: Option<PathBuf>,
 
@@ -656,15 +656,27 @@ async fn create_activity(
     output_format: OutputFormat,
 ) -> Result<()> {
     let activity_def = if let Some(file_path) = file {
-        // Load activity definition from file
-        let content = std::fs::read_to_string(&file_path)
-            .with_context(|| format!("Failed to read activity file: {}", file_path.display()))?;
+        // Load activity definition from file or stdin
+        let content = if file_path.as_os_str() == "-" {
+            use std::io::Read;
+            let mut buf = String::new();
+            std::io::stdin()
+                .lock()
+                .read_to_string(&mut buf)
+                .context("Failed to read activity definition from stdin")?;
+            buf
+        } else {
+            std::fs::read_to_string(&file_path)
+                .with_context(|| format!("Failed to read activity file: {}", file_path.display()))?
+        };
 
-        let def: ActivityDefinition = if file_path
-            .extension()
-            .map(|e| e == "yaml" || e == "yml")
-            .unwrap_or(false)
-        {
+        let is_yaml = file_path.as_os_str() == "-"
+            || file_path
+                .extension()
+                .map(|e| e == "yaml" || e == "yml")
+                .unwrap_or(false);
+
+        let def: ActivityDefinition = if is_yaml {
             serde_yaml::from_str(&content).with_context(|| {
                 format!(
                     "Failed to parse YAML activity file: {}",

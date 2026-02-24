@@ -46,7 +46,7 @@ use reedline::{
     ColumnarMenu, Emacs, FileBackedHistory, KeyCode, KeyModifiers, MenuBuilder, Reedline,
     ReedlineEvent, ReedlineMenu, Signal, default_emacs_keybindings,
 };
-use std::io::{self, IsTerminal};
+use std::io::{self, BufRead, IsTerminal};
 
 use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
@@ -103,7 +103,6 @@ const GROUPED_COMMANDS_HELP: &str = "\
   config        Configuration management (profiles, settings)
   completions   Generate shell completions for bash, zsh, fish, PowerShell
   shell         Start an interactive shell session
-  dashboard     Open the interactive TUI dashboard
   serve         Start MCP server for AI assistant integration
   generate      Generate synthetic engineering files for testing
   demo          Run demo scenarios (bucket lifecycle, model pipeline, etc.)
@@ -306,6 +305,7 @@ async fn main() -> Result<()> {
                     0
                 }
                 ErrorKind::DisplayHelp => {
+                    print!("{}", include_str!("../logo.ansi"));
                     let _ = e.print();
                     0
                 }
@@ -331,7 +331,7 @@ async fn main() -> Result<()> {
     // Setup interactive shell check flags
     interactive::init(cli.non_interactive, cli.yes);
 
-    let cmd_name = cli.command.as_ref().map(command_name).unwrap_or("shell");
+    let cmd_name = cli.command.as_ref().map(command_name).unwrap_or("help");
 
     if let Err(err) = run(cli).await {
         let exit_code = ExitCode::from_error(&err);
@@ -366,17 +366,13 @@ async fn run(cli: Cli) -> Result<()> {
     let command = match cli.command {
         Some(cmd) => cmd,
         None => {
-            #[cfg(feature = "dashboard")]
-            {
-                let config = Config::from_env_lenient()?;
-                let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
-                return commands::dashboard::run_dashboard(config, http_config).await;
+            // If stdin is piped, read commands line-by-line (batch mode)
+            if !io::stdin().is_terminal() {
+                return run_piped_stdin(cli.timeout, cli.output, cli.concurrency).await;
             }
-            #[cfg(not(feature = "dashboard"))]
-            {
-                Cli::command().print_help()?;
-                return Ok(());
-            }
+            print!("{}", include_str!("../logo.ansi"));
+            Cli::command().print_help()?;
+            return Ok(());
         }
     };
 
@@ -700,6 +696,78 @@ async fn run(cli: Cli) -> Result<()> {
     )
     .await?;
 
+    Ok(())
+}
+
+/// Read commands from piped stdin and execute each line as a raps command.
+/// Supports: `echo "bucket list" | raps` or `Get-Content commands.txt | raps`
+async fn run_piped_stdin(
+    timeout: Option<u64>,
+    output: Option<OutputFormat>,
+    concurrency: Option<usize>,
+) -> Result<()> {
+    let config = Config::from_env_lenient()?;
+    let mut exit_code = 0i32;
+
+    let stdin = io::stdin().lock();
+    for line in stdin.lines() {
+        let line = line?;
+        let line = line.trim();
+
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let mut args = match shlex::split(line) {
+            Some(args) => args,
+            None => {
+                eprintln!("{} Unmatched quote in: {}", "Error:".red().bold(), line);
+                exit_code = 2;
+                continue;
+            }
+        };
+        args.insert(0, "raps".to_string());
+
+        let sub_cli = match Cli::try_parse_from(&args) {
+            Ok(c) => c,
+            Err(e) => {
+                let _ = e.print();
+                exit_code = 2;
+                continue;
+            }
+        };
+
+        let sub_output_format = OutputFormat::determine(sub_cli.output.or(output));
+        let sub_http_config = HttpClientConfig::from_cli_and_env(sub_cli.timeout.or(timeout));
+
+        let sub_command = match sub_cli.command {
+            Some(cmd) => cmd,
+            None => continue,
+        };
+
+        if let Err(err) = execute_command(
+            sub_command,
+            &config,
+            &sub_http_config,
+            sub_output_format,
+            sub_cli.concurrency.or(concurrency).unwrap_or(5),
+        )
+        .await
+        {
+            let code = ExitCode::from_error(&err);
+            exit_code = code as i32;
+            eprintln!("{} {}", "Error:".red().bold(), err);
+            let mut source = err.source();
+            while let Some(cause) = source {
+                eprintln!("  {} {}", "Caused by:".dimmed(), cause);
+                source = cause.source();
+            }
+        }
+    }
+
+    if exit_code != 0 {
+        std::process::exit(exit_code);
+    }
     Ok(())
 }
 

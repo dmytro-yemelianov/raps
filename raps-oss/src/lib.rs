@@ -1081,6 +1081,56 @@ impl OssClient {
         Ok(())
     }
 
+    /// Download an object and stream it to any async writer (stdout, file, etc.)
+    pub async fn download_object_to_writer(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        writer: &mut (impl tokio::io::AsyncWrite + Unpin),
+    ) -> Result<()> {
+        let signed = self
+            .get_signed_download_url(bucket_key, object_key, None)
+            .await?;
+
+        let download_url = signed
+            .url
+            .ok_or_else(|| anyhow::anyhow!("No download URL returned"))?;
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&download_url)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
+        }
+
+        let total_size = signed
+            .size
+            .unwrap_or(response.content_length().unwrap_or(0));
+
+        let pb = progress::file_progress(total_size, &format!("Downloading {}", object_key));
+
+        let mut stream = response.bytes_stream();
+        let mut downloaded: u64 = 0;
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.context("Error while downloading")?;
+            writer
+                .write_all(&chunk)
+                .await
+                .context("Failed to write output")?;
+            downloaded += chunk.len() as u64;
+            pb.set_position(downloaded);
+        }
+
+        writer.flush().await?;
+        pb.finish_with_message(format!("Downloaded {}", object_key));
+        Ok(())
+    }
+
     /// List objects in a bucket
     pub async fn list_objects(&self, bucket_key: &str) -> Result<Vec<ObjectItem>> {
         const MAX_PAGES: usize = 100;

@@ -5,7 +5,7 @@
 //!
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use futures_util::future;
@@ -20,15 +20,15 @@ use raps_oss::OssClient;
 
 #[derive(Debug, Subcommand)]
 pub enum ObjectCommands {
-    /// Upload a file to a bucket
+    /// Upload a file to a bucket (use `-` to read from stdin)
     Upload {
         /// Bucket key
         bucket: Option<String>,
 
-        /// Path to the file to upload
+        /// Path to the file to upload, or `-` for stdin
         file: PathBuf,
 
-        /// Object key (defaults to filename)
+        /// Object key (defaults to filename; required when reading from stdin)
         #[arg(short, long)]
         key: Option<String>,
 
@@ -55,7 +55,7 @@ pub enum ObjectCommands {
         resume: bool,
     },
 
-    /// Download an object from a bucket
+    /// Download an object from a bucket (use `--out-file -` to write to stdout)
     Download {
         /// Bucket key
         bucket: Option<String>,
@@ -63,7 +63,7 @@ pub enum ObjectCommands {
         /// Object key to download
         object: Option<String>,
 
-        /// Output file path (defaults to object key)
+        /// Output file path (defaults to object key; use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
     },
@@ -279,10 +279,28 @@ async fn upload_object(
     resume: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    // Validate file exists
-    if !file.exists() {
-        anyhow::bail!("File not found: {}", file.display());
-    }
+    let from_stdin = file.as_os_str() == "-";
+
+    // Spool stdin to a temp file when `-` is given, otherwise validate the path
+    let (_tmp_guard, actual_file) = if from_stdin {
+        if resume {
+            anyhow::bail!("--resume cannot be used when reading from stdin");
+        }
+        if key.is_none() {
+            anyhow::bail!("--key is required when reading from stdin (no filename to derive)");
+        }
+        let mut tmp = tempfile::NamedTempFile::new()
+            .context("Failed to create temp file for stdin spool")?;
+        std::io::copy(&mut std::io::stdin().lock(), &mut tmp)
+            .context("Failed to read stdin")?;
+        let path = tmp.path().to_path_buf();
+        (Some(tmp), path)
+    } else {
+        if !file.exists() {
+            anyhow::bail!("File not found: {}", file.display());
+        }
+        (None, file.clone())
+    };
 
     // Select bucket
     let bucket_key = select_bucket(client, bucket).await?;
@@ -296,11 +314,12 @@ async fn upload_object(
     });
 
     if output_format.supports_colors() {
+        let source = if from_stdin { "stdin" } else { &file.display().to_string() };
         let resume_msg = if resume { " (with resume)" } else { "" };
         println!(
             "{} {} {} {}{}",
             "Uploading".dimmed(),
-            file.display().to_string().cyan(),
+            source.cyan(),
             "to".dimmed(),
             format!("{}/{}", bucket_key, object_key).cyan(),
             resume_msg.dimmed()
@@ -308,7 +327,7 @@ async fn upload_object(
     }
 
     let object_info = client
-        .upload_object_with_options(&bucket_key, &object_key, &file, resume)
+        .upload_object_with_options(&bucket_key, &object_key, &actual_file, resume)
         .await?;
 
     let urn = client.get_urn(&bucket_key, &object_key);
@@ -382,7 +401,18 @@ async fn download_object(
         }
     };
 
-    // Determine output path
+    let to_stdout = output.as_ref().is_some_and(|p| p.as_os_str() == "-");
+
+    if to_stdout {
+        // Stream directly to stdout — no progress messages, no formatting
+        let mut stdout = tokio::io::stdout();
+        client
+            .download_object_to_writer(&bucket_key, &object_key, &mut stdout)
+            .await?;
+        return Ok(());
+    }
+
+    // File-based download
     let output_path = output.unwrap_or_else(|| PathBuf::from(&object_key));
 
     // Check if output file exists (respects --yes flag)

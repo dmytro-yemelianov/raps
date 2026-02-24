@@ -94,7 +94,7 @@ pub enum ApiCommands {
         #[arg(short, long, conflicts_with = "data_file")]
         data: Option<String>,
 
-        /// Read request body from file
+        /// Read request body from file (use `-` for stdin)
         #[arg(short = 'f', long = "data-file", conflicts_with = "data")]
         data_file: Option<PathBuf>,
 
@@ -106,7 +106,7 @@ pub enum ApiCommands {
         #[arg(short = 'H', long = "header", value_parser = parse_header)]
         header: Vec<(String, String)>,
 
-        /// Save response to file
+        /// Save response to file (use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
@@ -124,7 +124,7 @@ pub enum ApiCommands {
         #[arg(short, long, conflicts_with = "data_file")]
         data: Option<String>,
 
-        /// Read request body from file
+        /// Read request body from file (use `-` for stdin)
         #[arg(short = 'f', long = "data-file", conflicts_with = "data")]
         data_file: Option<PathBuf>,
 
@@ -136,7 +136,7 @@ pub enum ApiCommands {
         #[arg(short = 'H', long = "header", value_parser = parse_header)]
         header: Vec<(String, String)>,
 
-        /// Save response to file
+        /// Save response to file (use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
@@ -154,7 +154,7 @@ pub enum ApiCommands {
         #[arg(short, long, conflicts_with = "data_file")]
         data: Option<String>,
 
-        /// Read request body from file
+        /// Read request body from file (use `-` for stdin)
         #[arg(short = 'f', long = "data-file", conflicts_with = "data")]
         data_file: Option<PathBuf>,
 
@@ -166,7 +166,7 @@ pub enum ApiCommands {
         #[arg(short = 'H', long = "header", value_parser = parse_header)]
         header: Vec<(String, String)>,
 
-        /// Save response to file
+        /// Save response to file (use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
 
@@ -399,14 +399,24 @@ fn parse_body(
         return Ok(None);
     }
 
-    // Read body from data or file
+    // Read body from data, file, or stdin
     let body_str = if let Some(data) = data {
         Some(data)
     } else if let Some(path) = data_file {
-        Some(
-            std::fs::read_to_string(&path)
-                .with_context(|| format!("Failed to read body from file: {}", path.display()))?,
-        )
+        if path.as_os_str() == "-" {
+            use std::io::Read;
+            let mut buf = String::new();
+            std::io::stdin()
+                .lock()
+                .read_to_string(&mut buf)
+                .context("Failed to read request body from stdin")?;
+            Some(buf)
+        } else {
+            Some(
+                std::fs::read_to_string(&path)
+                    .with_context(|| format!("Failed to read body from file: {}", path.display()))?,
+            )
+        }
     } else {
         None
     };
@@ -536,9 +546,14 @@ async fn handle_response(
             Ok(value) => {
                 if status.is_success() {
                     // Save to file if requested
-                    if let Some(path) = output_file {
-                        std::fs::write(&path, serde_json::to_string_pretty(&value)?)?;
-                        println!("{} {}", "Saved to:".green(), path.display());
+                    if let Some(ref path) = output_file {
+                        let pretty = serde_json::to_string_pretty(&value)?;
+                        if path.as_os_str() == "-" {
+                            print!("{}", pretty);
+                        } else {
+                            std::fs::write(path, &pretty)?;
+                            eprintln!("{} {}", "Saved to:".green(), path.display());
+                        }
                     } else {
                         // Output using configured format
                         output_format.write(&value)?;
@@ -566,9 +581,13 @@ async fn handle_response(
             Err(_) => {
                 // JSON parse failed, treat as text
                 if status.is_success() {
-                    if let Some(path) = output_file {
-                        std::fs::write(&path, &body_text)?;
-                        println!("{} {}", "Saved to:".green(), path.display());
+                    if let Some(ref path) = output_file {
+                        if path.as_os_str() == "-" {
+                            print!("{}", body_text);
+                        } else {
+                            std::fs::write(path, &body_text)?;
+                            eprintln!("{} {}", "Saved to:".green(), path.display());
+                        }
                     } else {
                         println!("{}", body_text);
                     }
@@ -587,8 +606,12 @@ async fn handle_response(
 
         if status.is_success() {
             if let Some(path) = output_file {
-                std::fs::write(&path, &body_text)?;
-                println!("{} {}", "Saved to:".green(), path.display());
+                if path.as_os_str() == "-" {
+                    print!("{}", body_text);
+                } else {
+                    std::fs::write(&path, &body_text)?;
+                    eprintln!("{} {}", "Saved to:".green(), path.display());
+                }
             } else {
                 println!("{}", body_text);
             }
@@ -605,17 +628,33 @@ async fn handle_response(
 
         if status.is_success() {
             if let Some(path) = output_file {
-                std::fs::write(&path, &bytes)?;
-                println!(
-                    "{} {} ({} bytes)",
-                    "Saved to:".green(),
-                    path.display(),
-                    bytes.len()
-                );
+                if path.as_os_str() == "-" {
+                    use std::io::Write;
+                    std::io::stdout()
+                        .lock()
+                        .write_all(&bytes)
+                        .context("Failed to write to stdout")?;
+                } else {
+                    std::fs::write(&path, &bytes)?;
+                    eprintln!(
+                        "{} {} ({} bytes)",
+                        "Saved to:".green(),
+                        path.display(),
+                        bytes.len()
+                    );
+                }
+                Ok(())
+            } else if !std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+                // stdout is piped — write binary directly
+                use std::io::Write;
+                std::io::stdout()
+                    .lock()
+                    .write_all(&bytes)
+                    .context("Failed to write to stdout")?;
                 Ok(())
             } else {
                 bail!(
-                    "Binary response received. Use --out-file to save to a file.\n\
+                    "Binary response received. Use --out-file to save to a file (or pipe stdout).\n\
                      Content-Type: {}, Size: {} bytes",
                     content_type,
                     bytes.len()

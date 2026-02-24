@@ -17,9 +17,9 @@ use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum PipelineCommands {
-    /// Run a pipeline from a YAML or JSON file
+    /// Run a pipeline from a YAML or JSON file (use `-` for stdin, parsed as YAML)
     Run {
-        /// Path to pipeline file
+        /// Path to pipeline file (use `-` for stdin)
         file: PathBuf,
 
         /// Continue on error
@@ -90,14 +90,27 @@ impl PipelineCommands {
 }
 
 fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
-    let content = std::fs::read_to_string(file)
-        .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?;
+    let content = if file.as_os_str() == "-" {
+        use std::io::Read;
+        let mut buf = String::new();
+        std::io::stdin()
+            .lock()
+            .read_to_string(&mut buf)
+            .context("Failed to read pipeline from stdin")?;
+        buf
+    } else {
+        std::fs::read_to_string(file)
+            .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?
+    };
 
-    let pipeline: Pipeline = if file
-        .extension()
-        .map(|e| e == "yaml" || e == "yml")
-        .unwrap_or(false)
-    {
+    // Stdin defaults to YAML; files use extension to determine format
+    let is_yaml = file.as_os_str() == "-"
+        || file
+            .extension()
+            .map(|e| e == "yaml" || e == "yml")
+            .unwrap_or(false);
+
+    let pipeline: Pipeline = if is_yaml {
         serde_yaml::from_str(&content)
             .with_context(|| format!("Failed to parse YAML pipeline: {}", file.display()))?
     } else {
