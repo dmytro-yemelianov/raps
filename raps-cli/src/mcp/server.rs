@@ -5,6 +5,7 @@
 //!
 //! Exposes APS API functionality as MCP tools for AI assistants.
 
+use futures_util::stream::{StreamExt as _, self as stream_util};
 use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
 use serde_json::{Map, Value, json};
 use std::{str::FromStr, sync::Arc};
@@ -27,6 +28,9 @@ use raps_oss::{OssClient, Region, RetentionPolicy};
 use raps_reality::RealityCaptureClient;
 use raps_webhooks::{UpdateWebhookRequest, WebhooksClient};
 
+/// Default concurrency for bulk MCP operations.
+const MCP_BULK_CONCURRENCY: usize = 10;
+
 /// RAPS MCP Server
 ///
 /// Provides AI assistants with direct access to Autodesk Platform Services.
@@ -45,7 +49,7 @@ pub struct RapsServer {
 impl RapsServer {
     /// Create a new RAPS MCP Server
     pub fn new() -> Result<Self, anyhow::Error> {
-        let config = Config::from_env()?;
+        let config = Config::from_env_lenient()?;
         let http_config = HttpClientConfig::default();
 
         Ok(Self {
@@ -58,75 +62,74 @@ impl RapsServer {
         })
     }
 
-    // Helper to get auth client
+    // Helper to get auth client (double-checked locking to avoid redundant init)
     async fn get_auth_client(&self) -> AuthClient {
-        if let Some(client) = self.auth_client.read().await.clone() {
-            return client;
+        if let Some(client) = self.auth_client.read().await.as_ref() {
+            return client.clone();
         }
 
         let mut guard = self.auth_client.write().await;
-        guard
-            .get_or_insert_with(|| {
-                AuthClient::new_with_http_config((*self.config).clone(), self.http_config.clone())
-            })
-            .clone()
+        if guard.is_none() {
+            *guard = Some(AuthClient::new_with_http_config(
+                (*self.config).clone(),
+                self.http_config.clone(),
+            ));
+        }
+        guard.as_ref().unwrap().clone()
     }
 
-    // Helper to get OSS client
+    // Helper to get OSS client (double-checked locking)
     async fn get_oss_client(&self) -> OssClient {
-        if let Some(client) = self.oss_client.read().await.clone() {
-            return client;
+        if let Some(client) = self.oss_client.read().await.as_ref() {
+            return client.clone();
         }
 
         let auth = self.get_auth_client().await;
         let mut guard = self.oss_client.write().await;
-        guard
-            .get_or_insert_with(|| {
-                OssClient::new_with_http_config(
-                    (*self.config).clone(),
-                    auth,
-                    self.http_config.clone(),
-                )
-            })
-            .clone()
+        if guard.is_none() {
+            *guard = Some(OssClient::new_with_http_config(
+                (*self.config).clone(),
+                auth,
+                self.http_config.clone(),
+            ));
+        }
+        guard.as_ref().unwrap().clone()
     }
 
-    // Helper to get Derivative client
+    // Helper to get Derivative client (double-checked locking)
     async fn get_derivative_client(&self) -> DerivativeClient {
-        if let Some(client) = self.derivative_client.read().await.clone() {
-            return client;
+        if let Some(client) = self.derivative_client.read().await.as_ref() {
+            return client.clone();
         }
 
         let auth = self.get_auth_client().await;
         let mut guard = self.derivative_client.write().await;
-        guard
-            .get_or_insert_with(|| {
-                DerivativeClient::new_with_http_config(
-                    (*self.config).clone(),
-                    auth,
-                    self.http_config.clone(),
-                )
-            })
-            .clone()
+        if guard.is_none() {
+            *guard = Some(DerivativeClient::new_with_http_config(
+                (*self.config).clone(),
+                auth,
+                self.http_config.clone(),
+            ));
+        }
+        guard.as_ref().unwrap().clone()
     }
 
-    // Helper to get Data Management client
+    // Helper to get Data Management client (double-checked locking)
     async fn get_dm_client(&self) -> DataManagementClient {
-        if let Some(client) = self.dm_client.read().await.clone() {
-            return client;
+        if let Some(client) = self.dm_client.read().await.as_ref() {
+            return client.clone();
         }
 
         let auth = self.get_auth_client().await;
         let mut guard = self.dm_client.write().await;
-        guard
-            .get_or_insert_with(|| {
-                DataManagementClient::new_with_http_config(
-                    (*self.config).clone(),
-                    auth,
-                    self.http_config.clone(),
-                )
-            })
-            .clone()
+        if guard.is_none() {
+            *guard = Some(DataManagementClient::new_with_http_config(
+                (*self.config).clone(),
+                auth,
+                self.http_config.clone(),
+            ));
+        }
+        guard.as_ref().unwrap().clone()
     }
 
     // Helper to get Account Admin client (created on demand, not cached)
@@ -225,6 +228,31 @@ impl RapsServer {
             .map(|v| v.to_string())
     }
 
+    /// Validate that a URN looks like a base64-encoded APS URN.
+    fn validate_urn(urn: &str) -> Result<(), String> {
+        if urn.len() < 10 {
+            return Err("URN is too short — expected a base64-encoded APS URN.".to_string());
+        }
+        if urn.contains(' ') {
+            return Err("URN must not contain spaces.".to_string());
+        }
+        Ok(())
+    }
+
+    /// Validate that an ID looks like a GUID (with optional prefix like `b.`).
+    #[allow(dead_code)]
+    fn validate_id(value: &str, label: &str) -> Result<(), String> {
+        // Allow prefixed IDs like "b.abc-123" or plain GUIDs
+        let id_part = value.split('.').last().unwrap_or(value);
+        if id_part.len() < 8 {
+            return Err(format!(
+                "{} '{}' looks too short — expected a GUID or APS ID.",
+                label, value
+            ));
+        }
+        Ok(())
+    }
+
     // ========================================================================
     // Tool Implementations
     // ========================================================================
@@ -287,9 +315,9 @@ impl RapsServer {
         let limit = Self::clamp_limit(limit, 100, 500);
 
         match client.list_buckets().await {
-            Ok(buckets) => {
+            Ok(all_buckets) => {
                 // Filter by region if specified
-                let buckets: Vec<_> = buckets
+                let filtered: Vec<_> = all_buckets
                     .into_iter()
                     .filter(|b| {
                         if let Some(ref r) = region {
@@ -301,11 +329,17 @@ impl RapsServer {
                             true
                         }
                     })
-                    .take(limit)
                     .collect();
 
-                // Format as simple output
-                let mut output = format!("Found {} bucket(s):\n\n", buckets.len());
+                let total = filtered.len();
+                let buckets: Vec<_> = filtered.into_iter().take(limit).collect();
+                let shown = buckets.len();
+
+                let mut output = if shown < total {
+                    format!("Showing {} of {} bucket(s):\n\n", shown, total)
+                } else {
+                    format!("Found {} bucket(s):\n\n", total)
+                };
                 for b in &buckets {
                     output.push_str(&format!(
                         "* {} (policy: {}, region: {})\n",
@@ -373,10 +407,18 @@ impl RapsServer {
         let limit = Self::clamp_limit(limit, 100, 1000);
 
         match client.list_objects(&bucket_key).await {
-            Ok(objects) => {
-                let objects: Vec<_> = objects.into_iter().take(limit).collect();
-                let mut output =
-                    format!("Found {} object(s) in '{}':\n\n", objects.len(), bucket_key);
+            Ok(all_objects) => {
+                let total = all_objects.len();
+                let objects: Vec<_> = all_objects.into_iter().take(limit).collect();
+                let shown = objects.len();
+                let mut output = if shown < total {
+                    format!(
+                        "Showing {} of {} object(s) in '{}':\n\n",
+                        shown, total, bucket_key
+                    )
+                } else {
+                    format!("Found {} object(s) in '{}':\n\n", total, bucket_key)
+                };
                 for obj in &objects {
                     output.push_str(&format!("* {} ({} bytes)\n", obj.object_key, obj.size));
                 }
@@ -464,9 +506,29 @@ impl RapsServer {
 
         match client.get_manifest(&urn).await {
             Ok(manifest) => {
-                let status = &manifest.status;
-                let progress = &manifest.progress;
-                format!("Translation status: {} ({})", status, progress)
+                let mut output = format!(
+                    "Translation status: {} ({})\n* URN: {}\n* Region: {}\n* Has thumbnail: {}",
+                    manifest.status,
+                    manifest.progress,
+                    manifest.urn,
+                    manifest.region,
+                    manifest.has_thumbnail
+                );
+                if !manifest.derivatives.is_empty() {
+                    output.push_str(&format!(
+                        "\n* Derivatives: {} output(s)",
+                        manifest.derivatives.len()
+                    ));
+                    for d in &manifest.derivatives {
+                        let name = d.name.as_deref().unwrap_or("-");
+                        let prog = d.progress.as_deref().unwrap_or("-");
+                        output.push_str(&format!(
+                            "\n  - {} [{}] status: {} ({})",
+                            name, d.output_type, d.status, prog
+                        ));
+                    }
+                }
+                output
             }
             Err(e) => format!("Could not get translation status: {}", e),
         }
@@ -477,9 +539,15 @@ impl RapsServer {
         let limit = Self::clamp_limit(limit, 50, 200);
 
         match client.list_hubs().await {
-            Ok(hubs) => {
-                let hubs: Vec<_> = hubs.into_iter().take(limit).collect();
-                let mut output = format!("Found {} hub(s):\n\n", hubs.len());
+            Ok(all_hubs) => {
+                let total = all_hubs.len();
+                let hubs: Vec<_> = all_hubs.into_iter().take(limit).collect();
+                let shown = hubs.len();
+                let mut output = if shown < total {
+                    format!("Showing {} of {} hub(s):\n\n", shown, total)
+                } else {
+                    format!("Found {} hub(s):\n\n", total)
+                };
                 for hub in &hubs {
                     let region = hub.attributes.region.as_deref().unwrap_or("unknown");
                     output.push_str(&format!(
@@ -517,9 +585,15 @@ impl RapsServer {
         let limit = Self::clamp_limit(limit, 50, 200);
 
         match client.list_projects(&hub_id).await {
-            Ok(projects) => {
-                let projects: Vec<_> = projects.into_iter().take(limit).collect();
-                let mut output = format!("Found {} project(s):\n\n", projects.len());
+            Ok(all_projects) => {
+                let total = all_projects.len();
+                let projects: Vec<_> = all_projects.into_iter().take(limit).collect();
+                let shown = projects.len();
+                let mut output = if shown < total {
+                    format!("Showing {} of {} project(s):\n\n", shown, total)
+                } else {
+                    format!("Found {} project(s):\n\n", total)
+                };
                 for proj in &projects {
                     output.push_str(&format!("* {} (id: {})\n", proj.attributes.name, proj.id));
                 }
@@ -604,7 +678,7 @@ impl RapsServer {
         };
 
         let bulk_config = BulkConfig {
-            concurrency: 10,
+            concurrency: MCP_BULK_CONCURRENCY,
             dry_run,
             ..Default::default()
         };
@@ -672,7 +746,7 @@ impl RapsServer {
         };
 
         let bulk_config = BulkConfig {
-            concurrency: 10,
+            concurrency: MCP_BULK_CONCURRENCY,
             dry_run,
             ..Default::default()
         };
@@ -726,7 +800,7 @@ impl RapsServer {
         };
 
         let bulk_config = BulkConfig {
-            concurrency: 10,
+            concurrency: MCP_BULK_CONCURRENCY,
             dry_run,
             ..Default::default()
         };
@@ -807,7 +881,7 @@ impl RapsServer {
         let permissions_client = Arc::new(self.get_permissions_client().await);
 
         let bulk_config = BulkConfig {
-            concurrency: 10,
+            concurrency: MCP_BULK_CONCURRENCY,
             dry_run,
             ..Default::default()
         };
@@ -987,7 +1061,7 @@ impl RapsServer {
         }
 
         let bulk_config = BulkConfig {
-            concurrency: 10,
+            concurrency: MCP_BULK_CONCURRENCY,
             dry_run: false,
             ..Default::default()
         };
@@ -1810,6 +1884,11 @@ impl RapsServer {
 
         let path = Path::new(&file_path);
 
+        // Security: reject paths to sensitive locations
+        if let Err(msg) = validate_file_path(path) {
+            return msg;
+        }
+
         // Validate file exists
         if !path.exists() {
             return format!("Error: File not found: {}", file_path);
@@ -1906,20 +1985,26 @@ impl RapsServer {
         let mut results = Vec::new();
 
         for handle in handles {
-            if let Ok((path, success, size, error)) = handle.await {
-                let path_display = Path::new(&path)
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or(path);
+            match handle.await {
+                Ok((path, success, size, error)) => {
+                    let path_display = Path::new(&path)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or(path);
 
-                if success {
-                    successful += 1;
-                    let size_display = size.map(format_size).unwrap_or_default();
-                    results.push(format!("✓ {} ({})", path_display, size_display));
-                } else {
+                    if success {
+                        successful += 1;
+                        let size_display = size.map(format_size).unwrap_or_default();
+                        results.push(format!("✓ {} ({})", path_display, size_display));
+                    } else {
+                        failed += 1;
+                        let err_msg = error.unwrap_or_else(|| "Unknown error".to_string());
+                        results.push(format!("✗ {} ({})", path_display, err_msg));
+                    }
+                }
+                Err(_join_err) => {
                     failed += 1;
-                    let err_msg = error.unwrap_or_else(|| "Unknown error".to_string());
-                    results.push(format!("✗ {} ({})", path_display, err_msg));
+                    results.push("✗ (internal task error)".to_string());
                 }
             }
         }
@@ -1942,8 +2027,13 @@ impl RapsServer {
 
         let client = self.get_oss_client().await;
 
-        // Check if parent directory exists
+        // Security: reject paths to sensitive locations
         let path = Path::new(&output_path);
+        if let Err(msg) = validate_file_path(path) {
+            return msg;
+        }
+
+        // Check if parent directory exists
         if let Some(parent) = path.parent()
             && !parent.exists()
         {
@@ -2031,33 +2121,31 @@ impl RapsServer {
         let temp_dir = std::env::temp_dir();
         let temp_path = temp_dir.join(format!("raps_copy_{}", uuid::Uuid::new_v4()));
 
-        // Download to temp
-        match client
+        // Download to temp — always clean up on any exit path
+        let result = match client
             .download_object(&source_bucket, &source_key, &temp_path)
             .await
         {
-            Ok(_) => {}
-            Err(e) => {
-                return format!("Failed to read source object: {}", e);
+            Ok(_) => {
+                // Upload to destination
+                match client
+                    .upload_object(&dest_bucket, &destination_key, &temp_path)
+                    .await
+                {
+                    Ok(info) => {
+                        let urn = client.get_urn(&dest_bucket, &destination_key);
+                        format!(
+                            "Copied '{}' from '{}' to '{}'\n* Size: {} bytes\n* New URN: {}",
+                            source_key, source_bucket, dest_bucket, info.size, urn
+                        )
+                    }
+                    Err(e) => format!("Failed to copy to destination: {}", e),
+                }
             }
-        }
-
-        // Upload to destination
-        let result = match client
-            .upload_object(&dest_bucket, &destination_key, &temp_path)
-            .await
-        {
-            Ok(info) => {
-                let urn = client.get_urn(&dest_bucket, &destination_key);
-                format!(
-                    "Copied '{}' from '{}' to '{}'\n* Size: {} bytes\n* New URN: {}",
-                    source_key, source_bucket, dest_bucket, info.size, urn
-                )
-            }
-            Err(e) => format!("Failed to copy to destination: {}", e),
+            Err(e) => format!("Failed to read source object: {}", e),
         };
 
-        // Clean up temp file
+        // Clean up temp file — always runs regardless of success/failure
         let _ = std::fs::remove_file(&temp_path);
 
         result
@@ -2202,6 +2290,8 @@ impl RapsServer {
         }
     }
 
+    // Note: pagination is client-side (DM API fetches all pages then we skip/take).
+    // Server-side pagination would require changes to the raps-dm crate.
     async fn folder_contents(
         &self,
         project_id: String,
@@ -2924,11 +3014,12 @@ impl RapsServer {
         let status = response.status();
         let status_code = status.as_u16();
 
-        // Collect response headers for display
+        // Collect response headers for display (filter sensitive ones)
         let response_headers: Vec<(String, String)> = response
             .headers()
             .iter()
-            .take(10) // Limit headers shown
+            .filter(|(k, _)| !SENSITIVE_HEADERS.contains(&k.as_str()))
+            .take(10)
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect();
 
@@ -3132,19 +3223,41 @@ impl RapsServer {
         }
 
         let rfi_client = self.get_rfi_client().await;
-        let mut output = format!("RFI Summary for {} project(s):\n\n", projects.len());
+        let project_count = projects.len();
+
+        // Fetch RFIs in parallel (bounded concurrency) instead of serial N+1
+        let futs: Vec<_> = projects
+            .into_iter()
+            .map(|proj| {
+                let client = rfi_client.clone();
+                let sf = status_filter.clone();
+                let proj_id = proj.id;
+                let proj_name = proj.name;
+                async move {
+                    let res = client.list_rfis(&proj_id).await;
+                    (proj_name, sf, res)
+                }
+            })
+            .collect();
+
+        let results: Vec<_> = stream_util::iter(futs)
+            .buffer_unordered(MCP_BULK_CONCURRENCY)
+            .collect()
+            .await;
+
+        let mut output = format!("RFI Summary for {} project(s):\n\n", project_count);
         let mut grand_total = 0usize;
         let mut grand_open = 0usize;
 
-        for proj in &projects {
-            match rfi_client.list_rfis(&proj.id).await {
+        for (proj_name, sf, res) in &results {
+            match res {
                 Ok(rfis) => {
-                    let filtered: Vec<_> = if let Some(ref sf) = status_filter {
-                        rfis.into_iter()
+                    let filtered: Vec<_> = if let Some(sf) = sf {
+                        rfis.iter()
                             .filter(|r| r.status.to_lowercase() == sf.to_lowercase())
                             .collect()
                     } else {
-                        rfis
+                        rfis.iter().collect()
                     };
                     let total = filtered.len();
                     let open = filtered
@@ -3156,21 +3269,19 @@ impl RapsServer {
                     if total > 0 {
                         output.push_str(&format!(
                             "* {} - {} RFIs ({} open)\n",
-                            proj.name, total, open
+                            proj_name, total, open
                         ));
                     }
                 }
                 Err(_) => {
-                    output.push_str(&format!("* {} - (access denied)\n", proj.name));
+                    output.push_str(&format!("* {} - (access denied)\n", proj_name));
                 }
             }
         }
 
         output.push_str(&format!(
             "\nTotal: {} RFIs across {} projects ({} open)",
-            grand_total,
-            projects.len(),
-            grand_open
+            grand_total, project_count, grand_open
         ));
         output
     }
@@ -3202,20 +3313,42 @@ impl RapsServer {
         }
 
         let issues_client = self.get_issues_client().await;
-        let mut output = format!("Issues Summary for {} project(s):\n\n", projects.len());
+        let project_count = projects.len();
+
+        // Fetch issues in parallel (bounded concurrency) instead of serial N+1
+        let futs: Vec<_> = projects
+            .into_iter()
+            .map(|proj| {
+                let client = issues_client.clone();
+                let sf = status_filter.clone();
+                let proj_id = proj.id;
+                let proj_name = proj.name;
+                async move {
+                    let res = client.list_issues(&proj_id, None).await;
+                    (proj_name, sf, res)
+                }
+            })
+            .collect();
+
+        let results: Vec<_> = stream_util::iter(futs)
+            .buffer_unordered(MCP_BULK_CONCURRENCY)
+            .collect()
+            .await;
+
+        let mut output = format!("Issues Summary for {} project(s):\n\n", project_count);
         let mut grand_total = 0usize;
         let mut grand_open = 0usize;
 
-        for proj in &projects {
-            match issues_client.list_issues(&proj.id, None).await {
+        for (proj_name, sf, res) in &results {
+            match res {
                 Ok(issues) => {
-                    let filtered: Vec<_> = if let Some(ref sf) = status_filter {
+                    let filtered: Vec<_> = if let Some(sf) = sf {
                         issues
-                            .into_iter()
+                            .iter()
                             .filter(|i| i.status.to_lowercase() == sf.to_lowercase())
                             .collect()
                     } else {
-                        issues
+                        issues.iter().collect()
                     };
                     let total = filtered.len();
                     let open = filtered
@@ -3227,21 +3360,19 @@ impl RapsServer {
                     if total > 0 {
                         output.push_str(&format!(
                             "* {} - {} issues ({} open)\n",
-                            proj.name, total, open
+                            proj_name, total, open
                         ));
                     }
                 }
                 Err(_) => {
-                    output.push_str(&format!("* {} - (access denied)\n", proj.name));
+                    output.push_str(&format!("* {} - (access denied)\n", proj_name));
                 }
             }
         }
 
         output.push_str(&format!(
             "\nTotal: {} issues across {} projects ({} open)",
-            grand_total,
-            projects.len(),
-            grand_open
+            grand_total, project_count, grand_open
         ));
         output
     }
@@ -3414,9 +3545,18 @@ impl RapsServer {
         }
     }
 
-    async fn da_workitem_create(&self, activity_id: String) -> String {
+    async fn da_workitem_create(
+        &self,
+        activity_id: String,
+        arguments: std::collections::HashMap<String, raps_da::WorkItemArgument>,
+    ) -> String {
         let client = self.get_da_client().await;
-        let arguments = std::collections::HashMap::new();
+        if arguments.is_empty() {
+            return "Error: workitem requires at least one argument (input/output mappings).\n\
+                    Example arguments: {\"input\": {\"url\": \"https://...\"}, \"output\": {\"url\": \"https://...\", \"verb\": \"put\"}}\n\
+                    Use da_activities_list to see the activity's expected arguments."
+                .to_string();
+        }
         match client.create_workitem(&activity_id, arguments).await {
             Ok(item) => {
                 format!(
@@ -3697,7 +3837,10 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                let minutes = args.get("minutes").and_then(|v| v.as_u64()).unwrap_or(10) as u32;
+                let minutes = args
+                    .get("minutes")
+                    .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                    .unwrap_or(10) as u32;
                 self.object_signed_url(bucket_key, object_key, minutes)
                     .await
             }
@@ -3717,6 +3860,9 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
+                if let Err(err) = Self::validate_urn(&urn) {
+                    return CallToolResult::success(vec![Content::text(err)]);
+                }
                 let format =
                     Self::optional_arg(&args, "format").unwrap_or_else(|| "svf2".to_string());
                 self.translate_start(urn, format).await
@@ -3726,6 +3872,9 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
+                if let Err(err) = Self::validate_urn(&urn) {
+                    return CallToolResult::success(vec![Content::text(err)]);
+                }
                 self.translate_status(urn).await
             }
             "hub_list" => {
@@ -4730,7 +4879,28 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                self.da_workitem_create(activity_id).await
+                let arguments: std::collections::HashMap<String, raps_da::WorkItemArgument> = args
+                    .get("arguments")
+                    .and_then(|v| v.as_object())
+                    .map(|obj| {
+                        obj.iter()
+                            .filter_map(|(k, v)| {
+                                // Accept either {"url": "..."} object or plain "url" string
+                                let arg = if let Some(url) = v.as_str() {
+                                    raps_da::WorkItemArgument { url: url.to_string(), verb: None, headers: None }
+                                } else if let Some(obj) = v.as_object() {
+                                    let url = obj.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
+                                    let verb = obj.get("verb").and_then(|u| u.as_str()).map(|s| s.to_string());
+                                    raps_da::WorkItemArgument { url, verb, headers: None }
+                                } else {
+                                    return None;
+                                };
+                                Some((k.clone(), arg))
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                self.da_workitem_create(activity_id, arguments).await
             }
             "da_workitem_status" => {
                 let workitem_id = match Self::required_arg(&args, "workitem_id") {
@@ -4876,7 +5046,7 @@ fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "auth_logout",
-            "Logout from 3-legged OAuth and clear stored tokens",
+            "Logout from 3-legged OAuth and clear stored tokens. WARNING: destructive — only call when the user explicitly requests logout.",
             schema(json!({}), &[]),
         ),
         Tool::new(
@@ -5872,12 +6042,13 @@ fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "da_workitem_create",
-            "Create and submit a new Design Automation workitem to execute an activity.",
+            "Create and submit a new Design Automation workitem. Requires activity_id and arguments mapping input/output names to URLs.",
             schema(
                 json!({
-                    "activity_id": {"type": "string", "description": "Fully qualified activity ID (e.g., 'YourApp.ActivityName+alias')"}
+                    "activity_id": {"type": "string", "description": "Fully qualified activity ID (e.g., 'YourApp.ActivityName+alias')"},
+                    "arguments": {"type": "object", "description": "Input/output argument mappings. Each value is either a URL string or {\"url\": \"...\", \"verb\": \"get|put\"}"}
                 }),
-                &["activity_id"],
+                &["activity_id", "arguments"],
             ),
         ),
         Tool::new(
@@ -6032,21 +6203,29 @@ impl ServerHandler for RapsServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             instructions: Some(
-                "RAPS MCP Server v4.5 - Autodesk Platform Services CLI\n\n\
-                Provides direct access to APS APIs (74 tools):\n\
-                * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
-                * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
-                * translate_* - CAD model translation\n\
-                * hub_*, project_* - Data Management & Project Info\n\
-                * folder_*, item_* - Folder and file management\n\
-                * project_create, project_user_* - ACC Project Admin\n\
-                * template_* - Project template management (v4.5)\n\
-                * admin_* - Bulk account administration\n\
-                * issue_*, rfi_* - ACC Issues and RFIs\n\
-                * acc_* - ACC Assets, Submittals, Checklists\n\n\
-                Set APS_CLIENT_ID and APS_CLIENT_SECRET env vars.\n\
-                For 3-legged auth, run 'raps auth login' first."
-                    .into(),
+                format!(
+                    "RAPS MCP Server v{version} - Autodesk Platform Services CLI\n\n\
+                    Provides direct access to APS APIs:\n\
+                    * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
+                    * bucket_*, object_* - OSS storage operations (incl. upload/download/copy)\n\
+                    * translate_* - CAD model translation\n\
+                    * hub_*, project_* - Data Management & Project Info\n\
+                    * folder_*, item_* - Folder and file management\n\
+                    * project_create, project_user_* - ACC Project Admin\n\
+                    * template_* - Project template management\n\
+                    * admin_* - Bulk account administration\n\
+                    * issue_*, rfi_* - ACC Issues and RFIs\n\
+                    * acc_* - ACC Assets, Submittals, Checklists\n\
+                    * da_* - Design Automation\n\
+                    * reality_* - Reality Capture / Photogrammetry\n\
+                    * webhook_* - Event subscriptions\n\
+                    * api_request - Custom APS API calls\n\
+                    * report_* - Portfolio reports\n\n\
+                    Set APS_CLIENT_ID and APS_CLIENT_SECRET env vars.\n\
+                    For 3-legged auth, run 'raps auth login' first.",
+                    version = env!("CARGO_PKG_VERSION"),
+                )
+                .into(),
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()
@@ -6074,6 +6253,52 @@ impl ServerHandler for RapsServer {
         Ok(result)
     }
 }
+
+/// Validate that a file path is not pointing at a sensitive system location.
+/// Returns Ok(()) if safe, Err(message) if the path should be rejected.
+fn validate_file_path(path: &std::path::Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().to_lowercase();
+
+    // Block well-known sensitive paths
+    let blocked_patterns = [
+        ".ssh",
+        ".gnupg",
+        ".aws/credentials",
+        ".env",
+        "id_rsa",
+        "id_ed25519",
+        "authorized_keys",
+        "known_hosts",
+        "/etc/shadow",
+        "/etc/passwd",
+        "/etc/cron",
+        "credentials.json",
+        "secrets.json",
+        "token.json",
+    ];
+
+    for pattern in &blocked_patterns {
+        if path_str.contains(pattern) {
+            return Err(format!(
+                "Error: Path '{}' targets a sensitive location (matched '{}').\n\
+                 MCP tools cannot read/write security-sensitive files.",
+                path.display(),
+                pattern
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Headers that should be stripped from API responses before returning to AI
+const SENSITIVE_HEADERS: &[&str] = &[
+    "set-cookie",
+    "www-authenticate",
+    "authorization",
+    "proxy-authorization",
+    "cookie",
+];
 
 /// Run the MCP server using stdio transport
 pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {

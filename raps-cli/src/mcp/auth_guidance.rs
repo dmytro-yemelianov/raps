@@ -5,13 +5,14 @@
 //!
 //! Provides structured guidance content, tool-auth mappings, and helper functions
 //! for native authentication support in the MCP server.
+//!
+//! Items in this module are pre-built for integration into the MCP auth flow.
 
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 
 /// Authentication requirement for MCP tools
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
 pub enum AuthRequirement {
     /// Requires 2-legged OAuth (client credentials)
     TwoLegged,
@@ -38,13 +39,11 @@ pub struct AuthState {
 
 impl AuthState {
     /// Check if any credentials are configured
-    #[allow(dead_code)]
     pub fn has_any_credentials(&self) -> bool {
         self.has_client_id || self.has_client_secret
     }
 
     /// Check if 2-legged credentials are complete
-    #[allow(dead_code)]
     pub fn has_complete_2leg_credentials(&self) -> bool {
         self.has_client_id && self.has_client_secret
     }
@@ -131,7 +130,6 @@ pub const TOOL_AVAILABILITY_HEADER: &str = "\nTool Availability:\n";
 // ============================================================================
 
 /// Get the authentication requirement for a tool
-#[allow(dead_code)]
 pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
     match tool_name {
         // Auth tools - work with either
