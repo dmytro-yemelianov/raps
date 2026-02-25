@@ -38,6 +38,40 @@ pub fn is_yes() -> bool {
     YES.load(Ordering::Relaxed)
 }
 
+/// Detect if the environment is headless (no display server / browser available).
+///
+/// Returns `true` when browser-based OAuth is unlikely to work:
+/// - SSH sessions (`SSH_CONNECTION` or `SSH_TTY` set)
+/// - No display server on Linux (`DISPLAY` and `WAYLAND_DISPLAY` both unset)
+/// - Docker / CI containers (`container` env var or `/.dockerenv` exists)
+/// - Explicit non-interactive flag
+pub fn is_headless() -> bool {
+    if is_non_interactive() {
+        return true;
+    }
+
+    // SSH session
+    if std::env::var_os("SSH_CONNECTION").is_some() || std::env::var_os("SSH_TTY").is_some() {
+        return true;
+    }
+
+    // Linux without a display server
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("DISPLAY").is_none() && std::env::var_os("WAYLAND_DISPLAY").is_none() {
+        return true;
+    }
+
+    // Container environment
+    if std::env::var_os("container").is_some()
+        || std::path::Path::new("/.dockerenv").exists()
+        || std::env::var_os("CI").is_some()
+    {
+        return true;
+    }
+
+    false
+}
+
 /// Require a value in non-interactive mode
 ///
 /// Returns an error if non-interactive mode is enabled and the value is None

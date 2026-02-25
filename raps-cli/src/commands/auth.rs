@@ -341,7 +341,25 @@ async fn login(
         println!("  {} {:?}", "Scopes:".bold(), scopes);
     }
 
-    // Use device code flow if requested
+    // Auto-detect headless environments and switch to device code flow
+    let device = if !device && raps_kernel::interactive::is_headless() {
+        eprintln!(
+            "{}",
+            "Headless environment detected (no browser available). \
+             Switching to device code flow automatically."
+                .yellow()
+        );
+        eprintln!(
+            "{}",
+            "   Tip: use 'raps auth login --device' to skip this detection."
+                .dimmed()
+        );
+        true
+    } else {
+        device
+    };
+
+    // Use device code flow if requested or auto-detected
     let token = if device {
         auth_client.login_device(&scopes).await?
     } else {
