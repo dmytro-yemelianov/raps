@@ -336,4 +336,57 @@ mod integration_tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "mock-cached-token");
     }
+
+    /// Helper to create an AuthClient with empty credentials (simulates from_env_lenient with no config)
+    fn create_empty_creds_client(mock_url: &str) -> AuthClient {
+        let config = Config {
+            client_id: "".to_string(),
+            client_secret: "".to_string(),
+            base_url: mock_url.to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        AuthClient::new(config)
+    }
+
+    #[tokio::test]
+    async fn test_get_token_fails_with_empty_credentials() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_empty_creds_client(&server.url);
+
+        let result = client.get_token().await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("APS_CLIENT_ID"),
+            "Error should mention APS_CLIENT_ID, got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_refresh_resets_flag_on_credential_error() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_empty_creds_client(&server.url);
+
+        // Simulate a logged-in state with an expired token that has a refresh token
+        let expired_token = StoredToken {
+            access_token: "expired".to_string(),
+            refresh_token: Some("refresh-token".to_string()),
+            expires_at: chrono::Utc::now().timestamp() - 100,
+            scopes: vec!["data:read".to_string()],
+        };
+        client.set_3leg_token_for_testing(expired_token).await;
+
+        // get_3leg_token should fail because credentials are empty
+        let result = client.get_3leg_token().await;
+        assert!(result.is_err());
+
+        // The refreshing flag must have been reset so the next caller doesn't spin-wait
+        let cache = client.cached_3leg_token.lock().await;
+        assert!(
+            !cache.refreshing,
+            "refreshing flag should be reset after credential error"
+        );
+    }
 }

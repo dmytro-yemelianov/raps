@@ -45,7 +45,13 @@ impl AuthClient {
                     let mut cache = self.cached_3leg_token.lock().await;
                     cache.refreshing = true;
                 }
-                return self.refresh_token(refresh).await;
+                let result = self.refresh_token(refresh).await;
+                // Always reset the refreshing flag, even on error
+                if result.is_err() {
+                    let mut cache = self.cached_3leg_token.lock().await;
+                    cache.refreshing = false;
+                }
+                return result;
             }
 
             anyhow::bail!("Not logged in. Please run 'raps auth login' first.")

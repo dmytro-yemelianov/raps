@@ -94,6 +94,9 @@ impl AuthClient {
             .context("Failed to read user input")?;
 
         let input = input.trim().to_string();
+        if input.is_empty() {
+            anyhow::bail!("No authorization code provided. Please try again.");
+        }
 
         // Parse the authorization code and validate state
         let auth_code = if input.contains("code=") || input.starts_with("http") {
