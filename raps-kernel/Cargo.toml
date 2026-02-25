@@ -68,6 +68,9 @@ urlencoding.workspace = true
 # Progress bars
 indicatif.workspace = true
 
+# Cryptographic hashing (PKCE S256 challenge)
+sha2.workspace = true
+
 # Interactive prompts
 dialoguer.workspace = true
 memory-stats.workspace = true

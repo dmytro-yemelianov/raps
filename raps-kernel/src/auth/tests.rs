@@ -145,39 +145,6 @@ fn test_token_response_with_scope() {
 }
 
 #[test]
-fn test_device_code_response_deserialization() {
-    let json = r#"{
-        "device_code": "device-123",
-        "user_code": "ABC-DEF",
-        "verification_uri": "https://autodesk.com/device",
-        "verification_uri_complete": "https://autodesk.com/device?code=ABC-DEF",
-        "expires_in": 600,
-        "interval": 5
-    }"#;
-
-    let response: DeviceCodeResponse = serde_json::from_str(json).unwrap();
-    assert_eq!(response.device_code, "device-123");
-    assert_eq!(response.user_code, "ABC-DEF");
-    assert_eq!(response.expires_in, 600);
-    assert_eq!(response.interval, Some(5));
-}
-
-#[test]
-fn test_device_code_response_minimal() {
-    let json = r#"{
-        "device_code": "device-456",
-        "user_code": "XYZ-123",
-        "verification_uri": "https://autodesk.com/device",
-        "expires_in": 300
-    }"#;
-
-    let response: DeviceCodeResponse = serde_json::from_str(json).unwrap();
-    assert_eq!(response.device_code, "device-456");
-    assert!(response.verification_uri_complete.is_none());
-    assert!(response.interval.is_none());
-}
-
-#[test]
 fn test_user_info_deserialization() {
     let json = r#"{
         "sub": "user-id-123",

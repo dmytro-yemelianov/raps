@@ -45,17 +45,6 @@ pub struct TokenResponse {
     pub scope: Option<String>,
 }
 
-/// Device code response from APS Device Authorization endpoint
-#[derive(Debug, Clone, Deserialize)]
-pub struct DeviceCodeResponse {
-    pub device_code: String,
-    pub user_code: String,
-    pub verification_uri: String,
-    pub verification_uri_complete: Option<String>,
-    pub expires_in: u64,
-    pub interval: Option<u64>, // Polling interval in seconds
-}
-
 /// Cached token with expiry tracking (for 2-legged)
 #[derive(Debug, Clone)]
 pub(crate) struct CachedToken {
