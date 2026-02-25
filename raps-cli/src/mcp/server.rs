@@ -265,7 +265,7 @@ impl RapsServer {
     #[allow(dead_code)]
     pub(crate) fn validate_id(value: &str, label: &str) -> Result<(), String> {
         // Allow prefixed IDs like "b.abc-123" or plain GUIDs
-        let id_part = value.split('.').last().unwrap_or(value);
+        let id_part = value.rsplit('.').next().unwrap_or(value);
         if id_part.len() < 8 {
             return Err(format!(
                 "{} '{}' looks too short — expected a GUID or APS ID.",
@@ -364,7 +364,7 @@ impl ServerHandler for RapsServer {
                     For 3-legged auth, run 'raps auth login' first.",
                     version = env!("CARGO_PKG_VERSION"),
                 )
-                .into(),
+                ,
             ),
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             ..Default::default()

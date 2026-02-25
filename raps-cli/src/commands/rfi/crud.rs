@@ -1,311 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
-//! RFI (Request for Information) Commands
-//!
-//! Commands for managing RFIs in ACC projects.
+//! CRUD operations for RFIs: list, get, create, update, delete.
 
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::Subcommand;
 use colored::Colorize;
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
-use crate::commands::interactive;
 use crate::output::OutputFormat;
 use raps_acc::{CreateRfiRequest, RfiClient, UpdateRfiRequest};
-use raps_dm::DataManagementClient;
 
-#[derive(Debug, Subcommand)]
-pub enum RfiCommands {
-    /// List RFIs in a project
-    List {
-        /// Project ID (without "b." prefix)
-        project_id: Option<String>,
+use super::{truncate_str, RfiOutput};
 
-        /// Filter by status (open, answered, closed, void)
-        #[arg(long)]
-        status: Option<String>,
-
-        /// Only show RFIs created after this date (YYYY-MM-DD)
-        #[arg(long)]
-        since: Option<String>,
-
-        /// Hub ID (for interactive mode)
-        #[arg(long, hide = true)]
-        hub_id: Option<String>,
-    },
-
-    /// Get details of a specific RFI
-    Get {
-        /// Project ID (without "b." prefix)
-        project_id: Option<String>,
-
-        /// RFI ID
-        rfi_id: Option<String>,
-
-        /// Hub ID (for interactive mode)
-        #[arg(long, hide = true)]
-        hub_id: Option<String>,
-    },
-
-    /// Create a new RFI
-    Create {
-        /// Project ID (without "b." prefix)
-        project_id: Option<String>,
-
-        /// RFI title
-        #[arg(long)]
-        title: Option<String>,
-
-        /// RFI question/description
-        #[arg(long)]
-        question: Option<String>,
-
-        /// Priority (low, normal, high, critical)
-        #[arg(long, default_value = "normal")]
-        priority: String,
-
-        /// Due date (ISO 8601 format: YYYY-MM-DD)
-        #[arg(long)]
-        due_date: Option<String>,
-
-        /// User ID to assign to
-        #[arg(long)]
-        assigned_to: Option<String>,
-
-        /// Location reference
-        #[arg(long)]
-        location: Option<String>,
-
-        /// Discipline
-        #[arg(long)]
-        discipline: Option<String>,
-
-        /// Create RFIs from CSV file (columns: title, description, assigned_to)
-        #[arg(long, value_name = "FILE")]
-        from_csv: Option<PathBuf>,
-
-        /// Hub ID (for interactive mode)
-        #[arg(long, hide = true)]
-        hub_id: Option<String>,
-    },
-
-    /// Update an existing RFI
-    Update {
-        /// Project ID (without "b." prefix)
-        project_id: Option<String>,
-
-        /// RFI ID
-        rfi_id: Option<String>,
-
-        /// New title
-        #[arg(long)]
-        title: Option<String>,
-
-        /// Update question
-        #[arg(long)]
-        question: Option<String>,
-
-        /// Set answer (typically transitions to 'answered' status)
-        #[arg(long)]
-        answer: Option<String>,
-
-        /// New status (open, answered, closed, void)
-        #[arg(long)]
-        status: Option<String>,
-
-        /// New priority
-        #[arg(long)]
-        priority: Option<String>,
-
-        /// New due date
-        #[arg(long)]
-        due_date: Option<String>,
-
-        /// Reassign to user
-        #[arg(long)]
-        assigned_to: Option<String>,
-
-        /// Update location
-        #[arg(long)]
-        location: Option<String>,
-
-        /// Hub ID (for interactive mode)
-        #[arg(long, hide = true)]
-        hub_id: Option<String>,
-    },
-
-    /// Delete an RFI
-    Delete {
-        /// Project ID (without "b." prefix)
-        project_id: Option<String>,
-
-        /// RFI ID
-        rfi_id: Option<String>,
-
-        /// Hub ID (for interactive mode)
-        #[arg(long, hide = true)]
-        hub_id: Option<String>,
-    },
-}
-
-impl RfiCommands {
-    pub async fn execute(
-        self,
-        client: &RfiClient,
-        dm_client: &DataManagementClient,
-        output_format: OutputFormat,
-    ) -> Result<()> {
-        match self {
-            RfiCommands::List {
-                project_id,
-                status,
-                since,
-                hub_id,
-            } => {
-                let (p_id, _) = resolve_rfi_args(
-                    dm_client,
-                    client,
-                    hub_id,
-                    project_id,
-                    Some("ignore".to_string()),
-                )
-                .await?;
-                list_rfis(client, &p_id, status.as_deref(), since, output_format).await
-            }
-            RfiCommands::Get {
-                project_id,
-                rfi_id,
-                hub_id,
-            } => {
-                let (p_id, r_id) =
-                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
-                get_rfi(client, &p_id, &r_id, output_format).await
-            }
-            RfiCommands::Create {
-                project_id,
-                title,
-                question,
-                priority,
-                due_date,
-                assigned_to,
-                location,
-                discipline,
-                from_csv,
-                hub_id,
-            } => {
-                let (p_id, _) = resolve_rfi_args(
-                    dm_client,
-                    client,
-                    hub_id,
-                    project_id,
-                    Some("ignore".to_string()),
-                )
-                .await?;
-                create_rfi(
-                    client,
-                    &p_id,
-                    title,
-                    question,
-                    &priority,
-                    due_date,
-                    assigned_to,
-                    location,
-                    discipline,
-                    from_csv,
-                    output_format,
-                )
-                .await
-            }
-            RfiCommands::Update {
-                project_id,
-                rfi_id,
-                title,
-                question,
-                answer,
-                status,
-                priority,
-                due_date,
-                assigned_to,
-                location,
-                hub_id,
-            } => {
-                let (p_id, r_id) =
-                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
-                update_rfi(
-                    client,
-                    &p_id,
-                    &r_id,
-                    title,
-                    question,
-                    answer,
-                    status,
-                    priority,
-                    due_date,
-                    assigned_to,
-                    location,
-                    output_format,
-                )
-                .await
-            }
-            RfiCommands::Delete {
-                project_id,
-                rfi_id,
-                hub_id,
-            } => {
-                let (p_id, r_id) =
-                    resolve_rfi_args(dm_client, client, hub_id, project_id, rfi_id).await?;
-                delete_rfi(client, &p_id, &r_id, output_format).await
-            }
-        }
-    }
-}
-
-async fn resolve_rfi_args(
-    dm_client: &DataManagementClient,
-    rfi_client: &RfiClient,
-    opt_hub_id: Option<String>,
-    opt_project_id: Option<String>,
-    opt_rfi_id: Option<String>,
-) -> Result<(String, String)> {
-    let hub_id = match (&opt_hub_id, &opt_project_id, &opt_rfi_id) {
-        (Some(h), _, _) => h.clone(),
-        (None, Some(_), Some(_)) => String::new(), // Not needed if both P and R are provided
-        (None, _, _) => interactive::prompt_for_hub(dm_client).await?,
-    };
-
-    let project_id = match opt_project_id {
-        Some(p) => p,
-        None => interactive::prompt_for_project(dm_client, &hub_id).await?,
-    };
-
-    let rfi_id = match opt_rfi_id {
-        Some(r) if r == "ignore" => String::new(),
-        Some(r) => r,
-        None => interactive::prompt_for_rfi(rfi_client, &project_id).await?,
-    };
-
-    Ok((project_id, rfi_id))
-}
-
-#[derive(Serialize)]
-struct RfiOutput {
-    id: String,
-    number: Option<String>,
-    title: String,
-    status: String,
-    priority: Option<String>,
-    question: Option<String>,
-    answer: Option<String>,
-    due_date: Option<String>,
-    assigned_to_name: Option<String>,
-    created_at: Option<String>,
-}
-
-async fn list_rfis(
+pub(super) async fn list_rfis(
     client: &RfiClient,
     project_id: &str,
     status_filter: Option<&str>,
@@ -423,7 +133,7 @@ async fn list_rfis(
     Ok(())
 }
 
-async fn get_rfi(
+pub(super) async fn get_rfi(
     client: &RfiClient,
     project_id: &str,
     rfi_id: &str,
@@ -507,14 +217,14 @@ async fn get_rfi(
 }
 
 #[derive(serde::Deserialize)]
-struct CsvRfiRow {
-    title: String,
-    description: Option<String>,
-    assigned_to: Option<String>,
+pub(super) struct CsvRfiRow {
+    pub(super) title: String,
+    pub(super) description: Option<String>,
+    pub(super) assigned_to: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn create_rfi(
+pub(super) async fn create_rfi(
     client: &RfiClient,
     project_id: &str,
     title: Option<String>,
@@ -749,7 +459,7 @@ async fn create_rfis_from_csv(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn update_rfi(
+pub(super) async fn update_rfi(
     client: &RfiClient,
     project_id: &str,
     rfi_id: &str,
@@ -814,7 +524,7 @@ async fn update_rfi(
     Ok(())
 }
 
-async fn delete_rfi(
+pub(super) async fn delete_rfi(
     client: &RfiClient,
     project_id: &str,
     rfi_id: &str,
@@ -856,131 +566,4 @@ async fn delete_rfi(
     }
 
     Ok(())
-}
-
-fn truncate_str(s: &str, max_len: usize) -> String {
-    if s.len() <= max_len {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_len - 3])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_csv_rfi_row_deserialization() {
-        let csv_data = "title,description,assigned_to\nMissing specs,Need structural specs for floor 3,jane@example.com\n";
-        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let row: CsvRfiRow = rdr.deserialize().next().unwrap().unwrap();
-        assert_eq!(row.title, "Missing specs");
-        assert_eq!(
-            row.description.unwrap(),
-            "Need structural specs for floor 3"
-        );
-        assert_eq!(row.assigned_to.unwrap(), "jane@example.com");
-    }
-
-    #[test]
-    fn test_csv_rfi_row_minimal() {
-        let csv_data = "title,description,assigned_to\nMissing specs,,\n";
-        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let row: CsvRfiRow = rdr.deserialize().next().unwrap().unwrap();
-        assert_eq!(row.title, "Missing specs");
-        assert!(
-            row.description.is_none() || row.description.as_deref() == Some(""),
-            "Expected None or empty for description, got {:?}",
-            row.description
-        );
-        assert!(
-            row.assigned_to.is_none() || row.assigned_to.as_deref() == Some(""),
-            "Expected None or empty for assigned_to, got {:?}",
-            row.assigned_to
-        );
-    }
-
-    #[test]
-    fn test_csv_rfi_row_multiple_rows() {
-        let csv_data = "\
-title,description,assigned_to
-Missing specs,Need structural specs,jane@example.com
-Electrical query,Wiring clarification,bob@example.com
-HVAC concern,,
-";
-        let mut rdr = csv::ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let rows: Vec<CsvRfiRow> = rdr.deserialize().collect::<Result<Vec<_>, _>>().unwrap();
-        assert_eq!(rows.len(), 3);
-        assert_eq!(rows[0].title, "Missing specs");
-        assert_eq!(rows[1].title, "Electrical query");
-        assert_eq!(rows[1].assigned_to.as_deref(), Some("bob@example.com"));
-        assert_eq!(rows[2].title, "HVAC concern");
-    }
-
-    #[test]
-    fn test_rfi_output_serialization() {
-        let output = RfiOutput {
-            id: "rfi-001".to_string(),
-            number: Some("RFI-42".to_string()),
-            title: "Missing specs".to_string(),
-            status: "open".to_string(),
-            priority: Some("high".to_string()),
-            question: Some("Where are the structural specs?".to_string()),
-            answer: None,
-            due_date: Some("2025-06-15".to_string()),
-            assigned_to_name: Some("Jane Smith".to_string()),
-            created_at: Some("2025-01-10T08:00:00Z".to_string()),
-        };
-        let json = serde_json::to_string(&output).unwrap();
-        assert!(json.contains("\"id\":\"rfi-001\""));
-        assert!(json.contains("\"number\":\"RFI-42\""));
-        assert!(json.contains("\"title\":\"Missing specs\""));
-        assert!(json.contains("\"status\":\"open\""));
-        assert!(json.contains("\"priority\":\"high\""));
-        assert!(json.contains("\"question\":\"Where are the structural specs?\""));
-        assert!(json.contains("\"answer\":null"));
-        assert!(json.contains("\"due_date\":\"2025-06-15\""));
-        assert!(json.contains("\"assigned_to_name\":\"Jane Smith\""));
-    }
-
-    #[test]
-    fn test_rfi_output_all_none_optionals() {
-        let output = RfiOutput {
-            id: "rfi-002".to_string(),
-            number: None,
-            title: "Basic RFI".to_string(),
-            status: "draft".to_string(),
-            priority: None,
-            question: None,
-            answer: None,
-            due_date: None,
-            assigned_to_name: None,
-            created_at: None,
-        };
-        let json = serde_json::to_string(&output).unwrap();
-        assert!(json.contains("\"id\":\"rfi-002\""));
-        assert!(json.contains("\"title\":\"Basic RFI\""));
-        assert!(json.contains("\"status\":\"draft\""));
-        // All optional fields should serialize as null
-        assert!(json.contains("\"number\":null"));
-        assert!(json.contains("\"priority\":null"));
-    }
-
-    #[test]
-    fn test_truncate_str_short() {
-        assert_eq!(truncate_str("hello", 10), "hello");
-    }
-
-    #[test]
-    fn test_truncate_str_exact() {
-        assert_eq!(truncate_str("hello", 5), "hello");
-    }
-
-    #[test]
-    fn test_truncate_str_long() {
-        let result = truncate_str("hello world", 8);
-        assert_eq!(result, "hello...");
-        assert_eq!(result.len(), 8);
-    }
 }
