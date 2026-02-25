@@ -178,6 +178,40 @@ impl Config {
         Ok((profile_name, profile))
     }
 
+    /// Validate that client credentials are configured.
+    ///
+    /// Call this before any operation that requires `client_id` / `client_secret`
+    /// (2-legged auth, 3-legged login, token refresh). Returns a clear error
+    /// telling the user how to set the missing value(s).
+    pub fn require_credentials(&self) -> Result<()> {
+        if self.client_id.is_empty() && self.client_secret.is_empty() {
+            anyhow::bail!(
+                "APS_CLIENT_ID and APS_CLIENT_SECRET are not set.\n\
+                 Set them via environment variables or a profile:\n  \
+                 export APS_CLIENT_ID=<your-client-id>\n  \
+                 export APS_CLIENT_SECRET=<your-client-secret>\n  \
+                 Or: raps config profile create <name> && raps config set client_id <value>"
+            );
+        }
+        if self.client_id.is_empty() {
+            anyhow::bail!(
+                "APS_CLIENT_ID is not set.\n\
+                 Set it via:\n  \
+                 export APS_CLIENT_ID=<your-client-id>\n  \
+                 Or: raps config set client_id <value>"
+            );
+        }
+        if self.client_secret.is_empty() {
+            anyhow::bail!(
+                "APS_CLIENT_SECRET is not set.\n\
+                 Set it via:\n  \
+                 export APS_CLIENT_SECRET=<your-client-secret>\n  \
+                 Or: raps config set client_secret <value>"
+            );
+        }
+        Ok(())
+    }
+
     /// Get the authentication endpoint URL
     pub fn auth_url(&self) -> String {
         format!("{}/authentication/v2/token", self.base_url)
@@ -544,6 +578,62 @@ mod tests {
         let config = create_test_config();
         assert!(config.callback_url.contains("localhost"));
         assert!(config.callback_url.contains("callback"));
+    }
+
+    // ==================== Credential Validation Tests ====================
+
+    #[test]
+    fn test_require_credentials_both_set() {
+        let config = create_test_config();
+        assert!(config.require_credentials().is_ok());
+    }
+
+    #[test]
+    fn test_require_credentials_both_empty() {
+        let config = Config {
+            client_id: "".to_string(),
+            client_secret: "".to_string(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        let err = config.require_credentials().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("APS_CLIENT_ID"));
+        assert!(msg.contains("APS_CLIENT_SECRET"));
+    }
+
+    #[test]
+    fn test_require_credentials_missing_client_id() {
+        let config = Config {
+            client_id: "".to_string(),
+            client_secret: "test_secret".to_string(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        let err = config.require_credentials().unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("APS_CLIENT_ID"));
+        assert!(!msg.contains("APS_CLIENT_SECRET"));
+    }
+
+    #[test]
+    fn test_require_credentials_missing_client_secret() {
+        let config = Config {
+            client_id: "test_client_id".to_string(),
+            client_secret: "".to_string(),
+            base_url: "https://developer.api.autodesk.com".to_string(),
+            callback_url: "http://localhost:8080/callback".to_string(),
+            da_nickname: None,
+            http_config: HttpClientConfig::default(),
+        };
+        let err = config.require_credentials().unwrap_err();
+        let msg = err.to_string();
+        assert!(!msg.contains("APS_CLIENT_ID"));
+        assert!(msg.contains("APS_CLIENT_SECRET"));
     }
 
     // ==================== ContextConfig Tests ====================

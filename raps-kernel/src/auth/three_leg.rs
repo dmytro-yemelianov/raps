@@ -69,6 +69,8 @@ impl AuthClient {
 
     /// Start 3-legged OAuth login flow
     pub async fn login(&self, scopes: &[&str]) -> Result<StoredToken> {
+        self.config.require_credentials()?;
+
         let state = uuid::Uuid::new_v4().to_string();
         let scope = scopes.join(" ");
 
@@ -276,6 +278,8 @@ impl AuthClient {
     /// On failure: preserves cached token (does not clear it), resets refreshing flag.
     /// On success: updates cached token, resets refreshing flag.
     async fn refresh_token(&self, refresh_token: String) -> Result<String> {
+        self.config.require_credentials()?;
+
         let url = self.config.auth_url();
 
         let params = [

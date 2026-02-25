@@ -39,6 +39,8 @@ impl AuthClient {
 
     /// Fetch a new 2-legged token
     async fn fetch_2leg_token(&self) -> Result<TokenResponse> {
+        self.config.require_credentials()?;
+
         let url = self.config.auth_url();
 
         let params = [

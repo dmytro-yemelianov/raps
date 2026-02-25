@@ -47,6 +47,8 @@ impl AuthClient {
     /// 3. Prompts the user to paste back the callback URL (or bare code).
     /// 4. Exchanges the authorization code + verifier for tokens.
     pub async fn login_device(&self, scopes: &[&str]) -> Result<StoredToken> {
+        self.config.require_credentials()?;
+
         // --- PKCE ---
         let code_verifier = generate_code_verifier();
         let code_challenge = derive_code_challenge(&code_verifier);
