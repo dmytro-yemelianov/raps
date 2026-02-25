@@ -11,6 +11,7 @@ use colored::Colorize;
 use raps_kernel::prompts;
 use serde::Serialize;
 
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_kernel::auth::AuthClient;
 // use raps_kernel::output::OutputFormat;
@@ -522,11 +523,12 @@ async fn whoami(auth_client: &AuthClient, output_format: OutputFormat) -> Result
         return Ok(());
     }
 
-    if output_format.supports_colors() {
-        println!("{}", "Fetching user profile...".dimmed());
-    }
-
-    let user = auth_client.get_user_info().await?;
+    let user = tracked_op(
+        "Fetching user profile",
+        output_format,
+        || auth_client.get_user_info(),
+    )
+    .await?;
 
     let output = WhoamiOutput {
         name: user.name.clone(),

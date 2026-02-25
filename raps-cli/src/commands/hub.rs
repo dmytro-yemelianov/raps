@@ -10,6 +10,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
 // use raps_kernel::output::OutputFormat;
@@ -49,11 +50,12 @@ struct HubListOutput {
 }
 
 async fn list_hubs(client: &DataManagementClient, output_format: OutputFormat) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching hubs (requires 3-legged auth)...".dimmed());
-    }
-
-    let hubs = client.list_hubs().await?;
+    let hubs = tracked_op(
+        "Fetching hubs (requires 3-legged auth)",
+        output_format,
+        || client.list_hubs(),
+    )
+    .await?;
 
     let hub_outputs: Vec<HubListOutput> = hubs
         .iter()
@@ -132,11 +134,12 @@ async fn hub_info(
     hub_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching hub details...".dimmed());
-    }
-
-    let hub = client.get_hub(hub_id).await?;
+    let hub = tracked_op(
+        "Fetching hub details",
+        output_format,
+        || client.get_hub(hub_id),
+    )
+    .await?;
 
     let extension_type = hub
         .attributes

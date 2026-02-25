@@ -197,6 +197,20 @@ pub fn report(command: Option<&str>, exit_code: Option<i32>) {
     if retry_count > 0 {
         eprintln!("{:<22} {}", "HTTP Retries:", retry_count);
     }
+    let health_snap = crate::api_health::snapshot();
+    if health_snap.sample_count > 0 {
+        eprintln!(
+            "{:<22} {}",
+            "Avg Latency:",
+            crate::api_health::format_duration_ms(health_snap.avg_latency)
+        );
+        eprintln!(
+            "{:<22} {}",
+            "Latency Jitter:",
+            crate::api_health::format_duration_ms(health_snap.jitter)
+        );
+        eprintln!("{:<22} {}", "API Health:", health_snap.health_status);
+    }
     eprintln!("{:<22} {:.3}s", "Other Time:", other_time.as_secs_f64());
     eprintln!("{:<22} {}", "Memory (at exit):", memory_str);
     eprintln!("================================");

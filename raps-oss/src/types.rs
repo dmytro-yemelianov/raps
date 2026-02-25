@@ -118,6 +118,14 @@ pub struct BucketItem {
     pub region: Option<String>,
 }
 
+/// Result from a single region query (used by streaming bucket listing).
+#[derive(Debug)]
+pub struct RegionResult {
+    pub region: Region,
+    pub buckets: anyhow::Result<Vec<BucketItem>>,
+    pub elapsed: std::time::Duration,
+}
+
 /// Signed S3 download response
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

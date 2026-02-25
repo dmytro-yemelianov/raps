@@ -11,6 +11,7 @@ use colored::Colorize;
 use raps_kernel::prompts;
 use serde::Serialize;
 
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
 use raps_webhooks::{UpdateWebhookRequest, WEBHOOK_EVENTS, WebhooksClient};
@@ -158,14 +159,17 @@ struct WebhookListOutput {
 }
 
 async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching webhooks...".dimmed());
-    }
-
-    let webhooks = client
-        .list_all_webhooks()
-        .await
-        .context("Failed to list webhooks. Check your authentication with 'raps auth test'")?;
+    let webhooks = tracked_op(
+        "Fetching webhooks",
+        output_format,
+        || async {
+            client
+                .list_all_webhooks()
+                .await
+                .context("Failed to list webhooks. Check your authentication with 'raps auth test'")
+        },
+    )
+    .await?;
 
     let webhook_outputs: Vec<WebhookListOutput> = webhooks
         .iter()

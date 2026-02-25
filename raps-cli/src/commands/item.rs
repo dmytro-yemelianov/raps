@@ -10,6 +10,7 @@ use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
 
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
 // use raps_kernel::output::OutputFormat;
@@ -128,11 +129,12 @@ async fn item_info(
     item_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching item details...".dimmed());
-    }
-
-    let item = client.get_item(project_id, item_id).await?;
+    let item = tracked_op(
+        "Fetching item details",
+        output_format,
+        || client.get_item(project_id, item_id),
+    )
+    .await?;
 
     let extension_type = item
         .attributes
@@ -206,11 +208,12 @@ async fn list_versions(
     item_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching item versions...".dimmed());
-    }
-
-    let versions = client.get_item_versions(project_id, item_id).await?;
+    let versions = tracked_op(
+        "Fetching item versions",
+        output_format,
+        || client.get_item_versions(project_id, item_id),
+    )
+    .await?;
 
     let version_outputs: Vec<VersionOutput> = versions
         .iter()

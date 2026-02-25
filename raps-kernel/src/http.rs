@@ -165,6 +165,7 @@ where
                     continue;
                 }
                 crate::profiler::record_http_request(total_network_time);
+                crate::api_health::record_latency(total_network_time);
                 return Ok(response);
             }
             Err(err) => {
@@ -172,6 +173,7 @@ where
                 let retriable = err.is_timeout() || err.is_connect() || err.is_request();
                 if !retriable || attempt >= config.max_retries {
                     crate::profiler::record_http_request(total_network_time);
+                    crate::api_health::record_failure();
                     tracing::error!(error = %err, attempt, "HTTP request failed");
                     return Err(err).context("HTTP request failed");
                 }

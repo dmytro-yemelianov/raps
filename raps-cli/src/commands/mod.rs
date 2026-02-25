@@ -29,6 +29,7 @@ pub mod reality;
 pub mod report;
 pub mod rfi;
 pub mod template;
+pub mod tracked;
 pub mod translate;
 pub mod webhook;
 

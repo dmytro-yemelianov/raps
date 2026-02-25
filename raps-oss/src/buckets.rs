@@ -108,6 +108,81 @@ impl OssClient {
         Ok(all_buckets)
     }
 
+    /// List buckets from all regions, returning results per-region as they complete.
+    ///
+    /// Uses `tokio::select!` so whichever region finishes first yields its
+    /// `RegionResult` immediately. The caller can display partial results
+    /// while waiting for slower regions.
+    pub async fn list_buckets_streaming(&self) -> Vec<RegionResult> {
+        use std::time::{Duration, Instant};
+
+        let per_region_timeout = Duration::from_secs(
+            std::env::var("RAPS_REGION_TIMEOUT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(10),
+        );
+
+        let us_start = Instant::now();
+        let emea_start = Instant::now();
+
+        let mut us_fut = std::pin::pin!(tokio::time::timeout(
+            per_region_timeout,
+            self.list_buckets_in_region(Region::US),
+        ));
+        let mut emea_fut = std::pin::pin!(tokio::time::timeout(
+            per_region_timeout,
+            self.list_buckets_in_region(Region::EMEA),
+        ));
+
+        let mut results = Vec::with_capacity(2);
+        let mut us_done = false;
+        let mut emea_done = false;
+
+        while !us_done || !emea_done {
+            tokio::select! {
+                us_result = &mut us_fut, if !us_done => {
+                    us_done = true;
+                    let elapsed = us_start.elapsed();
+                    let buckets = match us_result {
+                        Ok(Ok(mut buckets)) => {
+                            for b in &mut buckets {
+                                b.region = Some("US".to_string());
+                            }
+                            Ok(buckets)
+                        }
+                        Ok(Err(e)) => Err(e),
+                        Err(_) => Err(anyhow::anyhow!(
+                            "US region timed out after {:?}",
+                            per_region_timeout
+                        )),
+                    };
+                    results.push(RegionResult { region: Region::US, buckets, elapsed });
+                }
+                emea_result = &mut emea_fut, if !emea_done => {
+                    emea_done = true;
+                    let elapsed = emea_start.elapsed();
+                    let buckets = match emea_result {
+                        Ok(Ok(mut buckets)) => {
+                            for b in &mut buckets {
+                                b.region = Some("EMEA".to_string());
+                            }
+                            Ok(buckets)
+                        }
+                        Ok(Err(e)) => Err(e),
+                        Err(_) => Err(anyhow::anyhow!(
+                            "EMEA region timed out after {:?}",
+                            per_region_timeout
+                        )),
+                    };
+                    results.push(RegionResult { region: Region::EMEA, buckets, elapsed });
+                }
+            }
+        }
+
+        results
+    }
+
     /// List buckets in a specific region
     async fn list_buckets_in_region(&self, region: Region) -> Result<Vec<BucketItem>> {
         let token = self.auth.get_token().await?;

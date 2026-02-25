@@ -11,6 +11,7 @@ use colored::Colorize;
 use serde::Serialize;
 use std::str::FromStr;
 
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
 use raps_kernel::prompts;
@@ -251,22 +252,112 @@ async fn create_bucket(
 }
 
 async fn list_buckets(client: &OssClient, output_format: OutputFormat) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching buckets from all regions...".dimmed());
+    match output_format {
+        OutputFormat::Table => list_buckets_streaming(client).await,
+        _ => list_buckets_batch(client, output_format).await,
+    }
+}
+
+/// Streaming bucket listing for Table mode — displays results per-region as they arrive.
+async fn list_buckets_streaming(client: &OssClient) -> Result<()> {
+    use raps_kernel::api_health;
+
+    let spinner = raps_kernel::progress::spinner("Fetching buckets from US, EMEA...");
+    let start = std::time::Instant::now();
+
+    let region_results = client.list_buckets_streaming().await;
+    let elapsed = start.elapsed();
+
+    let snap = api_health::snapshot();
+    let status_suffix = if snap.sample_count > 0 {
+        format!(
+            " ({}, avg: {}, API: {})",
+            api_health::format_duration_ms(elapsed),
+            api_health::format_duration_ms(snap.avg_latency),
+            snap.health_status,
+        )
+    } else {
+        format!(" ({})", api_health::format_duration_ms(elapsed))
+    };
+    spinner.finish_with_message(format!(
+        "\u{2713} Fetching buckets from all regions{}",
+        status_suffix
+    ));
+
+    let mut all_outputs = Vec::new();
+
+    for rr in &region_results {
+        match &rr.buckets {
+            Ok(buckets) => {
+                println!(
+                    "{} {} responded ({}) \u{2014} {} buckets",
+                    "\u{2713}".green().bold(),
+                    rr.region,
+                    api_health::format_duration_ms(rr.elapsed),
+                    buckets.len(),
+                );
+                for b in buckets {
+                    all_outputs.push(BucketOutput {
+                        bucket_key: b.bucket_key.clone(),
+                        policy_key: b.policy_key.clone(),
+                        bucket_owner: String::new(),
+                        created_date: b.created_date,
+                        created_date_human: chrono_humanize(b.created_date),
+                        region: b.region.as_deref().unwrap_or("US").to_string(),
+                    });
+                }
+            }
+            Err(e) => {
+                println!(
+                    "{} {} failed ({}) \u{2014} {}",
+                    "\u{2717}".red().bold(),
+                    rr.region,
+                    api_health::format_duration_ms(rr.elapsed),
+                    e,
+                );
+            }
+        }
     }
 
+    if all_outputs.is_empty() {
+        println!("{}", "No buckets found.".yellow());
+        return Ok(());
+    }
+
+    println!("\n{}", "Buckets:".bold());
+    println!("{}", "-".repeat(90));
+    println!(
+        "{:<40} {:<12} {:<8} {}",
+        "Bucket Key".bold(),
+        "Policy".bold(),
+        "Region".bold(),
+        "Created".bold()
+    );
+    println!("{}", "-".repeat(90));
+
+    for bucket in &all_outputs {
+        println!(
+            "{:<40} {:<12} {:<8} {}",
+            bucket.bucket_key.cyan(),
+            bucket.policy_key,
+            bucket.region.yellow(),
+            bucket.created_date_human.dimmed()
+        );
+    }
+
+    println!("{}", "-".repeat(90));
+    Ok(())
+}
+
+/// Batch bucket listing for structured output (JSON/YAML/CSV).
+async fn list_buckets_batch(client: &OssClient, output_format: OutputFormat) -> Result<()> {
     let buckets = client
         .list_buckets()
         .await
         .context("Failed to list buckets. Check your authentication with 'raps auth test'")?;
 
     if buckets.is_empty() {
-        match output_format {
-            OutputFormat::Table => println!("{}", "No buckets found.".yellow()),
-            _ => {
-                output_format.write(&Vec::<BucketOutput>::new())?;
-            }
-        }
+        output_format.write(&Vec::<BucketOutput>::new())?;
         return Ok(());
     }
 
@@ -275,43 +366,14 @@ async fn list_buckets(client: &OssClient, output_format: OutputFormat) -> Result
         .map(|b| BucketOutput {
             bucket_key: b.bucket_key.clone(),
             policy_key: b.policy_key.clone(),
-            bucket_owner: String::new(), // Not available in list response
+            bucket_owner: String::new(),
             created_date: b.created_date,
             created_date_human: chrono_humanize(b.created_date),
             region: b.region.as_deref().unwrap_or("US").to_string(),
         })
         .collect();
 
-    match output_format {
-        OutputFormat::Table => {
-            println!("\n{}", "Buckets:".bold());
-            println!("{}", "-".repeat(90));
-            println!(
-                "{:<40} {:<12} {:<8} {}",
-                "Bucket Key".bold(),
-                "Policy".bold(),
-                "Region".bold(),
-                "Created".bold()
-            );
-            println!("{}", "-".repeat(90));
-
-            for bucket in &bucket_outputs {
-                println!(
-                    "{:<40} {:<12} {:<8} {}",
-                    bucket.bucket_key.cyan(),
-                    bucket.policy_key,
-                    bucket.region.yellow(),
-                    bucket.created_date_human.dimmed()
-                );
-            }
-
-            println!("{}", "-".repeat(90));
-        }
-        _ => {
-            output_format.write(&bucket_outputs)?;
-        }
-    }
-
+    output_format.write(&bucket_outputs)?;
     Ok(())
 }
 
@@ -320,17 +382,20 @@ async fn bucket_info(
     bucket_key: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching bucket details...".dimmed());
-    }
-
-    let bucket = client
-        .get_bucket_details(bucket_key)
-        .await
-        .context(format!(
-            "Failed to get bucket details for '{}'. Verify the bucket key is correct",
-            bucket_key
-        ))?;
+    let bucket = tracked_op(
+        "Fetching bucket details",
+        output_format,
+        || async {
+            client
+                .get_bucket_details(bucket_key)
+                .await
+                .context(format!(
+                    "Failed to get bucket details for '{}'. Verify the bucket key is correct",
+                    bucket_key
+                ))
+        },
+    )
+    .await?;
 
     let bucket_output = BucketInfoOutput {
         bucket_key: bucket.bucket_key.clone(),

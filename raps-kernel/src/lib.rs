@@ -12,6 +12,7 @@
 
 #![allow(clippy::uninlined_format_args)]
 
+pub mod api_health;
 pub mod auth;
 pub mod config;
 pub mod error;

@@ -4,11 +4,11 @@
 //! Shared interactive dialoguer prompt wrappers for CLI dropdowns.
 
 use anyhow::{Context, Result};
-use colored::Colorize;
 use dialoguer::Select;
 use raps_acc::RfiClient;
 use raps_dm::DataManagementClient;
 pub use raps_kernel::interactive::is_non_interactive;
+use raps_kernel::{api_health, progress};
 
 pub async fn prompt_for_hub(client: &DataManagementClient) -> Result<String> {
     if is_non_interactive() {
@@ -17,10 +17,28 @@ pub async fn prompt_for_hub(client: &DataManagementClient) -> Result<String> {
         );
     }
 
-    println!("{}", "Fetching hubs...".dimmed());
+    let spinner = progress::spinner("Fetching hubs...");
+    let start = std::time::Instant::now();
     let hubs = client.list_hubs().await.context(
         "Failed to list hubs. This requires 3-legged auth \u{2014} run 'raps auth login' first",
-    )?;
+    );
+    let elapsed = start.elapsed();
+    let snap = api_health::snapshot();
+    let suffix = if snap.sample_count > 0 {
+        format!(
+            " ({}, avg: {}, API: {})",
+            api_health::format_duration_ms(elapsed),
+            api_health::format_duration_ms(snap.avg_latency),
+            snap.health_status,
+        )
+    } else {
+        format!(" ({})", api_health::format_duration_ms(elapsed))
+    };
+    match &hubs {
+        Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching hubs{}", suffix)),
+        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching hubs (after {})", api_health::format_duration_ms(elapsed))),
+    }
+    let hubs = hubs?;
 
     if hubs.is_empty() {
         anyhow::bail!("No hubs found. Make sure you're logged in with 3-legged auth.");
@@ -46,11 +64,29 @@ pub async fn prompt_for_project(client: &DataManagementClient, hub_id: &str) -> 
         );
     }
 
-    println!("{}", "Fetching projects...".dimmed());
+    let spinner = progress::spinner("Fetching projects...");
+    let start = std::time::Instant::now();
     let projects = client
         .list_projects(hub_id)
         .await
-        .context(format!("Failed to list projects in hub '{}'", hub_id))?;
+        .context(format!("Failed to list projects in hub '{}'", hub_id));
+    let elapsed = start.elapsed();
+    let snap = api_health::snapshot();
+    let suffix = if snap.sample_count > 0 {
+        format!(
+            " ({}, avg: {}, API: {})",
+            api_health::format_duration_ms(elapsed),
+            api_health::format_duration_ms(snap.avg_latency),
+            snap.health_status,
+        )
+    } else {
+        format!(" ({})", api_health::format_duration_ms(elapsed))
+    };
+    match &projects {
+        Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching projects{}", suffix)),
+        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching projects (after {})", api_health::format_duration_ms(elapsed))),
+    }
+    let projects = projects?;
 
     if projects.is_empty() {
         anyhow::bail!("No projects found in this hub.");
@@ -80,14 +116,32 @@ pub async fn prompt_for_folder(
         );
     }
 
-    println!("{}", "Fetching top folders...".dimmed());
+    let spinner = progress::spinner("Fetching top folders...");
+    let start = std::time::Instant::now();
     let folders = client
         .get_top_folders(hub_id, project_id)
         .await
         .context(format!(
             "Failed to get top folders for project '{}'",
             project_id
-        ))?;
+        ));
+    let elapsed = start.elapsed();
+    let snap = api_health::snapshot();
+    let suffix = if snap.sample_count > 0 {
+        format!(
+            " ({}, avg: {}, API: {})",
+            api_health::format_duration_ms(elapsed),
+            api_health::format_duration_ms(snap.avg_latency),
+            snap.health_status,
+        )
+    } else {
+        format!(" ({})", api_health::format_duration_ms(elapsed))
+    };
+    match &folders {
+        Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching top folders{}", suffix)),
+        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching top folders (after {})", api_health::format_duration_ms(elapsed))),
+    }
+    let folders = folders?;
 
     if folders.is_empty() {
         anyhow::bail!("No folders found in this project.");
@@ -120,11 +174,29 @@ pub async fn prompt_for_rfi(client: &RfiClient, project_id: &str) -> Result<Stri
         );
     }
 
-    println!("{}", "Fetching RFIs...".dimmed());
+    let spinner = progress::spinner("Fetching RFIs...");
+    let start = std::time::Instant::now();
     let rfis = client
         .list_rfis(project_id)
         .await
-        .context(format!("Failed to list RFIs for project '{}'", project_id))?;
+        .context(format!("Failed to list RFIs for project '{}'", project_id));
+    let elapsed = start.elapsed();
+    let snap = api_health::snapshot();
+    let suffix = if snap.sample_count > 0 {
+        format!(
+            " ({}, avg: {}, API: {})",
+            api_health::format_duration_ms(elapsed),
+            api_health::format_duration_ms(snap.avg_latency),
+            snap.health_status,
+        )
+    } else {
+        format!(" ({})", api_health::format_duration_ms(elapsed))
+    };
+    match &rfis {
+        Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching RFIs{}", suffix)),
+        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching RFIs (after {})", api_health::format_duration_ms(elapsed))),
+    }
+    let rfis = rfis?;
 
     if rfis.is_empty() {
         anyhow::bail!("No RFIs found in this project.");

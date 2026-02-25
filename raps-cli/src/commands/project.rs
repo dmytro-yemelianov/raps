@@ -13,6 +13,7 @@ use raps_kernel::prompts;
 use serde::Serialize;
 
 use crate::commands::interactive;
+use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
 // use raps_kernel::output::OutputFormat;
@@ -68,14 +69,17 @@ async fn list_projects(
         None => interactive::prompt_for_hub(client).await?,
     };
 
-    if output_format.supports_colors() {
-        println!("{}", "Fetching projects...".dimmed());
-    }
-
-    let projects = client.list_projects(&hub).await.context(format!(
-        "Failed to list projects in hub '{}'. Verify the hub ID and your permissions",
-        hub
-    ))?;
+    let projects = tracked_op(
+        "Fetching projects",
+        output_format,
+        || async {
+            client.list_projects(&hub).await.context(format!(
+                "Failed to list projects in hub '{}'. Verify the hub ID and your permissions",
+                hub
+            ))
+        },
+    )
+    .await?;
 
     let project_outputs: Vec<ProjectListOutput> = projects
         .iter()
@@ -154,24 +158,28 @@ async fn project_info(
         Some(p) => p.clone(),
         None => interactive::prompt_for_project(client, &hub_id).await?,
     };
-    if output_format.supports_colors() {
-        println!("{}", "Fetching project details...".dimmed());
-    }
-
-    let project = client
-        .get_project(&hub_id, &project_id)
-        .await
-        .context(format!(
-            "Failed to get project '{}'. Verify the project ID and your permissions",
-            project_id
-        ))?;
-    let folders = client
-        .get_top_folders(&hub_id, &project_id)
-        .await
-        .context(format!(
-            "Failed to get top folders for project '{}'. You may lack folder-level permissions",
-            project_id
-        ))?;
+    let (project, folders) = tracked_op(
+        "Fetching project details",
+        output_format,
+        || async {
+            let project = client
+                .get_project(&hub_id, &project_id)
+                .await
+                .context(format!(
+                    "Failed to get project '{}'. Verify the project ID and your permissions",
+                    project_id
+                ))?;
+            let folders = client
+                .get_top_folders(&hub_id, &project_id)
+                .await
+                .context(format!(
+                    "Failed to get top folders for project '{}'. You may lack folder-level permissions",
+                    project_id
+                ))?;
+            Ok((project, folders))
+        },
+    )
+    .await?;
 
     let folder_outputs: Vec<FolderOutput> = folders
         .iter()

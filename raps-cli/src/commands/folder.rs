@@ -14,6 +14,7 @@ use raps_kernel::prompts;
 use serde::Serialize;
 
 use crate::commands::interactive;
+use crate::commands::tracked::tracked_op;
 
 use crate::output::OutputFormat;
 use raps_acc::permissions::FolderPermissionsClient;
@@ -185,17 +186,20 @@ async fn list_folder_contents(
     folder_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching folder contents...".dimmed());
-    }
-
-    let contents = client
-        .list_folder_contents(project_id, folder_id)
-        .await
-        .context(format!(
-            "Failed to list folder '{}' contents. Verify folder ID and permissions",
-            folder_id
-        ))?;
+    let contents = tracked_op(
+        "Fetching folder contents",
+        output_format,
+        || async {
+            client
+                .list_folder_contents(project_id, folder_id)
+                .await
+                .context(format!(
+                    "Failed to list folder '{}' contents. Verify folder ID and permissions",
+                    folder_id
+                ))
+        },
+    )
+    .await?;
 
     let items: Vec<FolderItemOutput> = contents
         .iter()
@@ -432,17 +436,20 @@ async fn folder_rights(
     folder_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    if output_format.supports_colors() {
-        println!("{}", "Fetching folder permissions...".dimmed());
-    }
-
-    let permissions = client
-        .get_permissions(project_id, folder_id)
-        .await
-        .context(format!(
-            "Failed to get permissions for folder '{}'",
-            folder_id
-        ))?;
+    let permissions = tracked_op(
+        "Fetching folder permissions",
+        output_format,
+        || async {
+            client
+                .get_permissions(project_id, folder_id)
+                .await
+                .context(format!(
+                    "Failed to get permissions for folder '{}'",
+                    folder_id
+                ))
+        },
+    )
+    .await?;
 
     let items: Vec<FolderRightOutput> = permissions
         .iter()
