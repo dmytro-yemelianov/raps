@@ -78,7 +78,7 @@ impl OssClient {
             let sem = semaphore.clone();
 
             join_set.spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                let _permit = sem.acquire().await.expect("semaphore closed unexpectedly");
                 let result = client.copy_object(&src, &key, &dest, None).await;
                 (key, result)
             });
@@ -140,7 +140,7 @@ impl OssClient {
             let sem = semaphore.clone();
 
             join_set.spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                let _permit = sem.acquire().await.expect("semaphore closed unexpectedly");
                 // Copy to new key
                 let copy_result = client.copy_object(&bucket, &old, &bucket, Some(&new)).await;
                 match copy_result {

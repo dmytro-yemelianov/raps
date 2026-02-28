@@ -473,7 +473,7 @@ pub(crate) async fn execute_csv_import(
         let sp = ProgressBar::new_spinner();
         sp.set_style(
             ProgressStyle::with_template("{spinner:.cyan} {msg}")
-                .unwrap()
+                .expect("hardcoded progress template is valid")
                 .tick_strings(&["\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283C}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}", "\u{280F}"]),
         );
         sp.set_message(format!("Importing {} users concurrently...", total));

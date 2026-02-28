@@ -380,7 +380,7 @@ impl ProjectUsersClient {
             let email = user.email.clone();
 
             join_set.spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
+                let _permit = sem.acquire().await.expect("semaphore closed unexpectedly");
                 let request = AddProjectUserRequest {
                     email: user.email.clone(),
                     role_id: user.role_id,

@@ -1,0 +1,35 @@
+rules:
+  - id: unwrap-in-production-code
+    patterns:
+      - pattern: $X.unwrap()
+      - pattern-not-inside: |
+          #[cfg(test)]
+          mod $MOD { ... }
+      - pattern-not-inside: |
+          #[test]
+          fn $FN() { ... }
+    message: "Avoid unwrap() in production code. Use expect(), unwrap_or(), or propagate with ?."
+    languages: [rust]
+    severity: WARNING
+    metadata:
+      category: correctness
+      cwe:
+        - "CWE-248: Uncaught Exception"
+
+  - id: command-injection-risk
+    pattern: std::process::Command::new($INPUT)
+    message: "Verify $INPUT is validated before use in Command::new() to prevent command injection."
+    languages: [rust]
+    severity: WARNING
+    metadata:
+      category: security
+      cwe:
+        - "CWE-78: OS Command Injection"
+
+  - id: hardcoded-api-url
+    pattern-regex: '"https?://[^"]*\.(autodesk|forge)\.[^"]*"'
+    message: "Hardcoded API URL detected. Consider using configuration for base URLs."
+    languages: [rust]
+    severity: INFO
+    metadata:
+      category: maintainability

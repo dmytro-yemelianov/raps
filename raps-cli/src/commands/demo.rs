@@ -223,7 +223,7 @@ async fn bucket_lifecycle(args: &BucketLifecycleArgs) -> Result<()> {
         println!("\n  Uploading to bucket: {}", target_bucket.dimmed());
 
         for file_path in &test_files {
-            let file_name = file_path.file_name().unwrap().to_string_lossy();
+            let file_name = file_path.file_name().unwrap_or_default().to_string_lossy();
             print!("  Uploading {}...", file_name);
 
             match oss
@@ -361,7 +361,7 @@ f 5//6 1//6 4//6 8//6
         file_path
     };
 
-    let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+    let file_name = file_path.file_name().unwrap_or_default().to_string_lossy().to_string();
     let file_size = fs::metadata(&file_path).await?.len();
 
     println!(
@@ -581,7 +581,7 @@ async fn data_management(args: &DataManagementArgs) -> Result<()> {
 
                 export_data["hubs"]
                     .as_array_mut()
-                    .unwrap()
+                    .expect("expected JSON array in demo data")
                     .push(serde_json::json!({
                         "id": id,
                         "name": name
@@ -753,7 +753,7 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
         let size = fs::metadata(file).await?.len();
         println!(
             "  - {} ({:.2} KB)",
-            file.file_name().unwrap().to_string_lossy(),
+            file.file_name().unwrap_or_default().to_string_lossy(),
             size as f64 / 1024.0
         );
     }
@@ -803,7 +803,7 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
     // Process files in parallel with concurrency limit
     for file in &files {
-        let file_name = file.file_name().unwrap().to_string_lossy().to_string();
+        let file_name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
         let file_path = file.clone();
         let bucket_prefix_clone = bucket_prefix.clone();
         let oss_clone = oss.clone();
@@ -813,7 +813,7 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
         let handle = tokio::spawn(async move {
             // Acquire semaphore permit (blocks if limit reached)
-            let _permit = semaphore_clone.acquire().await.unwrap();
+            let _permit = semaphore_clone.acquire().await.expect("semaphore closed unexpectedly");
 
             print!("  Processing: {}...", file_name);
 
@@ -1009,7 +1009,7 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
     if !args.skip_cleanup {
         println!("\n{}", "Cleaning up...".yellow());
         for file in &files {
-            let file_name = file.file_name().unwrap().to_string_lossy();
+            let file_name = file.file_name().unwrap_or_default().to_string_lossy();
             let _ = oss.delete_object(&bucket_prefix, &file_name).await;
         }
         let _ = oss.delete_bucket(&bucket_prefix).await;
