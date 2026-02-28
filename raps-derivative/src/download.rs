@@ -53,7 +53,7 @@ impl DerivativeClient {
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .unwrap()
+                .expect("hardcoded progress template is valid")
                 .progress_chars("█▓░"),
         );
 

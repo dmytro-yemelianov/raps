@@ -1,0 +1,36 @@
+name: OpenSSF Scorecard
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write
+
+on:
+  # Weekly scan on Monday
+  schedule:
+    - cron: '30 2 * * 1'
+  # On pushes to main for baseline
+  push:
+    branches: [main, master]
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Run OpenSSF Scorecard
+        uses: ossf/scorecard-action@62b2cac7ed8198b15735ed49ab1e5cf35480ba46 # v2.4.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@45580472a5bb82c4681c4ac726cfdb60060c2ee1 # v3
+        with:
+          sarif_file: results.sarif

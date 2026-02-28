@@ -103,7 +103,7 @@ impl RapsServer {
                 self.http_config.clone(),
             ));
         }
-        guard.as_ref().unwrap().clone()
+        guard.as_ref().expect("client was just initialized above").clone()
     }
 
     pub(crate) async fn get_oss_client(&self) -> OssClient {
@@ -120,7 +120,7 @@ impl RapsServer {
                 self.http_config.clone(),
             ));
         }
-        guard.as_ref().unwrap().clone()
+        guard.as_ref().expect("client was just initialized above").clone()
     }
 
     pub(crate) async fn get_derivative_client(&self) -> DerivativeClient {
@@ -137,7 +137,7 @@ impl RapsServer {
                 self.http_config.clone(),
             ));
         }
-        guard.as_ref().unwrap().clone()
+        guard.as_ref().expect("client was just initialized above").clone()
     }
 
     pub(crate) async fn get_dm_client(&self) -> DataManagementClient {
@@ -154,7 +154,7 @@ impl RapsServer {
                 self.http_config.clone(),
             ));
         }
-        guard.as_ref().unwrap().clone()
+        guard.as_ref().expect("client was just initialized above").clone()
     }
 
     // On-demand clients (not cached, created fresh each time)

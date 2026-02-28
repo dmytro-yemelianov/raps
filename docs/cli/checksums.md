@@ -42,9 +42,24 @@ shasum -a 256 -c checksums.txt
 2. **Authenticity**: Compare the checksum with the one published on GitHub releases
 3. **Tampering Detection**: If checksums don't match, the file may have been modified
 
+## Verifying Build Provenance (SLSA)
+
+RAPS releases include SLSA Build Level 2 provenance attestations, providing cryptographic proof that artifacts were built in GitHub Actions from this repository's source code.
+
+```bash
+# Verify provenance of a downloaded binary
+gh attestation verify <path-to-binary> --repo dmytro-yemelianov/raps
+```
+
+This verifies:
+- The artifact was built by GitHub Actions (not a local machine)
+- It was built from the official repository
+- The build process wasn't tampered with
+
 ## Security Best Practices
 
 - Always verify checksums before installing binaries
+- Verify SLSA provenance for additional supply chain assurance
 - Download checksums from the official GitHub releases page
 - Use HTTPS when downloading files
 - Store checksums securely for audit purposes

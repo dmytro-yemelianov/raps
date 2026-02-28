@@ -355,7 +355,7 @@ impl RapsServer {
         for file_path in file_paths.clone() {
             let client = client.clone();
             let bucket_key = bucket_key.clone();
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let permit = semaphore.clone().acquire_owned().await.expect("semaphore closed unexpectedly");
 
             let handle = tokio::spawn(async move {
                 let _permit = permit; // Hold permit until done

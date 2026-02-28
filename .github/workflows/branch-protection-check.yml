@@ -3,6 +3,9 @@ name: Branch Protection Check
 # This workflow helps enforce branch protection by checking if commits are made via PRs
 # Note: Actual branch protection must be configured in repository settings
 
+permissions:
+  contents: read
+
 on:
   push:
     branches:

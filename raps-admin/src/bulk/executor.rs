@@ -223,7 +223,7 @@ impl BulkExecutor {
         let mut handles = Vec::with_capacity(items.len());
 
         for item in items {
-            let permit = semaphore.clone().acquire_owned().await.unwrap();
+            let permit = semaphore.clone().acquire_owned().await.expect("semaphore closed unexpectedly");
             let processor = Arc::clone(&processor);
             let on_progress = Arc::clone(&on_progress);
             let completed = Arc::clone(&completed);

@@ -34,7 +34,7 @@ pub fn file_progress(size: u64, message: &str) -> ProgressBar {
     pb.set_style(
         ProgressStyle::default_bar()
             .template(FILE_PROGRESS_TEMPLATE)
-            .unwrap()
+            .expect("hardcoded progress template is valid")
             .progress_chars(PROGRESS_CHARS),
     );
     pb.set_message(message.to_string());
@@ -54,7 +54,7 @@ pub fn spinner(message: &str) -> ProgressBar {
     pb.set_style(
         ProgressStyle::default_spinner()
             .template(SPINNER_TEMPLATE)
-            .unwrap(),
+            .expect("hardcoded progress template is valid"),
     );
     pb.set_message(message.to_string());
 
@@ -78,7 +78,7 @@ pub fn item_progress(count: u64, message: &str) -> ProgressBar {
     pb.set_style(
         ProgressStyle::default_bar()
             .template("{msg} [{bar:40.cyan/blue}] {pos}/{len}")
-            .unwrap()
+            .expect("hardcoded progress template is valid")
             .progress_chars(PROGRESS_CHARS),
     );
     pb.set_message(message.to_string());
