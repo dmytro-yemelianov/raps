@@ -124,3 +124,4 @@ archive/
 
 # RAPS history
 .raps_history
+.worktrees/
