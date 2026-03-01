@@ -322,6 +322,9 @@ enum Commands {
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 
+    /// Run diagnostic checks (auth, cache, config, plugins, API health)
+    Doctor,
+
     /// Manage the download cache (stats, clear)
     #[command(subcommand)]
     Cache(commands::cache::CacheCommands),
@@ -870,6 +873,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
         Commands::Serve => "serve",
+        Commands::Doctor => "doctor",
         Commands::Cache(_) => "cache",
         Commands::Schema(_) => "schema",
         Commands::Man { .. } => "man",
@@ -1060,6 +1064,10 @@ async fn execute_command(
 
         Commands::Serve => {
             unreachable!()
+        }
+
+        Commands::Doctor => {
+            commands::doctor::execute(output_format).await?;
         }
 
         Commands::Cache(cmd) => {

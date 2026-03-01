@@ -16,6 +16,7 @@ pub mod da;
 #[cfg(feature = "dashboard")]
 pub mod dashboard;
 pub mod demo;
+pub mod doctor;
 pub mod folder;
 pub mod generate;
 pub mod hub;
