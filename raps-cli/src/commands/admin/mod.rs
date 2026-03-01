@@ -19,7 +19,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use clap::{Subcommand, ValueEnum};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 
 use raps_admin::{PermissionLevel, ProgressUpdate, ProjectFilter};
 use raps_kernel::auth::AuthClient;
@@ -500,14 +500,7 @@ pub(crate) fn create_bulk_progress_bar(output_format: OutputFormat) -> Option<Pr
     if !output_format.supports_colors() {
         return None;
     }
-    let pb = ProgressBar::new(0);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-            .expect("valid progress template")
-            .progress_chars("=>-"),
-    );
-    Some(pb)
+    Some(raps_kernel::progress::bulk_progress(0, ""))
 }
 
 pub(crate) fn make_progress_callback(pb: Option<ProgressBar>) -> impl Fn(ProgressUpdate) {

@@ -343,14 +343,7 @@ async fn upload_photos(
         }
     }
 
-    let pb = ProgressBar::new(photos.len() as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{msg} [{bar:40.cyan/blue}] {pos}/{len}")
-            .expect("valid progress template")
-            .progress_chars("█▓░"),
-    );
-    pb.set_message("Uploading photos");
+    let pb = raps_kernel::progress::item_progress(photos.len() as u64, "Uploading photos");
 
     // Upload in batches of 5
     let photo_refs: Vec<&std::path::Path> = photos.iter().map(|p| p.as_path()).collect();

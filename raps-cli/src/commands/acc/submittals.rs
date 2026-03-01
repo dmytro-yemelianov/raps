@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
 use crate::output::OutputFormat;
@@ -280,14 +279,7 @@ async fn create_submittals_from_csv(
 
     // Progress bar
     let progress_bar = if output_format.supports_colors() {
-        let pb = ProgressBar::new(rows.len() as u64);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}")
-                .expect("valid progress template")
-                .progress_chars("=>-"),
-        );
-        Some(pb)
+        Some(raps_kernel::progress::bulk_progress(rows.len() as u64, ""))
     } else {
         None
     };

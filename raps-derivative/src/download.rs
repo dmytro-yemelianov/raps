@@ -5,7 +5,6 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use indicatif::{ProgressBar, ProgressStyle};
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -49,13 +48,7 @@ impl DerivativeClient {
         let total_size = response.content_length().unwrap_or(0);
 
         // Create progress bar
-        let pb = ProgressBar::new(total_size);
-        pb.set_style(
-            ProgressStyle::default_bar()
-                .template("{msg} [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({percent}%)")
-                .expect("hardcoded progress template is valid")
-                .progress_chars("█▓░"),
-        );
+        let pb = raps_kernel::progress::file_progress(total_size, "");
 
         let filename = output_path
             .file_name()

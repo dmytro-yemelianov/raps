@@ -18,6 +18,10 @@ const FILE_PROGRESS_TEMPLATE: &str =
 /// Standard spinner style for async operations
 const SPINNER_TEMPLATE: &str = "{spinner:.cyan} {msg}";
 
+/// Standard progress bar style for bulk/batch operations with spinner
+const BULK_PROGRESS_TEMPLATE: &str =
+    "{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({percent}%) {msg}";
+
 /// Progress bar characters
 const PROGRESS_CHARS: &str = "█▓░";
 
@@ -82,6 +86,32 @@ pub fn item_progress(count: u64, message: &str) -> ProgressBar {
             .progress_chars(PROGRESS_CHARS),
     );
     pb.set_message(message.to_string());
+    pb
+}
+
+/// Create a progress bar for bulk/batch operations with spinner
+///
+/// Shows spinner + bar + position/total + percentage + message.
+/// Automatically hides the progress bar in non-interactive mode.
+pub fn bulk_progress(count: u64, message: &str) -> ProgressBar {
+    let pb = if interactive::is_non_interactive() {
+        ProgressBar::hidden()
+    } else {
+        ProgressBar::new(count)
+    };
+
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template(BULK_PROGRESS_TEMPLATE)
+            .expect("hardcoded progress template is valid")
+            .progress_chars(PROGRESS_CHARS),
+    );
+    pb.set_message(message.to_string());
+
+    if !interactive::is_non_interactive() {
+        pb.enable_steady_tick(std::time::Duration::from_millis(100));
+    }
+
     pb
 }
 
