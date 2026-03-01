@@ -1,18 +1,8 @@
 [advisories]
 version = 2
-# Ignore unmaintained crate advisories for transitive dependencies.
-# All three are resolvable by upgrading keyring (2→3) and reqwest (0.11→0.12),
-# which are breaking changes tracked separately.
+# Ignore unmaintained crate advisories for transitive dependencies
+# that have no available fix.
 ignore = [
-    # derivative unmaintained — transitive via keyring 2.3 → secret-service → zbus 3.x
-    # Fix: upgrade keyring to 3.6+ (zbus 5.x drops derivative)
-    { id = "RUSTSEC-2024-0388", reason = "Requires keyring 2→3 upgrade (breaking API changes)" },
-    # instant unmaintained — transitive via keyring 2.3 → zbus 3.x → fastrand 1.x
-    # Fix: upgrade keyring to 3.6+ (same fix as above, resolves both)
-    { id = "RUSTSEC-2024-0384", reason = "Requires keyring 2→3 upgrade (same fix as RUSTSEC-2024-0388)" },
-    # rustls-pemfile unmaintained — transitive via reqwest 0.11
-    # Fix: upgrade reqwest to 0.12+ (uses rustls-pki-types directly)
-    { id = "RUSTSEC-2025-0134", reason = "Requires reqwest 0.11→0.12 upgrade (breaking API changes)" },
     # paste unmaintained — transitive via ratatui 0.29 → paste 1.x
     # Fix: waiting for ratatui to migrate to pastey
     { id = "RUSTSEC-2024-0436", reason = "Transitive dep via ratatui; no action available until ratatui migrates" },

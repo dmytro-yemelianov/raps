@@ -278,7 +278,7 @@ impl TokenStorage {
             }
         };
 
-        match entry.delete_password() {
+        match entry.delete_credential() {
             Ok(()) => {
                 // Also delete file storage if it exists (for migration)
                 self.delete_file().ok();
