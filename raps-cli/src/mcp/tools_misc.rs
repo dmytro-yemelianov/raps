@@ -663,11 +663,7 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn pipeline_dry_run(
-        &self,
-        file: String,
-        variables: Option<String>,
-    ) -> String {
+    pub(crate) async fn pipeline_dry_run(&self, file: String, variables: Option<String>) -> String {
         let mut cmd = tokio::process::Command::new("raps");
         cmd.args(["pipeline", "run", &file, "--dry-run"]);
 
@@ -761,10 +757,7 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn pipeline_list_templates(
-        &self,
-        directory: Option<String>,
-    ) -> String {
+    pub(crate) async fn pipeline_list_templates(&self, directory: Option<String>) -> String {
         use std::fs;
         use std::path::Path;
 
@@ -806,9 +799,7 @@ impl RapsServer {
                             && content.contains("name:")
                             && content.contains("steps:")
                         {
-                            files.push(
-                                entry_path.to_string_lossy().to_string(),
-                            );
+                            files.push(entry_path.to_string_lossy().to_string());
                         }
                     }
                 }

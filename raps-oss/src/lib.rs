@@ -133,9 +133,16 @@ mod integration_tests {
             .send()
             .await
             .expect("token request failed");
-        assert!(resp.status().is_success(), "token endpoint returned {}", resp.status());
+        assert!(
+            resp.status().is_success(),
+            "token endpoint returned {}",
+            resp.status()
+        );
         let body: serde_json::Value = resp.json().await.expect("invalid token JSON");
-        let token = body["access_token"].as_str().expect("no access_token").to_string();
+        let token = body["access_token"]
+            .as_str()
+            .expect("no access_token")
+            .to_string();
         let expires_in = body["expires_in"].as_u64().unwrap_or(3600);
         client
             .auth

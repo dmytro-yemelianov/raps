@@ -492,7 +492,10 @@ mod tests {
 
     #[test]
     fn test_validate_urn_valid() {
-        assert!(RapsServer::validate_urn("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVja2V0L2ZpbGUucnZ0").is_ok());
+        assert!(
+            RapsServer::validate_urn("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVja2V0L2ZpbGUucnZ0")
+                .is_ok()
+        );
     }
 
     #[test]
