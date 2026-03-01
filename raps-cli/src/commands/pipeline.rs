@@ -21,7 +21,7 @@ use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum PipelineCommands {
-    /// Run a pipeline from a YAML or JSON file (use `-` for stdin, parsed as YAML)
+    /// Run a pipeline from a YAML or JSON file with v2 features: retry, timeout, conditionals, parallel steps, and for_each loops (use `-` for stdin, parsed as YAML)
     Run {
         /// Path to pipeline file (use `-` for stdin)
         file: PathBuf,
@@ -796,28 +796,41 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
         valid: bool,
         name: String,
         steps_count: usize,
+        errors: Vec<String>,
         warnings: Vec<String>,
     }
 
-    let mut warnings = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
 
-    // Check for potential issues
-    for (i, step) in pipeline.steps.iter().enumerate() {
-        if step.command.as_deref().unwrap_or("").is_empty() {
-            warnings.push(format!("Step {} '{}' has empty command", i + 1, step.name));
+    // Validate defaults
+    if let Some(ref retry) = pipeline.defaults.retry {
+        if retry.max_attempts < 1 {
+            errors.push("defaults.retry.max_attempts must be >= 1".to_string());
+        }
+    }
+    if let Some(ref timeout) = pipeline.defaults.timeout {
+        if parse_duration(timeout).is_err() {
+            errors.push(format!(
+                "defaults.timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
+                timeout
+            ));
         }
     }
 
+    validate_steps(&pipeline.steps, &mut errors, &mut warnings, "");
+
     let result = ValidationResult {
-        valid: warnings.is_empty(),
+        valid: errors.is_empty(),
         name: pipeline.name.clone(),
         steps_count: pipeline.steps.len(),
+        errors: errors.clone(),
         warnings: warnings.clone(),
     };
 
     match output_format {
         OutputFormat::Table => {
-            if warnings.is_empty() {
+            if errors.is_empty() && warnings.is_empty() {
                 println!(
                     "{} Pipeline '{}' is valid!",
                     "✓".green().bold(),
@@ -825,9 +838,17 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
                 );
                 println!("  {} {} steps", "Steps:".bold(), result.steps_count);
             } else {
-                println!("{} Pipeline has warnings:", "!".yellow().bold());
-                for warning in &warnings {
-                    println!("  {} {}", "•".yellow(), warning);
+                if !errors.is_empty() {
+                    println!("{} Pipeline has errors:", "✗".red().bold());
+                    for error in &errors {
+                        println!("  {} {}", "•".red(), error);
+                    }
+                }
+                if !warnings.is_empty() {
+                    println!("{} Pipeline has warnings:", "!".yellow().bold());
+                    for warning in &warnings {
+                        println!("  {} {}", "•".yellow(), warning);
+                    }
                 }
             }
         }
@@ -839,52 +860,147 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
     Ok(())
 }
 
+fn validate_steps(steps: &[Step], errors: &mut Vec<String>, warnings: &mut Vec<String>, prefix: &str) {
+    for (i, step) in steps.iter().enumerate() {
+        let step_label = if prefix.is_empty() {
+            format!("Step {} '{}'", i + 1, step.name)
+        } else {
+            format!("{} > Step {} '{}'", prefix, i + 1, step.name)
+        };
+
+        // Steps must have at least one of: command, parallel, or for_each
+        let has_command = step.command.as_deref().map(|c| !c.is_empty()).unwrap_or(false);
+        let has_parallel = step.parallel.is_some();
+        let has_for_each = step.for_each.is_some();
+
+        if !has_command && !has_parallel && !has_for_each {
+            errors.push(format!(
+                "{} must have at least one of: command, parallel, or for_each",
+                step_label
+            ));
+        }
+
+        // for_each steps must have either command or steps
+        if has_for_each {
+            let has_inner_steps = step.steps.as_ref().map(|s| !s.is_empty()).unwrap_or(false);
+            if !has_command && !has_inner_steps {
+                errors.push(format!(
+                    "{} has for_each but no command or steps",
+                    step_label
+                ));
+            }
+        }
+
+        // retry.max_attempts must be >= 1
+        if let Some(ref retry) = step.retry {
+            if retry.max_attempts < 1 {
+                errors.push(format!(
+                    "{}: retry.max_attempts must be >= 1",
+                    step_label
+                ));
+            }
+        }
+
+        // timeout must be parseable as a duration
+        if let Some(ref timeout) = step.timeout {
+            if parse_duration(timeout).is_err() {
+                errors.push(format!(
+                    "{}: timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
+                    step_label, timeout
+                ));
+            }
+        }
+
+        // Warn if step has both if and unless
+        if step.if_expr.is_some() && step.unless.is_some() {
+            warnings.push(format!(
+                "{} has both 'if' and 'unless' conditions; this may be confusing",
+                step_label
+            ));
+        }
+
+        // Recursively validate parallel sub-steps
+        if let Some(ref parallel_steps) = step.parallel {
+            validate_steps(parallel_steps, errors, warnings, &step_label);
+        }
+
+        // Recursively validate for_each inner steps
+        if let Some(ref inner_steps) = step.steps {
+            validate_steps(inner_steps, errors, warnings, &step_label);
+        }
+
+        // Recursively validate on_failure steps
+        if let Some(ref failure_steps) = step.on_failure {
+            validate_steps(failure_steps, errors, warnings, &format!("{} > on_failure", step_label));
+        }
+    }
+}
+
 fn generate_sample(output: &PathBuf, output_format: OutputFormat) -> Result<()> {
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-    let bucket_name = format!("raps-sample-{ts}");
-    let sample = Pipeline {
-        name: "Sample Pipeline".to_string(),
-        description: Some("Example pipeline demonstrating raps automation".to_string()),
-        variables: [
-            ("BUCKET".to_string(), bucket_name),
-            ("PROJECT_ID".to_string(), "12345".to_string()),
-        ]
-        .into_iter()
-        .collect(),
-        defaults: PipelineDefaults::default(),
-        steps: vec![
-            Step {
-                name: "List buckets".to_string(),
-                command: Some("bucket list".to_string()),
-                ..Step::default()
-            },
-            Step {
-                name: "Create bucket".to_string(),
-                command: Some("bucket create -k ${BUCKET} -p transient -r US".to_string()),
-                ignore_failure: true,
-                ..Step::default()
-            },
-            Step {
-                name: "List objects".to_string(),
-                command: Some("object list ${BUCKET}".to_string()),
-                ..Step::default()
-            },
-            Step {
-                name: "Delete bucket".to_string(),
-                command: Some("bucket delete ${BUCKET} -y".to_string()),
-                ignore_failure: true,
-                ..Step::default()
-            },
-        ],
-    };
+    let sample_yaml = r#"name: "Model Processing Pipeline"
+description: "Upload, translate, and download models with error handling"
+
+defaults:
+  retry:
+    max_attempts: 3
+    backoff: exponential
+    delay: 5s
+  timeout: 5m
+
+variables:
+  BUCKET: "my-models"
+
+steps:
+  - name: "Check if bucket exists"
+    id: check_bucket
+    command: "bucket info ${BUCKET}"
+    ignore_failure: true
+
+  - name: "Create bucket if missing"
+    command: "bucket create --key ${BUCKET} --policy persistent"
+    if: "${{ steps.check_bucket.exit_code != 0 }}"
+
+  - name: "Upload models in parallel"
+    parallel:
+      - name: "Upload building.rvt"
+        command: "object upload ${BUCKET} building.rvt"
+      - name: "Upload site.dwg"
+        command: "object upload ${BUCKET} site.dwg"
+    max_concurrency: 2
+
+  - name: "Translate all models"
+    for_each:
+      var: MODEL
+      in: ["building.rvt", "site.dwg"]
+    steps:
+      - name: "Start translation"
+        command: "translate start urn:${BUCKET}/${MODEL}"
+        retry:
+          max_attempts: 2
+          delay: 10s
+      - name: "Wait for translation"
+        command: "translate status urn:${BUCKET}/${MODEL} --wait"
+        timeout: 60m
+
+  - name: "Download results"
+    for_each:
+      var: MODEL
+      in: ["building.rvt", "site.dwg"]
+      parallel: true
+      max_concurrency: 4
+    command: "translate download urn:${BUCKET}/${MODEL} --output ./output/${MODEL}"
+
+  - name: "Cleanup bucket"
+    command: "bucket delete ${BUCKET} -y"
+    ignore_failure: true
+"#;
 
     let content = if output.extension().map(|e| e == "json").unwrap_or(false) {
-        serde_json::to_string_pretty(&sample)?
+        let pipeline: Pipeline = serde_yaml::from_str(sample_yaml)
+            .context("Failed to parse sample YAML (this is a bug)")?;
+        serde_json::to_string_pretty(&pipeline)?
     } else {
-        serde_yaml::to_string(&sample)?
+        sample_yaml.to_string()
     };
 
     std::fs::write(output, &content)
