@@ -46,9 +46,10 @@ impl AuthClient {
         let stored_token = Self::load_stored_token_static(&config);
 
         // Create HTTP client with configured timeouts
-        let http_client = http_config
-            .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new()); // Fallback to default if config fails
+        let http_client = http_config.create_client().unwrap_or_else(|e| {
+            tracing::warn!("HTTP client configuration failed, using defaults: {e}");
+            reqwest::Client::new()
+        });
 
         Self {
             config,
