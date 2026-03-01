@@ -83,7 +83,7 @@ pub struct UploadedFile {
 }
 
 impl UploadedFile {
-    /// Parse filesize string into bytes. Returns None if absent or unparseable.
+    /// Parse filesize string into bytes. Returns None if absent or unparsable.
     pub fn filesize_bytes(&self) -> Option<u64> {
         self.filesize.as_deref().and_then(|s| s.parse().ok())
     }
@@ -144,7 +144,7 @@ pub struct PhotosceneResult {
 }
 
 impl PhotosceneResult {
-    /// Parse file_size string into bytes. Returns None if absent or unparseable.
+    /// Parse file_size string into bytes. Returns None if absent or unparsable.
     pub fn filesize_bytes(&self) -> Option<u64> {
         self.file_size.as_deref().and_then(|s| s.parse().ok())
     }
@@ -793,7 +793,7 @@ mod tests {
     }
 
     #[test]
-    fn test_photoscene_result_filesize_bytes_unparseable() {
+    fn test_photoscene_result_filesize_bytes_unparsable() {
         let result = PhotosceneResult {
             photoscene_id: "scene-1".to_string(),
             progress: "100".to_string(),

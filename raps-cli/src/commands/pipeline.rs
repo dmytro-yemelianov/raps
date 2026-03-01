@@ -180,10 +180,7 @@ async fn run_pipeline(
             // Reject shell metacharacters in variable values
             const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
             if value.contains(SHELL_META) {
-                anyhow::bail!(
-                    "Pipeline variable '{}' contains shell metacharacters",
-                    key
-                );
+                anyhow::bail!("Pipeline variable '{}' contains shell metacharacters", key);
             }
             command = command.replace(&format!("${{{}}}", key), value);
             command = command.replace(&format!("${}", key), value);

@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-use crate::types::*;
 use crate::DerivativeClient;
+use crate::types::*;
 
 impl DerivativeClient {
     /// Start a translation job

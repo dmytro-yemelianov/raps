@@ -351,8 +351,7 @@ async fn login(
         );
         eprintln!(
             "{}",
-            "   Tip: use 'raps auth login --device' to skip this detection."
-                .dimmed()
+            "   Tip: use 'raps auth login --device' to skip this detection.".dimmed()
         );
         true
     } else {
@@ -541,11 +540,9 @@ async fn whoami(auth_client: &AuthClient, output_format: OutputFormat) -> Result
         return Ok(());
     }
 
-    let user = tracked_op(
-        "Fetching user profile",
-        output_format,
-        || auth_client.get_user_info(),
-    )
+    let user = tracked_op("Fetching user profile", output_format, || {
+        auth_client.get_user_info()
+    })
     .await?;
 
     let output = WhoamiOutput {

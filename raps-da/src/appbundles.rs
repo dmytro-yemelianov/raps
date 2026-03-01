@@ -8,8 +8,8 @@ use serde::Serialize;
 
 use raps_kernel::http;
 
-use crate::types::*;
 use crate::DesignAutomationClient;
+use crate::types::*;
 
 impl DesignAutomationClient {
     /// List all app bundles

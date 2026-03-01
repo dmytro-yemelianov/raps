@@ -108,7 +108,12 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn bucket_create(&self, bucket_key: String, policy: String, region: String) -> String {
+    pub(crate) async fn bucket_create(
+        &self,
+        bucket_key: String,
+        policy: String,
+        region: String,
+    ) -> String {
         let client = self.get_oss_client().await;
 
         let retention = match policy.to_lowercase().as_str() {
@@ -338,7 +343,11 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn object_upload_batch(&self, bucket_key: String, file_paths: Vec<String>) -> String {
+    pub(crate) async fn object_upload_batch(
+        &self,
+        bucket_key: String,
+        file_paths: Vec<String>,
+    ) -> String {
         use std::path::Path;
         use std::sync::Arc;
         use tokio::sync::Semaphore;
@@ -355,7 +364,11 @@ impl RapsServer {
         for file_path in file_paths.clone() {
             let client = client.clone();
             let bucket_key = bucket_key.clone();
-            let permit = semaphore.clone().acquire_owned().await.expect("semaphore closed unexpectedly");
+            let permit = semaphore
+                .clone()
+                .acquire_owned()
+                .await
+                .expect("semaphore closed unexpectedly");
 
             let handle = tokio::spawn(async move {
                 let _permit = permit; // Hold permit until done
@@ -565,7 +578,11 @@ impl RapsServer {
         result
     }
 
-    pub(crate) async fn object_delete_batch(&self, bucket_key: String, object_keys: Vec<String>) -> String {
+    pub(crate) async fn object_delete_batch(
+        &self,
+        bucket_key: String,
+        object_keys: Vec<String>,
+    ) -> String {
         if object_keys.is_empty() {
             return "Error: No objects specified for deletion.".to_string();
         }

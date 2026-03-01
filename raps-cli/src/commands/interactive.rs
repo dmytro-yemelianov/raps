@@ -36,7 +36,10 @@ pub async fn prompt_for_hub(client: &DataManagementClient) -> Result<String> {
     };
     match &hubs {
         Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching hubs{}", suffix)),
-        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching hubs (after {})", api_health::format_duration_ms(elapsed))),
+        Err(_) => spinner.finish_with_message(format!(
+            "\u{2717} Fetching hubs (after {})",
+            api_health::format_duration_ms(elapsed)
+        )),
     }
     let hubs = hubs?;
 
@@ -84,7 +87,10 @@ pub async fn prompt_for_project(client: &DataManagementClient, hub_id: &str) -> 
     };
     match &projects {
         Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching projects{}", suffix)),
-        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching projects (after {})", api_health::format_duration_ms(elapsed))),
+        Err(_) => spinner.finish_with_message(format!(
+            "\u{2717} Fetching projects (after {})",
+            api_health::format_duration_ms(elapsed)
+        )),
     }
     let projects = projects?;
 
@@ -139,7 +145,10 @@ pub async fn prompt_for_folder(
     };
     match &folders {
         Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching top folders{}", suffix)),
-        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching top folders (after {})", api_health::format_duration_ms(elapsed))),
+        Err(_) => spinner.finish_with_message(format!(
+            "\u{2717} Fetching top folders (after {})",
+            api_health::format_duration_ms(elapsed)
+        )),
     }
     let folders = folders?;
 
@@ -194,7 +203,10 @@ pub async fn prompt_for_rfi(client: &RfiClient, project_id: &str) -> Result<Stri
     };
     match &rfis {
         Ok(_) => spinner.finish_with_message(format!("\u{2713} Fetching RFIs{}", suffix)),
-        Err(_) => spinner.finish_with_message(format!("\u{2717} Fetching RFIs (after {})", api_health::format_duration_ms(elapsed))),
+        Err(_) => spinner.finish_with_message(format!(
+            "\u{2717} Fetching RFIs (after {})",
+            api_health::format_duration_ms(elapsed)
+        )),
     }
     let rfis = rfis?;
 

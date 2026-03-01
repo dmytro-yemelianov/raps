@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
-use crate::types::*;
 use crate::OssClient;
+use crate::types::*;
 
 impl OssClient {
     // ============== COPY & BATCH OPERATIONS ==============

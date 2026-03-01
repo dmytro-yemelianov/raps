@@ -9,10 +9,10 @@
 // API response structs may contain fields we don't use - this is expected for external API contracts
 #![allow(dead_code)]
 
-pub mod types;
 mod folders;
 mod hubs;
 mod items;
+pub mod types;
 
 // Re-export all public types for backward compatibility
 pub use types::*;

@@ -335,7 +335,11 @@ mod tests {
         let snap = snapshot_of(&tracker);
         let jitter_ms = snap.jitter.as_millis();
         // Allow small rounding error from integer arithmetic
-        assert!(jitter_ms >= 99 && jitter_ms <= 101, "jitter was {}ms", jitter_ms);
+        assert!(
+            jitter_ms >= 99 && jitter_ms <= 101,
+            "jitter was {}ms",
+            jitter_ms
+        );
     }
 
     #[test]

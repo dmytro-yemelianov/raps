@@ -336,7 +336,10 @@ impl AdminProjectCommands {
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!("\n{} Project created successfully!", "\u{2713}".green().bold());
+                        println!(
+                            "\n{} Project created successfully!",
+                            "\u{2713}".green().bold()
+                        );
                         println!("{:<15} {}", "ID:".bold(), project.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), project.name);
                         println!(
@@ -397,7 +400,10 @@ impl AdminProjectCommands {
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!("\n{} Project updated successfully!", "\u{2713}".green().bold());
+                        println!(
+                            "\n{} Project updated successfully!",
+                            "\u{2713}".green().bold()
+                        );
                         println!("{:<15} {}", "ID:".bold(), updated.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), updated.name);
                         println!(
@@ -441,7 +447,10 @@ impl AdminProjectCommands {
 
                 match output_format {
                     OutputFormat::Table => {
-                        println!("\n{} Project archived successfully!", "\u{2713}".green().bold());
+                        println!(
+                            "\n{} Project archived successfully!",
+                            "\u{2713}".green().bold()
+                        );
                         println!("{:<15} {}", "ID:".bold(), project.cyan());
                     }
                     _ => {

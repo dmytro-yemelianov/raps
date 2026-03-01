@@ -10,7 +10,11 @@ use super::server::RapsServer;
 
 impl RapsServer {
     // Tool dispatch
-    pub(crate) async fn dispatch_tool(&self, name: &str, args: Option<Map<String, Value>>) -> CallToolResult {
+    pub(crate) async fn dispatch_tool(
+        &self,
+        name: &str,
+        args: Option<Map<String, Value>>,
+    ) -> CallToolResult {
         let args = args.unwrap_or_default();
 
         let result = match name {
@@ -84,7 +88,10 @@ impl RapsServer {
                 };
                 let minutes = args
                     .get("minutes")
-                    .and_then(|v| v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
+                    .and_then(|v| {
+                        v.as_u64()
+                            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                    })
                     .unwrap_or(10) as u32;
                 self.object_signed_url(bucket_key, object_key, minutes)
                     .await
@@ -1132,11 +1139,26 @@ impl RapsServer {
                             .filter_map(|(k, v)| {
                                 // Accept either {"url": "..."} object or plain "url" string
                                 let arg = if let Some(url) = v.as_str() {
-                                    raps_da::WorkItemArgument { url: url.to_string(), verb: None, headers: None }
+                                    raps_da::WorkItemArgument {
+                                        url: url.to_string(),
+                                        verb: None,
+                                        headers: None,
+                                    }
                                 } else if let Some(obj) = v.as_object() {
-                                    let url = obj.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
-                                    let verb = obj.get("verb").and_then(|u| u.as_str()).map(|s| s.to_string());
-                                    raps_da::WorkItemArgument { url, verb, headers: None }
+                                    let url = obj
+                                        .get("url")
+                                        .and_then(|u| u.as_str())
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let verb = obj
+                                        .get("verb")
+                                        .and_then(|u| u.as_str())
+                                        .map(|s| s.to_string());
+                                    raps_da::WorkItemArgument {
+                                        url,
+                                        verb,
+                                        headers: None,
+                                    }
                                 } else {
                                     return None;
                                 };

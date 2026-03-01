@@ -134,11 +134,9 @@ async fn hub_info(
     hub_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let hub = tracked_op(
-        "Fetching hub details",
-        output_format,
-        || client.get_hub(hub_id),
-    )
+    let hub = tracked_op("Fetching hub details", output_format, || {
+        client.get_hub(hub_id)
+    })
     .await?;
 
     let extension_type = hub

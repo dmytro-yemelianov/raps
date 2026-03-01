@@ -299,9 +299,7 @@ impl SubmittalCommands {
             SubmittalCommands::Get {
                 project_id,
                 submittal_id,
-            } => {
-                submittals::get_submittal(client, &project_id, &submittal_id, output_format).await
-            }
+            } => submittals::get_submittal(client, &project_id, &submittal_id, output_format).await,
             SubmittalCommands::Create {
                 project_id,
                 title,
@@ -358,9 +356,7 @@ impl ChecklistCommands {
             ChecklistCommands::Get {
                 project_id,
                 checklist_id,
-            } => {
-                checklists::get_checklist(client, &project_id, &checklist_id, output_format).await
-            }
+            } => checklists::get_checklist(client, &project_id, &checklist_id, output_format).await,
             ChecklistCommands::Create {
                 project_id,
                 title,

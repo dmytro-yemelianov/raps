@@ -13,7 +13,7 @@ use serde::Serialize;
 use crate::output::OutputFormat;
 use raps_acc::{CreateRfiRequest, RfiClient, UpdateRfiRequest};
 
-use super::{truncate_str, RfiOutput};
+use super::{RfiOutput, truncate_str};
 
 pub(super) async fn list_rfis(
     client: &RfiClient,

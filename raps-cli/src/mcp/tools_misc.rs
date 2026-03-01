@@ -49,7 +49,11 @@ impl RapsServer {
             } else {
                 format!("/{}", endpoint)
             };
-            format!("{}{}", self.config().base_url.trim_end_matches('/'), endpoint)
+            format!(
+                "{}{}",
+                self.config().base_url.trim_end_matches('/'),
+                endpoint
+            )
         };
 
         // Add query parameters
@@ -267,7 +271,12 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn webhook_delete(&self, system: String, event: String, hook_id: String) -> String {
+    pub(crate) async fn webhook_delete(
+        &self,
+        system: String,
+        event: String,
+        hook_id: String,
+    ) -> String {
         let client = self.get_webhooks_client().await;
         match client.delete_webhook(&system, &event, &hook_id).await {
             Ok(()) => format!("Webhook {} deleted successfully.", hook_id),
@@ -285,7 +294,12 @@ impl RapsServer {
         output
     }
 
-    pub(crate) async fn webhook_get(&self, system: String, event: String, hook_id: String) -> String {
+    pub(crate) async fn webhook_get(
+        &self,
+        system: String,
+        event: String,
+        hook_id: String,
+    ) -> String {
         let client = self.get_webhooks_client().await;
         match client.get_webhook(&system, &event, &hook_id).await {
             Ok(hook) => {
@@ -532,7 +546,11 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn reality_result(&self, photoscene_id: String, format: Option<String>) -> String {
+    pub(crate) async fn reality_result(
+        &self,
+        photoscene_id: String,
+        format: Option<String>,
+    ) -> String {
         let client = self.get_reality_client().await;
 
         let fmt = match format.as_deref().map(|s| s.to_lowercase()).as_deref() {

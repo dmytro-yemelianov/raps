@@ -8,8 +8,8 @@ use serde::Deserialize;
 
 use raps_kernel::http;
 
-use super::types::*;
 use super::AccClient;
+use super::types::*;
 
 impl AccClient {
     /// List checklists in a project

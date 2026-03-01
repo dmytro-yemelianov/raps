@@ -171,16 +171,14 @@ pub fn redact_secrets(text: &str) -> String {
     fn cookie_pattern() -> &'static Regex {
         static PAT: OnceLock<Regex> = OnceLock::new();
         PAT.get_or_init(|| {
-            Regex::new(r"(?i)((?:Set-)?Cookie:)\s*[^\r\n]+")
-                .expect("cookie_pattern regex is valid")
+            Regex::new(r"(?i)((?:Set-)?Cookie:)\s*[^\r\n]+").expect("cookie_pattern regex is valid")
         })
     }
 
     fn x_api_key_pattern() -> &'static Regex {
         static PAT: OnceLock<Regex> = OnceLock::new();
         PAT.get_or_init(|| {
-            Regex::new(r"(?i)(X-API-Key:)\s*[^\s,;]+")
-                .expect("x_api_key_pattern regex is valid")
+            Regex::new(r"(?i)(X-API-Key:)\s*[^\s,;]+").expect("x_api_key_pattern regex is valid")
         })
     }
 
@@ -468,7 +466,8 @@ mod tests {
 
     #[test]
     fn test_redact_combined_patterns() {
-        let text = "Authorization: Bearer eyJtoken123456789012345 Cookie: sess=val X-API-Key: key123";
+        let text =
+            "Authorization: Bearer eyJtoken123456789012345 Cookie: sess=val X-API-Key: key123";
         let redacted = redact_secrets(text);
         assert!(!redacted.contains("eyJtoken"));
         assert!(!redacted.contains("sess=val"));

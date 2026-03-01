@@ -62,11 +62,7 @@ pub(super) async fn delete_activity(
 
     client.delete_activity(id).await?;
 
-    println!(
-        "{} Activity '{}' deleted!",
-        "\u{2713}".green().bold(),
-        id
-    );
+    println!("{} Activity '{}' deleted!", "\u{2713}".green().bold(), id);
     Ok(())
 }
 

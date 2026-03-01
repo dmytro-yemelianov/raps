@@ -65,8 +65,7 @@ impl DerivativeClient {
 
         // Validate output path stays within current directory
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        if let (Ok(canon_cwd), Ok(canon_target)) =
-            (cwd.canonicalize(), output_path.canonicalize())
+        if let (Ok(canon_cwd), Ok(canon_target)) = (cwd.canonicalize(), output_path.canonicalize())
             && !canon_target.starts_with(&canon_cwd)
         {
             anyhow::bail!(

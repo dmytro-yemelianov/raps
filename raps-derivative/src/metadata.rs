@@ -5,8 +5,8 @@
 
 use anyhow::{Context, Result};
 
-use crate::types::*;
 use crate::DerivativeClient;
+use crate::types::*;
 
 impl DerivativeClient {
     /// Get metadata (list of model views/viewables) for a translated model

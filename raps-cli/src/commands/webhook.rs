@@ -159,16 +159,12 @@ struct WebhookListOutput {
 }
 
 async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> Result<()> {
-    let webhooks = tracked_op(
-        "Fetching webhooks",
-        output_format,
-        || async {
-            client
-                .list_all_webhooks()
-                .await
-                .context("Failed to list webhooks. Check your authentication with 'raps auth test'")
-        },
-    )
+    let webhooks = tracked_op("Fetching webhooks", output_format, || async {
+        client
+            .list_all_webhooks()
+            .await
+            .context("Failed to list webhooks. Check your authentication with 'raps auth test'")
+    })
     .await?;
 
     let webhook_outputs: Vec<WebhookListOutput> = webhooks

@@ -361,7 +361,11 @@ f 5//6 1//6 4//6 8//6
         file_path
     };
 
-    let file_name = file_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_name = file_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     let file_size = fs::metadata(&file_path).await?.len();
 
     println!(
@@ -803,7 +807,11 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
     // Process files in parallel with concurrency limit
     for file in &files {
-        let file_name = file.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = file
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         let file_path = file.clone();
         let bucket_prefix_clone = bucket_prefix.clone();
         let oss_clone = oss.clone();
@@ -813,7 +821,10 @@ async fn batch_processing(args: &BatchProcessingArgs, concurrency: usize) -> Res
 
         let handle = tokio::spawn(async move {
             // Acquire semaphore permit (blocks if limit reached)
-            let _permit = semaphore_clone.acquire().await.expect("semaphore closed unexpectedly");
+            let _permit = semaphore_clone
+                .acquire()
+                .await
+                .expect("semaphore closed unexpectedly");
 
             print!("  Processing: {}...", file_name);
 

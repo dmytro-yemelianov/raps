@@ -218,10 +218,8 @@ pub(super) async fn check_status(
                     break;
                 }
                 "failed" => {
-                    spinner.finish_with_message(format!(
-                        "{} Translation failed!",
-                        "X".red().bold()
-                    ));
+                    spinner
+                        .finish_with_message(format!("{} Translation failed!", "X".red().bold()));
                     anyhow::bail!("Translation failed");
                 }
                 "timeout" => {

@@ -5,8 +5,8 @@
 
 use anyhow::{Context, Result};
 
-use crate::types::*;
 use crate::OssClient;
+use crate::types::*;
 
 impl OssClient {
     /// Create a new bucket

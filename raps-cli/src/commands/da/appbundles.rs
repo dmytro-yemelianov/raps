@@ -120,11 +120,7 @@ pub(super) async fn delete_appbundle(
 
     client.delete_appbundle(id).await?;
 
-    println!(
-        "{} App bundle '{}' deleted!",
-        "\u{2713}".green().bold(),
-        id
-    );
+    println!("{} App bundle '{}' deleted!", "\u{2713}".green().bold(), id);
     Ok(())
 }
 

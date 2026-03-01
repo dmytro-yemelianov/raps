@@ -11,8 +11,8 @@ use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use raps_kernel::progress;
 
-use crate::types::*;
 use crate::OssClient;
+use crate::types::*;
 
 impl OssClient {
     /// Upload a file to a bucket using S3 signed URLs
@@ -168,8 +168,7 @@ impl OssClient {
 
         // Validate output path stays within current directory
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        if let (Ok(canon_cwd), Ok(canon_target)) =
-            (cwd.canonicalize(), output_path.canonicalize())
+        if let (Ok(canon_cwd), Ok(canon_target)) = (cwd.canonicalize(), output_path.canonicalize())
             && !canon_target.starts_with(&canon_cwd)
         {
             anyhow::bail!(

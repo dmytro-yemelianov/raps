@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use std::time::{Duration, Instant};
 
-use super::types::{CachedToken, TokenResponse};
 use super::AuthClient;
+use super::types::{CachedToken, TokenResponse};
 
 impl AuthClient {
     /// Get a valid 2-legged access token

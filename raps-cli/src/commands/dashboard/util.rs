@@ -102,7 +102,7 @@ pub(super) fn copy_to_clipboard(text: &str) -> bool {
                 }
             }
         }
-        return false;
+        false
     }
 
     #[cfg(any(target_os = "windows", target_os = "macos"))]

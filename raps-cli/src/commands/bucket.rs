@@ -382,19 +382,12 @@ async fn bucket_info(
     bucket_key: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let bucket = tracked_op(
-        "Fetching bucket details",
-        output_format,
-        || async {
-            client
-                .get_bucket_details(bucket_key)
-                .await
-                .context(format!(
-                    "Failed to get bucket details for '{}'. Verify the bucket key is correct",
-                    bucket_key
-                ))
-        },
-    )
+    let bucket = tracked_op("Fetching bucket details", output_format, || async {
+        client.get_bucket_details(bucket_key).await.context(format!(
+            "Failed to get bucket details for '{}'. Verify the bucket key is correct",
+            bucket_key
+        ))
+    })
     .await?;
 
     let bucket_output = BucketInfoOutput {

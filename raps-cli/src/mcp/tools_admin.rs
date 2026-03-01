@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use futures_util::stream::{StreamExt as _, self as stream_util};
+use futures_util::stream::{self as stream_util, StreamExt as _};
 use raps_admin::{BulkConfig, FolderType, PermissionLevel, ProjectFilter, StateManager};
 
 use super::server::{MCP_BULK_CONCURRENCY, RapsServer};

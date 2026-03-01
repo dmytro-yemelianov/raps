@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 
 use raps_kernel::http;
 
-use crate::types::*;
 use crate::DesignAutomationClient;
+use crate::types::*;
 
 impl DesignAutomationClient {
     /// Create a work item (run an activity)

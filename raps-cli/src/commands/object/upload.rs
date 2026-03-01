@@ -46,10 +46,9 @@ pub(super) async fn upload_object(
         if key.is_none() {
             anyhow::bail!("--key is required when reading from stdin (no filename to derive)");
         }
-        let mut tmp = tempfile::NamedTempFile::new()
-            .context("Failed to create temp file for stdin spool")?;
-        std::io::copy(&mut std::io::stdin().lock(), &mut tmp)
-            .context("Failed to read stdin")?;
+        let mut tmp =
+            tempfile::NamedTempFile::new().context("Failed to create temp file for stdin spool")?;
+        std::io::copy(&mut std::io::stdin().lock(), &mut tmp).context("Failed to read stdin")?;
         let path = tmp.path().to_path_buf();
         (Some(tmp), path)
     } else {
@@ -71,7 +70,11 @@ pub(super) async fn upload_object(
     });
 
     if output_format.supports_colors() {
-        let source = if from_stdin { "stdin" } else { &file.display().to_string() };
+        let source = if from_stdin {
+            "stdin"
+        } else {
+            &file.display().to_string()
+        };
         let resume_msg = if resume { " (with resume)" } else { "" };
         println!(
             "{} {} {} {}{}",

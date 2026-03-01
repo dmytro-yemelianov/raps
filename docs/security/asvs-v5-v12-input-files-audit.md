@@ -38,7 +38,7 @@ Audit of input validation and file handling covering:
   - Extracts and validates the host
   - Checks against the domain allowlist with proper subdomain boundary checks
   - Rejects localhost, internal IPs, and lookalike domains
-  - Returns `false` for invalid or unparseable URLs
+  - Returns `false` for invalid or unparsable URLs
 
   This prevents credential leakage to external URLs when using the custom API call feature. Comprehensive tests cover edge cases including internal IPs, lookalike domains, and empty inputs.
 

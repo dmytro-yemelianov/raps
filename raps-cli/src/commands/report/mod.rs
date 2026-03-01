@@ -451,7 +451,11 @@ impl ReportCommands {
             }
             ReportCommands::AssetsSummary { account, filter } => {
                 extended_reports::assets_summary(
-                    config, auth_client, account, filter, output_format,
+                    config,
+                    auth_client,
+                    account,
+                    filter,
+                    output_format,
                 )
                 .await
             }

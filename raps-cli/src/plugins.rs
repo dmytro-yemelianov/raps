@@ -345,15 +345,18 @@ impl PluginManager {
         );
 
         let mut config = PluginConfig::load().unwrap_or_default();
-        let entry = config.plugins.entry(name.to_string()).or_insert(PluginEntry {
-            enabled: true,
-            path: Some(path.to_string_lossy().to_string()),
-            description: None,
-            sha256: None,
-            public_key: None,
-            signature: None,
-            trusted: false,
-        });
+        let entry = config
+            .plugins
+            .entry(name.to_string())
+            .or_insert(PluginEntry {
+                enabled: true,
+                path: Some(path.to_string_lossy().to_string()),
+                description: None,
+                sha256: None,
+                public_key: None,
+                signature: None,
+                trusted: false,
+            });
         entry.sha256 = Some(current_hash);
         entry.trusted = true;
         let _ = config.save();
@@ -368,15 +371,18 @@ impl PluginManager {
         let hash = compute_binary_hash(&path)?;
 
         let mut config = PluginConfig::load().unwrap_or_default();
-        let entry = config.plugins.entry(name.to_string()).or_insert(PluginEntry {
-            enabled: true,
-            path: Some(path.to_string_lossy().to_string()),
-            description: None,
-            sha256: None,
-            public_key: None,
-            signature: None,
-            trusted: false,
-        });
+        let entry = config
+            .plugins
+            .entry(name.to_string())
+            .or_insert(PluginEntry {
+                enabled: true,
+                path: Some(path.to_string_lossy().to_string()),
+                description: None,
+                sha256: None,
+                public_key: None,
+                signature: None,
+                trusted: false,
+            });
         entry.sha256 = Some(hash.clone());
         entry.trusted = true;
         config.save()?;

@@ -124,10 +124,7 @@ mod tests {
 
     #[test]
     fn test_traversal_etc_passwd() {
-        assert_eq!(
-            sanitize_filename("../../etc/passwd").unwrap(),
-            "passwd"
-        );
+        assert_eq!(sanitize_filename("../../etc/passwd").unwrap(), "passwd");
     }
 
     #[test]
@@ -162,10 +159,7 @@ mod tests {
 
     #[test]
     fn test_nul_bytes_stripped() {
-        assert_eq!(
-            sanitize_filename("file\0name.txt").unwrap(),
-            "filename.txt"
-        );
+        assert_eq!(sanitize_filename("file\0name.txt").unwrap(), "filename.txt");
     }
 
     #[test]

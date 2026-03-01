@@ -116,11 +116,7 @@ pub(super) async fn show_context(output_format: OutputFormat) -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn set_context(
-    key: &str,
-    value: &str,
-    output_format: OutputFormat,
-) -> Result<()> {
+pub(super) async fn set_context(key: &str, value: &str, output_format: OutputFormat) -> Result<()> {
     let mut data = load_profiles()?;
 
     let profile_name = data.active_profile.clone().ok_or_else(|| {

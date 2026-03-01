@@ -400,26 +400,26 @@ fn parse_body(
     }
 
     // Read body from data, file, or stdin
-    let body_str = if let Some(data) = data {
-        Some(data)
-    } else if let Some(path) = data_file {
-        if path.as_os_str() == "-" {
-            use std::io::Read;
-            let mut buf = String::new();
-            std::io::stdin()
-                .lock()
-                .read_to_string(&mut buf)
-                .context("Failed to read request body from stdin")?;
-            Some(buf)
+    let body_str =
+        if let Some(data) = data {
+            Some(data)
+        } else if let Some(path) = data_file {
+            if path.as_os_str() == "-" {
+                use std::io::Read;
+                let mut buf = String::new();
+                std::io::stdin()
+                    .lock()
+                    .read_to_string(&mut buf)
+                    .context("Failed to read request body from stdin")?;
+                Some(buf)
+            } else {
+                Some(std::fs::read_to_string(&path).with_context(|| {
+                    format!("Failed to read body from file: {}", path.display())
+                })?)
+            }
         } else {
-            Some(
-                std::fs::read_to_string(&path)
-                    .with_context(|| format!("Failed to read body from file: {}", path.display()))?,
-            )
-        }
-    } else {
-        None
-    };
+            None
+        };
 
     // Parse and validate JSON
     if let Some(body_str) = body_str {

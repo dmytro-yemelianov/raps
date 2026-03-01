@@ -12,8 +12,8 @@ use tokio::sync::Semaphore;
 
 use raps_kernel::progress;
 
-use crate::types::*;
 use crate::OssClient;
+use crate::types::*;
 
 impl OssClient {
     /// Create a fresh multipart upload state with signed URLs

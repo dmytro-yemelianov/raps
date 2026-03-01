@@ -2,7 +2,7 @@
 // Copyright 2024-2025 Dmytro Yemelianov
 
 use super::crud::CsvRfiRow;
-use super::{truncate_str, RfiOutput};
+use super::{RfiOutput, truncate_str};
 
 #[test]
 fn test_csv_rfi_row_deserialization() {

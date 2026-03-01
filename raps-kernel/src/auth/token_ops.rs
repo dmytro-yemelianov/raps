@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use colored::Colorize;
 
-use super::types::UserInfo;
 use super::AuthClient;
+use super::types::UserInfo;
 use crate::config::Config;
 use crate::storage::{StorageBackend, TokenStorage};
 use crate::types::StoredToken;

@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 
 use raps_kernel::http;
 
-use super::types::*;
 use super::AccClient;
+use super::types::*;
 
 impl AccClient {
     /// Get the base URL for ACC HQ Admin API

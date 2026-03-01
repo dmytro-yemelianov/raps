@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 
 use raps_kernel::http;
 
-use super::types::*;
 use super::AccClient;
+use super::types::*;
 
 impl AccClient {
     /// List submittals in a project

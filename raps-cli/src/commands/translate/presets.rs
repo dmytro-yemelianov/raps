@@ -186,7 +186,11 @@ pub(super) fn create_preset(
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Preset '{}' created!", "\u{2713}".green().bold(), name.cyan());
+            println!(
+                "{} Preset '{}' created!",
+                "\u{2713}".green().bold(),
+                name.cyan()
+            );
         }
         _ => {
             output_format.write(&preset)?;

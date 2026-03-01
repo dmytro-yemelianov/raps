@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use std::time::Duration;
 use tiny_http::{Response, Server};
 
-use super::types::TokenResponse;
 use super::AuthClient;
+use super::types::TokenResponse;
 use crate::config::DEFAULT_CALLBACK_PORT;
 use crate::types::StoredToken;
 

@@ -129,11 +129,9 @@ async fn item_info(
     item_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let item = tracked_op(
-        "Fetching item details",
-        output_format,
-        || client.get_item(project_id, item_id),
-    )
+    let item = tracked_op("Fetching item details", output_format, || {
+        client.get_item(project_id, item_id)
+    })
     .await?;
 
     let extension_type = item
@@ -208,11 +206,9 @@ async fn list_versions(
     item_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let versions = tracked_op(
-        "Fetching item versions",
-        output_format,
-        || client.get_item_versions(project_id, item_id),
-    )
+    let versions = tracked_op("Fetching item versions", output_format, || {
+        client.get_item_versions(project_id, item_id)
+    })
     .await?;
 
     let version_outputs: Vec<VersionOutput> = versions

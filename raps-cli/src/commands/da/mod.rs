@@ -196,9 +196,7 @@ impl DaCommands {
                 id,
                 engine,
                 description,
-            } => {
-                appbundles::create_appbundle(client, id, engine, description, output_format).await
-            }
+            } => appbundles::create_appbundle(client, id, engine, description, output_format).await,
             DaCommands::AppbundleDelete { id } => {
                 appbundles::delete_appbundle(client, &id, output_format).await
             }
@@ -208,8 +206,15 @@ impl DaCommands {
                 engine,
                 description,
             } => {
-                appbundles::upload_appbundle(client, &id, &file, &engine, description, output_format)
-                    .await
+                appbundles::upload_appbundle(
+                    client,
+                    &id,
+                    &file,
+                    &engine,
+                    description,
+                    output_format,
+                )
+                .await
             }
             DaCommands::Activities => activities::list_activities(client, output_format).await,
             DaCommands::ActivityCreate {

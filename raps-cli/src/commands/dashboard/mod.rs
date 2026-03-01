@@ -616,7 +616,10 @@ impl App {
             stack.pop();
             self.error_msg = None;
             // Restore from cache if available
-            let view = stack.last().expect("navigation stack is never empty").clone();
+            let view = stack
+                .last()
+                .expect("navigation stack is never empty")
+                .clone();
             if let Some(entry) = self.cache.get(&view) {
                 self.data = Some(entry.data.clone());
                 self.last_refresh = Some(entry.fetched_at);

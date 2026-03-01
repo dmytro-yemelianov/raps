@@ -153,8 +153,15 @@ impl IssueCommands {
                 description,
                 from_csv,
             } => {
-                crud::create_issue(client, &project_id, title, description, from_csv, output_format)
-                    .await
+                crud::create_issue(
+                    client,
+                    &project_id,
+                    title,
+                    description,
+                    from_csv,
+                    output_format,
+                )
+                .await
             }
             IssueCommands::Update {
                 project_id,
@@ -200,9 +207,7 @@ impl CommentCommands {
                 project_id,
                 issue_id,
                 body,
-            } => {
-                comments::add_comment(client, &project_id, &issue_id, &body, output_format).await
-            }
+            } => comments::add_comment(client, &project_id, &issue_id, &body, output_format).await,
             CommentCommands::Delete {
                 project_id,
                 issue_id,

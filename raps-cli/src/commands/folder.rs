@@ -186,19 +186,15 @@ async fn list_folder_contents(
     folder_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let contents = tracked_op(
-        "Fetching folder contents",
-        output_format,
-        || async {
-            client
-                .list_folder_contents(project_id, folder_id)
-                .await
-                .context(format!(
-                    "Failed to list folder '{}' contents. Verify folder ID and permissions",
-                    folder_id
-                ))
-        },
-    )
+    let contents = tracked_op("Fetching folder contents", output_format, || async {
+        client
+            .list_folder_contents(project_id, folder_id)
+            .await
+            .context(format!(
+                "Failed to list folder '{}' contents. Verify folder ID and permissions",
+                folder_id
+            ))
+    })
     .await?;
 
     let items: Vec<FolderItemOutput> = contents
@@ -436,19 +432,15 @@ async fn folder_rights(
     folder_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let permissions = tracked_op(
-        "Fetching folder permissions",
-        output_format,
-        || async {
-            client
-                .get_permissions(project_id, folder_id)
-                .await
-                .context(format!(
-                    "Failed to get permissions for folder '{}'",
-                    folder_id
-                ))
-        },
-    )
+    let permissions = tracked_op("Fetching folder permissions", output_format, || async {
+        client
+            .get_permissions(project_id, folder_id)
+            .await
+            .context(format!(
+                "Failed to get permissions for folder '{}'",
+                folder_id
+            ))
+    })
     .await?;
 
     let items: Vec<FolderRightOutput> = permissions

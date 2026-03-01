@@ -334,7 +334,12 @@ pub(crate) async fn execute_csv_update(
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
-                    println!("  {} {} - {}", "\u{2717}".red(), err.email, err.error.dimmed());
+                    println!(
+                        "  {} {} - {}",
+                        "\u{2717}".red(),
+                        err.email,
+                        err.error.dimmed()
+                    );
                 }
             }
 
@@ -474,7 +479,10 @@ pub(crate) async fn execute_csv_import(
         sp.set_style(
             ProgressStyle::with_template("{spinner:.cyan} {msg}")
                 .expect("hardcoded progress template is valid")
-                .tick_strings(&["\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283C}", "\u{2834}", "\u{2826}", "\u{2827}", "\u{2807}", "\u{280F}"]),
+                .tick_strings(&[
+                    "\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283C}", "\u{2834}",
+                    "\u{2826}", "\u{2827}", "\u{2807}", "\u{280F}",
+                ]),
         );
         sp.set_message(format!("Importing {} users concurrently...", total));
         sp.enable_steady_tick(std::time::Duration::from_millis(100));
@@ -531,7 +539,12 @@ pub(crate) async fn execute_csv_import(
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
-                    println!("  {} {} - {}", "\u{2717}".red(), err.email, err.error.dimmed());
+                    println!(
+                        "  {} {} - {}",
+                        "\u{2717}".red(),
+                        err.email,
+                        err.error.dimmed()
+                    );
                 }
             }
 

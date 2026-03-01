@@ -9,12 +9,12 @@
 //! callback URL (or bare authorization code) back into the terminal.
 
 use anyhow::{Context, Result};
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use colored::Colorize;
 use sha2::{Digest, Sha256};
 
-use super::types::TokenResponse;
 use super::AuthClient;
+use super::types::TokenResponse;
 use crate::types::StoredToken;
 
 /// Generate a cryptographically random PKCE code verifier.

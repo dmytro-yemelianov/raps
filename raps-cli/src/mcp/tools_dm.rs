@@ -453,7 +453,11 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn project_users_import(&self, project_id: String, users: Vec<Value>) -> String {
+    pub(crate) async fn project_users_import(
+        &self,
+        project_id: String,
+        users: Vec<Value>,
+    ) -> String {
         use raps_acc::users::ImportUserRequest;
 
         let client = self.get_users_client().await;
@@ -845,7 +849,12 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn item_rename(&self, project_id: String, item_id: String, new_name: String) -> String {
+    pub(crate) async fn item_rename(
+        &self,
+        project_id: String,
+        item_id: String,
+        new_name: String,
+    ) -> String {
         let client = self.get_dm_client().await;
 
         // Get current item to show old name
