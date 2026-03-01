@@ -103,6 +103,11 @@ csv.workspace = true
 # Temp files (stdin spool for piped uploads)
 tempfile.workspace = true
 
+# Plugin signature verification
+ed25519-dalek.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
 [features]
 default = []
 dashboard = ["ratatui", "crossterm"]
