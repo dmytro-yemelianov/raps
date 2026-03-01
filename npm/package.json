@@ -1,6 +1,6 @@
 {
   "name": "@dmytro-yemelianov/raps-cli",
-  "version": "4.15.0",
+  "version": "4.16.0",
   "description": "RAPS (rapeseed) - Rust CLI for Autodesk Platform Services",
   "keywords": [
     "autodesk",
@@ -36,10 +36,10 @@
     "node": ">=14"
   },
   "optionalDependencies": {
-    "@dmytro-yemelianov/raps-cli-win32-x64": "4.15.0",
-    "@dmytro-yemelianov/raps-cli-darwin-x64": "4.15.0",
-    "@dmytro-yemelianov/raps-cli-darwin-arm64": "4.15.0",
-    "@dmytro-yemelianov/raps-cli-linux-x64": "4.15.0",
-    "@dmytro-yemelianov/raps-cli-linux-arm64": "4.15.0"
+    "@dmytro-yemelianov/raps-cli-win32-x64": "4.16.0",
+    "@dmytro-yemelianov/raps-cli-darwin-x64": "4.16.0",
+    "@dmytro-yemelianov/raps-cli-darwin-arm64": "4.16.0",
+    "@dmytro-yemelianov/raps-cli-linux-x64": "4.16.0",
+    "@dmytro-yemelianov/raps-cli-linux-arm64": "4.16.0"
   }
 }
