@@ -205,6 +205,144 @@ fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
     Ok(pipeline)
 }
 
+#[derive(Debug)]
+enum StepOutcome {
+    Success(i32),
+    Failed(i32),
+    Skipped,
+}
+
+fn substitute_variables(
+    command: &str,
+    variables: &HashMap<String, String>,
+) -> Result<String> {
+    let mut result = command.to_string();
+    for (key, value) in variables {
+        const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
+        if value.contains(SHELL_META) {
+            anyhow::bail!("Pipeline variable '{}' contains shell metacharacters", key);
+        }
+        result = result.replace(&format!("${{{}}}", key), value);
+        result = result.replace(&format!("${}", key), value);
+    }
+    Ok(result)
+}
+
+async fn execute_command_step(
+    step: &Step,
+    cmd: &str,
+    variables: &HashMap<String, String>,
+    defaults: &PipelineDefaults,
+    dry_run: bool,
+    output_format: &OutputFormat,
+) -> Result<StepOutcome> {
+    let command = substitute_variables(cmd, variables)?;
+
+    if dry_run {
+        if output_format.supports_colors() {
+            println!("  {} Would execute: raps {}", "→".dimmed(), command);
+        }
+        return Ok(StepOutcome::Success(0));
+    }
+
+    // Determine retry config (step overrides defaults)
+    let retry = step
+        .retry
+        .clone()
+        .or_else(|| defaults.retry.clone())
+        .unwrap_or(RetryConfig {
+            max_attempts: 1,
+            backoff: BackoffStrategy::Fixed,
+            delay: "0s".to_string(),
+            on: vec![],
+        });
+
+    // Determine timeout
+    let timeout_duration = step
+        .timeout
+        .as_deref()
+        .or(defaults.timeout.as_deref())
+        .map(parse_duration)
+        .transpose()?;
+
+    let result = if let Some(timeout_dur) = timeout_duration {
+        match tokio::time::timeout(timeout_dur, execute_with_retry(&retry, &command)).await {
+            Ok(r) => r?,
+            Err(_) => {
+                if output_format.supports_colors() {
+                    eprintln!("  Step timed out after {}s", timeout_dur.as_secs());
+                }
+                return Ok(StepOutcome::Failed(-1));
+            }
+        }
+    } else {
+        execute_with_retry(&retry, &command).await?
+    };
+
+    if result == 0 {
+        Ok(StepOutcome::Success(0))
+    } else {
+        Ok(StepOutcome::Failed(result))
+    }
+}
+
+async fn execute_step(
+    step: &Step,
+    variables: &HashMap<String, String>,
+    context: &StepContext,
+    defaults: &PipelineDefaults,
+    output_format: &OutputFormat,
+    dry_run: bool,
+) -> Result<StepOutcome> {
+    // Evaluate if/unless conditions
+    if let Some(ref expr) = step.if_expr {
+        if !eval_expression(expr, context)? {
+            return Ok(StepOutcome::Skipped);
+        }
+    }
+    if let Some(ref expr) = step.unless {
+        if eval_expression(expr, context)? {
+            return Ok(StepOutcome::Skipped);
+        }
+    }
+
+    let outcome = if let Some(ref cmd) = step.command {
+        execute_command_step(step, cmd, variables, defaults, dry_run, output_format).await?
+    } else if step.parallel.is_some() {
+        // Placeholder — will be implemented in Task 5
+        StepOutcome::Success(0)
+    } else if step.for_each.is_some() {
+        // Placeholder — will be implemented in Task 6
+        StepOutcome::Success(0)
+    } else {
+        anyhow::bail!("Step '{}' has no command, parallel, or for_each", step.name);
+    };
+
+    // Record result in context
+    if let Some(ref id) = step.id {
+        let exit_code = match &outcome {
+            StepOutcome::Success(code) => *code,
+            StepOutcome::Failed(code) => *code,
+            StepOutcome::Skipped => 0,
+        };
+        context
+            .lock()
+            .unwrap()
+            .insert(id.clone(), StepResult { exit_code });
+    }
+
+    // Run on_failure steps if step failed
+    if matches!(outcome, StepOutcome::Failed(_)) {
+        if let Some(ref failure_steps) = step.on_failure {
+            for fs in failure_steps {
+                let _ = Box::pin(execute_step(fs, variables, context, defaults, output_format, dry_run)).await;
+            }
+        }
+    }
+
+    Ok(outcome)
+}
+
 async fn run_pipeline(
     file: &PathBuf,
     global_ignore_failure: bool,
@@ -212,6 +350,7 @@ async fn run_pipeline(
     output_format: OutputFormat,
 ) -> Result<()> {
     let pipeline = load_pipeline(file)?;
+    let context: StepContext = Arc::new(Mutex::new(HashMap::new()));
 
     if output_format.supports_colors() {
         println!("\n{} {}", "Pipeline:".bold(), pipeline.name.cyan());
@@ -221,88 +360,62 @@ async fn run_pipeline(
         println!("{}", "─".repeat(60));
     }
 
-    let mut passed = 0;
-    let mut failed = 0;
-    let mut skipped = 0;
+    let mut passed = 0u32;
+    let mut failed = 0u32;
+    let mut skipped = 0u32;
 
     for (i, step) in pipeline.steps.iter().enumerate() {
-        let step_num = i + 1;
-
         if output_format.supports_colors() {
             println!(
                 "\n[{}/{}] {}",
-                step_num,
+                i + 1,
                 pipeline.steps.len(),
                 step.name.bold()
             );
-            println!("  {} {}", "Command:".dimmed(), step.command.as_deref().unwrap_or("").cyan());
-        }
-
-        // Check condition if specified
-        if let Some(ref condition) = step.if_expr {
-            // Simple condition parsing (e.g., "exit_code == 0")
-            if !evaluate_condition(condition) {
-                if output_format.supports_colors() {
-                    println!("  {} Condition not met, skipping", "→".yellow());
-                }
-                skipped += 1;
-                continue;
+            if let Some(ref cmd) = step.command {
+                println!("  {} {}", "Command:".dimmed(), cmd.cyan());
+            } else if step.parallel.is_some() {
+                println!("  {} parallel steps", "⫸".dimmed());
+            } else if step.for_each.is_some() {
+                println!("  {} for-each loop", "⟳".dimmed());
             }
         }
 
-        if dry_run {
-            if output_format.supports_colors() {
-                println!("  {} Would execute: raps {}", "→".dimmed(), step.command.as_deref().unwrap_or(""));
-            }
-            passed += 1;
-            continue;
-        }
+        let outcome = execute_step(
+            step,
+            &pipeline.variables,
+            &context,
+            &pipeline.defaults,
+            &output_format,
+            dry_run,
+        )
+        .await?;
 
-        // Validate and substitute variables in command
-        let mut command = step.command.as_deref().unwrap_or("").to_string();
-        for (key, value) in &pipeline.variables {
-            // Reject shell metacharacters in variable values
-            const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
-            if value.contains(SHELL_META) {
-                anyhow::bail!("Pipeline variable '{}' contains shell metacharacters", key);
-            }
-            command = command.replace(&format!("${{{}}}", key), value);
-            command = command.replace(&format!("${}", key), value);
-        }
-
-        // Execute the command
-        let result = execute_raps_command(&command);
-
-        match result {
-            Ok(0) => {
+        match outcome {
+            StepOutcome::Success(_) => {
                 if output_format.supports_colors() {
                     println!("  {} Success", "✓".green().bold());
                 }
                 passed += 1;
             }
-            Ok(exit_code) => {
+            StepOutcome::Failed(code) => {
                 if output_format.supports_colors() {
-                    println!("  {} Failed (exit code: {})", "✗".red().bold(), exit_code);
+                    println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
                 }
                 failed += 1;
-
                 if !step.ignore_failure && !global_ignore_failure {
                     anyhow::bail!(
                         "Pipeline aborted at step '{}' (exit code: {})",
                         step.name,
-                        exit_code
+                        code
                     );
                 }
             }
-            Err(e) => {
+            StepOutcome::Skipped => {
                 if output_format.supports_colors() {
-                    println!("  {} Error: {}", "✗".red().bold(), e);
+                    println!("  {} Skipped (condition not met)", "○".dimmed());
                 }
-                failed += 1;
-
-                if !step.ignore_failure && !global_ignore_failure {
-                    anyhow::bail!("Pipeline aborted at step '{}': {e}", step.name);
-                }
+                skipped += 1;
             }
         }
     }
@@ -317,7 +430,7 @@ async fn run_pipeline(
             passed,
             "✗".red(),
             failed,
-            "→".yellow(),
+            "○".yellow(),
             skipped
         );
     }
@@ -325,15 +438,13 @@ async fn run_pipeline(
     #[derive(Serialize)]
     struct PipelineResult {
         success: bool,
-        passed: usize,
-        failed: usize,
-        skipped: usize,
+        passed: u32,
+        failed: u32,
+        skipped: u32,
     }
 
-    // If we reach here, all failures were from ignore_failure steps
-    // (hard failures bail immediately above), so the pipeline succeeded.
     let result = PipelineResult {
-        success: true,
+        success: failed == 0,
         passed,
         failed,
         skipped,
@@ -371,6 +482,7 @@ fn execute_raps_command(command: &str) -> Result<i32> {
     Ok(output.status.code().unwrap_or(-1))
 }
 
+#[cfg(test)]
 fn evaluate_condition(condition: &str) -> bool {
     // Simple condition evaluation
     // For now, just check if it's truthy
