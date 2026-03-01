@@ -9,8 +9,10 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::{Arc, Mutex};
 
 use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
@@ -22,9 +24,9 @@ pub enum PipelineCommands {
         /// Path to pipeline file (use `-` for stdin)
         file: PathBuf,
 
-        /// Continue on error
+        /// Ignore step failures and continue
         #[arg(short, long)]
-        continue_on_error: bool,
+        ignore_failure: bool,
 
         /// Dry run (show commands without executing)
         #[arg(short, long)]
@@ -48,41 +50,123 @@ pub enum PipelineCommands {
 /// Pipeline definition
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Pipeline {
-    /// Pipeline name
     pub name: String,
-    /// Pipeline description
     #[serde(default)]
     pub description: Option<String>,
-    /// Variables for substitution
     #[serde(default)]
     pub variables: std::collections::HashMap<String, String>,
-    /// Pipeline steps
-    pub steps: Vec<PipelineStep>,
+    #[serde(default)]
+    pub defaults: PipelineDefaults,
+    pub steps: Vec<Step>,
 }
 
-/// Single step in a pipeline
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PipelineStep {
-    /// Step name
-    pub name: String,
-    /// Command to execute (raps subcommand, e.g., "bucket list")
-    pub command: String,
-    /// Continue on failure
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct PipelineDefaults {
     #[serde(default)]
-    pub continue_on_error: bool,
-    /// Condition to check before running
+    pub retry: Option<RetryConfig>,
     #[serde(default)]
-    pub condition: Option<String>,
+    pub timeout: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RetryConfig {
+    #[serde(default = "default_max_attempts")]
+    pub max_attempts: u32,
+    #[serde(default = "default_backoff")]
+    pub backoff: BackoffStrategy,
+    #[serde(default = "default_delay")]
+    pub delay: String,
+    #[serde(default)]
+    pub on: Vec<String>,
+}
+
+fn default_max_attempts() -> u32 { 3 }
+fn default_backoff() -> BackoffStrategy { BackoffStrategy::Fixed }
+fn default_delay() -> String { "5s".to_string() }
+
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum BackoffStrategy {
+    #[default]
+    Fixed,
+    Exponential,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Step {
+    pub name: String,
+    #[serde(default)]
+    pub id: Option<String>,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub parallel: Option<Vec<Step>>,
+    #[serde(default)]
+    pub for_each: Option<ForEachConfig>,
+    #[serde(default)]
+    pub steps: Option<Vec<Step>>,
+    #[serde(default, rename = "if")]
+    pub if_expr: Option<String>,
+    #[serde(default)]
+    pub unless: Option<String>,
+    #[serde(default)]
+    pub ignore_failure: bool,
+    #[serde(default)]
+    pub retry: Option<RetryConfig>,
+    #[serde(default)]
+    pub timeout: Option<String>,
+    #[serde(default)]
+    pub on_failure: Option<Vec<Step>>,
+    #[serde(default)]
+    pub max_concurrency: Option<usize>,
+}
+
+impl Default for Step {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            id: None,
+            command: None,
+            parallel: None,
+            for_each: None,
+            steps: None,
+            if_expr: None,
+            unless: None,
+            ignore_failure: false,
+            retry: None,
+            timeout: None,
+            on_failure: None,
+            max_concurrency: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct ForEachConfig {
+    pub var: String,
+    #[serde(rename = "in")]
+    pub items: Vec<String>,
+    #[serde(default)]
+    pub parallel: bool,
+    #[serde(default)]
+    pub max_concurrency: Option<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StepResult {
+    pub exit_code: i32,
+}
+
+type StepContext = Arc<Mutex<HashMap<String, StepResult>>>;
 
 impl PipelineCommands {
     pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
         match self {
             PipelineCommands::Run {
                 file,
-                continue_on_error,
+                ignore_failure,
                 dry_run,
-            } => run_pipeline(&file, continue_on_error, dry_run, output_format).await,
+            } => run_pipeline(&file, ignore_failure, dry_run, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format),
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
         }
@@ -123,7 +207,7 @@ fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
 
 async fn run_pipeline(
     file: &PathBuf,
-    global_continue_on_error: bool,
+    global_ignore_failure: bool,
     dry_run: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
@@ -151,11 +235,11 @@ async fn run_pipeline(
                 pipeline.steps.len(),
                 step.name.bold()
             );
-            println!("  {} {}", "Command:".dimmed(), step.command.cyan());
+            println!("  {} {}", "Command:".dimmed(), step.command.as_deref().unwrap_or("").cyan());
         }
 
         // Check condition if specified
-        if let Some(ref condition) = step.condition {
+        if let Some(ref condition) = step.if_expr {
             // Simple condition parsing (e.g., "exit_code == 0")
             if !evaluate_condition(condition) {
                 if output_format.supports_colors() {
@@ -168,14 +252,14 @@ async fn run_pipeline(
 
         if dry_run {
             if output_format.supports_colors() {
-                println!("  {} Would execute: raps {}", "→".dimmed(), step.command);
+                println!("  {} Would execute: raps {}", "→".dimmed(), step.command.as_deref().unwrap_or(""));
             }
             passed += 1;
             continue;
         }
 
         // Validate and substitute variables in command
-        let mut command = step.command.clone();
+        let mut command = step.command.as_deref().unwrap_or("").to_string();
         for (key, value) in &pipeline.variables {
             // Reject shell metacharacters in variable values
             const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
@@ -202,7 +286,7 @@ async fn run_pipeline(
                 }
                 failed += 1;
 
-                if !step.continue_on_error && !global_continue_on_error {
+                if !step.ignore_failure && !global_ignore_failure {
                     anyhow::bail!(
                         "Pipeline aborted at step '{}' (exit code: {})",
                         step.name,
@@ -216,7 +300,7 @@ async fn run_pipeline(
                 }
                 failed += 1;
 
-                if !step.continue_on_error && !global_continue_on_error {
+                if !step.ignore_failure && !global_ignore_failure {
                     anyhow::bail!("Pipeline aborted at step '{}': {e}", step.name);
                 }
             }
@@ -246,7 +330,7 @@ async fn run_pipeline(
         skipped: usize,
     }
 
-    // If we reach here, all failures were from continue_on_error steps
+    // If we reach here, all failures were from ignore_failure steps
     // (hard failures bail immediately above), so the pipeline succeeded.
     let result = PipelineResult {
         success: true,
@@ -309,7 +393,7 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
 
     // Check for potential issues
     for (i, step) in pipeline.steps.iter().enumerate() {
-        if step.command.is_empty() {
+        if step.command.as_deref().unwrap_or("").is_empty() {
             warnings.push(format!("Step {} '{}' has empty command", i + 1, step.name));
         }
     }
@@ -360,30 +444,29 @@ fn generate_sample(output: &PathBuf, output_format: OutputFormat) -> Result<()> 
         ]
         .into_iter()
         .collect(),
+        defaults: PipelineDefaults::default(),
         steps: vec![
-            PipelineStep {
+            Step {
                 name: "List buckets".to_string(),
-                command: "bucket list".to_string(),
-                continue_on_error: false,
-                condition: None,
+                command: Some("bucket list".to_string()),
+                ..Step::default()
             },
-            PipelineStep {
+            Step {
                 name: "Create bucket".to_string(),
-                command: "bucket create -k ${BUCKET} -p transient -r US".to_string(),
-                continue_on_error: true,
-                condition: None,
+                command: Some("bucket create -k ${BUCKET} -p transient -r US".to_string()),
+                ignore_failure: true,
+                ..Step::default()
             },
-            PipelineStep {
+            Step {
                 name: "List objects".to_string(),
-                command: "object list ${BUCKET}".to_string(),
-                continue_on_error: false,
-                condition: None,
+                command: Some("object list ${BUCKET}".to_string()),
+                ..Step::default()
             },
-            PipelineStep {
+            Step {
                 name: "Delete bucket".to_string(),
-                command: "bucket delete ${BUCKET} -y".to_string(),
-                continue_on_error: true,
-                condition: None,
+                command: Some("bucket delete ${BUCKET} -y".to_string()),
+                ignore_failure: true,
+                ..Step::default()
             },
         ],
     };
@@ -437,7 +520,7 @@ steps:
     command: bucket list
   - name: Step 2
     command: object list ${BUCKET}
-    continue_on_error: true
+    ignore_failure: true
 "#;
 
         let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
@@ -447,8 +530,8 @@ steps:
             pipeline.variables.get("BUCKET"),
             Some(&"test-bucket".to_string())
         );
-        assert!(!pipeline.steps[0].continue_on_error);
-        assert!(pipeline.steps[1].continue_on_error);
+        assert!(!pipeline.steps[0].ignore_failure);
+        assert!(pipeline.steps[1].ignore_failure);
     }
 
     #[test]
@@ -487,8 +570,8 @@ steps:
 name: Test
 command: bucket list
 "#;
-        let step: PipelineStep = serde_yaml::from_str(yaml).unwrap();
-        assert!(!step.continue_on_error);
-        assert!(step.condition.is_none());
+        let step: Step = serde_yaml::from_str(yaml).unwrap();
+        assert!(!step.ignore_failure);
+        assert!(step.if_expr.is_none());
     }
 }
