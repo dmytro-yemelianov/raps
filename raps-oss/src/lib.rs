@@ -7,8 +7,6 @@
 //! Handles bucket and object operations for storing files in APS.
 //! Supports multipart chunked uploads for large files with resume capability.
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
 
 mod batch;
 mod buckets;

@@ -7,8 +7,6 @@
 //! Handles translation of CAD files and retrieval of derivative manifests.
 //! Supports downloading translated derivatives directly from manifest.
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
 
 mod download;
 mod metadata;

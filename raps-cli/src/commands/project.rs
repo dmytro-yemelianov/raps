@@ -8,8 +8,6 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-#[allow(unused_imports)]
-use raps_kernel::prompts;
 use serde::Serialize;
 
 use crate::commands::interactive;
