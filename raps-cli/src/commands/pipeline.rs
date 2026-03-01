@@ -1194,4 +1194,109 @@ steps:
         assert!(fe.parallel);
         assert_eq!(fe.max_concurrency, Some(3));
     }
+
+    #[test]
+    fn test_v2_full_pipeline_deserialization() {
+        let yaml = r#"
+name: "Full V2 Test"
+defaults:
+  retry:
+    max_attempts: 3
+    backoff: exponential
+    delay: 10s
+  timeout: 5m
+variables:
+  bucket: "test-bucket"
+steps:
+  - name: Check
+    id: check
+    command: "bucket info ${bucket}"
+    ignore_failure: true
+  - name: Create
+    command: "bucket create --key ${bucket}"
+    if: "${{ steps.check.exit_code != 0 }}"
+    retry:
+      max_attempts: 2
+      delay: 5s
+    timeout: 30s
+    on_failure:
+      - name: Log error
+        command: "api get /health"
+  - name: Parallel uploads
+    parallel:
+      - name: Upload A
+        command: "object upload ${bucket} a.rvt"
+      - name: Upload B
+        command: "object upload ${bucket} b.rvt"
+    max_concurrency: 2
+  - name: Process each
+    for_each:
+      var: file
+      in: ["a.rvt", "b.rvt"]
+      parallel: true
+      max_concurrency: 3
+    command: "translate start ${file}"
+  - name: Cleanup
+    command: "bucket delete ${bucket} -y"
+    unless: "${{ steps.check.exit_code != 0 }}"
+"#;
+        let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(pipeline.name, "Full V2 Test");
+        assert!(pipeline.defaults.retry.is_some());
+        let defaults_retry = pipeline.defaults.retry.as_ref().unwrap();
+        assert_eq!(defaults_retry.max_attempts, 3);
+        assert_eq!(defaults_retry.delay, "10s");
+        assert!(matches!(defaults_retry.backoff, BackoffStrategy::Exponential));
+        assert_eq!(pipeline.defaults.timeout, Some("5m".to_string()));
+        assert_eq!(pipeline.steps.len(), 5);
+
+        // Check step
+        assert_eq!(pipeline.steps[0].id, Some("check".to_string()));
+        assert!(pipeline.steps[0].ignore_failure);
+
+        // Create step
+        assert_eq!(pipeline.steps[1].if_expr.as_deref(), Some("${{ steps.check.exit_code != 0 }}"));
+        let step_retry = pipeline.steps[1].retry.as_ref().unwrap();
+        assert_eq!(step_retry.max_attempts, 2);
+        assert_eq!(step_retry.delay, "5s");
+        let on_failure = pipeline.steps[1].on_failure.as_ref().unwrap();
+        assert_eq!(on_failure.len(), 1);
+        assert_eq!(on_failure[0].name, "Log error");
+
+        // Parallel step
+        assert!(pipeline.steps[2].parallel.is_some());
+        assert_eq!(pipeline.steps[2].max_concurrency, Some(2));
+
+        // ForEach step
+        let fe = pipeline.steps[3].for_each.as_ref().unwrap();
+        assert_eq!(fe.var, "file");
+        assert_eq!(fe.items.len(), 2);
+        assert!(fe.parallel);
+        assert_eq!(fe.max_concurrency, Some(3));
+
+        // Unless step
+        assert_eq!(pipeline.steps[4].unless.as_deref(), Some("${{ steps.check.exit_code != 0 }}"));
+    }
+
+    #[test]
+    fn test_v2_pipeline_json_roundtrip() {
+        let yaml = r#"
+name: "Roundtrip Test"
+steps:
+  - name: Test
+    command: "auth test"
+    retry:
+      max_attempts: 2
+      delay: 3s
+"#;
+        let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
+        let json = serde_json::to_string_pretty(&pipeline).unwrap();
+        let roundtrip: Pipeline = serde_json::from_str(&json).unwrap();
+        assert_eq!(roundtrip.name, "Roundtrip Test");
+        assert_eq!(roundtrip.steps[0].name, "Test");
+        assert_eq!(roundtrip.steps[0].command.as_deref(), Some("auth test"));
+        let retry = roundtrip.steps[0].retry.as_ref().unwrap();
+        assert_eq!(retry.max_attempts, 2);
+        assert_eq!(retry.delay, "3s");
+    }
 }
