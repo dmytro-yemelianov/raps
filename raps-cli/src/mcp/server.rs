@@ -405,7 +405,7 @@ impl ServerHandler for RapsServer {
 #[cfg(test)]
 mod tests {
     use super::RapsServer;
-    use serde_json::{Map, Value, json};
+    use serde_json::{Map, json};
 
     #[test]
     fn test_clamp_limit_defaults() {
