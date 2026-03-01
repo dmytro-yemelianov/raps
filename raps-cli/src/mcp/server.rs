@@ -402,6 +402,110 @@ impl ServerHandler for RapsServer {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::RapsServer;
+    use serde_json::{Map, Value, json};
+
+    #[test]
+    fn test_clamp_limit_defaults() {
+        assert_eq!(RapsServer::clamp_limit(None, 100, 500), 100);
+    }
+
+    #[test]
+    fn test_clamp_limit_user_value() {
+        assert_eq!(RapsServer::clamp_limit(Some(50), 100, 500), 50);
+    }
+
+    #[test]
+    fn test_clamp_limit_exceeds_max() {
+        assert_eq!(RapsServer::clamp_limit(Some(999), 100, 500), 500);
+    }
+
+    #[test]
+    fn test_clamp_limit_zero_becomes_one() {
+        assert_eq!(RapsServer::clamp_limit(Some(0), 100, 500), 1);
+    }
+
+    #[test]
+    fn test_required_arg_present() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!("value"));
+        let result = RapsServer::required_arg(&args, "key");
+        assert_eq!(result, Ok("value".to_string()));
+    }
+
+    #[test]
+    fn test_required_arg_missing() {
+        let args = Map::new();
+        let result = RapsServer::required_arg(&args, "key");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Missing required"));
+    }
+
+    #[test]
+    fn test_required_arg_empty_string() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!(""));
+        let result = RapsServer::required_arg(&args, "key");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_required_arg_whitespace_only() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!("   "));
+        let result = RapsServer::required_arg(&args, "key");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_required_arg_trims_whitespace() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!("  value  "));
+        let result = RapsServer::required_arg(&args, "key");
+        assert_eq!(result, Ok("value".to_string()));
+    }
+
+    #[test]
+    fn test_optional_arg_present() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!("value"));
+        assert_eq!(
+            RapsServer::optional_arg(&args, "key"),
+            Some("value".to_string())
+        );
+    }
+
+    #[test]
+    fn test_optional_arg_missing() {
+        let args = Map::new();
+        assert_eq!(RapsServer::optional_arg(&args, "key"), None);
+    }
+
+    #[test]
+    fn test_optional_arg_empty_returns_none() {
+        let mut args = Map::new();
+        args.insert("key".to_string(), json!(""));
+        assert_eq!(RapsServer::optional_arg(&args, "key"), None);
+    }
+
+    #[test]
+    fn test_validate_urn_valid() {
+        assert!(RapsServer::validate_urn("dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6YnVja2V0L2ZpbGUucnZ0").is_ok());
+    }
+
+    #[test]
+    fn test_validate_urn_too_short() {
+        assert!(RapsServer::validate_urn("abc").is_err());
+    }
+
+    #[test]
+    fn test_validate_urn_with_spaces() {
+        assert!(RapsServer::validate_urn("some urn value here").is_err());
+    }
+}
+
 /// Run the MCP server using stdio transport
 pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
     // logging::init() in main.rs already set up a global subscriber;

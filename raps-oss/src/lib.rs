@@ -88,4 +88,79 @@ mod integration_tests {
         let client = create_mock_client(&server.url);
         assert!(client.auth.config().base_url.starts_with("http://"));
     }
+
+    #[test]
+    fn test_get_urn_encoding() {
+        let server_url = "http://localhost:3000";
+        let client = create_mock_client(server_url);
+        let urn = client.get_urn("my-bucket", "model.rvt");
+        // URN should be base64url-encoded
+        assert!(!urn.contains('/'));
+        assert!(!urn.is_empty());
+        // Decode and verify the raw URN
+        use base64::Engine;
+        let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&urn)
+            .unwrap();
+        let raw = String::from_utf8(decoded).unwrap();
+        assert_eq!(raw, "urn:adsk.objects:os.object:my-bucket/model.rvt");
+    }
+
+    #[test]
+    fn test_get_urn_special_characters() {
+        let client = create_mock_client("http://localhost:3000");
+        let urn = client.get_urn("test-bucket", "path/to/model (v2).rvt");
+        assert!(!urn.is_empty());
+        use base64::Engine;
+        let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(&urn)
+            .unwrap();
+        let raw = String::from_utf8(decoded).unwrap();
+        assert!(raw.contains("path/to/model (v2).rvt"));
+    }
+
+    /// Helper: get a valid mock token by calling the mock server's token endpoint
+    /// (with JSON body that the mock accepts), then cache it in the auth client.
+    async fn acquire_mock_token(client: &OssClient, mock_url: &str) {
+        let http = reqwest::Client::new();
+        let resp = http
+            .post(format!("{}/authentication/v2/token", mock_url))
+            .json(&serde_json::json!({
+                "grant_type": "client_credentials",
+                "client_id": "test-client-id",
+                "client_secret": "test-client-secret"
+            }))
+            .send()
+            .await
+            .expect("token request failed");
+        assert!(resp.status().is_success(), "token endpoint returned {}", resp.status());
+        let body: serde_json::Value = resp.json().await.expect("invalid token JSON");
+        let token = body["access_token"].as_str().expect("no access_token").to_string();
+        let expires_in = body["expires_in"].as_u64().unwrap_or(3600);
+        client
+            .auth
+            .set_2leg_token_for_testing(token, expires_in)
+            .await;
+    }
+
+    #[tokio::test]
+    async fn test_bucket_list_with_mock() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_client(&server.url);
+        acquire_mock_token(&client, &server.url).await;
+
+        let result = client.list_buckets().await;
+        assert!(result.is_ok(), "list_buckets failed: {:?}", result.err());
+    }
+
+    #[tokio::test]
+    async fn test_object_list_with_mock() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let client = create_mock_client(&server.url);
+        acquire_mock_token(&client, &server.url).await;
+
+        // List objects in a pre-seeded bucket (mock always returns empty list for unknown buckets)
+        let result = client.list_objects("test-bucket").await;
+        assert!(result.is_ok(), "list_objects failed: {:?}", result.err());
+    }
 }

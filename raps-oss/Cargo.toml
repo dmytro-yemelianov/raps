@@ -45,6 +45,7 @@ base64.workspace = true
 directories.workspace = true
 
 [dev-dependencies]
+raps-kernel = { workspace = true, features = ["test-utils"] }
 raps-mock.workspace = true
 tokio-test.workspace = true
 tempfile.workspace = true

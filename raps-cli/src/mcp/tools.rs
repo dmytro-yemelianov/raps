@@ -133,6 +133,11 @@ pub const TOOLS: &[&str] = &[
     "reality_result",
     "reality_delete",
     "reality_formats",
+    // Pipelines
+    "pipeline_validate",
+    "pipeline_dry_run",
+    "pipeline_run",
+    "pipeline_list_templates",
 ];
 
 #[cfg(test)]
@@ -143,8 +148,8 @@ mod tests {
     fn test_tools_array_count() {
         assert_eq!(
             TOOLS.len(),
-            101,
-            "TOOLS array has {} entries, expected 101 — sync with get_tools() in server.rs",
+            105,
+            "TOOLS array has {} entries, expected 105 — sync with get_tools() in server.rs",
             TOOLS.len()
         );
     }
@@ -168,6 +173,50 @@ mod tests {
                     .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
                 "Tool name not snake_case: {}",
                 tool
+            );
+        }
+    }
+
+    #[test]
+    fn test_tools_count_matches_definitions() {
+        let defined = crate::mcp::definitions::get_tools();
+        assert_eq!(
+            TOOLS.len(),
+            defined.len(),
+            "TOOLS constant ({}) out of sync with get_tools() ({}) in definitions.rs",
+            TOOLS.len(),
+            defined.len()
+        );
+    }
+
+    #[test]
+    fn test_tools_names_match_definitions() {
+        let defined = crate::mcp::definitions::get_tools();
+        let def_names: Vec<&str> = defined.iter().map(|t| t.name.as_ref()).collect();
+        for tool_name in TOOLS {
+            assert!(
+                def_names.contains(tool_name),
+                "TOOLS constant has '{}' but get_tools() does not",
+                tool_name
+            );
+        }
+        for def_name in &def_names {
+            assert!(
+                TOOLS.contains(def_name),
+                "get_tools() has '{}' but TOOLS constant does not",
+                def_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_definitions_have_descriptions() {
+        let defined = crate::mcp::definitions::get_tools();
+        for tool in &defined {
+            assert!(
+                !tool.description.as_deref().unwrap_or("").is_empty(),
+                "Tool '{}' has empty description",
+                tool.name
             );
         }
     }
