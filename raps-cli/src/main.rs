@@ -163,23 +163,28 @@ struct Cli {
     #[arg(long, global = true)]
     strict: bool,
 
-    /// HTTP request timeout in seconds (default: 120)
+    /// HTTP request timeout in seconds (default: 120, env: RAPS_TIMEOUT)
     #[arg(long, value_name = "SECONDS", global = true)]
     timeout: Option<u64>,
 
-    /// Maximum number of retries for 429/5xx responses (default: 3)
+    /// Maximum retries for 408/429/5xx responses (default: 3, env: RAPS_MAX_RETRIES).
+    /// Retries use exponential backoff with jitter and respect Retry-After headers.
     #[arg(long, value_name = "N", global = true)]
     max_retries: Option<u32>,
 
-    /// Base delay in seconds for exponential backoff (default: 1)
+    /// Base delay in seconds for exponential backoff (default: 1, env: RAPS_BASE_DELAY)
     #[arg(long, value_name = "SECONDS", global = true)]
     base_delay: Option<u64>,
 
-    /// Maximum wait time in seconds between retries (default: 60)
+    /// Maximum wait time in seconds between retries (default: 60, env: RAPS_MAX_WAIT)
     #[arg(long, value_name = "SECONDS", global = true)]
     max_wait: Option<u64>,
 
-    /// Maximum concurrent operations for bulk commands (default: 5)
+    /// Disable automatic retries (fail immediately on errors)
+    #[arg(long, global = true)]
+    no_retry: bool,
+
+    /// Maximum concurrent operations for bulk commands (default: 5, env: RAPS_CONCURRENCY)
     #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
 
@@ -515,7 +520,8 @@ async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env_lenient()?;
 
     // Create HTTP client with shared config
-    let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, cli.max_retries, cli.base_delay, cli.max_wait);
+    let max_retries = if cli.no_retry { Some(0) } else { cli.max_retries };
+    let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, max_retries, cli.base_delay, cli.max_wait);
 
     if let Commands::Shell = command {
         credits::shell_welcome();
@@ -710,7 +716,7 @@ async fn run(cli: Cli) -> Result<()> {
                         &config,
                         &sub_http_config,
                         sub_output_format,
-                        sub_cli.concurrency.unwrap_or(5),
+                        resolve_concurrency(sub_cli.concurrency),
                     )
                     .await
                     {
@@ -744,11 +750,21 @@ async fn run(cli: Cli) -> Result<()> {
         &config,
         &http_config,
         output_format,
-        cli.concurrency.unwrap_or(5),
+        resolve_concurrency(cli.concurrency),
     )
     .await?;
 
     Ok(())
+}
+
+/// Resolve concurrency from CLI flag, env var, or default.
+fn resolve_concurrency(flag: Option<usize>) -> usize {
+    flag.or_else(|| {
+        std::env::var("RAPS_CONCURRENCY")
+            .ok()
+            .and_then(|v| v.parse().ok())
+    })
+    .unwrap_or(5)
 }
 
 /// Read commands from piped stdin and execute each line as a raps command.
@@ -802,7 +818,7 @@ async fn run_piped_stdin(
             &config,
             &sub_http_config,
             sub_output_format,
-            sub_cli.concurrency.or(concurrency).unwrap_or(5),
+            resolve_concurrency(sub_cli.concurrency.or(concurrency)),
         )
         .await
         {

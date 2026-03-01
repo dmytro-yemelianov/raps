@@ -249,17 +249,9 @@ fn find_eocd(data: &[u8]) -> Option<usize> {
     if data.len() < 22 {
         return None;
     }
-    // Search backwards for EOCD signature
-    for i in (0..=data.len() - 22).rev() {
-        if data[i] == 0x50
-            && data[i + 1] == 0x4b
-            && data[i + 2] == 0x05
-            && data[i + 3] == 0x06
-        {
-            return Some(i);
-        }
-    }
-    None
+    (0..=data.len() - 22)
+        .rev()
+        .find(|&i| data[i] == 0x50 && data[i + 1] == 0x4b && data[i + 2] == 0x05 && data[i + 3] == 0x06)
 }
 
 struct CdEntry {
