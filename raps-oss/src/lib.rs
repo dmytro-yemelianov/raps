@@ -14,6 +14,7 @@ mod batch;
 mod buckets;
 mod multipart;
 mod objects;
+mod range;
 pub mod types;
 
 pub use types::*;

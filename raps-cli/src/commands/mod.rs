@@ -19,6 +19,7 @@ pub mod demo;
 pub mod folder;
 pub mod generate;
 pub mod hub;
+pub mod inspect;
 pub mod interactive;
 pub mod issue;
 pub mod item;

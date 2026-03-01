@@ -86,6 +86,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   da            Design Automation (engines, appbundles, activities, workitems)
   reality       Reality Capture / Photogrammetry
   api           Execute custom API calls to APS endpoints
+  inspect       Inspect archive contents via HTTP Range (no full download)
 
 \x1b[1;36m3-Legged Auth (User Login)\x1b[0m
   hub           List and manage hubs
@@ -271,6 +272,10 @@ enum Commands {
     /// Reality Capture / Photogrammetry
     #[command(subcommand)]
     Reality(RealityCommands),
+
+    /// Inspect archive contents via HTTP Range requests (no full download)
+    #[command(subcommand)]
+    Inspect(commands::inspect::InspectCommands),
 
     /// Manage plugins, hooks, and aliases
     #[command(subcommand)]
@@ -834,6 +839,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Report(_) => "report",
         Commands::Template(_) => "template",
         Commands::Reality(_) => "reality",
+        Commands::Inspect(_) => "inspect",
         Commands::Plugin(_) => "plugin",
         Commands::Generate(_) => "generate",
         Commands::Demo(_) => "demo",
@@ -1000,6 +1006,10 @@ async fn execute_command(
 
         Commands::Reality(cmd) => {
             cmd.execute(&get_rc_client(), output_format).await?;
+        }
+
+        Commands::Inspect(cmd) => {
+            cmd.execute(&get_oss_client(), output_format).await?;
         }
 
         Commands::Plugin(cmd) => {
