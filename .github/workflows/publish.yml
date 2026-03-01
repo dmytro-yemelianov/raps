@@ -44,7 +44,7 @@ jobs:
 
       - name: Publish to crates.io
         run: |
-          # Publish crates in dependency order, skipping already-published versions
+          # Publish crates in dependency order with retry for rate limits
           CRATES=(
             raps-kernel
             raps-acc
@@ -60,22 +60,27 @@ jobs:
           FAILED=0
           for crate in "${CRATES[@]}"; do
             echo "::group::Publishing $crate"
-            VERSION=$(cargo metadata --no-deps --format-version 1 | \
-              jq -r --arg c "$crate" '.packages[] | select(.name == $c) | .version')
-            # Check if already published
-            if cargo search "$crate" 2>/dev/null | grep -q "^$crate = \"$VERSION\""; then
-              echo "$crate@$VERSION already published, skipping"
-              echo "::endgroup::"
-              continue
-            fi
-            if cargo publish -p "$crate" --allow-dirty; then
-              echo "$crate@$VERSION published successfully"
-              # Brief pause to avoid rate limits
-              sleep 5
-            else
-              echo "::error::Failed to publish $crate@$VERSION"
-              FAILED=1
-            fi
+            for attempt in 1 2 3; do
+              OUTPUT=$(cargo publish -p "$crate" --allow-dirty 2>&1) && {
+                echo "$crate published successfully"
+                # Pause between publishes to avoid rate limits
+                sleep 15
+                break
+              }
+              if echo "$OUTPUT" | grep -q "already exists"; then
+                echo "$crate already published, skipping"
+                break
+              elif echo "$OUTPUT" | grep -q "429"; then
+                echo "Rate limited on $crate, waiting 90s (attempt $attempt/3)..."
+                sleep 90
+              else
+                echo "$OUTPUT"
+                if [ "$attempt" -eq 3 ]; then
+                  echo "::error::Failed to publish $crate after 3 attempts"
+                  FAILED=1
+                fi
+              fi
+            done
             echo "::endgroup::"
           done
           if [ "$FAILED" -ne 0 ]; then
