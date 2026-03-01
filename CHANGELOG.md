@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-03-01
+
+### Added
+- **Swarm Orchestration Kernel**: Circuit breaker, retry policy, rate budget, region routing, response cache, and HTTP middleware wiring for multi-agent coordination.
+- **Metrics & Audit**: API metrics collector with per-endpoint latency/error tracking and structured audit logger with JSON output.
+- **Checkpoint Store**: Durable progress checkpointing for long-running swarm operations with automatic resume.
+- **TUI Swarm Dashboard (F8)**: Real-time swarm status tab showing circuit breaker states, rate budgets, cache stats, API metrics, and active checkpoints.
+- **Compound MCP Tools**: Bulk MCP operations (`bulk_upload`, `bulk_download`, `search_and_download`, `upload_and_translate`, `translate_and_download`) with progress reporting.
+- **Swarm CLI**: `raps swarm status|reset|run` commands for swarm orchestration control.
+
+### Performance
+- **HTTP/2 Multiplexing**: Enabled `http2_adaptive_window`, connection pool tuning (`pool_idle_timeout=90s`, `pool_max_idle_per_host=10`), TCP keepalive (30s).
+
+### Security
+- ASVS L2 compliance at 100% (34/34 requirements met).
+
 ## [4.18.0] - 2026-03-01
 
 ### Added
