@@ -52,7 +52,7 @@ pub(crate) fn display_user_list(
     match output_format {
         OutputFormat::Table => {
             println!("{}", "Users:".bold());
-            println!("{}", "\u{2500}".repeat(110));
+            println!("{}", "─".repeat(110));
             println!(
                 "{:<30} {:<25} {:<18} {:<18} {}",
                 "Email".bold(),
@@ -61,7 +61,7 @@ pub(crate) fn display_user_list(
                 "Status".bold(),
                 "Company".bold()
             );
-            println!("{}", "\u{2500}".repeat(110));
+            println!("{}", "─".repeat(110));
 
             for u in users {
                 let email_truncated = if u.email.len() > 28 {
@@ -94,8 +94,8 @@ pub(crate) fn display_user_list(
                 );
             }
 
-            println!("{}", "\u{2500}".repeat(110));
-            println!("{} {} user(s) found", "\u{2192}".cyan(), users.len());
+            println!("{}", "─".repeat(110));
+            println!("{} {} user(s) found", "→".cyan(), users.len());
         }
         _ => {
             output_format.write(users)?;
@@ -138,7 +138,7 @@ impl UserCommands {
                     if output_format.supports_colors() {
                         println!(
                             "\n{} List users in project {}",
-                            "\u{2192}".cyan(),
+                            "→".cyan(),
                             project_id.cyan()
                         );
                         println!();
@@ -203,7 +203,7 @@ impl UserCommands {
                     if output_format.supports_colors() {
                         println!(
                             "\n{} List users in account {}",
-                            "\u{2192}".cyan(),
+                            "→".cyan(),
                             account_id.cyan()
                         );
                         println!();
@@ -305,7 +305,7 @@ impl UserCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Bulk add user: {} to account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         email.green(),
                         account_id.cyan()
                     );
@@ -317,7 +317,7 @@ impl UserCommands {
                     }
                     println!("  Concurrency: {}", concurrency.min(50));
                     if dry_run {
-                        println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+                        println!("  {} Dry-run mode enabled", "⚠".yellow());
                     }
                     println!();
                 }
@@ -391,7 +391,7 @@ impl UserCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Bulk remove user: {} from account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         email.red(),
                         account_id.cyan()
                     );
@@ -400,7 +400,7 @@ impl UserCommands {
                     }
                     println!("  Concurrency: {}", concurrency.min(50));
                     if dry_run {
-                        println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+                        println!("  {} Dry-run mode enabled", "⚠".yellow());
                     }
                     println!();
                 }
@@ -500,12 +500,12 @@ impl UserCommands {
                     if output_format.supports_colors() {
                         println!(
                             "\n{} Update company for user: {} to: {}",
-                            "\u{2192}".cyan(),
+                            "→".cyan(),
                             email.green(),
                             company_name.yellow()
                         );
                         if dry_run {
-                            println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+                            println!("  {} Dry-run mode enabled", "⚠".yellow());
                         }
                     }
 
@@ -528,7 +528,7 @@ impl UserCommands {
                         if output_format.supports_colors() {
                             println!(
                                 "{} Company updated for {} to '{}'",
-                                "\u{2713}".green().bold(),
+                                "✓".green().bold(),
                                 email,
                                 company_name
                             );
@@ -536,7 +536,7 @@ impl UserCommands {
                     } else if output_format.supports_colors() {
                         println!(
                             "  {} Would update company for {} to '{}'",
-                            "\u{2192}".dimmed(),
+                            "→".dimmed(),
                             email,
                             company_name
                         );
@@ -556,7 +556,7 @@ impl UserCommands {
                     if output_format.supports_colors() {
                         println!(
                             "\n{} Bulk update user: {} to role: {}",
-                            "\u{2192}".cyan(),
+                            "→".cyan(),
                             email.green(),
                             role_value.yellow()
                         );
@@ -568,7 +568,7 @@ impl UserCommands {
                         }
                         println!("  Concurrency: {}", concurrency.min(50));
                         if dry_run {
-                            println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+                            println!("  {} Dry-run mode enabled", "⚠".yellow());
                         }
                         println!();
                     }
@@ -630,7 +630,7 @@ impl UserCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Adding user {} to project {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         email.cyan(),
                         project.cyan()
                     );
@@ -662,7 +662,7 @@ impl UserCommands {
                 output_format.write(&result)?;
 
                 if output_format.supports_colors() {
-                    println!("\n{} User added successfully", "\u{2713}".green());
+                    println!("\n{} User added successfully", "✓".green());
                 }
 
                 Ok(())
@@ -683,7 +683,7 @@ impl UserCommands {
                 if !yes && output_format.supports_colors() {
                     println!(
                         "\n{} Remove user {} from project {}?",
-                        "\u{26A0}".yellow(),
+                        "⚠".yellow(),
                         user_id.cyan(),
                         project.cyan()
                     );
@@ -703,7 +703,7 @@ impl UserCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} User {} removed from project {}",
-                        "\u{2713}".green(),
+                        "✓".green(),
                         user_id.cyan(),
                         project.cyan()
                     );
@@ -729,7 +729,7 @@ impl UserCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Updating user {} in project {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         user_id.cyan(),
                         project.cyan()
                     );
@@ -762,7 +762,7 @@ impl UserCommands {
                 output_format.write(&result)?;
 
                 if output_format.supports_colors() {
-                    println!("\n{} User updated successfully", "\u{2713}".green());
+                    println!("\n{} User updated successfully", "✓".green());
                 }
 
                 Ok(())

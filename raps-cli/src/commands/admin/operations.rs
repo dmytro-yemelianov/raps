@@ -103,7 +103,7 @@ pub(crate) fn display_bulk_result(
     match output_format {
         OutputFormat::Table => {
             println!("\n{}", "Bulk Operation Results:".bold());
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Operation:".bold(), output.operation_id.cyan());
             println!("{:<15} {}", "Total:".bold(), output.total);
             println!(
@@ -122,7 +122,7 @@ pub(crate) fn display_bulk_result(
                 output.failed.to_string().red()
             );
             println!("{:<15} {:.2}s", "Duration:".bold(), output.duration_secs);
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
 
             // Show failed items if any
             if result.failed > 0 {
@@ -131,7 +131,7 @@ pub(crate) fn display_bulk_result(
                     if detail.status == "failed" {
                         let name = detail.project_name.as_deref().unwrap_or(&detail.project_id);
                         let msg = detail.message.as_deref().unwrap_or("Unknown error");
-                        println!("  {} {} - {}", "\u{2717}".red(), name, msg.dimmed());
+                        println!("  {} {} - {}", "✗".red(), name, msg.dimmed());
                     }
                 }
             }
@@ -141,12 +141,12 @@ pub(crate) fn display_bulk_result(
             if result.failed == 0 && result.total > 0 {
                 println!(
                     "{} Operation completed successfully!",
-                    "\u{2713}".green().bold()
+                    "✓".green().bold()
                 );
             } else if result.failed > 0 {
                 println!(
                     "{} Operation completed with {} failure(s)",
-                    "\u{26A0}".yellow().bold(),
+                    "⚠".yellow().bold(),
                     result.failed
                 );
             }
@@ -206,7 +206,7 @@ impl OperationCommands {
                 match output_format {
                     OutputFormat::Table => {
                         println!("\n{}", "Operation Status:".bold());
-                        println!("{}", "\u{2500}".repeat(60));
+                        println!("{}", "─".repeat(60));
                         println!("{:<15} {}", "Operation:".bold(), output.operation_id.cyan());
                         println!("{:<15} {}", "Type:".bold(), output.operation_type);
                         println!("{:<15} {}", "Status:".bold(), format_status(&output.status));
@@ -239,7 +239,7 @@ impl OperationCommands {
                         );
                         println!("{:<15} {}", "Created:".bold(), output.created_at);
                         println!("{:<15} {}", "Updated:".bold(), output.updated_at);
-                        println!("{}", "\u{2500}".repeat(60));
+                        println!("{}", "─".repeat(60));
                     }
                     _ => {
                         output_format.write(&output)?;
@@ -284,7 +284,7 @@ impl OperationCommands {
                     if output_format.supports_colors() {
                         println!(
                             "{} Operation {} is already complete",
-                            "\u{2713}".green(),
+                            "✓".green(),
                             op_id
                         );
                     }
@@ -296,7 +296,7 @@ impl OperationCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Resuming operation: {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         op_id.to_string().cyan()
                     );
                     println!("  Type: {:?}", state.operation_type);
@@ -312,7 +312,7 @@ impl OperationCommands {
                     // For now, just report pending items
                     println!(
                         "{} Resume requires re-running with the original command and credentials.",
-                        "\u{26A0}".yellow()
+                        "⚠".yellow()
                     );
                     println!("  Pending projects:");
                     for (i, project_id) in pending.iter().take(10).enumerate() {
@@ -349,7 +349,7 @@ impl OperationCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Cancelling operation: {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         op_id.to_string().cyan()
                     );
                     println!("  Type: {:?}", state.operation_type);
@@ -362,7 +362,7 @@ impl OperationCommands {
                 if output_format.supports_colors() {
                     let processed = state.results.len();
                     let total = state.project_ids.len();
-                    println!("\n{} Operation cancelled", "\u{2713}".green());
+                    println!("\n{} Operation cancelled", "✓".green());
                     println!(
                         "  Processed: {}/{} items before cancellation",
                         processed, total
@@ -411,7 +411,7 @@ impl OperationCommands {
                 match output_format {
                     OutputFormat::Table => {
                         println!("\n{}", "Operations:".bold());
-                        println!("{}", "\u{2500}".repeat(100));
+                        println!("{}", "─".repeat(100));
                         println!(
                             "{:<38} {:<15} {:<12} {:<12} {}",
                             "ID".bold(),
@@ -420,7 +420,7 @@ impl OperationCommands {
                             "Progress".bold(),
                             "Updated".bold()
                         );
-                        println!("{}", "\u{2500}".repeat(100));
+                        println!("{}", "─".repeat(100));
 
                         for op in &outputs {
                             println!(
@@ -433,8 +433,8 @@ impl OperationCommands {
                             );
                         }
 
-                        println!("{}", "\u{2500}".repeat(100));
-                        println!("{} {} operation(s) found", "\u{2192}".cyan(), outputs.len());
+                        println!("{}", "─".repeat(100));
+                        println!("{} {} operation(s) found", "→".cyan(), outputs.len());
                     }
                     _ => {
                         output_format.write(&outputs)?;

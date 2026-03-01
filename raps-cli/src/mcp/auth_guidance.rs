@@ -161,11 +161,11 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         | "admin_operation_resume"
         | "admin_operation_cancel" => AuthRequirement::TwoLegged,
 
-        // Admin user tools - 2-legged
+        // Admin user tools - 3-legged (ACC Project Users API requires user context)
         "admin_user_add"
         | "admin_user_remove"
         | "admin_user_update_role"
-        | "admin_folder_rights" => AuthRequirement::TwoLegged,
+        | "admin_folder_rights" => AuthRequirement::ThreeLegged,
 
         // Data Management tools - 3-legged required
         "hub_list" | "project_list" | "folder_list" | "folder_create" | "item_info"
@@ -352,11 +352,24 @@ pub fn get_tool_availability_summary(state: &AuthState) -> String {
         summary.push_str("  ✗ Derivative (translate_*) - requires 2-legged auth\n");
     }
 
-    // Admin tools
+    // Admin operation tools (2-legged)
     if state.two_legged_valid {
-        summary.push_str("  ✓ Admin (admin_*) - available\n");
+        summary.push_str("  ✓ Admin Ops (admin_project_list, admin_operation_*) - available\n");
     } else {
-        summary.push_str("  ✗ Admin (admin_*) - requires 2-legged auth\n");
+        summary.push_str(
+            "  ✗ Admin Ops (admin_project_list, admin_operation_*) - requires 2-legged auth\n",
+        );
+    }
+
+    // Admin user tools (3-legged)
+    if state.three_legged_valid {
+        summary.push_str(
+            "  ✓ Admin Users (admin_user_*, admin_folder_rights) - available\n",
+        );
+    } else {
+        summary.push_str(
+            "  ✗ Admin Users (admin_user_*, admin_folder_rights) - requires 3-legged auth\n",
+        );
     }
 
     // Data Management tools

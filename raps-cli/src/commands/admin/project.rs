@@ -58,7 +58,7 @@ pub(crate) async fn execute_company_list(
     if output_format.supports_colors() {
         println!(
             "\n{} List companies in account {}",
-            "\u{2192}".cyan(),
+            "→".cyan(),
             account_id.cyan()
         );
         println!();
@@ -88,7 +88,7 @@ pub(crate) async fn execute_company_list(
                 println!("{}", "No companies found.".yellow());
             } else {
                 println!("{}", "Companies:".bold());
-                println!("{}", "\u{2500}".repeat(110));
+                println!("{}", "─".repeat(110));
                 println!(
                     "{:<38} {:<25} {:<15} {:<15} {:<10} {}",
                     "ID".bold(),
@@ -98,7 +98,7 @@ pub(crate) async fn execute_company_list(
                     "Country".bold(),
                     "Members".bold()
                 );
-                println!("{}", "\u{2500}".repeat(110));
+                println!("{}", "─".repeat(110));
 
                 for c in &outputs {
                     let name_truncated = if c.name.len() > 23 {
@@ -130,8 +130,8 @@ pub(crate) async fn execute_company_list(
                     );
                 }
 
-                println!("{}", "\u{2500}".repeat(110));
-                println!("{} {} company(ies) found", "\u{2192}".cyan(), outputs.len());
+                println!("{}", "─".repeat(110));
+                println!("{} {} company(ies) found", "→".cyan(), outputs.len());
             }
         }
         _ => {
@@ -186,7 +186,7 @@ impl AdminProjectCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} List projects in account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         account_id.cyan()
                     );
                     if let Some(ref expr) = filter_expr {
@@ -241,7 +241,7 @@ impl AdminProjectCommands {
                             println!("{}", "No projects found matching the filter.".yellow());
                         } else {
                             println!("{}", "Projects:".bold());
-                            println!("{}", "\u{2500}".repeat(100));
+                            println!("{}", "─".repeat(100));
                             println!(
                                 "{:<38} {:<30} {:<10} {:<10} {}",
                                 "ID".bold(),
@@ -250,7 +250,7 @@ impl AdminProjectCommands {
                                 "Platform".bold(),
                                 "Created".bold()
                             );
-                            println!("{}", "\u{2500}".repeat(100));
+                            println!("{}", "─".repeat(100));
 
                             for p in &outputs {
                                 let created = p.created_at.as_deref().unwrap_or("-");
@@ -269,8 +269,8 @@ impl AdminProjectCommands {
                                 );
                             }
 
-                            println!("{}", "\u{2500}".repeat(100));
-                            println!("{} {} project(s) found", "\u{2192}".cyan(), outputs.len());
+                            println!("{}", "─".repeat(100));
+                            println!("{} {} project(s) found", "→".cyan(), outputs.len());
                         }
                     }
                     _ => {
@@ -294,7 +294,7 @@ impl AdminProjectCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Creating project '{}' in account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         name.cyan(),
                         account_id.cyan()
                     );
@@ -338,7 +338,7 @@ impl AdminProjectCommands {
                     OutputFormat::Table => {
                         println!(
                             "\n{} Project created successfully!",
-                            "\u{2713}".green().bold()
+                            "✓".green().bold()
                         );
                         println!("{:<15} {}", "ID:".bold(), project.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), project.name);
@@ -373,7 +373,7 @@ impl AdminProjectCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Updating project {} in account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         project.cyan(),
                         account_id.cyan()
                     );
@@ -402,7 +402,7 @@ impl AdminProjectCommands {
                     OutputFormat::Table => {
                         println!(
                             "\n{} Project updated successfully!",
-                            "\u{2713}".green().bold()
+                            "✓".green().bold()
                         );
                         println!("{:<15} {}", "ID:".bold(), updated.id.cyan());
                         println!("{:<15} {}", "Name:".bold(), updated.name);
@@ -430,7 +430,7 @@ impl AdminProjectCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Archiving project {} in account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         project.cyan(),
                         account_id.cyan()
                     );
@@ -449,7 +449,7 @@ impl AdminProjectCommands {
                     OutputFormat::Table => {
                         println!(
                             "\n{} Project archived successfully!",
-                            "\u{2713}".green().bold()
+                            "✓".green().bold()
                         );
                         println!("{:<15} {}", "ID:".bold(), project.cyan());
                     }

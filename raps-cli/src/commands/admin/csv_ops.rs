@@ -104,9 +104,9 @@ pub(crate) async fn execute_csv_update(
     // Report validation errors
     if !validation_errors.is_empty() {
         if output_format.supports_colors() {
-            println!("{} CSV validation errors:", "\u{2717}".red().bold());
+            println!("{} CSV validation errors:", "✗".red().bold());
             for err in &validation_errors {
-                println!("  {} {}", "\u{2022}".red(), err);
+                println!("  {} {}", "•".red(), err);
             }
         }
         anyhow::bail!(
@@ -122,12 +122,12 @@ pub(crate) async fn execute_csv_update(
     if output_format.supports_colors() {
         println!(
             "\n{} CSV update: {} rows from {}",
-            "\u{2192}".cyan(),
+            "→".cyan(),
             rows.len().to_string().green(),
             csv_path.display().to_string().cyan()
         );
         if dry_run {
-            println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+            println!("  {} Dry-run mode enabled", "⚠".yellow());
         }
         println!();
     }
@@ -167,8 +167,8 @@ pub(crate) async fn execute_csv_update(
                 }
                 if let Some(ref pb) = progress_bar {
                     pb.println(format!(
-                        "  {} {} \u{2192} {}",
-                        "\u{2192}".dimmed(),
+                        "  {} {} → {}",
+                        "→".dimmed(),
                         row.email,
                         changes.join(", ")
                     ));
@@ -312,7 +312,7 @@ pub(crate) async fn execute_csv_update(
     match output_format {
         OutputFormat::Table => {
             println!("\n{}", "CSV Update Results:".bold());
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Total:".bold(), output.total);
             println!(
                 "{:<15} {}",
@@ -329,14 +329,14 @@ pub(crate) async fn execute_csv_update(
                 "Failed:".bold(),
                 output.failed.to_string().red()
             );
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
 
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
                     println!(
                         "  {} {} - {}",
-                        "\u{2717}".red(),
+                        "✗".red(),
                         err.email,
                         err.error.dimmed()
                     );
@@ -346,13 +346,13 @@ pub(crate) async fn execute_csv_update(
             if output.failed == 0 {
                 println!(
                     "\n{} All {} user(s) updated successfully!",
-                    "\u{2713}".green().bold(),
+                    "✓".green().bold(),
                     output.updated
                 );
             } else {
                 println!(
                     "\n{} Completed with {} failure(s)",
-                    "\u{26A0}".yellow().bold(),
+                    "⚠".yellow().bold(),
                     output.failed
                 );
             }
@@ -435,9 +435,9 @@ pub(crate) async fn execute_csv_import(
     // Report validation errors
     if !validation_errors.is_empty() {
         if output_format.supports_colors() {
-            println!("{} CSV validation errors:", "\u{2717}".red().bold());
+            println!("{} CSV validation errors:", "✗".red().bold());
             for err in &validation_errors {
-                println!("  {} {}", "\u{2022}".red(), err);
+                println!("  {} {}", "•".red(), err);
             }
         }
         anyhow::bail!(
@@ -453,7 +453,7 @@ pub(crate) async fn execute_csv_import(
     if output_format.supports_colors() {
         println!(
             "\n{} Import users: {} rows from {} into project {}",
-            "\u{2192}".cyan(),
+            "→".cyan(),
             rows.len().to_string().green(),
             csv_path.display().to_string().cyan(),
             project_id.cyan()
@@ -522,7 +522,7 @@ pub(crate) async fn execute_csv_import(
     match output_format {
         OutputFormat::Table => {
             println!("\n{}", "Import Results:".bold());
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
             println!("{:<15} {}", "Total:".bold(), output.total);
             println!(
                 "{:<15} {}",
@@ -534,14 +534,14 @@ pub(crate) async fn execute_csv_import(
                 "Failed:".bold(),
                 output.failed.to_string().red()
             );
-            println!("{}", "\u{2500}".repeat(60));
+            println!("{}", "─".repeat(60));
 
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
                     println!(
                         "  {} {} - {}",
-                        "\u{2717}".red(),
+                        "✗".red(),
                         err.email,
                         err.error.dimmed()
                     );
@@ -551,13 +551,13 @@ pub(crate) async fn execute_csv_import(
             if output.failed == 0 {
                 println!(
                     "\n{} All {} user(s) imported successfully!",
-                    "\u{2713}".green().bold(),
+                    "✓".green().bold(),
                     output.imported
                 );
             } else {
                 println!(
                     "\n{} Completed with {} failure(s)",
-                    "\u{26A0}".yellow().bold(),
+                    "⚠".yellow().bold(),
                     output.failed
                 );
             }
