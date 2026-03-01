@@ -24,8 +24,8 @@ jobs:
         run: cargo install cargo-cyclonedx
       - name: Generate CycloneDX SBOM
         run: |
-          cargo cyclonedx --all --format json --override-filename raps-sbom
-          mv raps-sbom.cdx.json raps-sbom-${{ github.event.inputs.tag }}.cdx.json
+          cargo cyclonedx --manifest-path raps-cli/Cargo.toml --format json --override-filename raps-sbom
+          mv raps-cli/raps-sbom.cdx.json raps-sbom-${{ github.event.inputs.tag }}.cdx.json
       - name: Upload SBOM to release
         run: gh release upload "${{ github.event.inputs.tag }}" raps-sbom-${{ github.event.inputs.tag }}.cdx.json --clobber
         env:

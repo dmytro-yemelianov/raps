@@ -295,9 +295,8 @@ jobs:
         run: cargo install cargo-cyclonedx
       - name: Generate CycloneDX SBOM
         run: |
-          cargo cyclonedx --all --format json --override-filename raps-sbom
-          # cargo-cyclonedx writes files next to each Cargo.toml; collect the workspace-level one
-          mv raps-sbom.cdx.json raps-sbom-${{ needs.plan.outputs.tag }}.cdx.json
+          cargo cyclonedx --manifest-path raps-cli/Cargo.toml --format json --override-filename raps-sbom
+          mv raps-cli/raps-sbom.cdx.json raps-sbom-${{ needs.plan.outputs.tag }}.cdx.json
       - name: Upload SBOM to release
         run: gh release upload "${{ needs.plan.outputs.tag }}" raps-sbom-${{ needs.plan.outputs.tag }}.cdx.json --clobber
         env:
