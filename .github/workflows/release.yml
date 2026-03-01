@@ -612,7 +612,7 @@ jobs:
           cd npm
           sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" package.json
           # Update optional dependency versions
-          sed -i "s/\"@dmytro-yemelianov\/raps-cli-[^\"]*\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-win32-x64\": \"${VERSION}\"/1" package.json
+          sed -i "s/\"@dmytro-yemelianov\/raps-cli-win32-x64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-win32-x64\": \"${VERSION}\"/" package.json
           sed -i "s/\"@dmytro-yemelianov\/raps-cli-darwin-x64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-darwin-x64\": \"${VERSION}\"/" package.json
           sed -i "s/\"@dmytro-yemelianov\/raps-cli-darwin-arm64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-darwin-arm64\": \"${VERSION}\"/" package.json
           sed -i "s/\"@dmytro-yemelianov\/raps-cli-linux-x64\": \"[^\"]*\"/\"@dmytro-yemelianov\/raps-cli-linux-x64\": \"${VERSION}\"/" package.json
