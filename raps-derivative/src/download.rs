@@ -65,8 +65,15 @@ impl DerivativeClient {
 
         // Validate output path stays within current directory
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        if cwd.exists() && output_path.is_absolute() {
-            raps_kernel::security::validate_path_within(output_path, &cwd)?;
+        if let (Ok(canon_cwd), Ok(canon_target)) =
+            (cwd.canonicalize(), output_path.canonicalize())
+            && !canon_target.starts_with(&canon_cwd)
+        {
+            anyhow::bail!(
+                "Path '{}' escapes working directory '{}'",
+                output_path.display(),
+                cwd.display()
+            );
         }
 
         // Create parent directories if needed

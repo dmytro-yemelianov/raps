@@ -91,13 +91,22 @@ pub fn safe_join(base_dir: &Path, untrusted_name: &str) -> Result<PathBuf> {
 }
 
 /// Create directories with mode 0o700 (owner-only) on Unix.
+///
+/// Uses `DirBuilder::mode()` on Unix to avoid a TOCTOU window between
+/// creation and permission setting.
 pub fn create_dir_restricted(path: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(path)?;
-
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)?;
+    }
+
+    #[cfg(not(unix))]
+    {
+        std::fs::create_dir_all(path)?;
     }
 
     Ok(())
