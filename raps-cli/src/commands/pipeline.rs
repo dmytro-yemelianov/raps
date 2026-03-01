@@ -378,6 +378,79 @@ fn evaluate_condition(condition: &str) -> bool {
     !trimmed.is_empty() && trimmed != "false" && trimmed != "0"
 }
 
+fn parse_duration(s: &str) -> Result<std::time::Duration> {
+    let s = s.trim();
+    if s.is_empty() {
+        anyhow::bail!("Empty duration string");
+    }
+    let (num_str, suffix) = if s.ends_with('s') {
+        (&s[..s.len() - 1], 's')
+    } else if s.ends_with('m') {
+        (&s[..s.len() - 1], 'm')
+    } else if s.ends_with('h') {
+        (&s[..s.len() - 1], 'h')
+    } else {
+        anyhow::bail!("Duration must end with 's', 'm', or 'h': {}", s);
+    };
+    let num: u64 = num_str
+        .parse()
+        .with_context(|| format!("Invalid duration number: {}", num_str))?;
+    let secs = match suffix {
+        's' => num,
+        'm' => num * 60,
+        'h' => num * 3600,
+        _ => unreachable!(),
+    };
+    Ok(std::time::Duration::from_secs(secs))
+}
+
+async fn execute_with_retry(config: &RetryConfig, command: &str) -> Result<i32> {
+    let base_delay = parse_duration(&config.delay)?;
+    let mut last_exit = -1;
+
+    for attempt in 1..=config.max_attempts {
+        match execute_raps_command(command) {
+            Ok(0) => return Ok(0),
+            Ok(code) => {
+                last_exit = code;
+                if attempt == config.max_attempts {
+                    return Ok(last_exit);
+                }
+                let delay = match config.backoff {
+                    BackoffStrategy::Fixed => base_delay,
+                    BackoffStrategy::Exponential => base_delay * 2u32.pow(attempt - 1),
+                };
+                eprintln!(
+                    "  Retry {}/{} in {}s...",
+                    attempt,
+                    config.max_attempts,
+                    delay.as_secs()
+                );
+                tokio::time::sleep(delay).await;
+            }
+            Err(e) => {
+                last_exit = -1;
+                if attempt == config.max_attempts {
+                    return Err(e);
+                }
+                let delay = match config.backoff {
+                    BackoffStrategy::Fixed => base_delay,
+                    BackoffStrategy::Exponential => base_delay * 2u32.pow(attempt - 1),
+                };
+                eprintln!(
+                    "  Error: {}. Retry {}/{} in {}s...",
+                    e,
+                    attempt,
+                    config.max_attempts,
+                    delay.as_secs()
+                );
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
+    Ok(last_exit)
+}
+
 fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> {
     let pipeline = load_pipeline(file)?;
 
@@ -573,5 +646,26 @@ command: bucket list
         let step: Step = serde_yaml::from_str(yaml).unwrap();
         assert!(!step.ignore_failure);
         assert!(step.if_expr.is_none());
+    }
+
+    #[test]
+    fn test_parse_duration_seconds() {
+        assert_eq!(parse_duration("5s").unwrap(), std::time::Duration::from_secs(5));
+    }
+
+    #[test]
+    fn test_parse_duration_minutes() {
+        assert_eq!(parse_duration("30m").unwrap(), std::time::Duration::from_secs(1800));
+    }
+
+    #[test]
+    fn test_parse_duration_hours() {
+        assert_eq!(parse_duration("2h").unwrap(), std::time::Duration::from_secs(7200));
+    }
+
+    #[test]
+    fn test_parse_duration_invalid() {
+        assert!(parse_duration("abc").is_err());
+        assert!(parse_duration("").is_err());
     }
 }
