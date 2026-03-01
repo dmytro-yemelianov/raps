@@ -43,6 +43,12 @@ pub enum PluginCommands {
         name: String,
     },
 
+    /// Show detailed info about a plugin
+    Info {
+        /// Plugin name
+        name: String,
+    },
+
     /// Manage command aliases
     #[command(subcommand)]
     Alias(AliasCommands),
@@ -74,6 +80,7 @@ impl PluginCommands {
             PluginCommands::List => list_plugins(output_format),
             PluginCommands::Enable { name } => enable_plugin(&name, output_format),
             PluginCommands::Disable { name } => disable_plugin(&name, output_format),
+            PluginCommands::Info { name } => plugin_info(&name, output_format),
             PluginCommands::Trust { name } => trust_plugin(&name, output_format),
             PluginCommands::Verify { name } => verify_plugin(&name, output_format),
             PluginCommands::Alias(cmd) => cmd.execute(output_format),
@@ -341,6 +348,96 @@ fn remove_alias(name: &str, output_format: OutputFormat) -> Result<()> {
                     "error": "not found"
                 }))?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn plugin_info(name: &str, output_format: OutputFormat) -> Result<()> {
+    let manager = PluginManager::default();
+    let plugins = manager.list_plugins();
+
+    let plugin = plugins.iter().find(|p| p.name == name);
+    let config = PluginConfig::load().unwrap_or_default();
+    let entry = config.plugins.get(name);
+
+    match plugin {
+        Some(p) => {
+            let file_size = std::fs::metadata(&p.path).map(|m| m.len()).unwrap_or(0);
+
+            #[derive(Serialize, schemars::JsonSchema)]
+            struct PluginInfoOutput {
+                name: String,
+                path: String,
+                enabled: bool,
+                description: Option<String>,
+                trusted: bool,
+                has_sha256: bool,
+                has_signature: bool,
+                file_size: u64,
+            }
+
+            let info = PluginInfoOutput {
+                name: p.name.clone(),
+                path: p.path.to_string_lossy().to_string(),
+                enabled: p.enabled,
+                description: entry.and_then(|e| e.description.clone()),
+                trusted: entry.is_some_and(|e| e.trusted),
+                has_sha256: entry.and_then(|e| e.sha256.as_ref()).is_some(),
+                has_signature: entry.and_then(|e| e.signature.as_ref()).is_some(),
+                file_size,
+            };
+
+            match output_format {
+                OutputFormat::Table => {
+                    println!("\n{} {}", "Plugin:".bold(), info.name.cyan().bold());
+                    println!("{}", "─".repeat(60));
+                    println!("  {:<16} {}", "Path:".bold(), info.path);
+                    println!(
+                        "  {:<16} {}",
+                        "Status:".bold(),
+                        if info.enabled {
+                            "enabled".green().to_string()
+                        } else {
+                            "disabled".red().to_string()
+                        }
+                    );
+                    if let Some(ref desc) = info.description {
+                        println!("  {:<16} {}", "Description:".bold(), desc);
+                    }
+                    println!(
+                        "  {:<16} {}",
+                        "Size:".bold(),
+                        super::object::format_size(file_size)
+                    );
+                    println!(
+                        "  {:<16} {}",
+                        "Trusted:".bold(),
+                        if info.trusted {
+                            "yes".green().to_string()
+                        } else {
+                            "no".yellow().to_string()
+                        }
+                    );
+                    if info.has_sha256 {
+                        println!("  {:<16} {}", "SHA-256:".bold(), "recorded".green());
+                    }
+                    if info.has_signature {
+                        println!("  {:<16} {}", "Signature:".bold(), "present".green());
+                    }
+                    println!("{}", "─".repeat(60));
+                }
+                _ => {
+                    output_format.write(&info)?;
+                }
+            }
+        }
+        None => {
+            anyhow::bail!(
+                "Plugin '{}' not found. Use 'raps plugin list' to see available plugins.",
+                name
+            );
         }
     }
 
