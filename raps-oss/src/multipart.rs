@@ -188,6 +188,17 @@ impl OssClient {
         let pb_arc = Arc::new(Mutex::new(pb));
         let file_path_clone = file_path.to_path_buf();
 
+        // Buffer pool: pre-allocate buffers to avoid per-chunk allocations.
+        // Each concurrent upload task takes a buffer from the pool and returns it when done.
+        let (buf_tx, buf_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(MAX_CONCURRENT_UPLOADS);
+        for _ in 0..MAX_CONCURRENT_UPLOADS {
+            buf_tx
+                .send(vec![0u8; chunk_size as usize])
+                .await
+                .expect("buffer pool channel closed unexpectedly");
+        }
+        let buf_rx = Arc::new(Mutex::new(buf_rx));
+
         // Create upload tasks
         let upload_tasks: FuturesUnordered<_> = remaining_parts
             .into_iter()
@@ -202,6 +213,8 @@ impl OssClient {
                 let state_mutex = state_mutex.clone();
                 let parts_since_flush = parts_since_flush.clone();
                 let pb_arc = pb_arc.clone();
+                let buf_rx = buf_rx.clone();
+                let buf_tx = buf_tx.clone();
                 let object_key = object_key.to_string();
                 let file_path = file_path_clone.clone();
 
@@ -212,17 +225,24 @@ impl OssClient {
                         .await
                         .map_err(|_| anyhow::anyhow!("Upload cancelled"))?;
 
-                    // Read file chunk
-                    let buffer = {
+                    // Take a buffer from the pool (reused across chunks)
+                    let mut buffer = {
+                        let mut rx = buf_rx.lock().await;
+                        rx.recv()
+                            .await
+                            .ok_or_else(|| anyhow::anyhow!("Buffer pool exhausted"))?
+                    };
+
+                    // Read file chunk into pooled buffer
+                    {
                         let mut file =
                             tokio::fs::File::open(&file_path).await.with_context(|| {
                                 format!("Failed to open file for part {}", part_num)
                             })?;
                         file.seek(SeekFrom::Start(start)).await?;
-                        let mut buffer = vec![0u8; part_size as usize];
+                        buffer.resize(part_size as usize, 0);
                         file.read_exact(&mut buffer).await?;
-                        buffer
-                    };
+                    }
 
                     // Upload part with retry logic
                     let mut attempts = 0;
@@ -280,6 +300,8 @@ impl OssClient {
                                 }
 
                                 raps_kernel::profiler::record_http_request(total_part_network_time);
+                                // Return buffer to pool for reuse
+                                let _ = buf_tx.send(buffer).await;
                                 return Ok::<_, anyhow::Error>(part_num);
                             }
                             Ok(resp) => {
