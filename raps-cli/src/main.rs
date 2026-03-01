@@ -159,6 +159,10 @@ struct Cli {
     #[arg(long, global = true)]
     yes: bool,
 
+    /// Strict mode for CI: fail on any ambiguity, no silent defaults
+    #[arg(long, global = true)]
+    strict: bool,
+
     /// HTTP request timeout in seconds (default: 120)
     #[arg(long, value_name = "SECONDS", global = true)]
     timeout: Option<u64>,
@@ -371,7 +375,7 @@ async fn main() -> Result<()> {
     raps_kernel::profiler::mark_kernel_loaded();
 
     // Setup interactive shell check flags
-    interactive::init(cli.non_interactive, cli.yes);
+    interactive::init_full(cli.non_interactive, cli.yes, cli.strict);
 
     // Initialize download cache
     raps_kernel::cache::init(!cli.no_cache, cli.offline, cli.refresh);

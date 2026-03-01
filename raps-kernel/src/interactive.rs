@@ -12,6 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static NON_INTERACTIVE: AtomicBool = AtomicBool::new(false);
 static YES: AtomicBool = AtomicBool::new(false);
+static STRICT: AtomicBool = AtomicBool::new(false);
 
 #[cfg(test)]
 pub(crate) static MOCK_IS_TERMINAL: AtomicBool = AtomicBool::new(true);
@@ -21,11 +22,20 @@ pub(crate) static MOCK_IS_TERMINAL: AtomicBool = AtomicBool::new(true);
 /// Also checks environment variables as fallback:
 /// - `RAPS_NON_INTERACTIVE=1` — equivalent to `--non-interactive`
 /// - `RAPS_YES=1` — equivalent to `--yes`
+/// - `RAPS_STRICT=1` — equivalent to `--strict`
 pub fn init(non_interactive: bool, yes: bool) {
-    let ni = non_interactive || env_is_truthy("RAPS_NON_INTERACTIVE");
+    init_full(non_interactive, yes, false);
+}
+
+/// Initialize all interactive mode flags including strict mode.
+pub fn init_full(non_interactive: bool, yes: bool, strict: bool) {
+    let s = strict || env_is_truthy("RAPS_STRICT");
+    // --strict implies --non-interactive
+    let ni = non_interactive || s || env_is_truthy("RAPS_NON_INTERACTIVE");
     let y = yes || env_is_truthy("RAPS_YES");
     NON_INTERACTIVE.store(ni, Ordering::Relaxed);
     YES.store(y, Ordering::Relaxed);
+    STRICT.store(s, Ordering::Relaxed);
 }
 
 fn env_is_truthy(name: &str) -> bool {
@@ -48,6 +58,14 @@ pub fn is_non_interactive() -> bool {
 #[allow(dead_code)] // May be used in future
 pub fn is_yes() -> bool {
     YES.load(Ordering::Relaxed)
+}
+
+/// Check if --strict mode is enabled.
+///
+/// Strict mode is designed for CI/CD: it implies non-interactive and also
+/// rejects silent defaults — every ambiguous parameter must be explicit.
+pub fn is_strict() -> bool {
+    STRICT.load(Ordering::Relaxed)
 }
 
 /// Detect if the environment is headless (no display server / browser available).
@@ -134,7 +152,7 @@ mod tests {
     // or they may interfere with each other
 
     fn reset_state() {
-        init(false, false);
+        init_full(false, false, false);
         MOCK_IS_TERMINAL.store(true, Ordering::Relaxed);
     }
 
@@ -232,5 +250,32 @@ mod tests {
         init(true, true); // non-interactive with --yes
         assert!(should_proceed_destructive("delete bucket"));
         reset_state();
+    }
+
+    #[test]
+    fn test_strict_implies_non_interactive() {
+        reset_state();
+        init_full(false, false, true);
+        assert!(is_strict());
+        assert!(is_non_interactive()); // strict implies non-interactive
+        reset_state();
+    }
+
+    #[test]
+    fn test_strict_env_var() {
+        reset_state();
+        // SAFETY: test runs single-threaded (--test-threads=1)
+        unsafe { std::env::set_var("RAPS_STRICT", "1") };
+        init_full(false, false, false);
+        assert!(is_strict());
+        assert!(is_non_interactive());
+        unsafe { std::env::remove_var("RAPS_STRICT") };
+        reset_state();
+    }
+
+    #[test]
+    fn test_not_strict_by_default() {
+        reset_state();
+        assert!(!is_strict());
     }
 }

@@ -89,9 +89,19 @@ pub fn select<S: Into<String>>(prompt: S, items: &[String]) -> Result<usize> {
     let prompt_str = prompt.into();
 
     if interactive::is_non_interactive() {
+        let available: Vec<_> = items.iter().take(5).cloned().collect();
+        let hint = if items.len() > 5 {
+            format!(" (and {} more)", items.len() - 5)
+        } else {
+            String::new()
+        };
         anyhow::bail!(
-            "Selection required for '{}' but running in non-interactive mode",
-            prompt_str
+            "Selection required for '{}' but running in non-interactive mode. \
+             Provide the value explicitly via command-line argument. \
+             Available: [{}]{}",
+            prompt_str,
+            available.join(", "),
+            hint
         );
     }
 
@@ -106,11 +116,22 @@ pub fn select<S: Into<String>>(prompt: S, items: &[String]) -> Result<usize> {
 /// Prompt for selection with a default index
 ///
 /// Returns the selected index. Returns the default in non-interactive mode.
+/// In strict mode, fails instead of silently using the default.
 pub fn select_with_default<S: Into<String>>(
     prompt: S,
     items: &[String],
     default: usize,
 ) -> Result<usize> {
+    if interactive::is_strict() {
+        let prompt_str: String = prompt.into();
+        anyhow::bail!(
+            "Selection required for '{}' in --strict mode. \
+             Provide the value explicitly. Default would be: '{}'",
+            prompt_str,
+            items.get(default).map(|s| s.as_str()).unwrap_or("?")
+        );
+    }
+
     if interactive::is_non_interactive() {
         return Ok(default);
     }
@@ -149,10 +170,20 @@ pub fn multi_select<S: Into<String>>(prompt: S, items: &[String]) -> Result<Vec<
 ///
 /// Returns true if --yes flag is set, or prompts interactively.
 /// Returns false in non-interactive mode without --yes.
+/// In strict mode, fails with error instead of silently returning false.
 pub fn confirm<S: Into<String>>(prompt: S, default: bool) -> Result<bool> {
     // Auto-confirm if --yes flag is set
     if interactive::is_yes() {
         return Ok(true);
+    }
+
+    // In strict mode, fail instead of silently declining
+    if interactive::is_strict() {
+        let prompt_str: String = prompt.into();
+        anyhow::bail!(
+            "Confirmation required for '{}' in --strict mode. Use --yes to auto-confirm.",
+            prompt_str
+        );
     }
 
     // Fail in non-interactive mode without --yes
@@ -173,11 +204,20 @@ pub fn confirm<S: Into<String>>(prompt: S, default: bool) -> Result<bool> {
 ///
 /// Use this for destructive operations. Returns true only if user confirms
 /// or --yes flag is set. Always returns false in non-interactive mode
-/// without --yes.
+/// without --yes. In strict mode, fails with error.
 pub fn confirm_destructive<S: Into<String>>(prompt: S) -> Result<bool> {
     // Auto-confirm if --yes flag is set
     if interactive::is_yes() {
         return Ok(true);
+    }
+
+    // In strict mode, fail instead of silently declining
+    if interactive::is_strict() {
+        let prompt_str: String = prompt.into();
+        anyhow::bail!(
+            "Destructive action requires confirmation for '{}' in --strict mode. Use --yes to auto-confirm.",
+            prompt_str
+        );
     }
 
     // Fail in non-interactive mode without --yes
@@ -349,6 +389,65 @@ mod tests {
         let result = confirm_destructive("Delete all?");
         assert!(result.is_ok());
         assert!(result.unwrap());
+        reset_state();
+    }
+
+    // ==================== Strict Mode Tests ====================
+
+    fn set_strict() {
+        interactive::init_full(false, false, true);
+    }
+
+    #[test]
+    fn test_select_with_default_strict_fails() {
+        set_strict();
+        let items = vec!["Option 1".to_string(), "Option 2".to_string()];
+        let result = select_with_default("Choose:", &items, 0);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("--strict"));
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_strict_fails_without_yes() {
+        set_strict();
+        let result = confirm("Proceed?", false);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("--strict"));
+        assert!(err.contains("--yes"));
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_destructive_strict_fails_without_yes() {
+        set_strict();
+        let result = confirm_destructive("Delete all?");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("--strict"));
+        reset_state();
+    }
+
+    #[test]
+    fn test_confirm_strict_with_yes_succeeds() {
+        interactive::init_full(false, true, true); // --yes + --strict
+        let result = confirm("Proceed?", false);
+        assert!(result.is_ok());
+        assert!(result.unwrap());
+        reset_state();
+    }
+
+    #[test]
+    fn test_select_strict_includes_available_items() {
+        set_strict();
+        let items = vec!["alpha".to_string(), "beta".to_string()];
+        let result = select("Choose:", &items);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("alpha"));
+        assert!(err.contains("beta"));
         reset_state();
     }
 
