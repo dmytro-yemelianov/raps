@@ -1,7 +1,7 @@
 # ASVS L2 Compliance Matrix (CLI-Scoped)
 
 **Last Updated:** 2026-02-28
-**RAPS Version:** 4.14.0
+**RAPS Version:** 4.14.1
 **ASVS Version:** 4.0.3
 
 ## Summary
