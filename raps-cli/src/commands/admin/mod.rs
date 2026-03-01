@@ -509,7 +509,7 @@ pub(crate) fn make_progress_callback(pb: Option<ProgressBar>) -> impl Fn(Progres
             pb.set_length(progress.total as u64);
             pb.set_position((progress.completed + progress.failed + progress.skipped) as u64);
             pb.set_message(format!(
-                "\u{2713}{} \u{25CB}{} \u{2717}{}",
+                "✓{} ○{} ✗{}",
                 progress.completed, progress.skipped, progress.failed
             ));
         }

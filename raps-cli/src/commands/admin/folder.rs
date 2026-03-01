@@ -63,7 +63,7 @@ impl FolderCommands {
                 if output_format.supports_colors() {
                     println!(
                         "\n{} Bulk update folder rights for: {} in account {}",
-                        "\u{2192}".cyan(),
+                        "→".cyan(),
                         email.green(),
                         account_id.cyan()
                     );
@@ -74,7 +74,7 @@ impl FolderCommands {
                     }
                     println!("  Concurrency: {}", concurrency.min(50));
                     if dry_run {
-                        println!("  {} Dry-run mode enabled", "\u{26A0}".yellow());
+                        println!("  {} Dry-run mode enabled", "⚠".yellow());
                     }
                     println!();
                 }
