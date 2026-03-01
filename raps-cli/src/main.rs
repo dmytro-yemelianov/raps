@@ -106,6 +106,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   serve         Start MCP server for AI assistant integration
   generate      Generate synthetic engineering files for testing
   demo          Run demo scenarios (bucket lifecycle, model pipeline, etc.)
+  cache         Manage the download cache (stats, clear)
   pipeline      Run pipeline from YAML/JSON file
   plugin        Manage plugins, hooks, and aliases
   man           Generate man pages for raps and its subcommands";
@@ -176,6 +177,22 @@ struct Cli {
     /// Maximum concurrent operations for bulk commands (default: 5)
     #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
+
+    /// Disable the download cache
+    #[arg(long, global = true)]
+    no_cache: bool,
+
+    /// Custom cache directory (default: platform cache dir)
+    #[arg(long, value_name = "PATH", global = true)]
+    cache_dir: Option<std::path::PathBuf>,
+
+    /// Ignore cached artifacts and re-download
+    #[arg(long, global = true)]
+    refresh: bool,
+
+    /// Fail if artifact is not cached (no network requests for downloads)
+    #[arg(long, global = true)]
+    offline: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -291,6 +308,10 @@ enum Commands {
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 
+    /// Manage the download cache (stats, clear)
+    #[command(subcommand)]
+    Cache(commands::cache::CacheCommands),
+
     /// Generate JSON Schema for CLI output types
     #[command(subcommand)]
     Schema(commands::schema::SchemaCommands),
@@ -346,6 +367,12 @@ async fn main() -> Result<()> {
 
     // Setup interactive shell check flags
     interactive::init(cli.non_interactive, cli.yes);
+
+    // Initialize download cache
+    raps_kernel::cache::init(!cli.no_cache, cli.offline, cli.refresh);
+    if let Some(ref dir) = cli.cache_dir {
+        raps_kernel::cache::set_cache_dir(dir.clone());
+    }
 
     let cmd_name = cli.command.as_ref().map(command_name).unwrap_or("help");
 
@@ -817,6 +844,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
         Commands::Serve => "serve",
+        Commands::Cache(_) => "cache",
         Commands::Schema(_) => "schema",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
@@ -1002,6 +1030,10 @@ async fn execute_command(
 
         Commands::Serve => {
             unreachable!()
+        }
+
+        Commands::Cache(cmd) => {
+            cmd.execute(output_format)?;
         }
 
         Commands::Schema(cmd) => {

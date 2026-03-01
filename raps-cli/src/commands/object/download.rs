@@ -87,6 +87,35 @@ pub(super) async fn download_object(
         }
     }
 
+    // Try cache first — use SHA1 from object details
+    if raps_kernel::cache::is_enabled()
+        && let Ok(details) = client.get_object_details(&bucket_key, &object_key).await
+        && let Ok(true) = raps_kernel::cache::materialize(&details.sha1, &output_path)
+    {
+        if output_format.supports_colors() {
+            println!(
+                "{} {} (from cache)",
+                "✓".green().bold(),
+                format!("{}/{}", bucket_key, object_key).cyan()
+            );
+        }
+        let output = DownloadOutput {
+            success: true,
+            bucket_key,
+            object_key,
+            output_path: output_path.display().to_string(),
+        };
+        match output_format {
+            OutputFormat::Table => {
+                println!("  {} {}", "Saved to:".bold(), output.output_path);
+            }
+            _ => {
+                output_format.write(&output)?;
+            }
+        }
+        return Ok(());
+    }
+
     if output_format.supports_colors() {
         println!(
             "{} {} {} {}",
@@ -100,6 +129,13 @@ pub(super) async fn download_object(
     client
         .download_object(&bucket_key, &object_key, &output_path)
         .await?;
+
+    // Store in cache after successful download
+    if raps_kernel::cache::is_enabled()
+        && let Ok(details) = client.get_object_details(&bucket_key, &object_key).await
+    {
+        let _ = raps_kernel::cache::store(&details.sha1, &output_path);
+    }
 
     let output = DownloadOutput {
         success: true,

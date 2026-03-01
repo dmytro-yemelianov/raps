@@ -10,6 +10,7 @@ pub mod admin;
 pub mod api;
 pub mod auth;
 pub mod bucket;
+pub mod cache;
 pub mod config;
 pub mod da;
 #[cfg(feature = "dashboard")]
