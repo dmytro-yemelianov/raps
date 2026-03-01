@@ -107,6 +107,17 @@ nav:
   - CLI Reference:
     - Exit Codes: cli/exit-codes.md
     - Checksums: cli/checksums.md
+  - Security:
+    - Overview: security.md
+    - ASVS L2 Compliance: security/asvs-l2-compliance-matrix.md
+    - Auth Audit (V2): security/asvs-v2-auth-audit.md
+    - Input & Files Audit (V5/V12): security/asvs-v5-v12-input-files-audit.md
+    - Crypto & Comms Audit (V6/V9): security/asvs-v6-v9-crypto-comms-audit.md
+    - Logging Audit (V7): security/asvs-v7-logging-audit.md
+    - Plugin Trust Model: security/plugin-trust-model.md
+    - NIST SSDF Mapping: security/nist-ssdf-mapping.md
+    - SOC 2 Self-Assessment: security/soc2-tsc-self-assessment.md
+    - GDPR Privacy: security/gdpr-privacy-statement.md
   - Additional Topics:
     - Examples: examples.md
     - Feature Overview: features.md

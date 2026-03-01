@@ -11,9 +11,11 @@
   [![Downloads](https://img.shields.io/crates/d/raps.svg)](https://crates.io/crates/raps)
   [![Documentation](https://img.shields.io/badge/docs-rapscli.xyz-blue.svg)](https://rapscli.xyz)
   [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-  [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
+  [![Rust](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org/)
   [![Build Status](https://github.com/dmytro-yemelianov/raps/workflows/CI/badge.svg)](https://github.com/dmytro-yemelianov/raps/actions)
   [![Codecov](https://codecov.io/gh/dmytro-yemelianov/raps/graph/badge.svg)](https://codecov.io/gh/dmytro-yemelianov/raps)
+  [![ASVS L2](https://img.shields.io/badge/OWASP_ASVS-L2_Met-green.svg)](https://rapscli.xyz/security/)
+  [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](https://github.com/dmytro-yemelianov/raps/security/policy)
 
 </div>
 
@@ -223,7 +225,7 @@ chmod +x /usr/local/bin/raps
 ### Build from Source
 
 ```bash
-# Requires Rust 1.70 or later (https://rustup.rs/)
+# Requires Rust 1.88 or later (https://rustup.rs/)
 cd raps
 cargo build --release
 ```
