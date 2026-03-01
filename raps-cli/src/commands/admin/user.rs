@@ -120,6 +120,7 @@ impl UserCommands {
         config: &Config,
         auth_client: &AuthClient,
         output_format: OutputFormat,
+        global_concurrency: usize,
     ) -> Result<()> {
         match self {
             UserCommands::List {
@@ -291,6 +292,7 @@ impl UserCommands {
                 dry_run,
                 yes: _,
             } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency);
                 let account_id = get_account_id(account)?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
@@ -376,6 +378,7 @@ impl UserCommands {
                 dry_run,
                 yes: _,
             } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency);
                 let account_id = get_account_id(account)?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
@@ -461,6 +464,7 @@ impl UserCommands {
                 dry_run,
                 yes: _,
             } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency);
                 // Handle --from-csv mode
                 if let Some(csv_path) = from_csv {
                     return execute_csv_update(

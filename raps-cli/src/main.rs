@@ -893,7 +893,8 @@ async fn execute_command(
         }
 
         Commands::Object(cmd) => {
-            cmd.execute(&get_oss_client(), output_format).await?;
+            cmd.execute(&get_oss_client(), output_format, concurrency)
+                .await?;
         }
 
         Commands::Translate(cmd) => {
@@ -937,7 +938,8 @@ async fn execute_command(
 
         Commands::Admin(cmd) => {
             let auth_client = get_auth_client();
-            cmd.execute(config, &auth_client, output_format).await?;
+            cmd.execute(config, &auth_client, output_format, concurrency)
+                .await?;
         }
 
         Commands::Api(cmd) => {

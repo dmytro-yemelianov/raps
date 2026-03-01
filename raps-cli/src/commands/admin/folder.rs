@@ -28,6 +28,7 @@ impl FolderCommands {
         config: &Config,
         auth_client: &AuthClient,
         output_format: OutputFormat,
+        global_concurrency: usize,
     ) -> Result<()> {
         match self {
             FolderCommands::Rights {
@@ -41,6 +42,7 @@ impl FolderCommands {
                 dry_run,
                 yes: _,
             } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency);
                 let account_id = get_account_id(account)?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 

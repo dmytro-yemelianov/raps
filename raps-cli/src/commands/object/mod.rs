@@ -49,9 +49,9 @@ pub enum ObjectCommands {
         /// Files to upload
         files: Vec<PathBuf>,
 
-        /// Number of parallel uploads (default: 4)
-        #[arg(short, long, default_value = "4")]
-        parallel: usize,
+        /// Number of parallel uploads (defaults to global --concurrency)
+        #[arg(short, long)]
+        parallel: Option<usize>,
 
         /// Resume a previously interrupted batch upload
         #[arg(long)]
@@ -172,7 +172,12 @@ pub enum ObjectCommands {
 }
 
 impl ObjectCommands {
-    pub async fn execute(self, client: &OssClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &OssClient,
+        output_format: OutputFormat,
+        concurrency: usize,
+    ) -> Result<()> {
         match self {
             ObjectCommands::Upload {
                 bucket,
@@ -185,7 +190,17 @@ impl ObjectCommands {
                 files,
                 parallel,
                 resume,
-            } => upload_batch(client, bucket, files, parallel, resume, output_format).await,
+            } => {
+                upload_batch(
+                    client,
+                    bucket,
+                    files,
+                    parallel.unwrap_or(concurrency),
+                    resume,
+                    output_format,
+                )
+                .await
+            }
             ObjectCommands::Download {
                 bucket,
                 object,

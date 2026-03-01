@@ -102,9 +102,9 @@ pub enum UserCommands {
         #[arg(long, value_name = "FILE")]
         project_ids: Option<PathBuf>,
 
-        /// Parallel requests (default: 10, max: 50)
-        #[arg(long, default_value = "10")]
-        concurrency: usize,
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
 
         /// Preview changes without executing
         #[arg(long)]
@@ -132,9 +132,9 @@ pub enum UserCommands {
         #[arg(long, value_name = "FILE")]
         project_ids: Option<PathBuf>,
 
-        /// Parallel requests (default: 10, max: 50)
-        #[arg(long, default_value = "10")]
-        concurrency: usize,
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
 
         /// Preview changes without executing
         #[arg(long)]
@@ -178,9 +178,9 @@ pub enum UserCommands {
         #[arg(long, value_name = "FILE")]
         from_csv: Option<PathBuf>,
 
-        /// Parallel requests (default: 10, max: 50)
-        #[arg(long, default_value = "10")]
-        concurrency: usize,
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
 
         /// Preview changes without executing
         #[arg(long)]
@@ -280,9 +280,9 @@ pub enum FolderCommands {
         #[arg(long, value_name = "FILE")]
         project_ids: Option<PathBuf>,
 
-        /// Parallel requests (default: 10, max: 50)
-        #[arg(long, default_value = "10")]
-        concurrency: usize,
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
 
         /// Preview changes without executing
         #[arg(long)]
@@ -529,10 +529,17 @@ impl AdminCommands {
         config: &Config,
         auth_client: &AuthClient,
         output_format: OutputFormat,
+        concurrency: usize,
     ) -> Result<()> {
         match self {
-            AdminCommands::User(cmd) => cmd.execute(config, auth_client, output_format).await,
-            AdminCommands::Folder(cmd) => cmd.execute(config, auth_client, output_format).await,
+            AdminCommands::User(cmd) => {
+                cmd.execute(config, auth_client, output_format, concurrency)
+                    .await
+            }
+            AdminCommands::Folder(cmd) => {
+                cmd.execute(config, auth_client, output_format, concurrency)
+                    .await
+            }
             AdminCommands::Project(cmd) => cmd.execute(config, auth_client, output_format).await,
             AdminCommands::Operation(cmd) => cmd.execute(output_format).await,
             AdminCommands::CompanyList { account } => {
