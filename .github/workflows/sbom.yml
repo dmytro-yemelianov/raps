@@ -1,0 +1,32 @@
+name: Generate SBOM
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v4.15.0)'
+        required: true
+        type: string
+
+jobs:
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+      - name: Install cargo-cyclonedx
+        run: cargo install cargo-cyclonedx
+      - name: Generate CycloneDX SBOM
+        run: |
+          cargo cyclonedx --all --format json --override-filename raps-sbom
+          mv raps-sbom.cdx.json raps-sbom-${{ github.event.inputs.tag }}.cdx.json
+      - name: Upload SBOM to release
+        run: gh release upload "${{ github.event.inputs.tag }}" raps-sbom-${{ github.event.inputs.tag }}.cdx.json --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
