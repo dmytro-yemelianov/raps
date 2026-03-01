@@ -12,7 +12,7 @@ use crate::output::OutputFormat;
 use super::{load_profiles, save_profiles};
 
 pub(super) async fn show_context(output_format: OutputFormat) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     #[derive(Serialize)]
     struct ContextItem {
@@ -117,7 +117,7 @@ pub(super) async fn show_context(output_format: OutputFormat) -> Result<()> {
 }
 
 pub(super) async fn set_context(key: &str, value: &str, output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     let profile_name = data.active_profile.clone().ok_or_else(|| {
         anyhow::anyhow!(
@@ -150,7 +150,7 @@ pub(super) async fn set_context(key: &str, value: &str, output_format: OutputFor
         }
     }
 
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct SetContextOutput {
@@ -195,7 +195,7 @@ pub(super) async fn set_context(key: &str, value: &str, output_format: OutputFor
 }
 
 pub(super) async fn clear_context(output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     let profile_name = data.active_profile.clone().ok_or_else(|| {
         anyhow::anyhow!(
@@ -212,7 +212,7 @@ pub(super) async fn clear_context(output_format: OutputFormat) -> Result<()> {
     profile.context_project_id = None;
     profile.context_account_id = None;
 
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct ClearContextOutput {

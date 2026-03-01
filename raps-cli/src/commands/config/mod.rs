@@ -204,16 +204,16 @@ pub(crate) struct ProfilesData {
     pub profiles: HashMap<String, ProfileConfig>,
 }
 
-fn profiles_path() -> Result<PathBuf> {
+async fn profiles_path() -> Result<PathBuf> {
     let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
         .context("Failed to get project directories")?;
     let config_dir = proj_dirs.config_dir();
-    std::fs::create_dir_all(config_dir)?;
+    tokio::fs::create_dir_all(config_dir).await?;
     Ok(config_dir.join("profiles.json"))
 }
 
-pub(crate) fn load_profiles() -> Result<ProfilesData> {
-    let path = profiles_path()?;
+pub(crate) async fn load_profiles() -> Result<ProfilesData> {
+    let path = profiles_path().await?;
     if !path.exists() {
         return Ok(ProfilesData {
             active_profile: None,
@@ -221,15 +221,15 @@ pub(crate) fn load_profiles() -> Result<ProfilesData> {
         });
     }
 
-    let content = std::fs::read_to_string(&path)?;
+    let content = tokio::fs::read_to_string(&path).await?;
     let data: ProfilesData =
         serde_json::from_str(&content).context("Failed to parse profiles.json")?;
     Ok(data)
 }
 
-fn save_profiles(data: &ProfilesData) -> Result<()> {
-    let path = profiles_path()?;
+async fn save_profiles(data: &ProfilesData) -> Result<()> {
+    let path = profiles_path().await?;
     let content = serde_json::to_string_pretty(data)?;
-    std::fs::write(&path, content)?;
+    tokio::fs::write(&path, content).await?;
     Ok(())
 }

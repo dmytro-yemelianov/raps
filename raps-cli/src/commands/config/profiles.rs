@@ -12,7 +12,7 @@ use crate::output::OutputFormat;
 use super::{ProfileConfig, ProfilesData, load_profiles, save_profiles};
 
 pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     if data.profiles.contains_key(name) {
         let msg = format!("Profile '{}' already exists", name);
@@ -46,7 +46,7 @@ pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> R
         },
     );
 
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct CreateProfileOutput {
@@ -74,7 +74,7 @@ pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> R
 }
 
 pub(super) async fn list_profiles(output_format: OutputFormat) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     #[derive(Serialize)]
     struct ProfileInfo {
@@ -123,7 +123,7 @@ pub(super) async fn list_profiles(output_format: OutputFormat) -> Result<()> {
 }
 
 pub(super) async fn use_profile(name: &str, output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     if !data.profiles.contains_key(name) {
         anyhow::bail!(
@@ -134,7 +134,7 @@ pub(super) async fn use_profile(name: &str, output_format: OutputFormat) -> Resu
     }
 
     data.active_profile = Some(name.to_string());
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct UseProfileOutput {
@@ -162,7 +162,7 @@ pub(super) async fn use_profile(name: &str, output_format: OutputFormat) -> Resu
 }
 
 pub(super) async fn delete_profile(name: &str, output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     if !data.profiles.contains_key(name) {
         anyhow::bail!("Profile '{name}' does not exist");
@@ -178,7 +178,7 @@ pub(super) async fn delete_profile(name: &str, output_format: OutputFormat) -> R
     }
 
     data.profiles.remove(name);
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct DeleteProfileOutput {
@@ -206,7 +206,7 @@ pub(super) async fn delete_profile(name: &str, output_format: OutputFormat) -> R
 }
 
 pub(super) async fn show_current_profile(output_format: OutputFormat) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     #[derive(Serialize)]
     struct CurrentProfileOutput {
@@ -240,7 +240,7 @@ pub(super) async fn export_profiles(
     name_filter: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     // Filter profiles if name specified
     let mut export_data = if let Some(ref name) = name_filter {
@@ -322,7 +322,7 @@ pub(super) async fn import_profiles(
     let import_data: ProfilesData = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse import file: {}", file_path.display()))?;
 
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
     let mut imported = 0;
     let mut skipped = 0;
 
@@ -342,7 +342,7 @@ pub(super) async fn import_profiles(
         imported += 1;
     }
 
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct ImportOutput {
@@ -385,7 +385,7 @@ pub(super) async fn diff_profiles(
     profile2: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     let p1 = data
         .profiles

@@ -155,13 +155,13 @@ impl PipelineCommands {
                 ignore_failure,
                 dry_run,
             } => run_pipeline(&file, ignore_failure, dry_run, output_format).await,
-            PipelineCommands::Validate { file } => validate_pipeline(&file, output_format),
+            PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
         }
     }
 }
 
-fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
+async fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
     let content = if file.as_os_str() == "-" {
         use std::io::Read;
         let mut buf = String::new();
@@ -171,7 +171,8 @@ fn load_pipeline(file: &PathBuf) -> Result<Pipeline> {
             .context("Failed to read pipeline from stdin")?;
         buf
     } else {
-        std::fs::read_to_string(file)
+        tokio::fs::read_to_string(file)
+            .await
             .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?
     };
 
@@ -520,7 +521,7 @@ async fn run_pipeline(
     dry_run: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let pipeline = load_pipeline(file)?;
+    let pipeline = load_pipeline(file).await?;
     let context: StepContext = Arc::new(Mutex::new(HashMap::new()));
 
     if output_format.supports_colors() {
@@ -806,8 +807,8 @@ async fn execute_with_retry(config: &RetryConfig, command: &str) -> Result<i32> 
     Ok(last_exit)
 }
 
-fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> {
-    let pipeline = load_pipeline(file)?;
+async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> {
+    let pipeline = load_pipeline(file).await?;
 
     #[derive(Serialize)]
     struct ValidationResult {

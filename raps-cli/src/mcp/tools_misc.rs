@@ -768,7 +768,7 @@ impl RapsServer {
             return format!("Directory not found: {}", dir);
         }
 
-        let mut pipeline_files: Vec<String> = Vec::new();
+        let mut pipeline_files: Vec<String>;
 
         fn scan_dir(path: &Path, files: &mut Vec<String>, depth: usize) {
             if depth > 3 {
@@ -806,7 +806,14 @@ impl RapsServer {
             }
         }
 
-        scan_dir(base, &mut pipeline_files, 0);
+        let base_owned = base.to_path_buf();
+        pipeline_files = tokio::task::spawn_blocking(move || {
+            let mut files = Vec::new();
+            scan_dir(&base_owned, &mut files, 0);
+            files
+        })
+        .await
+        .unwrap_or_default();
 
         if pipeline_files.is_empty() {
             return format!(

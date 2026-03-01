@@ -158,32 +158,32 @@ fn batch_state_path() -> Result<PathBuf> {
 }
 
 /// Save batch upload state to disk
-fn save_batch_state(state: &BatchUploadState) -> Result<()> {
+async fn save_batch_state(state: &BatchUploadState) -> Result<()> {
     let path = batch_state_path()?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
+        tokio::fs::create_dir_all(parent).await?;
     }
     let content = serde_json::to_string_pretty(state)?;
-    std::fs::write(&path, content)?;
+    tokio::fs::write(&path, content).await?;
     Ok(())
 }
 
 /// Load batch upload state from disk
-fn load_batch_state() -> Result<Option<BatchUploadState>> {
+async fn load_batch_state() -> Result<Option<BatchUploadState>> {
     let path = batch_state_path()?;
     if !path.exists() {
         return Ok(None);
     }
-    let content = std::fs::read_to_string(&path)?;
+    let content = tokio::fs::read_to_string(&path).await?;
     let state: BatchUploadState = serde_json::from_str(&content)?;
     Ok(Some(state))
 }
 
 /// Remove batch upload state file
-fn clear_batch_state() -> Result<()> {
+async fn clear_batch_state() -> Result<()> {
     let path = batch_state_path()?;
     if path.exists() {
-        std::fs::remove_file(&path)?;
+        tokio::fs::remove_file(&path).await?;
     }
     Ok(())
 }
@@ -217,7 +217,7 @@ pub(super) async fn upload_batch(
 ) -> Result<()> {
     // If resume flag, try to load previous state
     if resume {
-        if let Some(saved_state) = load_batch_state()? {
+        if let Some(saved_state) = load_batch_state().await? {
             let pending_count = saved_state
                 .files
                 .iter()
@@ -231,7 +231,7 @@ pub(super) async fn upload_batch(
                         "✓".green().bold()
                     );
                 }
-                clear_batch_state()?;
+                clear_batch_state().await?;
                 return Ok(());
             }
 
@@ -279,7 +279,7 @@ pub(super) async fn upload_batch(
             .collect(),
         started_at: chrono::Utc::now().to_rfc3339(),
     };
-    save_batch_state(&state)?;
+    save_batch_state(&state).await?;
 
     if output_format.supports_colors() {
         println!(
@@ -366,7 +366,7 @@ pub(super) async fn upload_batch(
                         state.files[idx].error = Some(e.to_string());
                     }
                 }
-                save_batch_state(&state)?;
+                save_batch_state(&state).await?;
             }
             Err(e) => {
                 batch_result.failed += 1;
@@ -383,10 +383,10 @@ pub(super) async fn upload_batch(
 
     // Clear state on full success
     if batch_result.failed == 0 {
-        clear_batch_state()?;
+        clear_batch_state().await?;
     } else {
         // Save final state so it can be resumed
-        save_batch_state(&state)?;
+        save_batch_state(&state).await?;
     }
 
     match output_format {
@@ -484,7 +484,7 @@ async fn resume_batch_upload(
         if !file_path.exists() {
             state.files[*idx].status = BatchFileStatus::Failed;
             state.files[*idx].error = Some(format!("File not found: {}", file_path.display()));
-            save_batch_state(&state)?;
+            save_batch_state(&state).await?;
             continue;
         }
 
@@ -563,7 +563,7 @@ async fn resume_batch_upload(
                         state.files[idx].error = Some(e.to_string());
                     }
                 }
-                save_batch_state(&state)?;
+                save_batch_state(&state).await?;
             }
             Err(e) => {
                 batch_result.failed += 1;
@@ -590,9 +590,9 @@ async fn resume_batch_upload(
         .iter()
         .all(|f| f.status == BatchFileStatus::Completed);
     if all_done {
-        clear_batch_state()?;
+        clear_batch_state().await?;
     } else {
-        save_batch_state(&state)?;
+        save_batch_state(&state).await?;
     }
 
     match output_format {

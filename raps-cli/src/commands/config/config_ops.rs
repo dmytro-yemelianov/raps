@@ -12,7 +12,7 @@ use crate::output::OutputFormat;
 use super::{load_profiles, save_profiles};
 
 pub(super) async fn get_config(key: &str, output_format: OutputFormat) -> Result<()> {
-    let data = load_profiles()?;
+    let data = load_profiles().await?;
 
     // Handle use_keychain separately since it's an environment variable, not a profile setting
     let (value, source) = if key == "use_keychain" {
@@ -85,7 +85,7 @@ pub(super) async fn get_config(key: &str, output_format: OutputFormat) -> Result
 }
 
 pub(super) async fn set_config(key: &str, value: &str, output_format: OutputFormat) -> Result<()> {
-    let mut data = load_profiles()?;
+    let mut data = load_profiles().await?;
 
     let profile_name = data.active_profile.clone()
         .ok_or_else(|| anyhow::anyhow!("No active profile. Create and activate one first with 'raps config profile create <name>' and 'raps config profile use <name>'"))?;
@@ -124,7 +124,7 @@ pub(super) async fn set_config(key: &str, value: &str, output_format: OutputForm
         }
     }
 
-    save_profiles(&data)?;
+    save_profiles(&data).await?;
 
     #[derive(Serialize)]
     struct SetConfigOutput {

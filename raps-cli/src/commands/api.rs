@@ -308,7 +308,7 @@ impl ApiCommands {
         }
 
         // Parse request body if provided
-        let body = parse_body(method, data, data_file)?;
+        let body = parse_body(method, data, data_file).await?;
 
         // Get auth token
         let token = get_auth_token(auth_client).await?;
@@ -379,7 +379,7 @@ fn build_url(base_url: &str, endpoint: &str, query_params: &[(String, String)]) 
 }
 
 /// Parse and validate request body from --data or --data-file
-fn parse_body(
+async fn parse_body(
     method: HttpMethod,
     data: Option<String>,
     data_file: Option<PathBuf>,
@@ -413,7 +413,7 @@ fn parse_body(
                     .context("Failed to read request body from stdin")?;
                 Some(buf)
             } else {
-                Some(std::fs::read_to_string(&path).with_context(|| {
+                Some(tokio::fs::read_to_string(&path).await.with_context(|| {
                     format!("Failed to read body from file: {}", path.display())
                 })?)
             }
@@ -551,7 +551,7 @@ async fn handle_response(
                         if path.as_os_str() == "-" {
                             print!("{}", pretty);
                         } else {
-                            std::fs::write(path, &pretty)?;
+                            tokio::fs::write(path, &pretty).await?;
                             eprintln!("{} {}", "Saved to:".green(), path.display());
                         }
                     } else {
@@ -585,7 +585,7 @@ async fn handle_response(
                         if path.as_os_str() == "-" {
                             print!("{}", body_text);
                         } else {
-                            std::fs::write(path, &body_text)?;
+                            tokio::fs::write(path, &body_text).await?;
                             eprintln!("{} {}", "Saved to:".green(), path.display());
                         }
                     } else {
@@ -609,7 +609,7 @@ async fn handle_response(
                 if path.as_os_str() == "-" {
                     print!("{}", body_text);
                 } else {
-                    std::fs::write(&path, &body_text)?;
+                    tokio::fs::write(&path, &body_text).await?;
                     eprintln!("{} {}", "Saved to:".green(), path.display());
                 }
             } else {
@@ -635,7 +635,7 @@ async fn handle_response(
                         .write_all(&bytes)
                         .context("Failed to write to stdout")?;
                 } else {
-                    std::fs::write(&path, &bytes)?;
+                    tokio::fs::write(&path, &bytes).await?;
                     eprintln!(
                         "{} {} ({} bytes)",
                         "Saved to:".green(),

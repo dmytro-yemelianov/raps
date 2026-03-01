@@ -256,7 +256,8 @@ async fn create_issues_from_csv(
             .context("Failed to read CSV from stdin")?;
         buf
     } else {
-        std::fs::read_to_string(csv_path)
+        tokio::fs::read_to_string(csv_path)
+            .await
             .with_context(|| format!("Failed to open CSV file: {}", csv_path.display()))?
     };
     let mut reader = csv::Reader::from_reader(csv_content.as_bytes());

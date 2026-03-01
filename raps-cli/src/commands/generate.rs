@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
+use anyhow::Context;
 use clap::{Args, Subcommand};
 use colored::*;
 use rand::Rng;
@@ -43,6 +44,13 @@ pub async fn execute(args: GenerateArgs) -> anyhow::Result<()> {
 }
 
 async fn generate_files(count: u32, output: PathBuf, complexity: &str) -> anyhow::Result<()> {
+    let complexity = complexity.to_string();
+    tokio::task::spawn_blocking(move || generate_files_sync(count, output, &complexity))
+        .await
+        .context("generate task panicked")?
+}
+
+fn generate_files_sync(count: u32, output: PathBuf, complexity: &str) -> anyhow::Result<()> {
     let settings = match complexity {
         "simple" => ComplexitySettings {
             vertices: 8,

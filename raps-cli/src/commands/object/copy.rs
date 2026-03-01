@@ -70,7 +70,7 @@ pub(super) async fn copy_object(
         .await;
 
     // Clean up temp file regardless of outcome
-    let _ = std::fs::remove_file(&temp_path);
+    let _ = tokio::fs::remove_file(&temp_path).await;
 
     let info = upload_result?;
 
@@ -155,7 +155,7 @@ pub(super) async fn rename_object(
     let upload_result = client.upload_object(bucket, new_key, &temp_path).await;
 
     // Clean up temp file regardless of outcome
-    let _ = std::fs::remove_file(&temp_path);
+    let _ = tokio::fs::remove_file(&temp_path).await;
 
     let info = upload_result?;
 
