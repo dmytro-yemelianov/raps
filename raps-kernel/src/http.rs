@@ -86,9 +86,13 @@ impl Default for HttpClientConfig {
 }
 
 impl HttpClientConfig {
-    /// Create HTTP client with configured timeouts
+    /// Create HTTP client with configured timeouts, H2 multiplexing, and connection pooling.
     pub fn create_client(&self) -> Result<Client> {
         Client::builder()
+            .http2_adaptive_window(true)
+            .pool_idle_timeout(Duration::from_secs(90))
+            .pool_max_idle_per_host(10)
+            .tcp_keepalive(Duration::from_secs(30))
             .timeout(Duration::from_secs(self.timeout))
             .connect_timeout(Duration::from_secs(self.connect_timeout))
             .build()
