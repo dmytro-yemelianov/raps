@@ -8,8 +8,8 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
-use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
+use futures_util::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -82,9 +82,15 @@ pub struct RetryConfig {
     pub on: Vec<String>,
 }
 
-fn default_max_attempts() -> u32 { 3 }
-fn default_backoff() -> BackoffStrategy { BackoffStrategy::Fixed }
-fn default_delay() -> String { "5s".to_string() }
+fn default_max_attempts() -> u32 {
+    3
+}
+fn default_backoff() -> BackoffStrategy {
+    BackoffStrategy::Fixed
+}
+fn default_delay() -> String {
+    "5s".to_string()
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -94,7 +100,7 @@ pub enum BackoffStrategy {
     Exponential,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Step {
     pub name: String,
     #[serde(default)]
@@ -121,26 +127,6 @@ pub struct Step {
     pub on_failure: Option<Vec<Step>>,
     #[serde(default)]
     pub max_concurrency: Option<usize>,
-}
-
-impl Default for Step {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            id: None,
-            command: None,
-            parallel: None,
-            for_each: None,
-            steps: None,
-            if_expr: None,
-            unless: None,
-            ignore_failure: false,
-            retry: None,
-            timeout: None,
-            on_failure: None,
-            max_concurrency: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -214,10 +200,7 @@ enum StepOutcome {
     Skipped,
 }
 
-fn substitute_variables(
-    command: &str,
-    variables: &HashMap<String, String>,
-) -> Result<String> {
+fn substitute_variables(command: &str, variables: &HashMap<String, String>) -> Result<String> {
     let mut result = command.to_string();
     for (key, value) in variables {
         const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
@@ -338,6 +321,7 @@ async fn execute_parallel_steps(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_for_each(
     config: ForEachConfig,
     parent_step: Step,
@@ -376,7 +360,16 @@ async fn execute_for_each(
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.expect("semaphore closed");
                 for step in steps_to_run {
-                    match execute_step(step.clone(), iter_vars.clone(), ctx.clone(), defs.clone(), fmt, dry_run).await? {
+                    match execute_step(
+                        step.clone(),
+                        iter_vars.clone(),
+                        ctx.clone(),
+                        defs.clone(),
+                        fmt,
+                        dry_run,
+                    )
+                    .await?
+                    {
                         StepOutcome::Failed(c) if !step.ignore_failure => {
                             return Ok::<_, anyhow::Error>(StepOutcome::Failed(c));
                         }
@@ -414,7 +407,16 @@ async fn execute_for_each(
             };
 
             for step in steps_to_run {
-                match execute_step(step.clone(), iter_vars.clone(), context.clone(), defaults.clone(), output_format, dry_run).await? {
+                match execute_step(
+                    step.clone(),
+                    iter_vars.clone(),
+                    context.clone(),
+                    defaults.clone(),
+                    output_format,
+                    dry_run,
+                )
+                .await?
+                {
                     StepOutcome::Failed(c) if !step.ignore_failure => {
                         return Ok(StepOutcome::Failed(c));
                     }
@@ -436,15 +438,15 @@ fn execute_step(
 ) -> BoxFuture<'static, Result<StepOutcome>> {
     async move {
         // Evaluate if/unless conditions
-        if let Some(ref expr) = step.if_expr {
-            if !eval_expression(expr, &context)? {
-                return Ok(StepOutcome::Skipped);
-            }
+        if let Some(ref expr) = step.if_expr
+            && !eval_expression(expr, &context)?
+        {
+            return Ok(StepOutcome::Skipped);
         }
-        if let Some(ref expr) = step.unless {
-            if eval_expression(expr, &context)? {
-                return Ok(StepOutcome::Skipped);
-            }
+        if let Some(ref expr) = step.unless
+            && eval_expression(expr, &context)?
+        {
+            return Ok(StepOutcome::Skipped);
         }
 
         let outcome = if let Some(ref cmd) = step.command {
@@ -458,7 +460,8 @@ fn execute_step(
                 output_format,
                 dry_run,
                 step.max_concurrency.unwrap_or(10),
-            ).await?
+            )
+            .await?
         } else if let Some(ref for_each) = step.for_each {
             let inner_steps = step.steps.clone().unwrap_or_default();
             execute_for_each(
@@ -470,7 +473,8 @@ fn execute_step(
                 defaults.clone(),
                 output_format,
                 dry_run,
-            ).await?
+            )
+            .await?
         } else {
             anyhow::bail!("Step '{}' has no command, parallel, or for_each", step.name);
         };
@@ -489,16 +493,25 @@ fn execute_step(
         }
 
         // Run on_failure steps if step failed
-        if matches!(outcome, StepOutcome::Failed(_)) {
-            if let Some(ref failure_steps) = step.on_failure {
-                for fs in failure_steps {
-                    let _ = execute_step(fs.clone(), variables.clone(), context.clone(), defaults.clone(), output_format, dry_run).await;
-                }
+        if matches!(outcome, StepOutcome::Failed(_))
+            && let Some(ref failure_steps) = step.on_failure
+        {
+            for fs in failure_steps {
+                let _ = execute_step(
+                    fs.clone(),
+                    variables.clone(),
+                    context.clone(),
+                    defaults.clone(),
+                    output_format,
+                    dry_run,
+                )
+                .await;
             }
         }
 
         Ok(outcome)
-    }.boxed()
+    }
+    .boxed()
 }
 
 async fn run_pipeline(
@@ -652,7 +665,10 @@ fn eval_expression(expr: &str, context: &StepContext) -> Result<bool> {
     let trimmed = expr.trim();
 
     // Check for ${{ ... }} template syntax
-    if let Some(inner) = trimmed.strip_prefix("${{").and_then(|s| s.strip_suffix("}}")) {
+    if let Some(inner) = trimmed
+        .strip_prefix("${{")
+        .and_then(|s| s.strip_suffix("}}"))
+    {
         let inner = inner.trim();
         return eval_comparison(inner, context);
     }
@@ -665,13 +681,15 @@ fn eval_expression(expr: &str, context: &StepContext) -> Result<bool> {
 fn eval_comparison(expr: &str, context: &StepContext) -> Result<bool> {
     // Support: <left> && <right>
     if let Some((left, right)) = expr.split_once("&&") {
-        return Ok(eval_comparison(left.trim(), context)?
-            && eval_comparison(right.trim(), context)?);
+        return Ok(
+            eval_comparison(left.trim(), context)? && eval_comparison(right.trim(), context)?
+        );
     }
     // Support: <left> || <right>
     if let Some((left, right)) = expr.split_once("||") {
-        return Ok(eval_comparison(left.trim(), context)?
-            || eval_comparison(right.trim(), context)?);
+        return Ok(
+            eval_comparison(left.trim(), context)? || eval_comparison(right.trim(), context)?
+        );
     }
 
     // Negation
@@ -720,12 +738,12 @@ fn parse_duration(s: &str) -> Result<std::time::Duration> {
     if s.is_empty() {
         anyhow::bail!("Empty duration string");
     }
-    let (num_str, suffix) = if s.ends_with('s') {
-        (&s[..s.len() - 1], 's')
-    } else if s.ends_with('m') {
-        (&s[..s.len() - 1], 'm')
-    } else if s.ends_with('h') {
-        (&s[..s.len() - 1], 'h')
+    let (num_str, suffix) = if let Some(stripped) = s.strip_suffix('s') {
+        (stripped, 's')
+    } else if let Some(stripped) = s.strip_suffix('m') {
+        (stripped, 'm')
+    } else if let Some(stripped) = s.strip_suffix('h') {
+        (stripped, 'h')
     } else {
         anyhow::bail!("Duration must end with 's', 'm', or 'h': {}", s);
     };
@@ -804,18 +822,18 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
     let mut warnings: Vec<String> = Vec::new();
 
     // Validate defaults
-    if let Some(ref retry) = pipeline.defaults.retry {
-        if retry.max_attempts < 1 {
-            errors.push("defaults.retry.max_attempts must be >= 1".to_string());
-        }
+    if let Some(ref retry) = pipeline.defaults.retry
+        && retry.max_attempts < 1
+    {
+        errors.push("defaults.retry.max_attempts must be >= 1".to_string());
     }
-    if let Some(ref timeout) = pipeline.defaults.timeout {
-        if parse_duration(timeout).is_err() {
-            errors.push(format!(
-                "defaults.timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
-                timeout
-            ));
-        }
+    if let Some(ref timeout) = pipeline.defaults.timeout
+        && parse_duration(timeout).is_err()
+    {
+        errors.push(format!(
+            "defaults.timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
+            timeout
+        ));
     }
 
     validate_steps(&pipeline.steps, &mut errors, &mut warnings, "");
@@ -860,7 +878,12 @@ fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> 
     Ok(())
 }
 
-fn validate_steps(steps: &[Step], errors: &mut Vec<String>, warnings: &mut Vec<String>, prefix: &str) {
+fn validate_steps(
+    steps: &[Step],
+    errors: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+    prefix: &str,
+) {
     for (i, step) in steps.iter().enumerate() {
         let step_label = if prefix.is_empty() {
             format!("Step {} '{}'", i + 1, step.name)
@@ -869,7 +892,11 @@ fn validate_steps(steps: &[Step], errors: &mut Vec<String>, warnings: &mut Vec<S
         };
 
         // Steps must have at least one of: command, parallel, or for_each
-        let has_command = step.command.as_deref().map(|c| !c.is_empty()).unwrap_or(false);
+        let has_command = step
+            .command
+            .as_deref()
+            .map(|c| !c.is_empty())
+            .unwrap_or(false);
         let has_parallel = step.parallel.is_some();
         let has_for_each = step.for_each.is_some();
 
@@ -892,23 +919,20 @@ fn validate_steps(steps: &[Step], errors: &mut Vec<String>, warnings: &mut Vec<S
         }
 
         // retry.max_attempts must be >= 1
-        if let Some(ref retry) = step.retry {
-            if retry.max_attempts < 1 {
-                errors.push(format!(
-                    "{}: retry.max_attempts must be >= 1",
-                    step_label
-                ));
-            }
+        if let Some(ref retry) = step.retry
+            && retry.max_attempts < 1
+        {
+            errors.push(format!("{}: retry.max_attempts must be >= 1", step_label));
         }
 
         // timeout must be parseable as a duration
-        if let Some(ref timeout) = step.timeout {
-            if parse_duration(timeout).is_err() {
-                errors.push(format!(
-                    "{}: timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
-                    step_label, timeout
-                ));
-            }
+        if let Some(ref timeout) = step.timeout
+            && parse_duration(timeout).is_err()
+        {
+            errors.push(format!(
+                "{}: timeout '{}' is not a valid duration (use e.g. 5s, 30m, 2h)",
+                step_label, timeout
+            ));
         }
 
         // Warn if step has both if and unless
@@ -931,7 +955,12 @@ fn validate_steps(steps: &[Step], errors: &mut Vec<String>, warnings: &mut Vec<S
 
         // Recursively validate on_failure steps
         if let Some(ref failure_steps) = step.on_failure {
-            validate_steps(failure_steps, errors, warnings, &format!("{} > on_failure", step_label));
+            validate_steps(
+                failure_steps,
+                errors,
+                warnings,
+                &format!("{} > on_failure", step_label),
+            );
         }
     }
 }
@@ -1103,17 +1132,26 @@ command: bucket list
 
     #[test]
     fn test_parse_duration_seconds() {
-        assert_eq!(parse_duration("5s").unwrap(), std::time::Duration::from_secs(5));
+        assert_eq!(
+            parse_duration("5s").unwrap(),
+            std::time::Duration::from_secs(5)
+        );
     }
 
     #[test]
     fn test_parse_duration_minutes() {
-        assert_eq!(parse_duration("30m").unwrap(), std::time::Duration::from_secs(1800));
+        assert_eq!(
+            parse_duration("30m").unwrap(),
+            std::time::Duration::from_secs(1800)
+        );
     }
 
     #[test]
     fn test_parse_duration_hours() {
-        assert_eq!(parse_duration("2h").unwrap(), std::time::Duration::from_secs(7200));
+        assert_eq!(
+            parse_duration("2h").unwrap(),
+            std::time::Duration::from_secs(7200)
+        );
     }
 
     #[test]
@@ -1246,7 +1284,10 @@ steps:
         let defaults_retry = pipeline.defaults.retry.as_ref().unwrap();
         assert_eq!(defaults_retry.max_attempts, 3);
         assert_eq!(defaults_retry.delay, "10s");
-        assert!(matches!(defaults_retry.backoff, BackoffStrategy::Exponential));
+        assert!(matches!(
+            defaults_retry.backoff,
+            BackoffStrategy::Exponential
+        ));
         assert_eq!(pipeline.defaults.timeout, Some("5m".to_string()));
         assert_eq!(pipeline.steps.len(), 5);
 
@@ -1255,7 +1296,10 @@ steps:
         assert!(pipeline.steps[0].ignore_failure);
 
         // Create step
-        assert_eq!(pipeline.steps[1].if_expr.as_deref(), Some("${{ steps.check.exit_code != 0 }}"));
+        assert_eq!(
+            pipeline.steps[1].if_expr.as_deref(),
+            Some("${{ steps.check.exit_code != 0 }}")
+        );
         let step_retry = pipeline.steps[1].retry.as_ref().unwrap();
         assert_eq!(step_retry.max_attempts, 2);
         assert_eq!(step_retry.delay, "5s");
@@ -1275,7 +1319,10 @@ steps:
         assert_eq!(fe.max_concurrency, Some(3));
 
         // Unless step
-        assert_eq!(pipeline.steps[4].unless.as_deref(), Some("${{ steps.check.exit_code != 0 }}"));
+        assert_eq!(
+            pipeline.steps[4].unless.as_deref(),
+            Some("${{ steps.check.exit_code != 0 }}")
+        );
     }
 
     #[test]
