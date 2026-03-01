@@ -1260,6 +1260,46 @@ impl RapsServer {
                 self.report_issues_summary(account_id, filter, status).await
             }
 
+            // ================================================================
+            // Pipeline v2 Tools
+            // ================================================================
+            "pipeline_validate" => {
+                let file = match Self::required_arg(&args, "file") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.pipeline_validate(file).await
+            }
+            "pipeline_dry_run" => {
+                let file = match Self::required_arg(&args, "file") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let variables = Self::optional_arg(&args, "variables");
+                self.pipeline_dry_run(file, variables).await
+            }
+            "pipeline_run" => {
+                let file = match Self::required_arg(&args, "file") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let dry_run = args
+                    .get("dry_run")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let ignore_failure = args
+                    .get("ignore_failure")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let variables = Self::optional_arg(&args, "variables");
+                self.pipeline_run(file, dry_run, ignore_failure, variables)
+                    .await
+            }
+            "pipeline_list_templates" => {
+                let directory = Self::optional_arg(&args, "directory");
+                self.pipeline_list_templates(directory).await
+            }
+
             _ => format!("Unknown tool: {}", name),
         };
 

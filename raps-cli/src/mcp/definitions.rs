@@ -1186,5 +1186,52 @@ pub(crate) fn get_tools() -> Vec<Tool> {
                 &["account_id"],
             ),
         ),
+        // ================================================================
+        // Pipeline v2 Tools
+        // ================================================================
+        Tool::new(
+            "pipeline_validate",
+            "Validate a RAPS pipeline YAML/JSON file for syntax and structural errors.",
+            schema(
+                json!({
+                    "file": {"type": "string", "description": "Path to the pipeline file (YAML or JSON)"}
+                }),
+                &["file"],
+            ),
+        ),
+        Tool::new(
+            "pipeline_dry_run",
+            "Preview a RAPS pipeline execution without running any commands. Shows each step that would execute.",
+            schema(
+                json!({
+                    "file": {"type": "string", "description": "Path to the pipeline file (YAML or JSON)"},
+                    "variables": {"type": "string", "description": "Comma-separated key=value pairs for variable substitution"}
+                }),
+                &["file"],
+            ),
+        ),
+        Tool::new(
+            "pipeline_run",
+            "Execute a RAPS pipeline file. Runs each step sequentially (or in parallel for parallel steps). Returns execution summary.",
+            schema(
+                json!({
+                    "file": {"type": "string", "description": "Path to the pipeline file (YAML or JSON)"},
+                    "dry_run": {"type": "boolean", "description": "Preview without executing (default: false)"},
+                    "ignore_failure": {"type": "boolean", "description": "Continue on step failure (default: false)"},
+                    "variables": {"type": "string", "description": "Comma-separated key=value pairs for variable substitution"}
+                }),
+                &["file"],
+            ),
+        ),
+        Tool::new(
+            "pipeline_list_templates",
+            "List available pipeline template files. Searches current directory and common locations for .yaml/.yml/.json pipeline files.",
+            schema(
+                json!({
+                    "directory": {"type": "string", "description": "Directory to search (default: current directory)"}
+                }),
+                &[],
+            ),
+        ),
     ]
 }

@@ -625,4 +625,236 @@ impl RapsServer {
             Err(e) => format!("Failed to list photoscenes: {}", e),
         }
     }
+
+    // ================================================================
+    // Pipeline v2
+    // ================================================================
+
+    pub(crate) async fn pipeline_validate(&self, file: String) -> String {
+        let output = tokio::process::Command::new("raps")
+            .args(["pipeline", "validate", &file])
+            .output()
+            .await;
+
+        match output {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                if out.status.success() {
+                    if stdout.is_empty() {
+                        format!("Pipeline file '{}' is valid.", file)
+                    } else {
+                        stdout.to_string()
+                    }
+                } else {
+                    format!(
+                        "Validation failed for '{}':\n{}{}",
+                        file,
+                        stdout,
+                        if stderr.is_empty() {
+                            String::new()
+                        } else {
+                            format!("\n{}", stderr)
+                        }
+                    )
+                }
+            }
+            Err(e) => format!("Failed to run pipeline validate: {}", e),
+        }
+    }
+
+    pub(crate) async fn pipeline_dry_run(
+        &self,
+        file: String,
+        variables: Option<String>,
+    ) -> String {
+        let mut cmd = tokio::process::Command::new("raps");
+        cmd.args(["pipeline", "run", &file, "--dry-run"]);
+
+        if let Some(vars) = &variables {
+            for pair in vars.split(',') {
+                let pair = pair.trim();
+                if !pair.is_empty() {
+                    cmd.args(["--var", pair]);
+                }
+            }
+        }
+
+        match cmd.output().await {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                if out.status.success() {
+                    if stdout.is_empty() {
+                        "Dry run completed with no output.".to_string()
+                    } else {
+                        format!("Dry run preview:\n\n{}", stdout)
+                    }
+                } else {
+                    format!(
+                        "Dry run failed:\n{}{}",
+                        stdout,
+                        if stderr.is_empty() {
+                            String::new()
+                        } else {
+                            format!("\n{}", stderr)
+                        }
+                    )
+                }
+            }
+            Err(e) => format!("Failed to run pipeline dry-run: {}", e),
+        }
+    }
+
+    pub(crate) async fn pipeline_run(
+        &self,
+        file: String,
+        dry_run: bool,
+        ignore_failure: bool,
+        variables: Option<String>,
+    ) -> String {
+        let mut cmd = tokio::process::Command::new("raps");
+        cmd.args(["pipeline", "run", &file]);
+
+        if dry_run {
+            cmd.arg("--dry-run");
+        }
+        if ignore_failure {
+            cmd.arg("--ignore-failure");
+        }
+        if let Some(vars) = &variables {
+            for pair in vars.split(',') {
+                let pair = pair.trim();
+                if !pair.is_empty() {
+                    cmd.args(["--var", pair]);
+                }
+            }
+        }
+
+        match cmd.output().await {
+            Ok(out) => {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                if out.status.success() {
+                    if stdout.is_empty() {
+                        "Pipeline completed successfully with no output.".to_string()
+                    } else {
+                        format!("Pipeline execution result:\n\n{}", stdout)
+                    }
+                } else {
+                    format!(
+                        "Pipeline execution failed (exit code: {}):\n{}{}",
+                        out.status
+                            .code()
+                            .map(|c| c.to_string())
+                            .unwrap_or_else(|| "unknown".to_string()),
+                        stdout,
+                        if stderr.is_empty() {
+                            String::new()
+                        } else {
+                            format!("\n{}", stderr)
+                        }
+                    )
+                }
+            }
+            Err(e) => format!("Failed to run pipeline: {}", e),
+        }
+    }
+
+    pub(crate) async fn pipeline_list_templates(
+        &self,
+        directory: Option<String>,
+    ) -> String {
+        use std::fs;
+        use std::path::Path;
+
+        let dir = directory.unwrap_or_else(|| ".".to_string());
+        let base = Path::new(&dir);
+
+        if !base.is_dir() {
+            return format!("Directory not found: {}", dir);
+        }
+
+        let mut pipeline_files: Vec<String> = Vec::new();
+
+        fn scan_dir(path: &Path, files: &mut Vec<String>, depth: usize) {
+            if depth > 3 {
+                return; // Limit recursion depth
+            }
+            let entries = match std::fs::read_dir(path) {
+                Ok(e) => e,
+                Err(_) => return,
+            };
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                if entry_path.is_dir() {
+                    // Skip hidden directories and common non-pipeline dirs
+                    let name = entry.file_name();
+                    let name_str = name.to_string_lossy();
+                    if name_str.starts_with('.')
+                        || name_str == "node_modules"
+                        || name_str == "target"
+                    {
+                        continue;
+                    }
+                    scan_dir(&entry_path, files, depth + 1);
+                } else if let Some(ext) = entry_path.extension() {
+                    let ext = ext.to_string_lossy().to_lowercase();
+                    if ext == "yaml" || ext == "yml" || ext == "json" {
+                        // Check if this looks like a pipeline file
+                        if let Ok(content) = std::fs::read_to_string(&entry_path)
+                            && content.contains("name:")
+                            && content.contains("steps:")
+                        {
+                            files.push(
+                                entry_path.to_string_lossy().to_string(),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        scan_dir(base, &mut pipeline_files, 0);
+
+        if pipeline_files.is_empty() {
+            return format!(
+                "No pipeline template files found in '{}'.\n\n\
+                 Pipeline files are YAML/JSON files containing 'name:' and 'steps:' fields.",
+                dir
+            );
+        }
+
+        pipeline_files.sort();
+        let mut output = format!(
+            "Found {} pipeline file(s) in '{}':\n\n",
+            pipeline_files.len(),
+            dir
+        );
+        for f in &pipeline_files {
+            // Read name from file for display
+            let name = fs::read_to_string(f)
+                .ok()
+                .and_then(|content| {
+                    content.lines().find_map(|line| {
+                        let trimmed = line.trim();
+                        if trimmed.starts_with("name:") {
+                            Some(
+                                trimmed
+                                    .trim_start_matches("name:")
+                                    .trim()
+                                    .trim_matches('"')
+                                    .trim_matches('\'')
+                                    .to_string(),
+                            )
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .unwrap_or_else(|| "Unknown".to_string());
+            output.push_str(&format!("* {} (name: {})\n", f, name));
+        }
+        output
+    }
 }
