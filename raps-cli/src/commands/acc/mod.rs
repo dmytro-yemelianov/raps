@@ -205,6 +205,17 @@ pub enum ChecklistCommands {
         due_date: Option<String>,
     },
 
+    /// Delete a checklist
+    Delete {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+        /// Checklist ID
+        checklist_id: String,
+        /// Skip confirmation prompt
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+
     /// List checklist templates
     Templates {
         /// Project ID (without "b." prefix)
@@ -393,6 +404,20 @@ impl ChecklistCommands {
                     status,
                     location,
                     due_date,
+                    output_format,
+                )
+                .await
+            }
+            ChecklistCommands::Delete {
+                project_id,
+                checklist_id,
+                yes,
+            } => {
+                checklists::delete_checklist(
+                    client,
+                    &project_id,
+                    &checklist_id,
+                    yes,
                     output_format,
                 )
                 .await

@@ -248,6 +248,62 @@ pub(super) async fn update_checklist(
     Ok(())
 }
 
+pub(super) async fn delete_checklist(
+    client: &AccClient,
+    project_id: &str,
+    checklist_id: &str,
+    skip_confirm: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    if !skip_confirm {
+        let confirmed = raps_kernel::prompts::confirm_destructive(format!(
+            "Are you sure you want to delete checklist '{}'?",
+            checklist_id.red()
+        ))?;
+
+        if !confirmed {
+            println!("{}", "Deletion cancelled.".yellow());
+            return Ok(());
+        }
+    }
+
+    if output_format.supports_colors() {
+        println!("{}", "Deleting checklist...".dimmed());
+    }
+
+    client
+        .delete_checklist(project_id, checklist_id)
+        .await
+        .context(format!(
+            "Failed to delete checklist '{}'. Check permissions",
+            checklist_id
+        ))?;
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct DeleteChecklistOutput {
+        success: bool,
+        checklist_id: String,
+        message: String,
+    }
+
+    let output = DeleteChecklistOutput {
+        success: true,
+        checklist_id: checklist_id.to_string(),
+        message: format!("Checklist '{}' deleted successfully!", checklist_id),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} {}", "✓".green().bold(), output.message);
+        }
+        _ => {
+            output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
 pub(super) async fn list_templates(
     client: &AccClient,
     project_id: &str,

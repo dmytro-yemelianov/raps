@@ -177,4 +177,28 @@ impl AccClient {
             .context("Failed to parse checklist response")?;
         Ok(checklist)
     }
+
+    /// Delete a checklist
+    pub async fn delete_checklist(&self, project_id: &str, checklist_id: &str) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/checklists/{}",
+            self.config.checklists_url(),
+            project_id,
+            checklist_id
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.delete(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete checklist ({status}): {error_text}");
+        }
+
+        Ok(())
+    }
 }
