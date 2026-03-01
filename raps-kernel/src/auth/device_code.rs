@@ -49,6 +49,14 @@ impl AuthClient {
     pub async fn login_device(&self, scopes: &[&str]) -> Result<StoredToken> {
         self.config.require_credentials()?;
 
+        if crate::interactive::is_non_interactive() {
+            anyhow::bail!(
+                "3-legged OAuth (device/PKCE) requires interactive mode.\n\
+                 Use 2-legged auth (raps auth login) for CI/CD, or pass \
+                 credentials via APS_CLIENT_ID and APS_CLIENT_SECRET environment variables."
+            );
+        }
+
         // --- PKCE ---
         let code_verifier = generate_code_verifier();
         let code_challenge = derive_code_challenge(&code_verifier);
