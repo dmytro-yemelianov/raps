@@ -25,6 +25,11 @@ jobs:
       - name: Generate CycloneDX SBOM
         run: |
           cargo cyclonedx --manifest-path raps-cli/Cargo.toml --format json --override-filename raps-sbom
+          echo "=== Searching for generated SBOM files ==="
+          find . -name "*.cdx.*" -o -name "*sbom*" 2>/dev/null | head -20
+          find . -name "bom.*" 2>/dev/null | head -20
+          ls -la raps-cli/ | grep -i sbom || true
+          ls -la . | grep -i sbom || true
           mv raps-cli/raps-sbom.cdx.json raps-sbom-${{ github.event.inputs.tag }}.cdx.json
       - name: Upload SBOM to release
         run: gh release upload "${{ github.event.inputs.tag }}" raps-sbom-${{ github.event.inputs.tag }}.cdx.json --clobber
