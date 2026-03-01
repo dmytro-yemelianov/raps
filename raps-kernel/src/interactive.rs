@@ -38,6 +38,16 @@ pub fn init_full(non_interactive: bool, yes: bool, strict: bool) {
     STRICT.store(s, Ordering::Relaxed);
 }
 
+/// Test-only init that sets flags directly without reading env vars.
+/// Prevents env var pollution from leaking between parallel tests.
+#[cfg(test)]
+pub fn init_exact(non_interactive: bool, yes: bool, strict: bool) {
+    let ni = non_interactive || strict; // strict implies non-interactive
+    NON_INTERACTIVE.store(ni, Ordering::Relaxed);
+    YES.store(yes, Ordering::Relaxed);
+    STRICT.store(strict, Ordering::Relaxed);
+}
+
 fn env_is_truthy(name: &str) -> bool {
     std::env::var(name)
         .ok()
@@ -148,18 +158,19 @@ pub fn should_proceed_destructive(action: &str) -> bool {
 mod tests {
     use super::*;
 
-    // Note: These tests manipulate global state, so they should be run with --test-threads=1
-    // or they may interfere with each other
+    // Serializes tests that manipulate environment variables to prevent leaking
+    // env state to other parallel tests in the same process.
+    static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn reset_state() {
-        init_full(false, false, false);
+        init_exact(false, false, false);
         MOCK_IS_TERMINAL.store(true, Ordering::Relaxed);
     }
 
     #[test]
     fn test_init_non_interactive() {
         reset_state();
-        init(true, false);
+        init_exact(true, false, false);
         assert!(is_non_interactive());
         assert!(!is_yes());
         reset_state();
@@ -168,7 +179,7 @@ mod tests {
     #[test]
     fn test_init_yes() {
         reset_state();
-        init(false, true);
+        init_exact(false, true, false);
         assert!(!is_non_interactive());
         assert!(is_yes());
         reset_state();
@@ -177,7 +188,7 @@ mod tests {
     #[test]
     fn test_init_both() {
         reset_state();
-        init(true, true);
+        init_exact(true, true, false);
         assert!(is_non_interactive());
         assert!(is_yes());
         reset_state();
@@ -211,7 +222,7 @@ mod tests {
     #[test]
     fn test_require_value_none_non_interactive() {
         reset_state();
-        init(true, false);
+        init_exact(true, false, false);
         let result = require_value::<String>(None, "name");
         assert!(result.is_err());
         // In non-interactive mode, should mention the flag
@@ -223,7 +234,7 @@ mod tests {
     #[test]
     fn test_should_proceed_destructive_yes() {
         reset_state();
-        init(false, true); // --yes flag set
+        init_exact(false, true, false); // --yes flag set
         assert!(should_proceed_destructive("delete bucket"));
         reset_state();
     }
@@ -231,7 +242,7 @@ mod tests {
     #[test]
     fn test_should_proceed_destructive_non_interactive_no_yes() {
         reset_state();
-        init(true, false); // non-interactive but no --yes
+        init_exact(true, false, false); // non-interactive but no --yes
         assert!(!should_proceed_destructive("delete bucket"));
         reset_state();
     }
@@ -239,7 +250,7 @@ mod tests {
     #[test]
     fn test_should_proceed_destructive_interactive() {
         reset_state();
-        init(false, false); // interactive mode
+        init_exact(false, false, false); // interactive mode
         assert!(!should_proceed_destructive("delete bucket")); // Should prompt
         reset_state();
     }
@@ -247,7 +258,7 @@ mod tests {
     #[test]
     fn test_should_proceed_destructive_non_interactive_with_yes() {
         reset_state();
-        init(true, true); // non-interactive with --yes
+        init_exact(true, true, false); // non-interactive with --yes
         assert!(should_proceed_destructive("delete bucket"));
         reset_state();
     }
@@ -255,7 +266,7 @@ mod tests {
     #[test]
     fn test_strict_implies_non_interactive() {
         reset_state();
-        init_full(false, false, true);
+        init_exact(false, false, true);
         assert!(is_strict());
         assert!(is_non_interactive()); // strict implies non-interactive
         reset_state();
@@ -263,14 +274,21 @@ mod tests {
 
     #[test]
     fn test_strict_env_var() {
+        // Acquire env mutex to prevent env var leaking to other tests.
+        let _guard = ENV_TEST_LOCK.lock().unwrap();
         reset_state();
-        // SAFETY: test runs single-threaded (--test-threads=1)
+        // SAFETY: protected by ENV_TEST_LOCK mutex; no other test reads
+        // this env var concurrently.
         unsafe { std::env::set_var("RAPS_STRICT", "1") };
-        init_full(false, false, false);
-        assert!(is_strict());
-        assert!(is_non_interactive());
+        // Use a scope + cleanup pattern so remove_var runs even on panic.
+        let result = std::panic::catch_unwind(|| {
+            init_full(false, false, false);
+            assert!(is_strict());
+            assert!(is_non_interactive());
+        });
         unsafe { std::env::remove_var("RAPS_STRICT") };
         reset_state();
+        result.unwrap();
     }
 
     #[test]

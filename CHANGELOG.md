@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.18.0] - 2026-03-01
+
+### Added
+- **Content-Addressed Download Cache**: SHA-1 keyed cache with hardlink materialization. New CLI flags: `--no-cache`, `--cache-dir`, `--refresh`, `--offline`. `raps cache stats|clear|dir` subcommands.
+- **HTTP Range Inspect**: `raps inspect zip` lists zip archive contents via Range requests — only downloads the central directory, not the entire file.
+- **Strict Mode for CI**: `--strict` flag (or `RAPS_STRICT=1`) implies `--non-interactive` and rejects silent defaults, making every ambiguous parameter require explicit values.
+- **Unified Retry/Concurrency Flags**: `--no-retry` flag and `RAPS_CONCURRENCY` env var support for consistent control across all commands.
+- **Plugin Info Command**: `raps plugin info` for detailed plugin inspection.
+- **Non-Interactive Env Vars**: `RAPS_NON_INTERACTIVE=1` and `RAPS_YES=1` environment variable support.
+- **Upload Management**: `raps upload status|abort|cleanup` subcommands.
+- **Checklist Delete**: Complete CRUD coverage for checklists.
+- **JSON Schema Output**: `--output-format=json-schema` for all CLI output types.
+- **Unified Concurrency Flag**: `--concurrency` standardized across all bulk commands.
+- **List Limits**: `--limit` flag on `bucket list` and `object list` commands.
+- **Configurable Retry/Backoff**: `--max-retries`, `--retry-delay`, `--max-retry-delay` CLI flags and env vars.
+
+### Changed
+- **ASVS L2 Security Hardening**: Path traversal protection on all download paths, automatic log redaction via `RedactingMakeWriter`, restricted directory permissions (0o700) on log/config dirs, pipeline variable injection hardening with `shlex` parsing and metacharacter validation.
+
+### Performance
+- Replace blocking `std::fs` calls with async `tokio::fs` in async functions.
+- Reuse buffers across multipart upload chunks via pool.
+- Batch resumable upload state writes (every 5 parts instead of every part).
+
+### Fixed
+- Remove unused `Value` import in MCP server.
+
+### Security
+- Path traversal: `sanitize_filename()`, `validate_path_within()`, `safe_join()` applied to all download code paths.
+- Log redaction: Bearer, Basic auth, Cookie, API key headers, and URL token parameters automatically redacted in all log output.
+- Auth error messages redacted before inclusion in `bail!()` messages.
+- Log and config directories created with mode 0o700.
+- Pipeline variable substitution hardened against shell injection.
+- ASVS L2 compliance matrix updated from 74% to ~82%.
+
 ## [4.17.0] - 2026-03-01
 
 ### Added

@@ -238,21 +238,23 @@ pub fn confirm_destructive<S: Into<String>>(prompt: S) -> Result<bool> {
 mod tests {
     use super::*;
 
-    // Helper to reset interactive state between tests
+    // Helper to reset interactive state between tests.
+    // Uses init_exact to avoid reading env vars (prevents races
+    // with tests in interactive.rs that set RAPS_STRICT etc.).
     fn reset_state() {
-        interactive::init(false, false);
+        interactive::init_exact(false, false, false);
     }
 
     fn set_non_interactive() {
-        interactive::init(true, false);
+        interactive::init_exact(true, false, false);
     }
 
     fn set_yes_mode() {
-        interactive::init(false, true);
+        interactive::init_exact(false, true, false);
     }
 
     fn set_non_interactive_with_yes() {
-        interactive::init(true, true);
+        interactive::init_exact(true, true, false);
     }
 
     // ==================== Input Tests (Non-Interactive Mode) ====================
@@ -395,7 +397,7 @@ mod tests {
     // ==================== Strict Mode Tests ====================
 
     fn set_strict() {
-        interactive::init_full(false, false, true);
+        interactive::init_exact(false, false, true);
     }
 
     #[test]
@@ -432,7 +434,7 @@ mod tests {
 
     #[test]
     fn test_confirm_strict_with_yes_succeeds() {
-        interactive::init_full(false, true, true); // --yes + --strict
+        interactive::init_exact(false, true, true); // --yes + --strict
         let result = confirm("Proceed?", false);
         assert!(result.is_ok());
         assert!(result.unwrap());

@@ -42,16 +42,16 @@ pub fn is_refresh() -> bool {
 // Cache directory
 // ---------------------------------------------------------------------------
 
-static CACHE_DIR_OVERRIDE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+static CACHE_DIR_OVERRIDE: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
 
 /// Set a custom cache directory (call before any cache operations).
 pub fn set_cache_dir(dir: PathBuf) {
-    let _ = CACHE_DIR_OVERRIDE.set(dir);
+    *CACHE_DIR_OVERRIDE.lock().unwrap() = Some(dir);
 }
 
 /// Get the cache root directory.
 pub fn cache_dir() -> Result<PathBuf> {
-    if let Some(dir) = CACHE_DIR_OVERRIDE.get() {
+    if let Some(dir) = CACHE_DIR_OVERRIDE.lock().unwrap().as_ref() {
         return Ok(dir.clone());
     }
     let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
@@ -185,22 +185,26 @@ pub fn clear() -> Result<usize> {
 mod tests {
     use super::*;
     use std::io::Write;
+    use std::sync::MutexGuard;
     use tempfile::TempDir;
 
-    fn setup_test_cache() -> TempDir {
+    // Cache tests mutate global CACHE_DIR_OVERRIDE, so they must run serially.
+    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn setup_test_cache() -> (TempDir, MutexGuard<'static, ()>) {
+        let guard = TEST_LOCK.lock().unwrap();
         let tmp = TempDir::new().unwrap();
-        let _ = CACHE_DIR_OVERRIDE.set(tmp.path().to_path_buf());
+        set_cache_dir(tmp.path().to_path_buf());
         init(true, false, false);
-        tmp
+        (tmp, guard)
     }
 
     #[test]
     fn test_store_and_contains() {
-        let _tmp = setup_test_cache();
+        let (tmp, _guard) = setup_test_cache();
         let sha1 = "abcdef0123456789abcdef0123456789abcdef01";
 
-        // Create a test file
-        let src = _tmp.path().join("test.bin");
+        let src = tmp.path().join("test.bin");
         let mut f = std::fs::File::create(&src).unwrap();
         f.write_all(b"hello cache").unwrap();
 
@@ -211,15 +215,15 @@ mod tests {
 
     #[test]
     fn test_materialize_hardlink_or_copy() {
-        let _tmp = setup_test_cache();
+        let (tmp, _guard) = setup_test_cache();
         let sha1 = "1234567890abcdef1234567890abcdef12345678";
 
-        let src = _tmp.path().join("original.txt");
+        let src = tmp.path().join("original.txt");
         std::fs::write(&src, b"test data").unwrap();
 
         store(sha1, &src).unwrap();
 
-        let dest = _tmp.path().join("output.txt");
+        let dest = tmp.path().join("output.txt");
         let hit = materialize(sha1, &dest).unwrap();
         assert!(hit);
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "test data");
@@ -227,19 +231,19 @@ mod tests {
 
     #[test]
     fn test_materialize_miss() {
-        let _tmp = setup_test_cache();
-        let dest = _tmp.path().join("missing.txt");
+        let (tmp, _guard) = setup_test_cache();
+        let dest = tmp.path().join("missing.txt");
         let hit = materialize("0000000000000000000000000000000000000000", &dest).unwrap();
         assert!(!hit);
     }
 
     #[test]
     fn test_stats_and_clear() {
-        let _tmp = setup_test_cache();
+        let (tmp, _guard) = setup_test_cache();
         let sha1a = "aaaa567890abcdef1234567890abcdef12345678";
         let sha1b = "bbbb567890abcdef1234567890abcdef12345678";
 
-        let src = _tmp.path().join("data.bin");
+        let src = tmp.path().join("data.bin");
         std::fs::write(&src, b"12345").unwrap();
 
         store(sha1a, &src).unwrap();
