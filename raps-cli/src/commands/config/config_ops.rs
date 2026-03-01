@@ -53,7 +53,7 @@ pub(super) async fn get_config(key: &str, output_format: OutputFormat) -> Result
         (value, source)
     };
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct GetConfigOutput {
         key: String,
         value: Option<String>,
@@ -126,7 +126,7 @@ pub(super) async fn set_config(key: &str, value: &str, output_format: OutputForm
 
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct SetConfigOutput {
         success: bool,
         key: String,

@@ -12,7 +12,7 @@ use raps_acc::{AccClient, CreateChecklistRequest, UpdateChecklistRequest};
 
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ChecklistOutput {
     id: String,
     title: String,
@@ -21,7 +21,7 @@ struct ChecklistOutput {
     due_date: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct TemplateOutput {
     id: String,
     title: String,

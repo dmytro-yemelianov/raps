@@ -25,7 +25,7 @@ pub(super) async fn list_workitems(
 
     let workitems = client.list_workitems().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct WorkitemOutput {
         id: String,
         status: String,
@@ -143,7 +143,7 @@ pub(super) async fn run_workitem(
         .create_workitem(&qualified_activity, arguments)
         .await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct RunOutput {
         success: bool,
         workitem_id: String,

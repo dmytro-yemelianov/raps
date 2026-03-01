@@ -173,7 +173,7 @@ async fn resolve_folder_args(
     Ok((project_id, folder_id))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct FolderItemOutput {
     id: String,
     name: String,
@@ -259,7 +259,7 @@ async fn list_folder_contents(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CreateFolderOutput {
     success: bool,
     id: String,
@@ -321,7 +321,7 @@ async fn create_folder(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct RenameFolderOutput {
     success: bool,
     id: String,
@@ -382,7 +382,7 @@ async fn rename_folder(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct DeleteFolderOutput {
     success: bool,
     folder_id: String,
@@ -424,7 +424,7 @@ async fn delete_folder(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct FolderRightOutput {
     subject_id: String,
     subject_type: String,

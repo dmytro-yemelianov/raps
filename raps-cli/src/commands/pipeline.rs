@@ -50,7 +50,7 @@ pub enum PipelineCommands {
 }
 
 /// Pipeline definition
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct Pipeline {
     pub name: String,
     #[serde(default)]
@@ -62,7 +62,7 @@ pub struct Pipeline {
     pub steps: Vec<Step>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct PipelineDefaults {
     #[serde(default)]
     pub retry: Option<RetryConfig>,
@@ -70,7 +70,7 @@ pub struct PipelineDefaults {
     pub timeout: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct RetryConfig {
     #[serde(default = "default_max_attempts")]
     pub max_attempts: u32,
@@ -92,7 +92,7 @@ fn default_delay() -> String {
     "5s".to_string()
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BackoffStrategy {
     #[default]
@@ -100,7 +100,7 @@ pub enum BackoffStrategy {
     Exponential,
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct Step {
     pub name: String,
     #[serde(default)]
@@ -129,7 +129,7 @@ pub struct Step {
     pub max_concurrency: Option<usize>,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
 pub struct ForEachConfig {
     pub var: String,
     #[serde(rename = "in")]
@@ -607,7 +607,7 @@ async fn run_pipeline(
         );
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct PipelineResult {
         success: bool,
         passed: u32,
@@ -810,7 +810,7 @@ async fn execute_with_retry(config: &RetryConfig, command: &str) -> Result<i32> 
 async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Result<()> {
     let pipeline = load_pipeline(file).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ValidationResult {
         valid: bool,
         name: String,
@@ -1045,7 +1045,7 @@ steps:
             );
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct SampleOutput {
                 success: bool,
                 path: String,

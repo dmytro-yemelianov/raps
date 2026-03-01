@@ -291,6 +291,10 @@ enum Commands {
     /// Start MCP (Model Context Protocol) server for AI assistant integration
     Serve,
 
+    /// Generate JSON Schema for CLI output types
+    #[command(subcommand)]
+    Schema(commands::schema::SchemaCommands),
+
     /// Generate man pages for raps and its subcommands
     Man {
         /// Output directory for all man pages (default: print main page to stdout)
@@ -813,6 +817,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
         Commands::Serve => "serve",
+        Commands::Schema(_) => "schema",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
     }
@@ -997,6 +1002,10 @@ async fn execute_command(
 
         Commands::Serve => {
             unreachable!()
+        }
+
+        Commands::Schema(cmd) => {
+            cmd.execute()?;
         }
 
         Commands::Man { .. } => {

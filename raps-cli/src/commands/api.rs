@@ -51,7 +51,7 @@ impl HttpMethod {
 }
 
 /// Error response structure
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct ApiError {
     pub status_code: u16,
     pub error_type: String,

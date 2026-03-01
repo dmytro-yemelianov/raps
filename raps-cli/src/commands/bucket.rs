@@ -78,8 +78,8 @@ impl BucketCommands {
 }
 
 /// Serializable bucket representation for output
-#[derive(Debug, Serialize)]
-struct BucketOutput {
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub(crate) struct BucketOutput {
     bucket_key: String,
     policy_key: String,
     bucket_owner: String,
@@ -89,8 +89,8 @@ struct BucketOutput {
 }
 
 /// Serializable bucket info representation
-#[derive(Debug, Serialize)]
-struct BucketInfoOutput {
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub(crate) struct BucketInfoOutput {
     bucket_key: String,
     bucket_owner: String,
     policy_key: String,
@@ -99,8 +99,8 @@ struct BucketInfoOutput {
     permissions: Vec<PermissionOutput>,
 }
 
-#[derive(Debug, Serialize)]
-struct PermissionOutput {
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub(crate) struct PermissionOutput {
     auth_id: String,
     access: String,
 }
@@ -511,7 +511,7 @@ async fn delete_bucket(
         key
     ))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteResult {
         success: bool,
         bucket_key: String,

@@ -25,7 +25,7 @@ use super::{
     parse_filter_with_ids,
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(crate) struct UserListOutput {
     pub(crate) id: String,
     pub(crate) email: String,
@@ -644,7 +644,7 @@ impl UserCommands {
 
                 let user = users_client.add_user(&project, request).await?;
 
-                #[derive(Serialize)]
+                #[derive(Serialize, schemars::JsonSchema)]
                 struct AddResult {
                     user_id: String,
                     email: String,
@@ -744,7 +744,7 @@ impl UserCommands {
                     .update_user(&project, &user_id, request)
                     .await?;
 
-                #[derive(Serialize)]
+                #[derive(Serialize, schemars::JsonSchema)]
                 struct UpdateResult {
                     user_id: String,
                     email: Option<String>,

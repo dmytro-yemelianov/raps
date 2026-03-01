@@ -150,7 +150,7 @@ impl WebhookCommands {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct WebhookListOutput {
     hook_id: String,
     event: String,
@@ -227,7 +227,7 @@ async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> 
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CreateWebhookOutput {
     success: bool,
     hook_id: String,
@@ -323,7 +323,7 @@ async fn create_webhook(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct GetWebhookOutput {
     hook_id: String,
     system: String,
@@ -392,7 +392,7 @@ async fn get_webhook(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct UpdateWebhookOutput {
     success: bool,
     hook_id: String,
@@ -452,7 +452,7 @@ async fn update_webhook(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct DeleteWebhookOutput {
     success: bool,
     hook_id: String,
@@ -495,7 +495,7 @@ async fn delete_webhook(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct EventOutput {
     event: String,
     description: String,
@@ -543,7 +543,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 
 // ============== WEBHOOK TESTING ==============
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct TestEndpointOutput {
     success: bool,
     url: String,
@@ -642,7 +642,7 @@ async fn test_webhook_endpoint(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct VerifySignatureOutput {
     valid: bool,
     message: String,

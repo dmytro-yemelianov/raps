@@ -36,7 +36,7 @@ pub(crate) struct CsvUpdateRow {
     pub(crate) company: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(crate) struct CsvUpdateResultOutput {
     pub(crate) total: usize,
     pub(crate) updated: usize,
@@ -45,7 +45,7 @@ pub(crate) struct CsvUpdateResultOutput {
     pub(crate) errors: Vec<CsvUpdateErrorOutput>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(crate) struct CsvUpdateErrorOutput {
     pub(crate) email: String,
     pub(crate) error: String,
@@ -384,7 +384,7 @@ struct CsvImportRow {
     role_id: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CsvImportResultOutput {
     total: usize,
     imported: usize,
@@ -392,7 +392,7 @@ struct CsvImportResultOutput {
     errors: Vec<CsvImportErrorOutput>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CsvImportErrorOutput {
     email: String,
     error: String,

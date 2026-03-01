@@ -18,7 +18,7 @@ use crate::output::OutputFormat;
 
 use super::{AdminProjectCommands, get_account_id};
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ProjectListOutput {
     id: String,
     name: String,
@@ -36,7 +36,7 @@ pub(crate) fn format_project_status(status: &str) -> String {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CompanyListOutput {
     id: String,
     name: String,

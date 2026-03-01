@@ -14,7 +14,7 @@ use super::format_size;
 
 // ============== OBJECT COPY ==============
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CopyObjectOutput {
     success: bool,
     source_bucket: String,
@@ -103,7 +103,7 @@ pub(super) async fn copy_object(
 
 // ============== OBJECT RENAME ==============
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct RenameObjectOutput {
     success: bool,
     bucket_key: String,
@@ -251,7 +251,7 @@ pub(super) async fn batch_copy_objects(
             );
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct BatchSummary {
                 total: usize,
                 succeeded: usize,
@@ -325,7 +325,7 @@ pub(super) async fn batch_rename_objects(
             );
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct BatchSummary {
                 total: usize,
                 succeeded: usize,

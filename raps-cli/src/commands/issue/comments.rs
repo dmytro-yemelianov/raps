@@ -12,7 +12,7 @@ use raps_acc::IssuesClient;
 
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct CommentOutput {
     id: String,
     body: String,
@@ -91,7 +91,7 @@ pub(super) async fn add_comment(
         .await
         .context("Failed to add comment")?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct AddCommentOutput {
         success: bool,
         id: String,
@@ -132,7 +132,7 @@ pub(super) async fn delete_comment(
         .await
         .context(format!("Failed to delete comment '{}'", comment_id))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteCommentOutput {
         success: bool,
         comment_id: String,

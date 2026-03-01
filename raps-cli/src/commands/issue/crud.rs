@@ -391,7 +391,7 @@ async fn create_issues_from_csv(
             }
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct BulkCreateResult {
                 total: usize,
                 created: usize,
@@ -502,7 +502,7 @@ pub(super) async fn delete_issue(
             issue_id
         ))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteIssueOutput {
         success: bool,
         issue_id: String,

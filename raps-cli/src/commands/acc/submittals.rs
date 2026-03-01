@@ -15,7 +15,7 @@ use raps_acc::{AccClient, CreateSubmittalRequest, UpdateSubmittalRequest};
 
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct SubmittalOutput {
     id: String,
     title: String,
@@ -348,7 +348,7 @@ async fn create_submittals_from_csv(
             }
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct BulkCreateResult {
                 total: usize,
                 created: usize,

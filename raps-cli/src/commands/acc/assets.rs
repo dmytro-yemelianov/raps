@@ -12,7 +12,7 @@ use raps_acc::{AccClient, CreateAssetRequest, UpdateAssetRequest};
 
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct AssetOutput {
     id: String,
     category_id: Option<String>,

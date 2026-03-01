@@ -437,7 +437,7 @@ async fn create_rfis_from_csv(
             }
         }
         _ => {
-            #[derive(Serialize)]
+            #[derive(Serialize, schemars::JsonSchema)]
             struct BulkCreateResult {
                 total: usize,
                 created: usize,
@@ -542,7 +542,7 @@ pub(super) async fn delete_rfi(
             rfi_id
         ))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteRfiOutput {
         success: bool,
         rfi_id: String,

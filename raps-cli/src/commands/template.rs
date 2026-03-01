@@ -73,7 +73,7 @@ pub enum TemplateCommands {
     },
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct TemplateOutput {
     id: String,
     name: String,

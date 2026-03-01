@@ -155,7 +155,7 @@ pub(super) async fn create_activity(
         }
     }
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct CreateActivityOutput {
         success: bool,
         id: String,

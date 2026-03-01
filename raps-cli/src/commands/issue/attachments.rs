@@ -12,7 +12,7 @@ use raps_acc::IssuesClient;
 
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct AttachmentOutput {
     id: String,
     name: String,

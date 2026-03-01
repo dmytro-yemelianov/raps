@@ -113,7 +113,7 @@ pub enum ReportCommands {
 // Summary types
 // ---------------------------------------------------------------------------
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct RfiProjectSummary {
     pub(super) project_id: String,
     pub(super) project_name: String,
@@ -124,7 +124,7 @@ pub(super) struct RfiProjectSummary {
     pub(super) void: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct IssueProjectSummary {
     pub(super) project_id: String,
     pub(super) project_name: String,
@@ -134,28 +134,28 @@ pub(super) struct IssueProjectSummary {
     pub(super) other: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct SubmittalProjectSummary {
     pub(super) project_id: String,
     pub(super) project_name: String,
     pub(super) total: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct ChecklistProjectSummary {
     pub(super) project_id: String,
     pub(super) project_name: String,
     pub(super) total: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct AssetProjectSummary {
     pub(super) project_id: String,
     pub(super) project_name: String,
     pub(super) total: usize,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct ReportSummaryOutput<T: Serialize> {
     pub(super) total_projects: usize,
     pub(super) projects: Vec<T>,

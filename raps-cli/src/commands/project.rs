@@ -50,7 +50,7 @@ impl ProjectCommands {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ProjectListOutput {
     id: String,
     name: String,
@@ -123,7 +123,7 @@ async fn list_projects(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ProjectInfoOutput {
     id: String,
     name: String,
@@ -132,7 +132,7 @@ struct ProjectInfoOutput {
     top_folders: Vec<FolderOutput>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct FolderOutput {
     id: String,
     name: String,

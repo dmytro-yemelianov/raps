@@ -297,7 +297,7 @@ async fn resolve_rfi_args(
     Ok((project_id, rfi_id))
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub(super) struct RfiOutput {
     pub(super) id: String,
     pub(super) number: Option<String>,

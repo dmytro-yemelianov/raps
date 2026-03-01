@@ -82,7 +82,7 @@ impl OutputFormat {
                 Ok(())
             }
             OutputFormat::Json => {
-                #[derive(Serialize)]
+                #[derive(Serialize, schemars::JsonSchema)]
                 struct Message {
                     message: String,
                 }
@@ -91,7 +91,7 @@ impl OutputFormat {
                 })
             }
             OutputFormat::Yaml => {
-                #[derive(Serialize)]
+                #[derive(Serialize, schemars::JsonSchema)]
                 struct Message {
                     message: String,
                 }

@@ -178,7 +178,7 @@ impl ProfileCommands {
 }
 
 /// Profile configuration structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ProfileConfig {
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
@@ -198,7 +198,7 @@ pub struct ProfileConfig {
 }
 
 /// Profiles storage structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub(crate) struct ProfilesData {
     pub active_profile: Option<String>,
     pub profiles: HashMap<String, ProfileConfig>,

@@ -20,7 +20,7 @@ pub(super) async fn list_engines(
 
     let engines = client.list_engines().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct EngineOutput {
         id: String,
         description: Option<String>,

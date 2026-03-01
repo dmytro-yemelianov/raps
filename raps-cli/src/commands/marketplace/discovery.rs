@@ -14,7 +14,7 @@ use raps_kernel::marketplace::Plugin;
 use super::SearchArgs;
 use super::truncate_str;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct PluginSearchOutput {
     name: String,
     version: String,

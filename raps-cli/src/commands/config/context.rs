@@ -14,7 +14,7 @@ use super::{load_profiles, save_profiles};
 pub(super) async fn show_context(output_format: OutputFormat) -> Result<()> {
     let data = load_profiles().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ContextItem {
         key: String,
         value: Option<String>,
@@ -152,7 +152,7 @@ pub(super) async fn set_context(key: &str, value: &str, output_format: OutputFor
 
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct SetContextOutput {
         success: bool,
         key: String,
@@ -214,7 +214,7 @@ pub(super) async fn clear_context(output_format: OutputFormat) -> Result<()> {
 
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ClearContextOutput {
         success: bool,
         profile: String,

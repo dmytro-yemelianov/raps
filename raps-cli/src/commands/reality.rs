@@ -133,7 +133,7 @@ async fn list_photoscenes(
 
     let photoscenes = client.list_photoscenes().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct PhotosceneOutput {
         id: String,
         name: String,
@@ -289,7 +289,7 @@ async fn create_photoscene(
         .create_photoscene(&scene_name, selected_scene_type, selected_format)
         .await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct CreatePhotosceneOutput {
         success: bool,
         photoscene_id: String,

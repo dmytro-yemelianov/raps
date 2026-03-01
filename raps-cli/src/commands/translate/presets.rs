@@ -12,14 +12,14 @@ use serde::Serialize;
 use crate::output::OutputFormat;
 use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
 
-#[derive(Debug, Clone, Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize, schemars::JsonSchema)]
 struct TranslationPreset {
     name: String,
     format: String,
     description: Option<String>,
 }
 
-#[derive(Debug, Serialize, serde::Deserialize, Default)]
+#[derive(Debug, Serialize, serde::Deserialize, Default, schemars::JsonSchema)]
 struct PresetStore {
     presets: Vec<TranslationPreset>,
 }
@@ -212,7 +212,7 @@ pub(super) fn delete_preset(name: &str, output_format: OutputFormat) -> Result<(
 
     store.save()?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteOutput {
         success: bool,
         name: String,
@@ -272,7 +272,7 @@ pub(super) async fn use_preset(
         )
         .await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct UsePresetOutput {
         success: bool,
         preset: String,

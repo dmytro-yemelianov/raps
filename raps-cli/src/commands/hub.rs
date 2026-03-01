@@ -40,7 +40,7 @@ impl HubCommands {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct HubListOutput {
     id: String,
     name: String,
@@ -120,7 +120,7 @@ async fn list_hubs(client: &DataManagementClient, output_format: OutputFormat) -
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct HubInfoOutput {
     id: String,
     name: String,

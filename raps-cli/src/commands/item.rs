@@ -112,7 +112,7 @@ impl ItemCommands {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ItemInfoOutput {
     id: String,
     name: String,
@@ -191,7 +191,7 @@ async fn item_info(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct VersionOutput {
     version_number: Option<i32>,
     name: String,
@@ -307,7 +307,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct CreateFromOssOutput {
     success: bool,
     item_id: String,
@@ -385,7 +385,7 @@ async fn delete_item(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct RenameItemOutput {
     id: String,
     name: String,

@@ -24,7 +24,7 @@ pub use prompt::RapsPrompt;
 use serde::Serialize;
 
 /// Command metadata for completion and hints
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 pub struct CommandInfo {
     /// The command name
     pub name: &'static str,

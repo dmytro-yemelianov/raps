@@ -14,8 +14,8 @@ use raps_oss::OssClient;
 
 use super::{format_size, select_bucket, truncate_str};
 
-#[derive(Serialize)]
-struct DownloadOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct DownloadOutput {
     success: bool,
     bucket_key: String,
     object_key: String,
@@ -121,8 +121,8 @@ pub(super) async fn download_object(
     Ok(())
 }
 
-#[derive(Serialize)]
-struct ObjectListOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct ObjectListOutput {
     bucket_key: String,
     object_key: String,
     size: u64,
@@ -205,8 +205,8 @@ pub(super) async fn list_objects(
     Ok(())
 }
 
-#[derive(Serialize)]
-struct DeleteObjectOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct DeleteObjectOutput {
     success: bool,
     bucket_key: String,
     object_key: String,
@@ -281,8 +281,8 @@ pub(super) async fn delete_object(
     Ok(())
 }
 
-#[derive(Serialize)]
-struct SignedUrlOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct SignedUrlOutput {
     success: bool,
     bucket_key: String,
     object_key: String,
@@ -369,8 +369,8 @@ pub(super) async fn get_signed_url(
 
 // ============== OBJECT INFO ==============
 
-#[derive(Serialize)]
-struct ObjectInfoOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct ObjectInfoOutput {
     bucket_key: String,
     object_key: String,
     object_id: String,

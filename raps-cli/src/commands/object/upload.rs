@@ -16,8 +16,8 @@ use raps_oss::OssClient;
 
 use super::{format_size, select_bucket};
 
-#[derive(Serialize)]
-struct UploadOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct UploadOutput {
     success: bool,
     object_id: String,
     bucket_key: String,
@@ -127,7 +127,7 @@ pub(super) async fn upload_object(
 // ============== BATCH UPLOAD STATE ==============
 
 /// Persistent state for a batch upload operation
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 struct BatchUploadState {
     bucket_key: String,
     files: Vec<BatchFileState>,
@@ -135,7 +135,7 @@ struct BatchUploadState {
 }
 
 /// State of a single file in a batch upload
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, schemars::JsonSchema)]
 struct BatchFileState {
     path: String,
     status: BatchFileStatus,
@@ -143,7 +143,7 @@ struct BatchFileState {
 }
 
 /// Status of a file in a batch upload
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
 enum BatchFileStatus {
     Pending,
     Completed,
@@ -190,8 +190,8 @@ async fn clear_batch_state() -> Result<()> {
 
 // ============== PARALLEL UPLOADS ==============
 
-#[derive(Serialize)]
-struct BatchUploadResult {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct BatchUploadResult {
     success: bool,
     uploaded: usize,
     failed: usize,
@@ -199,7 +199,7 @@ struct BatchUploadResult {
     files: Vec<BatchFileResult>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct BatchFileResult {
     name: String,
     success: bool,

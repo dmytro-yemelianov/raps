@@ -169,7 +169,7 @@ pub(super) async fn upload_appbundle(
             bundle_details.version
         );
     } else {
-        #[derive(serde::Serialize)]
+        #[derive(serde::Serialize, schemars::JsonSchema)]
         struct UploadResult {
             id: String,
             version: i32,

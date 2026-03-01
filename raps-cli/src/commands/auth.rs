@@ -206,8 +206,8 @@ impl AuthCommands {
     }
 }
 
-#[derive(Serialize)]
-struct TestAuthOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct TestAuthOutput {
     success: bool,
     client_id: String,
     base_url: String,
@@ -238,7 +238,7 @@ async fn test_auth(auth_client: &AuthClient, output_format: OutputFormat) -> Res
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct LoginOutput {
     success: bool,
     access_token: String,
@@ -389,7 +389,7 @@ async fn login(
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct LogoutOutput {
     success: bool,
     message: String,
@@ -429,18 +429,18 @@ async fn logout(auth_client: &AuthClient, output_format: OutputFormat) -> Result
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct StatusOutput {
     two_legged: TwoLeggedStatus,
     three_legged: ThreeLeggedStatus,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct TwoLeggedStatus {
     available: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct ThreeLeggedStatus {
     logged_in: bool,
     token: Option<String>,
@@ -520,8 +520,8 @@ async fn status(auth_client: &AuthClient, output_format: OutputFormat) -> Result
     Ok(())
 }
 
-#[derive(Serialize)]
-struct WhoamiOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct WhoamiOutput {
     name: Option<String>,
     email: Option<String>,
     email_verified: Option<bool>,
@@ -603,8 +603,8 @@ fn mask_string(s: &str) -> String {
     }
 }
 
-#[derive(Serialize)]
-struct InspectOutput {
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct InspectOutput {
     authenticated: bool,
     token_type: Option<String>,
     expires_in_seconds: Option<i64>,

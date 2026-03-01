@@ -103,7 +103,7 @@ pub(super) async fn transition_issue(
             issue_id, new_status
         ))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct TransitionOutput {
         success: bool,
         issue_id: String,

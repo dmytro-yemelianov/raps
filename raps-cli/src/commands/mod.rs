@@ -28,6 +28,7 @@ pub mod project;
 pub mod reality;
 pub mod report;
 pub mod rfi;
+pub mod schema;
 pub mod template;
 pub mod tracked;
 pub mod translate;

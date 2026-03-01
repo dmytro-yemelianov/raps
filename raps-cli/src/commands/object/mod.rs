@@ -6,8 +6,8 @@
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.
 
 mod copy;
-mod download;
-mod upload;
+pub(crate) mod download;
+pub(crate) mod upload;
 
 use anyhow::Result;
 use clap::Subcommand;

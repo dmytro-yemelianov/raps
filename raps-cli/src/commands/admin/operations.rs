@@ -13,7 +13,7 @@ use crate::output::OutputFormat;
 
 use super::OperationCommands;
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct OperationStatusOutput {
     operation_id: String,
     operation_type: String,
@@ -26,7 +26,7 @@ struct OperationStatusOutput {
     updated_at: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct OperationListOutput {
     operation_id: String,
     operation_type: String,
@@ -46,7 +46,7 @@ pub(crate) fn format_status(status: &str) -> String {
 }
 
 /// Output format for bulk operation results
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct BulkResultOutput {
     operation_id: String,
     total: usize,
@@ -57,7 +57,7 @@ struct BulkResultOutput {
     details: Vec<BulkResultDetailOutput>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct BulkResultDetailOutput {
     project_id: String,
     project_name: Option<String>,

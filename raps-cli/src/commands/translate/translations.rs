@@ -18,7 +18,7 @@ use raps_kernel::{progress, prompts};
 /// Translations typically complete within minutes, but complex models can take longer.
 pub(super) const TRANSLATE_POLL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct TranslationStartOutput {
     success: bool,
     result: String,
@@ -26,13 +26,13 @@ struct TranslationStartOutput {
     accepted_formats: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct StatusOutput {
     status: String,
     progress: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct DerivativeListOutput {
     guid: String,
     name: String,
@@ -42,7 +42,7 @@ struct DerivativeListOutput {
     size_human: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct DownloadResultOutput {
     success: bool,
     downloaded: Vec<DownloadedFile>,
@@ -50,7 +50,7 @@ struct DownloadResultOutput {
     total_size_human: String,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct DownloadedFile {
     name: String,
     size: u64,

@@ -91,7 +91,7 @@ impl AliasCommands {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct PluginOutput {
     name: String,
     path: String,
@@ -236,7 +236,7 @@ fn disable_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
     Ok(())
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 struct AliasOutput {
     name: String,
     command: String,

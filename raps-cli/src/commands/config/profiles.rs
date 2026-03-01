@@ -21,7 +21,7 @@ pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> R
                 eprintln!("{}", msg.yellow());
             }
             _ => {
-                #[derive(Serialize)]
+                #[derive(Serialize, schemars::JsonSchema)]
                 struct ErrorOutput {
                     error: String,
                 }
@@ -48,7 +48,7 @@ pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> R
 
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct CreateProfileOutput {
         success: bool,
         profile: String,
@@ -76,7 +76,7 @@ pub(super) async fn create_profile(name: &str, output_format: OutputFormat) -> R
 pub(super) async fn list_profiles(output_format: OutputFormat) -> Result<()> {
     let data = load_profiles().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ProfileInfo {
         name: String,
         active: bool,
@@ -136,7 +136,7 @@ pub(super) async fn use_profile(name: &str, output_format: OutputFormat) -> Resu
     data.active_profile = Some(name.to_string());
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct UseProfileOutput {
         success: bool,
         profile: String,
@@ -180,7 +180,7 @@ pub(super) async fn delete_profile(name: &str, output_format: OutputFormat) -> R
     data.profiles.remove(name);
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DeleteProfileOutput {
         success: bool,
         profile: String,
@@ -208,7 +208,7 @@ pub(super) async fn delete_profile(name: &str, output_format: OutputFormat) -> R
 pub(super) async fn show_current_profile(output_format: OutputFormat) -> Result<()> {
     let data = load_profiles().await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct CurrentProfileOutput {
         active_profile: Option<String>,
     }
@@ -273,7 +273,7 @@ pub(super) async fn export_profiles(
     let content = serde_json::to_string_pretty(&export_data)?;
     std::fs::write(output_path, &content)?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ExportOutput {
         success: bool,
         path: String,
@@ -344,7 +344,7 @@ pub(super) async fn import_profiles(
 
     save_profiles(&data).await?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct ImportOutput {
         success: bool,
         imported: usize,
@@ -396,7 +396,7 @@ pub(super) async fn diff_profiles(
         .get(profile2)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found", profile2))?;
 
-    #[derive(Serialize)]
+    #[derive(Serialize, schemars::JsonSchema)]
     struct DiffItem {
         key: String,
         value1: Option<String>,
