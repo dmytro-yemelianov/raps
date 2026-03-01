@@ -177,6 +177,131 @@ pub fn clear() -> Result<usize> {
     Ok(removed)
 }
 
+/// Remove cached artifacts older than the given duration.
+/// Returns the number of entries removed.
+pub fn prune_older_than(max_age: std::time::Duration) -> Result<usize> {
+    let dir = cache_dir()?;
+    if !dir.exists() {
+        return Ok(0);
+    }
+    let now = std::time::SystemTime::now();
+    let mut removed = 0usize;
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            for inner in std::fs::read_dir(entry.path())? {
+                let inner = inner?;
+                if inner.file_type()?.is_file() {
+                    let modified = inner.metadata()?.modified()?;
+                    if let Ok(age) = now.duration_since(modified) {
+                        if age > max_age {
+                            std::fs::remove_file(inner.path())?;
+                            removed += 1;
+                        }
+                    }
+                }
+            }
+            // Remove directory if now empty
+            let _ = std::fs::remove_dir(entry.path());
+        }
+    }
+    Ok(removed)
+}
+
+/// Remove oldest cached artifacts until total size is under the given limit.
+/// Returns the number of entries removed.
+pub fn prune_to_size(max_bytes: u64) -> Result<usize> {
+    let dir = cache_dir()?;
+    if !dir.exists() {
+        return Ok(0);
+    }
+
+    // Collect all entries with their sizes and modification times
+    let mut entries: Vec<(std::path::PathBuf, u64, std::time::SystemTime)> = Vec::new();
+    let mut total_size = 0u64;
+    for entry in std::fs::read_dir(&dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            for inner in std::fs::read_dir(entry.path())? {
+                let inner = inner?;
+                if inner.file_type()?.is_file() {
+                    let meta = inner.metadata()?;
+                    let size = meta.len();
+                    let modified = meta.modified()?;
+                    total_size += size;
+                    entries.push((inner.path(), size, modified));
+                }
+            }
+        }
+    }
+
+    if total_size <= max_bytes {
+        return Ok(0);
+    }
+
+    // Sort oldest first
+    entries.sort_by_key(|(_, _, modified)| *modified);
+
+    let mut removed = 0usize;
+    for (path, size, _) in &entries {
+        if total_size <= max_bytes {
+            break;
+        }
+        std::fs::remove_file(path)?;
+        total_size -= size;
+        removed += 1;
+        // Try to clean up parent dir if empty
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::remove_dir(parent);
+        }
+    }
+
+    Ok(removed)
+}
+
+/// Parse a human-readable duration string (e.g. "30d", "7d", "2h", "90m").
+pub fn parse_age(s: &str) -> Result<std::time::Duration> {
+    let s = s.trim();
+    if s.is_empty() {
+        anyhow::bail!("Empty duration string");
+    }
+    let (num_str, unit) = s.split_at(s.len() - 1);
+    let num: u64 = num_str
+        .parse()
+        .context("Invalid number in duration")?;
+    match unit {
+        "s" => Ok(std::time::Duration::from_secs(num)),
+        "m" => Ok(std::time::Duration::from_secs(num * 60)),
+        "h" => Ok(std::time::Duration::from_secs(num * 3600)),
+        "d" => Ok(std::time::Duration::from_secs(num * 86400)),
+        "w" => Ok(std::time::Duration::from_secs(num * 604800)),
+        _ => anyhow::bail!("Unknown duration unit '{}'. Use s/m/h/d/w.", unit),
+    }
+}
+
+/// Parse a human-readable size string (e.g. "1G", "500M", "100K").
+pub fn parse_size(s: &str) -> Result<u64> {
+    let s = s.trim();
+    if s.is_empty() {
+        anyhow::bail!("Empty size string");
+    }
+    let (num_str, unit) = s.split_at(s.len() - 1);
+    let num: u64 = num_str
+        .parse()
+        .context("Invalid number in size")?;
+    match unit {
+        "B" | "b" => Ok(num),
+        "K" | "k" => Ok(num * 1024),
+        "M" | "m" => Ok(num * 1024 * 1024),
+        "G" | "g" => Ok(num * 1024 * 1024 * 1024),
+        _ => {
+            // Try parsing the whole string as bytes
+            s.parse::<u64>()
+                .context("Invalid size. Use a number with B/K/M/G suffix (e.g. 500M, 1G)")
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -258,5 +383,82 @@ mod tests {
 
         let (count, _) = stats().unwrap();
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_parse_age() {
+        assert_eq!(parse_age("30s").unwrap().as_secs(), 30);
+        assert_eq!(parse_age("5m").unwrap().as_secs(), 300);
+        assert_eq!(parse_age("2h").unwrap().as_secs(), 7200);
+        assert_eq!(parse_age("7d").unwrap().as_secs(), 604800);
+        assert_eq!(parse_age("1w").unwrap().as_secs(), 604800);
+        assert!(parse_age("").is_err());
+        assert!(parse_age("abc").is_err());
+        assert!(parse_age("5x").is_err());
+    }
+
+    #[test]
+    fn test_parse_size() {
+        assert_eq!(parse_size("100B").unwrap(), 100);
+        assert_eq!(parse_size("1K").unwrap(), 1024);
+        assert_eq!(parse_size("500M").unwrap(), 500 * 1024 * 1024);
+        assert_eq!(parse_size("1G").unwrap(), 1024 * 1024 * 1024);
+        assert_eq!(parse_size("1k").unwrap(), 1024);
+        assert_eq!(parse_size("2g").unwrap(), 2 * 1024 * 1024 * 1024);
+        assert_eq!(parse_size("4096").unwrap(), 4096);
+        assert!(parse_size("").is_err());
+        assert!(parse_size("abc").is_err());
+    }
+
+    #[test]
+    fn test_prune_older_than() {
+        let (tmp, _guard) = setup_test_cache();
+        let sha1a = "cccc567890abcdef1234567890abcdef12345678";
+        let sha1b = "dddd567890abcdef1234567890abcdef12345678";
+
+        let src = tmp.path().join("data.bin");
+        std::fs::write(&src, b"prune me").unwrap();
+
+        store(sha1a, &src).unwrap();
+        store(sha1b, &src).unwrap();
+
+        // With a very large max_age, nothing should be pruned
+        let removed = prune_older_than(std::time::Duration::from_secs(86400)).unwrap();
+        assert_eq!(removed, 0);
+
+        let (count, _) = stats().unwrap();
+        assert_eq!(count, 2);
+
+        // With zero max_age, everything should be pruned
+        let removed = prune_older_than(std::time::Duration::from_secs(0)).unwrap();
+        assert_eq!(removed, 2);
+
+        let (count, _) = stats().unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_prune_to_size() {
+        let (tmp, _guard) = setup_test_cache();
+        let sha1a = "eeee567890abcdef1234567890abcdef12345678";
+        let sha1b = "ffff567890abcdef1234567890abcdef12345678";
+
+        let src = tmp.path().join("big.bin");
+        std::fs::write(&src, vec![0u8; 1000]).unwrap();
+
+        store(sha1a, &src).unwrap();
+        store(sha1b, &src).unwrap();
+
+        let (count, size) = stats().unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(size, 2000);
+
+        // Prune to 1500 bytes — should remove one entry
+        let removed = prune_to_size(1500).unwrap();
+        assert_eq!(removed, 1);
+
+        let (count, size) = stats().unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(size, 1000);
     }
 }
