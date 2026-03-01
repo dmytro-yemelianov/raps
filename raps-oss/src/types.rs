@@ -256,6 +256,41 @@ impl MultipartUploadState {
         }
     }
 
+    /// Get the cache directory used for upload state files
+    pub fn cache_dir() -> Result<PathBuf> {
+        let proj_dirs = directories::ProjectDirs::from("com", "autodesk", "raps")
+            .context("Failed to get project directories")?;
+        let dir = proj_dirs.cache_dir().to_path_buf();
+        Ok(dir)
+    }
+
+    /// List all pending upload state files, returning parsed states.
+    /// Corrupt files are returned as Err entries.
+    pub fn list_all() -> Result<Vec<(PathBuf, Result<Self>)>> {
+        let cache_dir = Self::cache_dir()?;
+        if !cache_dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut results = Vec::new();
+        for entry in std::fs::read_dir(&cache_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .is_some_and(|f| f.starts_with("upload_") && f.ends_with(".json"))
+            {
+                let parsed = std::fs::read_to_string(&path)
+                    .context("Failed to read state file")
+                    .and_then(|json| {
+                        serde_json::from_str::<Self>(&json).context("Failed to parse state file")
+                    });
+                results.push((path, parsed));
+            }
+        }
+        Ok(results)
+    }
+
     /// Calculate which parts still need to be uploaded
     pub fn remaining_parts(&self) -> Vec<u32> {
         (1..=self.total_parts)

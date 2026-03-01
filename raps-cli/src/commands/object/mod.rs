@@ -169,6 +169,27 @@ pub enum ObjectCommands {
         #[arg(long)]
         to: String,
     },
+
+    /// List pending/incomplete resumable uploads
+    #[command(name = "upload-status")]
+    UploadStatus,
+
+    /// Abort a resumable upload and clean up state
+    #[command(name = "upload-abort")]
+    UploadAbort {
+        /// Bucket key
+        bucket: String,
+        /// Object key
+        object: String,
+    },
+
+    /// Remove stale upload state files
+    #[command(name = "upload-cleanup")]
+    UploadCleanup {
+        /// Remove all state files without checking file existence
+        #[arg(long)]
+        all: bool,
+    },
 }
 
 impl ObjectCommands {
@@ -262,6 +283,11 @@ impl ObjectCommands {
             ObjectCommands::BatchRename { bucket, from, to } => {
                 batch_rename_objects(client, &bucket, &from, &to, output_format).await
             }
+            ObjectCommands::UploadStatus => upload::upload_status(output_format),
+            ObjectCommands::UploadAbort { bucket, object } => {
+                upload::upload_abort(&bucket, &object, output_format)
+            }
+            ObjectCommands::UploadCleanup { all } => upload::upload_cleanup(all, output_format),
         }
     }
 }

@@ -656,3 +656,236 @@ async fn resume_batch_upload(
 
     Ok(())
 }
+
+// ============== UPLOAD MANAGEMENT ==============
+
+/// List all pending/incomplete resumable uploads
+pub(crate) fn upload_status(output_format: OutputFormat) -> Result<()> {
+    use raps_oss::MultipartUploadState;
+
+    let entries = MultipartUploadState::list_all()?;
+
+    if entries.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No pending uploads found.".yellow()),
+            _ => output_format.write(&Vec::<serde_json::Value>::new())?,
+        }
+        return Ok(());
+    }
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct UploadStateOutput {
+        bucket_key: String,
+        object_key: String,
+        file_path: String,
+        file_size_human: String,
+        completed_parts: u32,
+        total_parts: u32,
+        progress_pct: f64,
+        resumable: bool,
+        started_at: i64,
+    }
+
+    let mut outputs = Vec::new();
+    let mut corrupt_count = 0u32;
+
+    for (path, result) in &entries {
+        match result {
+            Ok(state) => {
+                let resumable = std::path::Path::new(&state.file_path).exists()
+                    && state.can_resume(std::path::Path::new(&state.file_path));
+                let progress = if state.total_parts > 0 {
+                    (state.completed_parts.len() as f64 / state.total_parts as f64) * 100.0
+                } else {
+                    0.0
+                };
+                outputs.push(UploadStateOutput {
+                    bucket_key: state.bucket_key.clone(),
+                    object_key: state.object_key.clone(),
+                    file_path: state.file_path.clone(),
+                    file_size_human: format_size(state.file_size),
+                    completed_parts: state.completed_parts.len() as u32,
+                    total_parts: state.total_parts,
+                    progress_pct: (progress * 10.0).round() / 10.0,
+                    resumable,
+                    started_at: state.started_at,
+                });
+            }
+            Err(_) => {
+                corrupt_count += 1;
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Corrupt state file: {}",
+                        "⚠".yellow(),
+                        path.display()
+                    );
+                }
+            }
+        }
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Pending Uploads:".bold());
+            println!("{}", "─".repeat(100));
+            println!(
+                "{:<30} {:<30} {:>10} {:>8} {}",
+                "Bucket".bold(),
+                "Object".bold(),
+                "Size".bold(),
+                "Progress".bold(),
+                "Resumable".bold()
+            );
+            println!("{}", "─".repeat(100));
+
+            for u in &outputs {
+                let resume_str = if u.resumable {
+                    "✓".green().to_string()
+                } else {
+                    "✗".red().to_string()
+                };
+                println!(
+                    "{:<30} {:<30} {:>10} {:>7.1}% {}",
+                    super::truncate_str(&u.bucket_key, 30).cyan(),
+                    super::truncate_str(&u.object_key, 30),
+                    u.file_size_human,
+                    u.progress_pct,
+                    resume_str,
+                );
+            }
+
+            println!("{}", "─".repeat(100));
+            if corrupt_count > 0 {
+                println!(
+                    "{} {} corrupt state file(s). Use 'upload-cleanup' to remove.",
+                    "⚠".yellow(),
+                    corrupt_count
+                );
+            }
+            println!(
+                "\n{} Resume with: raps object upload <bucket> <file> --resume",
+                "Hint:".yellow().bold()
+            );
+        }
+        _ => {
+            output_format.write(&outputs)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Abort a resumable upload and clean up its state file
+pub(crate) fn upload_abort(
+    bucket: &str,
+    object: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use raps_oss::MultipartUploadState;
+
+    let state = MultipartUploadState::load(bucket, object)?;
+    match state {
+        Some(s) => {
+            MultipartUploadState::delete(bucket, object)?;
+            if output_format.supports_colors() {
+                println!(
+                    "{} Aborted upload for '{}/{}' ({}/{} parts completed)",
+                    "✓".green().bold(),
+                    bucket,
+                    object,
+                    s.completed_parts.len(),
+                    s.total_parts
+                );
+            } else {
+                output_format.write(&serde_json::json!({
+                    "aborted": true,
+                    "bucket_key": bucket,
+                    "object_key": object,
+                }))?;
+            }
+        }
+        None => {
+            if output_format.supports_colors() {
+                println!(
+                    "{} No pending upload found for '{}/{}'",
+                    "⚠".yellow(),
+                    bucket,
+                    object
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Remove stale upload state files
+pub(crate) fn upload_cleanup(remove_all: bool, output_format: OutputFormat) -> Result<()> {
+    use raps_oss::MultipartUploadState;
+
+    let entries = MultipartUploadState::list_all()?;
+
+    if entries.is_empty() {
+        if output_format.supports_colors() {
+            println!("{}", "No upload state files found.".yellow());
+        }
+        return Ok(());
+    }
+
+    let mut removed = 0u32;
+    let mut kept = 0u32;
+
+    for (path, result) in &entries {
+        let should_remove = if remove_all {
+            true
+        } else {
+            match result {
+                Ok(state) => {
+                    // Remove if source file is missing or has changed
+                    let file_path = std::path::Path::new(&state.file_path);
+                    !file_path.exists() || !state.can_resume(file_path)
+                }
+                Err(_) => true, // Always remove corrupt state files
+            }
+        };
+
+        if should_remove {
+            if let Err(e) = std::fs::remove_file(path) {
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Failed to remove {}: {}",
+                        "⚠".yellow(),
+                        path.display(),
+                        e
+                    );
+                }
+            } else {
+                removed += 1;
+            }
+        } else {
+            kept += 1;
+        }
+    }
+
+    // Also clean up batch state if it exists
+    let batch_path = batch_state_path()?;
+    if batch_path.exists() && remove_all {
+        std::fs::remove_file(&batch_path)?;
+        removed += 1;
+    }
+
+    if output_format.supports_colors() {
+        println!(
+            "{} Cleaned up {} state file(s), {} kept",
+            "✓".green().bold(),
+            removed,
+            kept
+        );
+    } else {
+        output_format.write(&serde_json::json!({
+            "removed": removed,
+            "kept": kept,
+        }))?;
+    }
+
+    Ok(())
+}
