@@ -16,10 +16,22 @@ static YES: AtomicBool = AtomicBool::new(false);
 #[cfg(test)]
 pub(crate) static MOCK_IS_TERMINAL: AtomicBool = AtomicBool::new(true);
 
-/// Initialize interactive mode flags
+/// Initialize interactive mode flags.
+///
+/// Also checks environment variables as fallback:
+/// - `RAPS_NON_INTERACTIVE=1` — equivalent to `--non-interactive`
+/// - `RAPS_YES=1` — equivalent to `--yes`
 pub fn init(non_interactive: bool, yes: bool) {
-    NON_INTERACTIVE.store(non_interactive, Ordering::Relaxed);
-    YES.store(yes, Ordering::Relaxed);
+    let ni = non_interactive || env_is_truthy("RAPS_NON_INTERACTIVE");
+    let y = yes || env_is_truthy("RAPS_YES");
+    NON_INTERACTIVE.store(ni, Ordering::Relaxed);
+    YES.store(y, Ordering::Relaxed);
+}
+
+fn env_is_truthy(name: &str) -> bool {
+    std::env::var(name)
+        .ok()
+        .is_some_and(|v| matches!(v.as_str(), "1" | "true" | "yes"))
 }
 
 /// Check if non-interactive mode is enabled (explicit flag or no TTY detected)
