@@ -227,8 +227,8 @@ flowchart LR
 | Profile Import | `config profile import` | Local | ✅ Stable |
 | Profile Export | `config profile export` | Local | ✅ Stable |
 | Token Inspection | `auth inspect-token` | Local | ✅ Stable |
-| Pipeline Execution | `pipeline run` | Various | ✅ Stable |
-| Pipeline Validation | `pipeline validate` | Local | ✅ Stable |
+| Pipeline Execution | `pipeline run` | Various | ✅ Stable (v2) |
+| Pipeline Validation | `pipeline validate` | Local | ✅ Stable (v2) |
 
 ### Plugin System
 
@@ -291,22 +291,96 @@ sequenceDiagram
     RAPS-->>User: ✓ Translation complete
 ```
 
-### Pipeline Execution
+### Pipeline Execution (v2)
 
 ```mermaid
 flowchart TD
     Start([Start]) --> Load[Load Pipeline File]
     Load --> Validate{Validate}
     Validate -->|Invalid| Error[Show Errors]
-    Validate -->|Valid| Variables[Process Variables]
-    Variables --> Step1[Execute Step 1]
-    Step1 -->|Success| Step2[Execute Step 2]
-    Step1 -->|Fail| Check1{continue_on_error?}
-    Check1 -->|Yes| Step2
-    Check1 -->|No| Fail[Pipeline Failed]
-    Step2 -->|Success| StepN[Execute Step N]
-    Step2 -->|Fail| Check2{continue_on_error?}
-    StepN --> Complete([Pipeline Complete])
+    Validate -->|Valid| Defaults[Apply Pipeline Defaults]
+    Defaults --> Step[Evaluate Next Step]
+    Step --> Cond{if/unless?}
+    Cond -->|Skip| Record[Record Result & Continue]
+    Cond -->|Run| Type{Step Type}
+    Type -->|command| Retry[Execute with Retry & Timeout]
+    Type -->|parallel| Par[Run Parallel Steps]
+    Type -->|for_each| ForEach[Iterate with For-Each]
+    Retry -->|Success| Record
+    Retry -->|Fail| OnFail{on_failure?}
+    OnFail -->|Yes| Recovery[Run Recovery Steps]
+    OnFail -->|No| Check{ignore_failure?}
+    Recovery --> Check
+    Par --> Record
+    ForEach --> Record
+    Check -->|Yes| Record
+    Check -->|No| Fail[Pipeline Failed]
+    Record --> More{More steps?}
+    More -->|Yes| Step
+    More -->|No| Complete([Pipeline Complete])
+```
+
+#### Pipeline v2 Features
+
+Pipeline v2 adds retry logic, timeouts, conditionals, parallel execution, for-each loops, recovery steps, and pipeline-level defaults.
+
+**Step properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `name` | string | Human-readable step name |
+| `id` | string | Identifier for referencing exit codes in later steps |
+| `command` | string | RAPS command to execute (without `raps` prefix) |
+| `parallel` | list | Sub-steps to run concurrently |
+| `for_each` | object | Loop over a list of values (`var`, `in`, `parallel`, `max_concurrency`) |
+| `if` / `unless` | string | Conditional expression, e.g. `${{ steps.<id>.exit_code == 0 }}` |
+| `retry` | object | Retry config: `max_attempts`, `backoff` (fixed/exponential), `delay` |
+| `timeout` | string | Max duration for the step (e.g. `30s`, `5m`, `2h`) |
+| `on_failure` | list | Recovery steps that run when this step fails |
+| `ignore_failure` | bool | Continue pipeline even if this step fails |
+| `max_concurrency` | int | Limit concurrent tasks in `parallel` or `for_each` blocks |
+
+**Pipeline-level `defaults`** apply `retry` and `timeout` to all steps unless overridden.
+
+**Example** (YAML):
+
+```yaml
+name: Model Processing Pipeline
+defaults:
+  retry: { max_attempts: 3, backoff: exponential, delay: 5s }
+  timeout: 5m
+variables:
+  BUCKET: my-models
+
+steps:
+  - name: Check bucket
+    id: check_bucket
+    command: bucket info ${BUCKET}
+    ignore_failure: true
+
+  - name: Create bucket if missing
+    command: bucket create --key ${BUCKET}
+    if: "${{ steps.check_bucket.exit_code != 0 }}"
+
+  - name: Upload models in parallel
+    parallel:
+      - name: Upload building.rvt
+        command: object upload ${BUCKET} building.rvt
+      - name: Upload site.dwg
+        command: object upload ${BUCKET} site.dwg
+    max_concurrency: 2
+
+  - name: Translate all models
+    for_each:
+      var: MODEL
+      in: [building.rvt, site.dwg]
+      parallel: true
+      max_concurrency: 4
+    command: translate start urn:${BUCKET}/${MODEL}
+    retry: { max_attempts: 2, delay: 10s }
+    on_failure:
+      - name: Log failure
+        command: auth test
 ```
 
 ### Design Automation Workflow
@@ -377,6 +451,11 @@ timeline
         MCP Server : AI assistant integration
         14 MCP Tools : Direct API access for Claude, Cursor
         Natural Language : Conversational APS operations
+    section v3.1.0
+        Pipeline v2 : Retry, timeout, conditionals
+        Parallel Steps : Concurrent step execution
+        For-Each Loops : Iterate over value lists
+        Step Outputs : Conditional logic via exit codes
 ```
 
 ## Related Documentation

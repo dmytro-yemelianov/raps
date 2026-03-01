@@ -9,13 +9,13 @@ Usage:
 
 Options:
   --dry-run            Validate and preview without executing
-  --continue-on-error  Continue pipeline even if a step fails
+  --ignore-failure     Continue pipeline even if a step fails
   --help               Show this help
 
 Examples:
   $(basename "$0") pipeline.yaml --dry-run
   $(basename "$0") deploy-pipeline.yaml
-  $(basename "$0") batch-process.json --continue-on-error"
+  $(basename "$0") batch-process.json --ignore-failure"
 
 check_help "$@" && show_usage "$USAGE"
 
@@ -28,7 +28,7 @@ CONTINUE_ON_ERROR=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run)           DRY_RUN=true; shift ;;
-        --continue-on-error) CONTINUE_ON_ERROR=true; shift ;;
+        --ignore-failure) CONTINUE_ON_ERROR=true; shift ;;
         -*)                  error "Unknown option: $1"; exit 2 ;;
         *)
             if [[ -z "$PIPELINE_FILE" ]]; then
@@ -78,7 +78,7 @@ confirm "Execute pipeline: $PIPELINE_FILE?"
 
 step "Running pipeline..."
 RUN_ARGS=(raps pipeline run "$PIPELINE_FILE")
-$CONTINUE_ON_ERROR && RUN_ARGS+=(--continue-on-error)
+$CONTINUE_ON_ERROR && RUN_ARGS+=(--ignore-failure)
 
 if "${RUN_ARGS[@]}"; then
     info "Pipeline completed successfully."

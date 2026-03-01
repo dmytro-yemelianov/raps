@@ -24,7 +24,7 @@ steps:
 
   - name: Create issues from CSV
     command: issue create ${PROJECT_ID} --from-csv ${CSV_PATH}
-    continue_on_error: true
+    ignore_failure: true
 
   - name: Verify created issues
     command: issue list ${PROJECT_ID} --output table
