@@ -15,6 +15,7 @@
 pub mod api_health;
 pub mod auth;
 pub mod cache;
+pub mod circuit_breaker;
 pub mod config;
 pub mod error;
 pub mod http;
@@ -24,6 +25,10 @@ pub mod output;
 pub mod profiler;
 pub mod progress;
 pub mod prompts;
+pub mod rate_budget;
+pub mod region;
+pub mod response_cache;
+pub mod retry_policy;
 pub mod security;
 pub mod storage;
 pub mod types;

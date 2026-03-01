@@ -75,6 +75,10 @@ sha2.workspace = true
 dialoguer.workspace = true
 memory-stats.workspace = true
 tracing.workspace = true
+
+# Concurrent data structures (swarm orchestration)
+dashmap.workspace = true
+lru.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 

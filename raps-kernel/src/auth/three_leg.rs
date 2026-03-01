@@ -4,7 +4,6 @@
 //! 3-legged OAuth (authorization code) flow
 
 use anyhow::{Context, Result};
-use std::time::Duration;
 use tiny_http::{Response, Server};
 
 use super::AuthClient;
@@ -27,9 +26,9 @@ impl AuthClient {
                         return Ok(token.access_token.clone());
                     }
                     if cache.refreshing {
-                        // Another task is already refreshing; drop lock and wait
+                        // Another task is already refreshing; wait for notification
                         drop(cache);
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        self.token_refresh_notify.notified().await;
                         continue;
                     }
                     refresh_token_to_use = token.refresh_token.clone();
@@ -50,6 +49,8 @@ impl AuthClient {
                 if result.is_err() {
                     let mut cache = self.cached_3leg_token.lock().await;
                     cache.refreshing = false;
+                    drop(cache);
+                    self.token_refresh_notify.notify_waiters();
                 }
                 return result;
             }
@@ -311,6 +312,7 @@ impl AuthClient {
                 let mut cache = self.cached_3leg_token.lock().await;
                 cache.refreshing = false;
             }
+            self.token_refresh_notify.notify_waiters();
             anyhow::bail!("Token refresh failed. Please login again with 'raps auth login'");
         }
 
@@ -342,6 +344,7 @@ impl AuthClient {
             cache.token = Some(stored);
             cache.refreshing = false;
         }
+        self.token_refresh_notify.notify_waiters();
 
         Ok(token.access_token)
     }
@@ -352,6 +355,8 @@ impl AuthClient {
         let mut cache = self.cached_3leg_token.lock().await;
         cache.token = None;
         cache.refreshing = false;
+        drop(cache);
+        self.token_refresh_notify.notify_waiters();
         Ok(())
     }
 

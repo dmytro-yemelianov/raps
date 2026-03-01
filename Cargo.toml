@@ -141,6 +141,10 @@ tar = "0.4"
 # File locking for concurrent operations
 fs2 = "0.4"
 
+# Concurrent data structures
+dashmap = "6"
+lru = "0.12"
+
 # Testing
 assert_cmd = "2.1"
 predicates = "3.1"

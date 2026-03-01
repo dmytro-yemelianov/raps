@@ -164,6 +164,43 @@ pub async fn send_with_retry<F>(
 where
     F: Fn() -> reqwest::RequestBuilder,
 {
+    // --- Pre-flight: circuit breaker check ---
+    // We need the URL for endpoint classification.  Build once to peek, but
+    // the closure will be called again for the actual send.
+    let probe_req = build_request().build();
+    let endpoint_group = match &probe_req {
+        Ok(r) => crate::circuit_breaker::endpoint_group(r.url().as_str()).to_string(),
+        Err(_) => "other".to_string(),
+    };
+
+    // Check circuit breaker — fail fast if endpoint is unhealthy
+    if let Err(cb_err) = crate::circuit_breaker::registry().check(&endpoint_group) {
+        tracing::warn!(endpoint = %endpoint_group, "circuit breaker open — rejecting request");
+        anyhow::bail!(cb_err);
+    }
+
+    // --- Pre-flight: rate budget check ---
+    match crate::rate_budget::registry().check(&endpoint_group) {
+        crate::rate_budget::RateStatus::Exhausted { retry_after } => {
+            tracing::warn!(
+                endpoint = %endpoint_group,
+                retry_after_ms = retry_after.as_millis() as u64,
+                "rate limit exhausted — waiting before request"
+            );
+            sleep(retry_after).await;
+        }
+        crate::rate_budget::RateStatus::NearLimit { remaining, limit } => {
+            tracing::debug!(
+                endpoint = %endpoint_group,
+                remaining,
+                limit,
+                "rate limit near exhaustion"
+            );
+        }
+        _ => {}
+    }
+
+    // --- Request loop with retry ---
     let mut attempt = 0;
     let mut total_network_time = std::time::Duration::ZERO;
     loop {
@@ -179,6 +216,21 @@ where
                     elapsed_ms = elapsed.as_millis() as u64,
                     "HTTP response"
                 );
+
+                // Record rate limit headers
+                crate::rate_budget::registry()
+                    .record_from_headers(&endpoint_group, response.headers());
+
+                // Record success/failure for circuit breaker
+                let failure_type = crate::retry_policy::FailureType::from_status(status);
+                if let Some(ft) = failure_type {
+                    if ft.triggers_circuit_breaker() {
+                        crate::circuit_breaker::registry().record_failure(&endpoint_group);
+                    }
+                } else if status < 400 {
+                    crate::circuit_breaker::registry().record_success(&endpoint_group);
+                }
+
                 if is_retryable_status(status) && attempt < config.max_retries {
                     let delay = retry_delay_from_response(&response, attempt, config);
                     attempt += 1;
@@ -199,6 +251,10 @@ where
             }
             Err(err) => {
                 total_network_time += start.elapsed();
+
+                // Network error → record circuit breaker failure
+                crate::circuit_breaker::registry().record_failure(&endpoint_group);
+
                 let retriable = err.is_timeout() || err.is_connect() || err.is_request();
                 if !retriable || attempt >= config.max_retries {
                     crate::profiler::record_http_request(total_network_time);

@@ -32,6 +32,8 @@ pub struct AuthClient {
     pub(crate) http_client: reqwest::Client,
     pub(crate) cached_2leg_token: Arc<RwLock<Option<CachedToken>>>,
     pub(crate) cached_3leg_token: Arc<tokio::sync::Mutex<TokenCache>>,
+    /// Notify waiters when a 3-legged token refresh completes.
+    pub(crate) token_refresh_notify: Arc<tokio::sync::Notify>,
 }
 
 impl AuthClient {
@@ -59,6 +61,7 @@ impl AuthClient {
                 token: stored_token,
                 refreshing: false,
             })),
+            token_refresh_notify: Arc::new(tokio::sync::Notify::new()),
         }
     }
 
