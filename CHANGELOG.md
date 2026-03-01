@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.17.0] - 2026-03-01
+
+### Added
+- **Pipeline v2 Engine**: Complete rewrite of pipeline execution with retry, timeout, conditionals, parallel steps, and for-each loops.
+  - Expression evaluator for conditional step execution.
+  - Duration parser for human-readable timeouts (`30s`, `5m`).
+  - Parallel step execution with configurable concurrency.
+  - `for-each` loop steps for iterating over collections.
+  - 4 new MCP tools: `pipeline-validate`, `pipeline-dry-run`, `pipeline-run`, `pipeline-list-templates`.
+- **Pipeline v2 MCP Integration**: Validate, dry-run, and execute pipelines via MCP.
+
+### Changed
+- **keyring 2.3 → 3.6**: Simplified dependency tree, `delete_password()` → `delete_credential()`.
+- **reqwest 0.11 → 0.12**: Upgraded to hyper v1 / http v1 with zero API changes.
+
+### Fixed
+- Wrap all 18 blocking `dialoguer` prompts with `tokio::task::spawn_blocking` to prevent async runtime stalls.
+- Guard 3-legged OAuth device flow against non-interactive mode with early bail.
+- Fix npm publish workflow overwriting all optional deps with win32-x64.
+
+### Security
+- Add top-level `permissions:` blocks to publish and sbom workflows.
+- Remove 3 RustSec advisory exceptions (RUSTSEC-2024-0388, RUSTSEC-2024-0384, RUSTSEC-2025-0134) — resolved by keyring 3.6 and reqwest 0.12.
+
+## [4.16.0] - 2026-02-28
+
+### Added
+- **Pipeline v2 Data Model**: Restructured pipeline configuration with retry policies, timeout support, and conditional execution.
+
+### Fixed
+- CI: SBOM generation workflow fixes (filename, manifest-path, cargo-cyclonedx flags).
+- CI: Publish workflow — handle already-published crates, rate limit retries.
+- CI: Add continue-on-error to release announce dispatch steps.
+- Add version to internal workspace deps for crates.io publishing.
+
+## [4.15.0] - 2026-02-27
+
+### Added
+- **Plugin Signing**: Cryptographic plugin signature verification.
+- **ASVS L2 Compliance**: Full compliance documentation and matrix.
+- Security badges on README and website security page.
+
+### Security
+- Pin Semgrep container image and fuzz RAPS-specific code.
+- Comprehensive security hardening: ASVS L2, SLSA L2, CI scanning, OpenSSF Scorecard.
+
+## [4.14.1] - 2026-02-26
+
+### Security
+- Fix TOCTOU race condition in path validation.
+- Path traversal fix for download code paths using `sanitize_filename` and `safe_join`.
+- Automatic log redaction for Bearer tokens, cookies, and API keys.
+- Restricted directory permissions (0o700) for log and config directories.
+
+## [4.14.0] - 2026-02-25
+
+### Added
+- **Auto-Detect Headless Environments**: `auth login` detects missing display server and suggests alternatives.
+- **Live Progress Spinners**: API health and latency tracking on all network operations.
+- **Unix Pipe Support**: stdin/stdout piping across CLI commands.
+
+### Changed
+- Split 14 monolithic files into focused modules (MCP server.rs from 6312 lines → 8 modules).
+
+### Fixed
+- Validate empty auth code input and reset refreshing flag on error.
+- Validate client credentials before auth operations.
+- Replace broken device code flow with manual PKCE auth.
+- Comprehensive MCP server review fixes (20 issues).
+
 ## [4.13.0] - 2026-02-24
 
 ### Added
