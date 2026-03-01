@@ -8,6 +8,8 @@
 use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
+use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -286,61 +288,217 @@ async fn execute_command_step(
     }
 }
 
-async fn execute_step(
-    step: &Step,
-    variables: &HashMap<String, String>,
-    context: &StepContext,
-    defaults: &PipelineDefaults,
-    output_format: &OutputFormat,
+async fn execute_parallel_steps(
+    steps: Vec<Step>,
+    variables: HashMap<String, String>,
+    context: StepContext,
+    defaults: PipelineDefaults,
+    output_format: OutputFormat,
+    dry_run: bool,
+    max_concurrency: usize,
+) -> Result<StepOutcome> {
+    use tokio::sync::Semaphore;
+
+    let semaphore = Arc::new(Semaphore::new(max_concurrency));
+    let mut handles = Vec::new();
+
+    for step in steps {
+        let sem = semaphore.clone();
+        let vars = variables.clone();
+        let ctx = context.clone();
+        let defs = defaults.clone();
+        let fmt = output_format;
+
+        let handle = tokio::spawn(async move {
+            let _permit = sem.acquire().await.expect("semaphore closed");
+            execute_step(step, vars, ctx, defs, fmt, dry_run).await
+        });
+        handles.push(handle);
+    }
+
+    let mut any_failed = false;
+    let mut last_code = 0;
+
+    for handle in handles {
+        match handle.await {
+            Ok(Ok(StepOutcome::Failed(code))) => {
+                any_failed = true;
+                last_code = code;
+            }
+            Ok(Err(e)) => return Err(e),
+            Err(e) => anyhow::bail!("Parallel task panicked: {}", e),
+            _ => {}
+        }
+    }
+
+    if any_failed {
+        Ok(StepOutcome::Failed(last_code))
+    } else {
+        Ok(StepOutcome::Success(0))
+    }
+}
+
+async fn execute_for_each(
+    config: ForEachConfig,
+    parent_step: Step,
+    inner_steps: Vec<Step>,
+    variables: HashMap<String, String>,
+    context: StepContext,
+    defaults: PipelineDefaults,
+    output_format: OutputFormat,
     dry_run: bool,
 ) -> Result<StepOutcome> {
-    // Evaluate if/unless conditions
-    if let Some(ref expr) = step.if_expr {
-        if !eval_expression(expr, context)? {
-            return Ok(StepOutcome::Skipped);
+    if config.parallel {
+        use tokio::sync::Semaphore;
+
+        let max_concurrency = config.max_concurrency.unwrap_or(5);
+        let semaphore = Arc::new(Semaphore::new(max_concurrency));
+        let mut handles = Vec::new();
+
+        for item in &config.items {
+            let sem = semaphore.clone();
+            let mut iter_vars = variables.clone();
+            iter_vars.insert(config.var.clone(), item.clone());
+            let ctx = context.clone();
+            let defs = defaults.clone();
+            let fmt = output_format;
+
+            let steps_to_run: Vec<Step> = if let Some(ref cmd) = parent_step.command {
+                vec![Step {
+                    name: format!("{} [{}={}]", parent_step.name, config.var, item),
+                    command: Some(cmd.clone()),
+                    ..Step::default()
+                }]
+            } else {
+                inner_steps.clone()
+            };
+
+            let handle = tokio::spawn(async move {
+                let _permit = sem.acquire().await.expect("semaphore closed");
+                for step in steps_to_run {
+                    match execute_step(step.clone(), iter_vars.clone(), ctx.clone(), defs.clone(), fmt, dry_run).await? {
+                        StepOutcome::Failed(c) if !step.ignore_failure => {
+                            return Ok::<_, anyhow::Error>(StepOutcome::Failed(c));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(StepOutcome::Success(0))
+            });
+            handles.push(handle);
         }
-    }
-    if let Some(ref expr) = step.unless {
-        if eval_expression(expr, context)? {
-            return Ok(StepOutcome::Skipped);
-        }
-    }
 
-    let outcome = if let Some(ref cmd) = step.command {
-        execute_command_step(step, cmd, variables, defaults, dry_run, output_format).await?
-    } else if step.parallel.is_some() {
-        // Placeholder — will be implemented in Task 5
-        StepOutcome::Success(0)
-    } else if step.for_each.is_some() {
-        // Placeholder — will be implemented in Task 6
-        StepOutcome::Success(0)
-    } else {
-        anyhow::bail!("Step '{}' has no command, parallel, or for_each", step.name);
-    };
-
-    // Record result in context
-    if let Some(ref id) = step.id {
-        let exit_code = match &outcome {
-            StepOutcome::Success(code) => *code,
-            StepOutcome::Failed(code) => *code,
-            StepOutcome::Skipped => 0,
-        };
-        context
-            .lock()
-            .unwrap()
-            .insert(id.clone(), StepResult { exit_code });
-    }
-
-    // Run on_failure steps if step failed
-    if matches!(outcome, StepOutcome::Failed(_)) {
-        if let Some(ref failure_steps) = step.on_failure {
-            for fs in failure_steps {
-                let _ = Box::pin(execute_step(fs, variables, context, defaults, output_format, dry_run)).await;
+        for handle in handles {
+            match handle.await {
+                Ok(Ok(StepOutcome::Failed(code))) => return Ok(StepOutcome::Failed(code)),
+                Ok(Err(e)) => return Err(e),
+                Err(e) => anyhow::bail!("ForEach task panicked: {}", e),
+                _ => {}
             }
         }
-    }
+        Ok(StepOutcome::Success(0))
+    } else {
+        // Sequential for_each
+        for item in &config.items {
+            let mut iter_vars = variables.clone();
+            iter_vars.insert(config.var.clone(), item.clone());
 
-    Ok(outcome)
+            let steps_to_run: Vec<Step> = if let Some(ref cmd) = parent_step.command {
+                vec![Step {
+                    name: format!("{} [{}={}]", parent_step.name, config.var, item),
+                    command: Some(cmd.clone()),
+                    ..Step::default()
+                }]
+            } else {
+                inner_steps.clone()
+            };
+
+            for step in steps_to_run {
+                match execute_step(step.clone(), iter_vars.clone(), context.clone(), defaults.clone(), output_format, dry_run).await? {
+                    StepOutcome::Failed(c) if !step.ignore_failure => {
+                        return Ok(StepOutcome::Failed(c));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        Ok(StepOutcome::Success(0))
+    }
+}
+
+fn execute_step(
+    step: Step,
+    variables: HashMap<String, String>,
+    context: StepContext,
+    defaults: PipelineDefaults,
+    output_format: OutputFormat,
+    dry_run: bool,
+) -> BoxFuture<'static, Result<StepOutcome>> {
+    async move {
+        // Evaluate if/unless conditions
+        if let Some(ref expr) = step.if_expr {
+            if !eval_expression(expr, &context)? {
+                return Ok(StepOutcome::Skipped);
+            }
+        }
+        if let Some(ref expr) = step.unless {
+            if eval_expression(expr, &context)? {
+                return Ok(StepOutcome::Skipped);
+            }
+        }
+
+        let outcome = if let Some(ref cmd) = step.command {
+            execute_command_step(&step, cmd, &variables, &defaults, dry_run, &output_format).await?
+        } else if let Some(ref parallel_steps) = step.parallel {
+            execute_parallel_steps(
+                parallel_steps.clone(),
+                variables.clone(),
+                context.clone(),
+                defaults.clone(),
+                output_format,
+                dry_run,
+                step.max_concurrency.unwrap_or(10),
+            ).await?
+        } else if let Some(ref for_each) = step.for_each {
+            let inner_steps = step.steps.clone().unwrap_or_default();
+            execute_for_each(
+                for_each.clone(),
+                step.clone(),
+                inner_steps,
+                variables.clone(),
+                context.clone(),
+                defaults.clone(),
+                output_format,
+                dry_run,
+            ).await?
+        } else {
+            anyhow::bail!("Step '{}' has no command, parallel, or for_each", step.name);
+        };
+
+        // Record result in context
+        if let Some(ref id) = step.id {
+            let exit_code = match &outcome {
+                StepOutcome::Success(code) => *code,
+                StepOutcome::Failed(code) => *code,
+                StepOutcome::Skipped => 0,
+            };
+            context
+                .lock()
+                .unwrap()
+                .insert(id.clone(), StepResult { exit_code });
+        }
+
+        // Run on_failure steps if step failed
+        if matches!(outcome, StepOutcome::Failed(_)) {
+            if let Some(ref failure_steps) = step.on_failure {
+                for fs in failure_steps {
+                    let _ = execute_step(fs.clone(), variables.clone(), context.clone(), defaults.clone(), output_format, dry_run).await;
+                }
+            }
+        }
+
+        Ok(outcome)
+    }.boxed()
 }
 
 async fn run_pipeline(
@@ -382,11 +540,11 @@ async fn run_pipeline(
         }
 
         let outcome = execute_step(
-            step,
-            &pipeline.variables,
-            &context,
-            &pipeline.defaults,
-            &output_format,
+            step.clone(),
+            pipeline.variables.clone(),
+            context.clone(),
+            pipeline.defaults.clone(),
+            output_format,
             dry_run,
         )
         .await?;
@@ -876,5 +1034,48 @@ command: bucket list
     fn test_eval_expr_missing_step() {
         let ctx = Arc::new(Mutex::new(HashMap::new()));
         assert!(eval_expression("${{ steps.missing.exit_code == 0 }}", &ctx).is_err());
+    }
+
+    #[test]
+    fn test_parallel_step_deserialization() {
+        let yaml = r#"
+name: "Parallel Test"
+steps:
+  - name: Upload all
+    parallel:
+      - name: Upload A
+        command: "object upload bucket file-a.rvt"
+      - name: Upload B
+        command: "object upload bucket file-b.rvt"
+    max_concurrency: 2
+"#;
+        let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(pipeline.steps.len(), 1);
+        let step = &pipeline.steps[0];
+        assert!(step.parallel.is_some());
+        assert_eq!(step.parallel.as_ref().unwrap().len(), 2);
+        assert_eq!(step.max_concurrency, Some(2));
+    }
+
+    #[test]
+    fn test_for_each_deserialization() {
+        let yaml = r#"
+name: "ForEach Test"
+steps:
+  - name: Process each model
+    for_each:
+      var: model
+      in: ["a.rvt", "b.rvt", "c.dwg"]
+      parallel: true
+      max_concurrency: 3
+    command: "translate start ${model}"
+"#;
+        let pipeline: Pipeline = serde_yaml::from_str(yaml).unwrap();
+        let step = &pipeline.steps[0];
+        let fe = step.for_each.as_ref().unwrap();
+        assert_eq!(fe.var, "model");
+        assert_eq!(fe.items.len(), 3);
+        assert!(fe.parallel);
+        assert_eq!(fe.max_concurrency, Some(3));
     }
 }
