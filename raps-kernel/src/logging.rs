@@ -10,6 +10,7 @@
 //! - --debug: Include full trace (redacts secrets)
 
 use regex::Regex;
+use std::io::Write;
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -60,7 +61,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         });
 
     let stderr_layer = tracing_subscriber::fmt::layer()
-        .with_writer(std::io::stderr)
+        .with_writer(RedactingMakeWriter::new(std::io::stderr))
         .with_ansi(!no_color)
         .with_target(debug)
         .without_time()
@@ -74,7 +75,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
                 .join(".raps-logs")
         });
 
-    let _ = std::fs::create_dir_all(&log_dir);
+    let _ = crate::security::create_dir_restricted(&log_dir);
     cleanup_old_logs(&log_dir, 7);
 
     let file_appender = tracing_appender::rolling::daily(&log_dir, "raps.log");
@@ -93,18 +94,20 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         .map(|v| v.eq_ignore_ascii_case("json"))
         .unwrap_or(false);
 
+    let redacting_appender = RedactingMakeWriter::new(non_blocking_appender);
+
     let file_layer: Box<dyn Layer<_> + Send + Sync> = if use_json {
         Box::new(
             tracing_subscriber::fmt::layer()
                 .json()
-                .with_writer(non_blocking_appender)
+                .with_writer(redacting_appender)
                 .with_current_span(true)
                 .with_filter(file_filter),
         )
     } else {
         Box::new(
             tracing_subscriber::fmt::layer()
-                .with_writer(non_blocking_appender)
+                .with_writer(redacting_appender)
                 .with_ansi(false)
                 .with_filter(file_filter),
         )
@@ -157,10 +160,88 @@ pub fn redact_secrets(text: &str) -> String {
         })
     }
 
+    fn auth_header_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(r"(?i)(Authorization:\s*(?:Bearer|Basic))\s+[^\s,;]+")
+                .expect("auth_header_pattern regex is valid")
+        })
+    }
+
+    fn cookie_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(r"(?i)((?:Set-)?Cookie:)\s*[^\r\n]+")
+                .expect("cookie_pattern regex is valid")
+        })
+    }
+
+    fn x_api_key_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(r"(?i)(X-API-Key:)\s*[^\s,;]+")
+                .expect("x_api_key_pattern regex is valid")
+        })
+    }
+
+    fn url_token_pattern() -> &'static Regex {
+        static PAT: OnceLock<Regex> = OnceLock::new();
+        PAT.get_or_init(|| {
+            Regex::new(r"(?i)([?&](?:access_token|apikey|api_key|token)=)[^&\s]+")
+                .expect("url_token_pattern regex is valid")
+        })
+    }
+
     let redacted = secret_pattern().replace_all(text, "$1: [REDACTED]");
-    token_pattern()
-        .replace_all(&redacted, "$1: [REDACTED]")
+    let redacted = token_pattern().replace_all(&redacted, "$1: [REDACTED]");
+    let redacted = auth_header_pattern().replace_all(&redacted, "$1 [REDACTED]");
+    let redacted = cookie_pattern().replace_all(&redacted, "$1 [REDACTED]");
+    let redacted = x_api_key_pattern().replace_all(&redacted, "$1 [REDACTED]");
+    url_token_pattern()
+        .replace_all(&redacted, "${1}[REDACTED]")
         .into_owned()
+}
+
+/// A writer wrapper that redacts secrets from every line before passing to the inner writer.
+struct RedactingWriter<W: Write> {
+    inner: W,
+}
+
+impl<W: Write> Write for RedactingWriter<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let text = String::from_utf8_lossy(buf);
+        let redacted = redact_secrets(&text);
+        self.inner.write_all(redacted.as_bytes())?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// A `MakeWriter` that wraps another writer with automatic secret redaction.
+struct RedactingMakeWriter<W> {
+    inner: W,
+}
+
+impl<W> RedactingMakeWriter<W> {
+    fn new(inner: W) -> Self {
+        Self { inner }
+    }
+}
+
+impl<'a, W> tracing_subscriber::fmt::MakeWriter<'a> for RedactingMakeWriter<W>
+where
+    W: tracing_subscriber::fmt::MakeWriter<'a>,
+{
+    type Writer = RedactingWriter<W::Writer>;
+
+    fn make_writer(&'a self) -> Self::Writer {
+        RedactingWriter {
+            inner: self.inner.make_writer(),
+        }
+    }
 }
 
 /// Maximum total log size in bytes (50 MB).
@@ -317,5 +398,92 @@ mod tests {
         let text = r#""access_token":"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.abc123""#;
         let redacted = redact_secrets(text);
         assert!(!redacted.contains("eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9"));
+    }
+
+    // ==================== New Redaction Pattern Tests ====================
+
+    #[test]
+    fn test_redact_bearer_header() {
+        let text = "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.sig";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"));
+    }
+
+    #[test]
+    fn test_redact_basic_auth_header() {
+        let text = "Authorization: Basic dXNlcjpwYXNzd29yZA==";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("dXNlcjpwYXNzd29yZA=="));
+    }
+
+    #[test]
+    fn test_redact_cookie_header() {
+        let text = "Cookie: session_id=abc123; auth_token=xyz789";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("abc123"));
+    }
+
+    #[test]
+    fn test_redact_set_cookie_header() {
+        let text = "Set-Cookie: session=secret_value; Path=/; HttpOnly";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("secret_value"));
+    }
+
+    #[test]
+    fn test_redact_x_api_key_header() {
+        let text = "X-API-Key: sk-1234567890abcdef";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("sk-1234567890abcdef"));
+    }
+
+    #[test]
+    fn test_redact_url_access_token_param() {
+        let text = "https://api.example.com/data?access_token=secret123&format=json";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("secret123"));
+        assert!(redacted.contains("format=json"));
+    }
+
+    #[test]
+    fn test_redact_url_apikey_param() {
+        let text = "https://api.example.com/data?apikey=mykey123&limit=10";
+        let redacted = redact_secrets(text);
+        assert!(redacted.contains("[REDACTED]"));
+        assert!(!redacted.contains("mykey123"));
+    }
+
+    #[test]
+    fn test_redact_non_sensitive_unchanged() {
+        let text = "GET /api/v1/projects HTTP/1.1\nHost: example.com\nAccept: application/json";
+        let redacted = redact_secrets(text);
+        assert_eq!(text, redacted);
+    }
+
+    #[test]
+    fn test_redact_combined_patterns() {
+        let text = "Authorization: Bearer eyJtoken123456789012345 Cookie: sess=val X-API-Key: key123";
+        let redacted = redact_secrets(text);
+        assert!(!redacted.contains("eyJtoken"));
+        assert!(!redacted.contains("sess=val"));
+        assert!(!redacted.contains("key123"));
+    }
+
+    #[test]
+    fn test_redacting_writer() {
+        let mut buf = Vec::new();
+        {
+            let mut writer = super::RedactingWriter { inner: &mut buf };
+            write!(writer, "Authorization: Bearer secret_token_value_here").unwrap();
+        }
+        let output = String::from_utf8(buf).unwrap();
+        assert!(output.contains("[REDACTED]"));
+        assert!(!output.contains("secret_token_value_here"));
     }
 }

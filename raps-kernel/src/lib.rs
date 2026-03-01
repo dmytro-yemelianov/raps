@@ -23,6 +23,7 @@ pub mod output;
 pub mod profiler;
 pub mod progress;
 pub mod prompts;
+pub mod security;
 pub mod storage;
 pub mod types;
 

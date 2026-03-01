@@ -63,6 +63,19 @@ impl DerivativeClient {
             .unwrap_or("derivative");
         pb.set_message(format!("Downloading {}", filename));
 
+        // Validate output path stays within current directory
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        if let (Ok(canon_cwd), Ok(canon_target)) =
+            (cwd.canonicalize(), output_path.canonicalize())
+            && !canon_target.starts_with(&canon_cwd)
+        {
+            anyhow::bail!(
+                "Path '{}' escapes working directory '{}'",
+                output_path.display(),
+                cwd.display()
+            );
+        }
+
         // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
