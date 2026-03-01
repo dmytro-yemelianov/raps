@@ -378,6 +378,73 @@ fn evaluate_condition(condition: &str) -> bool {
     !trimmed.is_empty() && trimmed != "false" && trimmed != "0"
 }
 
+fn eval_expression(expr: &str, context: &StepContext) -> Result<bool> {
+    let trimmed = expr.trim();
+
+    // Check for ${{ ... }} template syntax
+    if let Some(inner) = trimmed.strip_prefix("${{").and_then(|s| s.strip_suffix("}}")) {
+        let inner = inner.trim();
+        return eval_comparison(inner, context);
+    }
+
+    // Fallback: simple truthiness
+    let lower = trimmed.to_lowercase();
+    Ok(!matches!(lower.as_str(), "false" | "0" | ""))
+}
+
+fn eval_comparison(expr: &str, context: &StepContext) -> Result<bool> {
+    // Support: <left> && <right>
+    if let Some((left, right)) = expr.split_once("&&") {
+        return Ok(eval_comparison(left.trim(), context)?
+            && eval_comparison(right.trim(), context)?);
+    }
+    // Support: <left> || <right>
+    if let Some((left, right)) = expr.split_once("||") {
+        return Ok(eval_comparison(left.trim(), context)?
+            || eval_comparison(right.trim(), context)?);
+    }
+
+    // Negation
+    if let Some(inner) = expr.strip_prefix('!') {
+        return Ok(!eval_comparison(inner.trim(), context)?);
+    }
+
+    // Comparison operators
+    let (lhs, op, rhs) = if let Some((l, r)) = expr.split_once("!=") {
+        (l.trim(), "!=", r.trim())
+    } else if let Some((l, r)) = expr.split_once("==") {
+        (l.trim(), "==", r.trim())
+    } else {
+        anyhow::bail!("Unsupported expression: {}", expr);
+    };
+
+    let lhs_val = resolve_value(lhs, context)?;
+    let rhs_val: i32 = rhs
+        .parse()
+        .with_context(|| format!("Invalid number in expression: {}", rhs))?;
+
+    match op {
+        "==" => Ok(lhs_val == rhs_val),
+        "!=" => Ok(lhs_val != rhs_val),
+        _ => unreachable!(),
+    }
+}
+
+fn resolve_value(path: &str, context: &StepContext) -> Result<i32> {
+    // Expected format: steps.<id>.exit_code
+    let parts: Vec<&str> = path.split('.').collect();
+    if parts.len() == 3 && parts[0] == "steps" && parts[2] == "exit_code" {
+        let step_id = parts[1];
+        let ctx = context.lock().unwrap();
+        let result = ctx
+            .get(step_id)
+            .ok_or_else(|| anyhow::anyhow!("Step '{}' not found in context", step_id))?;
+        Ok(result.exit_code)
+    } else {
+        anyhow::bail!("Unknown variable path: {}", path);
+    }
+}
+
 fn parse_duration(s: &str) -> Result<std::time::Duration> {
     let s = s.trim();
     if s.is_empty() {
@@ -667,5 +734,35 @@ command: bucket list
     fn test_parse_duration_invalid() {
         assert!(parse_duration("abc").is_err());
         assert!(parse_duration("").is_err());
+    }
+
+    #[test]
+    fn test_eval_expr_simple_eq() {
+        let mut ctx = HashMap::new();
+        ctx.insert("upload".to_string(), StepResult { exit_code: 0 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression("${{ steps.upload.exit_code == 0 }}", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_not_eq() {
+        let mut ctx = HashMap::new();
+        ctx.insert("check".to_string(), StepResult { exit_code: 1 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression("${{ steps.check.exit_code != 0 }}", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_no_template_fallback() {
+        let ctx = Arc::new(Mutex::new(HashMap::new()));
+        assert!(eval_expression("true", &ctx).unwrap());
+        assert!(!eval_expression("false", &ctx).unwrap());
+        assert!(!eval_expression("0", &ctx).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_missing_step() {
+        let ctx = Arc::new(Mutex::new(HashMap::new()));
+        assert!(eval_expression("${{ steps.missing.exit_code == 0 }}", &ctx).is_err());
     }
 }
