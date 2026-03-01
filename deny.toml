@@ -22,6 +22,7 @@ allow = [
     "Zlib",
     "Unicode-3.0",
     "Unicode-DFS-2016",
+    "CDLA-Permissive-2.0",
 ]
 
 # Allow duplicate versions of windows crates (transitive dependencies)
