@@ -24,7 +24,7 @@ steps:
 
   - name: Create submittals from template
     command: acc submittals create ${PROJECT_ID} --title "Initial Submittal Package" --spec-section "01 00 00"
-    continue_on_error: true
+    ignore_failure: true
 
   - name: List created submittals
     command: acc submittals list ${PROJECT_ID} --output table
