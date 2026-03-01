@@ -335,6 +335,7 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
         | ResourceData::Manifest(fields)
         | ResourceData::DerivativeDetail(fields)
         | ResourceData::WebhookDetail(fields)
-        | ResourceData::PhotosceneDetail(fields) => fields.first().map(|f| f.value.clone()),
+        | ResourceData::PhotosceneDetail(fields)
+        | ResourceData::SwarmStatus(fields) => fields.first().map(|f| f.value.clone()),
     }
 }

@@ -765,7 +765,8 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
         | ResourceData::Manifest(fields)
         | ResourceData::DerivativeDetail(fields)
         | ResourceData::WebhookDetail(fields)
-        | ResourceData::PhotosceneDetail(fields) => {
+        | ResourceData::PhotosceneDetail(fields)
+        | ResourceData::SwarmStatus(fields) => {
             let table_rows: Vec<Row> = fields
                 .iter()
                 .map(|field| {
@@ -983,6 +984,7 @@ fn shortcut_hints(app: &App) -> String {
             | ViewKind::DerivativeDetail { .. }
             | ViewKind::WebhookDetail { .. }
             | ViewKind::PhotosceneDetail { .. }
+            | ViewKind::SwarmOverview
     ) {
         return "Esc:Back  y:Copy  r:Refresh  Enter:Drill  ?:Help".into();
     }

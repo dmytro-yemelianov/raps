@@ -13,14 +13,17 @@
 #![allow(clippy::uninlined_format_args)]
 
 pub mod api_health;
+pub mod audit;
 pub mod auth;
 pub mod cache;
+pub mod checkpoint;
 pub mod circuit_breaker;
 pub mod config;
 pub mod error;
 pub mod http;
 pub mod interactive;
 pub mod logging;
+pub mod metrics;
 pub mod output;
 pub mod profiler;
 pub mod progress;

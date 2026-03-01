@@ -138,6 +138,11 @@ pub const TOOLS: &[&str] = &[
     "pipeline_dry_run",
     "pipeline_run",
     "pipeline_list_templates",
+    // Compound Workflows
+    "workflow_prepare_for_viewing",
+    "workflow_analyze_model",
+    "workflow_batch_translate",
+    "swarm_status",
 ];
 
 #[cfg(test)]
@@ -148,8 +153,8 @@ mod tests {
     fn test_tools_array_count() {
         assert_eq!(
             TOOLS.len(),
-            105,
-            "TOOLS array has {} entries, expected 105 — sync with get_tools() in server.rs",
+            109,
+            "TOOLS array has {} entries, expected 109 — sync with get_tools() in server.rs",
             TOOLS.len()
         );
     }

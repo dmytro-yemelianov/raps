@@ -32,6 +32,7 @@ pub mod reality;
 pub mod report;
 pub mod rfi;
 pub mod schema;
+pub mod swarm;
 pub mod template;
 pub mod tracked;
 pub mod translate;

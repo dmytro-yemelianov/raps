@@ -329,6 +329,10 @@ enum Commands {
     #[command(subcommand)]
     Cache(commands::cache::CacheCommands),
 
+    /// Swarm orchestration (circuit breakers, rate budgets, metrics, audit)
+    #[command(subcommand)]
+    Swarm(commands::swarm::SwarmCommands),
+
     /// Generate JSON Schema for CLI output types
     #[command(subcommand)]
     Schema(commands::schema::SchemaCommands),
@@ -875,6 +879,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Serve => "serve",
         Commands::Doctor => "doctor",
         Commands::Cache(_) => "cache",
+        Commands::Swarm(_) => "swarm",
         Commands::Schema(_) => "schema",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
@@ -1071,6 +1076,10 @@ async fn execute_command(
         }
 
         Commands::Cache(cmd) => {
+            cmd.execute(output_format)?;
+        }
+
+        Commands::Swarm(cmd) => {
             cmd.execute(output_format)?;
         }
 

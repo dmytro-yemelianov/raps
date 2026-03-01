@@ -1300,6 +1300,35 @@ impl RapsServer {
                 self.pipeline_list_templates(directory).await
             }
 
+            // ─── Compound Workflows ─────────────────────────────────
+            "workflow_prepare_for_viewing" => {
+                let file_path = match Self::required_arg(&args, "file_path") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let bucket_key = Self::optional_arg(&args, "bucket_key");
+                let object_key = Self::optional_arg(&args, "object_key");
+                self.workflow_prepare_for_viewing(file_path, bucket_key, object_key).await
+            }
+            "workflow_analyze_model" => {
+                let urn = match Self::required_arg(&args, "urn") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let region = Self::optional_arg(&args, "region");
+                self.workflow_analyze_model(urn, region).await
+            }
+            "workflow_batch_translate" => {
+                let urns = match Self::required_arg(&args, "urns") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let output_format = Self::optional_arg(&args, "output_format");
+                let region = Self::optional_arg(&args, "region");
+                self.workflow_batch_translate(urns, output_format, region).await
+            }
+            "swarm_status" => self.swarm_status_tool().await,
+
             _ => format!("Unknown tool: {}", name),
         };
 

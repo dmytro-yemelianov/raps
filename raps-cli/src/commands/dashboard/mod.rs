@@ -77,10 +77,11 @@ enum ResourceTab {
     ModelDerivative,
     Webhooks,
     RealityCapture,
+    Swarm,
 }
 
 impl ResourceTab {
-    const ALL: [ResourceTab; 7] = [
+    const ALL: [ResourceTab; 8] = [
         ResourceTab::Buckets,
         ResourceTab::DataManagement,
         ResourceTab::Issues,
@@ -88,6 +89,7 @@ impl ResourceTab {
         ResourceTab::ModelDerivative,
         ResourceTab::Webhooks,
         ResourceTab::RealityCapture,
+        ResourceTab::Swarm,
     ];
 
     fn index(self) -> usize {
@@ -99,6 +101,7 @@ impl ResourceTab {
             ResourceTab::ModelDerivative => 4,
             ResourceTab::Webhooks => 5,
             ResourceTab::RealityCapture => 6,
+            ResourceTab::Swarm => 7,
         }
     }
 
@@ -111,6 +114,7 @@ impl ResourceTab {
             ResourceTab::ModelDerivative => "F5 Derivative",
             ResourceTab::Webhooks => "F6 Webhooks",
             ResourceTab::RealityCapture => "F7 Reality",
+            ResourceTab::Swarm => "F8 Swarm",
         }
     }
 }
@@ -221,6 +225,8 @@ enum ViewKind {
     PhotosceneDetail {
         id: String,
     },
+    // Swarm tab (F8)
+    SwarmOverview,
 }
 
 impl ViewKind {
@@ -262,6 +268,7 @@ impl ViewKind {
             ViewKind::WebhookDetail { hook_id, .. } => format!("Webhook: {hook_id}"),
             ViewKind::PhotosceneList => "Photoscenes".into(),
             ViewKind::PhotosceneDetail { id } => format!("Photoscene: {id}"),
+            ViewKind::SwarmOverview => "Swarm Status".into(),
         }
     }
 }
@@ -302,6 +309,7 @@ enum ResourceData {
     WebhookDetail(Vec<DetailField>),
     Photoscenes(Vec<PhotosceneRow>),
     PhotosceneDetail(Vec<DetailField>),
+    SwarmStatus(Vec<DetailField>),
 }
 
 // --- Row structs ---
@@ -514,7 +522,7 @@ struct Clients {
 /// Application state
 struct App {
     tab: ResourceTab,
-    nav_stacks: [Vec<ViewKind>; 7],
+    nav_stacks: [Vec<ViewKind>; 8],
     table_state: TableState,
     /// Currently displayed data for the active view (set from cache or fresh fetch).
     data: Option<ResourceData>,
@@ -557,6 +565,7 @@ impl App {
                 vec![],                         // Tab 4: Model Derivative (empty until :urn)
                 vec![ViewKind::WebhookList],    // Tab 5: Webhooks
                 vec![ViewKind::PhotosceneList], // Tab 6: Reality Capture
+                vec![ViewKind::SwarmOverview],  // Tab 7: Swarm
             ],
             table_state: TableState::default(),
             data: None,
@@ -871,7 +880,8 @@ impl App {
             | ResourceData::Manifest(v)
             | ResourceData::DerivativeDetail(v)
             | ResourceData::WebhookDetail(v)
-            | ResourceData::PhotosceneDetail(v) => v.len(),
+            | ResourceData::PhotosceneDetail(v)
+            | ResourceData::SwarmStatus(v) => v.len(),
         }
     }
 }

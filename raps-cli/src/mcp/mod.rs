@@ -15,6 +15,7 @@ pub mod server;
 pub mod tools;
 mod tools_acc;
 mod tools_admin;
+mod tools_compound;
 mod tools_dm;
 mod tools_misc;
 mod tools_oss;

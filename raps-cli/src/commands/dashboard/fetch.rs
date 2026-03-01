@@ -1087,5 +1087,134 @@ async fn fetch_data(
             ];
             Ok(ResourceData::PhotosceneDetail(fields))
         }
+        ViewKind::SwarmOverview => {
+            let mut fields = Vec::new();
+
+            // Circuit breakers
+            fields.push(DetailField {
+                label: "── Circuit Breakers ──".into(),
+                value: String::new(),
+            });
+            let cb_snap = raps_kernel::circuit_breaker::registry().snapshot();
+            if cb_snap.is_empty() {
+                fields.push(DetailField {
+                    label: "Status".into(),
+                    value: "All circuits closed (healthy)".into(),
+                });
+            } else {
+                for (name, state, failures) in &cb_snap {
+                    fields.push(DetailField {
+                        label: name.clone(),
+                        value: format!("{state} (failures: {failures})"),
+                    });
+                }
+            }
+
+            // Rate budgets
+            fields.push(DetailField {
+                label: "── Rate Budgets ──".into(),
+                value: String::new(),
+            });
+            let rb_snap = raps_kernel::rate_budget::registry().snapshot();
+            if rb_snap.is_empty() {
+                fields.push(DetailField {
+                    label: "Status".into(),
+                    value: "No budget data yet".into(),
+                });
+            } else {
+                for (name, remaining, limit) in &rb_snap {
+                    let pct = if *limit > 0 {
+                        *remaining as f64 / *limit as f64 * 100.0
+                    } else {
+                        100.0
+                    };
+                    fields.push(DetailField {
+                        label: name.clone(),
+                        value: format!("{remaining}/{limit} ({pct:.0}% remaining)"),
+                    });
+                }
+            }
+
+            // Response cache
+            fields.push(DetailField {
+                label: "── Response Cache ──".into(),
+                value: String::new(),
+            });
+            let cache_len = raps_kernel::response_cache::cache().len();
+            fields.push(DetailField {
+                label: "Entries".into(),
+                value: format!("{cache_len}"),
+            });
+
+            // Metrics summary
+            fields.push(DetailField {
+                label: "── API Metrics ──".into(),
+                value: String::new(),
+            });
+            let metrics_snap = raps_kernel::metrics::collector().snapshot();
+            if metrics_snap.api_metrics.is_empty() {
+                fields.push(DetailField {
+                    label: "Status".into(),
+                    value: "No API calls recorded yet".into(),
+                });
+            } else {
+                for ep in &metrics_snap.api_metrics {
+                    fields.push(DetailField {
+                        label: ep.endpoint.clone(),
+                        value: format!(
+                            "{} reqs, {} errs, avg {}ms",
+                            ep.request_count, ep.error_count, ep.avg_latency_ms
+                        ),
+                    });
+                }
+            }
+
+            // Checkpoints
+            fields.push(DetailField {
+                label: "── Checkpoints ──".into(),
+                value: String::new(),
+            });
+            let cp_dir = raps_kernel::checkpoint::CheckpointStore::default_dir();
+            match raps_kernel::checkpoint::CheckpointStore::new(cp_dir) {
+                Ok(store) => match store.list() {
+                    Ok(checkpoints) => {
+                        let incomplete: Vec<&raps_kernel::checkpoint::Checkpoint> =
+                            checkpoints.iter().filter(|c| !c.is_complete()).collect();
+                        if incomplete.is_empty() {
+                            fields.push(DetailField {
+                                label: "Status".into(),
+                                value: "No incomplete checkpoints".into(),
+                            });
+                        } else {
+                            for cp in &incomplete {
+                                let pct = (cp.progress() * 100.0) as u32;
+                                let remaining = cp.remaining().len();
+                                fields.push(DetailField {
+                                    label: cp.workflow_id.clone(),
+                                    value: format!(
+                                        "{} — {pct}% done ({remaining} remaining)",
+                                        cp.workflow_type,
+                                    ),
+                                });
+                            }
+                        }
+                    }
+                    Err(_) => {
+                        fields.push(DetailField {
+                            label: "Status".into(),
+                            value: "No checkpoint data".into(),
+                        });
+                    }
+                },
+                Err(_) => {
+                    fields.push(DetailField {
+                        label: "Status".into(),
+                        value: "No checkpoint data".into(),
+                    });
+                }
+            }
+
+            Ok(ResourceData::SwarmStatus(fields))
+        }
     }
 }

@@ -98,7 +98,7 @@ pub(super) fn handle_key(
             KeyCode::Char(':') => {
                 app.input_mode = InputMode::Command(String::new());
             }
-            KeyCode::F(n @ 1..=7) => {
+            KeyCode::F(n @ 1..=8) => {
                 let tab = ResourceTab::ALL[(n as usize) - 1];
                 switch_tab(app, tab, clients, tx);
             }
@@ -137,6 +137,7 @@ pub(super) fn handle_key(
         KeyCode::F(5) => switch_tab(app, ResourceTab::ModelDerivative, clients, tx),
         KeyCode::F(6) => switch_tab(app, ResourceTab::Webhooks, clients, tx),
         KeyCode::F(7) => switch_tab(app, ResourceTab::RealityCapture, clients, tx),
+        KeyCode::F(8) => switch_tab(app, ResourceTab::Swarm, clients, tx),
         KeyCode::Tab => {
             cycle_tab(app, true, clients, tx);
         }
@@ -391,7 +392,7 @@ fn show_help(app: &mut App) {
     app.error_msg = Some(format!(
         "Tabs\n\
          F1 Buckets   F2 Data Mgmt   F3 ACC   F4 Design Auto\n\
-         F5 Derivative   F6 Webhooks   F7 Reality\n\
+         F5 Derivative   F6 Webhooks   F7 Reality   F8 Swarm\n\
          Tab/Shift-Tab  Cycle tabs\n\n\
          Navigation\n\
          j/k        Up / Down          PgUp/PgDn  Page scroll\n\

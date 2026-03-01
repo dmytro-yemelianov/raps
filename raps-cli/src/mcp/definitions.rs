@@ -1233,5 +1233,49 @@ pub(crate) fn get_tools() -> Vec<Tool> {
                 &[],
             ),
         ),
+        // ─── Compound Workflows ─────────────────────────────────
+        Tool::new(
+            "workflow_prepare_for_viewing",
+            "Upload a file and start SVF2 translation in one step. Returns URN and translation status. Use translate_status to poll for completion.",
+            schema(
+                json!({
+                    "file_path": {"type": "string", "description": "Local file path to upload (e.g. /path/to/model.rvt)"},
+                    "bucket_key": {"type": "string", "description": "Target bucket (default: raps-workflow-temp)"},
+                    "object_key": {"type": "string", "description": "Object key in bucket (default: filename)"}
+                }),
+                &["file_path"],
+            ),
+        ),
+        Tool::new(
+            "workflow_analyze_model",
+            "Get comprehensive analysis of a translated model: translation status, metadata, and properties in one call.",
+            schema(
+                json!({
+                    "urn": {"type": "string", "description": "Base64-encoded URN of the translated model"},
+                    "region": {"type": "string", "description": "Region: US or EMEA (default: US)"}
+                }),
+                &["urn"],
+            ),
+        ),
+        Tool::new(
+            "workflow_batch_translate",
+            "Start translation for multiple URNs at once. Returns status for each. Pass comma-separated URNs.",
+            schema(
+                json!({
+                    "urns": {"type": "string", "description": "Comma-separated list of base64-encoded URNs"},
+                    "output_format": {"type": "string", "description": "Output format: svf, svf2, thumbnail, stl, obj (default: svf2)"},
+                    "region": {"type": "string", "description": "Region: US or EMEA (default: US)"}
+                }),
+                &["urns"],
+            ),
+        ),
+        Tool::new(
+            "swarm_status",
+            "Get swarm orchestration health: circuit breaker states, rate limit budgets, and response cache stats. Useful for diagnosing API connectivity issues.",
+            schema(
+                json!({}),
+                &[],
+            ),
+        ),
     ]
 }
