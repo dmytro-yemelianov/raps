@@ -159,6 +159,129 @@ impl RapsServer {
         output
     }
 
+    /// Compare two model versions by checking translation status for both URNs.
+    ///
+    /// Steps: get status for URN A → get status for URN B → diff report
+    pub(crate) async fn workflow_compare_versions(
+        &self,
+        urn_a: String,
+        urn_b: String,
+        label_a: Option<String>,
+        label_b: Option<String>,
+    ) -> String {
+        let label_a = label_a.unwrap_or_else(|| "Version A".to_string());
+        let label_b = label_b.unwrap_or_else(|| "Version B".to_string());
+
+        let mut output = format!(
+            "Workflow: Compare Versions\n{}\n\n",
+            "─".repeat(40),
+        );
+
+        // Step 1: Get status for URN A
+        let status_a = self.translate_status(urn_a.clone()).await;
+        output.push_str(&format!("{label_a}:\n"));
+        output.push_str(&format!("  URN: {}\n", if urn_a.len() > 60 { format!("{}…", &urn_a[..59]) } else { urn_a.clone() }));
+        let state_a = if status_a.contains("complete") || status_a.contains("success") {
+            "complete"
+        } else if status_a.contains("failed") {
+            "failed"
+        } else if status_a.contains("not found") {
+            "not found"
+        } else {
+            "in progress"
+        };
+        output.push_str(&format!("  Status: {state_a}\n\n"));
+
+        // Step 2: Get status for URN B
+        let status_b = self.translate_status(urn_b.clone()).await;
+        output.push_str(&format!("{label_b}:\n"));
+        output.push_str(&format!("  URN: {}\n", if urn_b.len() > 60 { format!("{}…", &urn_b[..59]) } else { urn_b.clone() }));
+        let state_b = if status_b.contains("complete") || status_b.contains("success") {
+            "complete"
+        } else if status_b.contains("failed") {
+            "failed"
+        } else if status_b.contains("not found") {
+            "not found"
+        } else {
+            "in progress"
+        };
+        output.push_str(&format!("  Status: {state_b}\n\n"));
+
+        // Step 3: Comparison summary
+        output.push_str("Comparison:\n");
+        if state_a == "complete" && state_b == "complete" {
+            output.push_str("  Both versions are fully translated and ready for comparison.\n");
+            output.push_str("  Suggestions:\n");
+            output.push_str("  • Use `translate_download` to download derivatives for both\n");
+            output.push_str("  • Both models can be loaded in Autodesk Viewer for visual comparison\n");
+        } else {
+            if state_a != "complete" {
+                output.push_str(&format!("  {label_a} is not ready ({state_a})\n"));
+            }
+            if state_b != "complete" {
+                output.push_str(&format!("  {label_b} is not ready ({state_b})\n"));
+            }
+            output.push_str("  Wait for both translations to complete before comparing.\n");
+        }
+
+        output
+    }
+
+    /// Set up a new project workspace: create bucket, prepare for uploads.
+    ///
+    /// Steps: create bucket → report ready state
+    pub(crate) async fn workflow_setup_project(
+        &self,
+        project_name: String,
+        bucket_region: Option<String>,
+    ) -> String {
+        let mut output = format!(
+            "Workflow: Setup Project\n{}\n\n",
+            "─".repeat(40),
+        );
+
+        // Normalize project name to a valid bucket key
+        let bucket_key = project_name
+            .to_lowercase()
+            .replace(' ', "-")
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+            .collect::<String>();
+
+        if bucket_key.len() < 3 {
+            return format!("Error: Project name '{project_name}' is too short for a bucket key (min 3 chars).");
+        }
+
+        output.push_str(&format!("Project: {project_name}\n"));
+        output.push_str(&format!("Bucket key: {bucket_key}\n\n"));
+
+        // Step 1: Create bucket
+        let region = bucket_region.unwrap_or_else(|| "US".to_string());
+        let create_result = self.bucket_create(
+            bucket_key.clone(),
+            "persistent".to_string(),
+            region.clone(),
+        ).await;
+
+        if create_result.contains("Error") || create_result.contains("Failed") {
+            if create_result.contains("409") || create_result.contains("already exists") || create_result.contains("Conflict") {
+                output.push_str(&format!("Bucket '{bucket_key}' already exists — using existing bucket.\n\n"));
+            } else {
+                return format!("Bucket creation failed: {create_result}");
+            }
+        } else {
+            output.push_str(&format!("Bucket '{bucket_key}' created (region: {region}, policy: persistent).\n\n"));
+        }
+
+        output.push_str("Project workspace is ready.\n\n");
+        output.push_str("Next steps:\n");
+        output.push_str(&format!("  • Upload files: use `object_upload` with bucket '{bucket_key}'\n"));
+        output.push_str("  • Start translations: use `workflow_prepare_for_viewing`\n");
+        output.push_str("  • List contents: use `object_list`\n");
+
+        output
+    }
+
     /// Get swarm orchestration status for AI agent introspection.
     pub(crate) async fn swarm_status_tool(&self) -> String {
         let cb_snap = raps_kernel::circuit_breaker::registry().snapshot();

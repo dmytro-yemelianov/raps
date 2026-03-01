@@ -1270,6 +1270,30 @@ pub(crate) fn get_tools() -> Vec<Tool> {
             ),
         ),
         Tool::new(
+            "workflow_compare_versions",
+            "Compare two model versions by checking translation status for both URNs. Reports readiness for visual comparison in Autodesk Viewer.",
+            schema(
+                json!({
+                    "urn_a": {"type": "string", "description": "Base64-encoded URN of the first model version"},
+                    "urn_b": {"type": "string", "description": "Base64-encoded URN of the second model version"},
+                    "label_a": {"type": "string", "description": "Label for version A (default: 'Version A')"},
+                    "label_b": {"type": "string", "description": "Label for version B (default: 'Version B')"}
+                }),
+                &["urn_a", "urn_b"],
+            ),
+        ),
+        Tool::new(
+            "workflow_setup_project",
+            "Set up a new project workspace: creates a persistent bucket for file storage. Returns bucket key and next steps for uploading and translating models.",
+            schema(
+                json!({
+                    "project_name": {"type": "string", "description": "Project name (will be normalized to a valid bucket key)"},
+                    "bucket_region": {"type": "string", "description": "Bucket region: US or EMEA (default: US)"}
+                }),
+                &["project_name"],
+            ),
+        ),
+        Tool::new(
             "swarm_status",
             "Get swarm orchestration health: circuit breaker states, rate limit budgets, and response cache stats. Useful for diagnosing API connectivity issues.",
             schema(

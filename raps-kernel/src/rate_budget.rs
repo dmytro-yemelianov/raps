@@ -233,6 +233,12 @@ impl RateBudgetRegistry {
         }
     }
 
+    /// Clear all tracked budgets.
+    pub fn reset_all(&self) {
+        self.budgets.clear();
+        self.known_limits.clear();
+    }
+
     /// Snapshot of all tracked budgets.
     pub fn snapshot(&self) -> Vec<(String, u32, u32)> {
         self.budgets

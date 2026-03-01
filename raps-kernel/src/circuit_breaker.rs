@@ -266,6 +266,11 @@ impl CircuitBreakerRegistry {
         breaker.record_failure();
     }
 
+    /// Clear all circuit breakers, resetting them to closed state.
+    pub fn reset_all(&self) {
+        self.breakers.clear();
+    }
+
     /// Snapshot of all circuit breaker states.
     pub fn snapshot(&self) -> Vec<(String, CircuitState, u32)> {
         self.breakers

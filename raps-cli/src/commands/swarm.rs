@@ -21,6 +21,17 @@ pub enum SwarmCommands {
     /// Show API latency, error rates, translation stats
     Metrics,
 
+    /// Show all batch operations: pending, active, and completed
+    Queue {
+        /// Filter by workflow type (e.g. "upload", "translate", "permissions")
+        #[arg(long, short)]
+        r#type: Option<String>,
+
+        /// Show only incomplete operations
+        #[arg(long)]
+        pending: bool,
+    },
+
     /// List incomplete batch operations that can be resumed
     Resume,
 
@@ -33,6 +44,13 @@ pub enum SwarmCommands {
         /// Number of most recent entries to show.
         #[arg(long, default_value = "20")]
         limit: usize,
+    },
+
+    /// Reset swarm state: circuit breakers, caches, or all
+    Reset {
+        /// What to reset: "circuit-breakers", "cache", "rate-budgets", or "all"
+        #[arg(default_value = "all")]
+        target: String,
     },
 }
 
@@ -78,8 +96,10 @@ impl SwarmCommands {
         match self {
             SwarmCommands::Status => swarm_status(output_format),
             SwarmCommands::Metrics => swarm_metrics(output_format),
+            SwarmCommands::Queue { r#type, pending } => swarm_queue(r#type, pending, output_format),
             SwarmCommands::Resume => swarm_resume(output_format),
             SwarmCommands::Audit { date, limit } => swarm_audit(date, limit, output_format),
+            SwarmCommands::Reset { target } => swarm_reset(&target, output_format),
         }
     }
 }
@@ -306,6 +326,155 @@ fn swarm_audit(date: Option<String>, limit: usize, output_format: OutputFormat) 
         }
         _ => {
             output_format.write(&tail)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Queue
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, schemars::JsonSchema)]
+struct QueueItem {
+    workflow_id: String,
+    workflow_type: String,
+    status: String,
+    total: usize,
+    completed: usize,
+    failed: usize,
+    remaining: usize,
+    progress_pct: f64,
+    created_at: String,
+    updated_at: String,
+}
+
+fn swarm_queue(
+    type_filter: Option<String>,
+    pending_only: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let store_dir = raps_kernel::checkpoint::CheckpointStore::default_dir();
+    let store = raps_kernel::checkpoint::CheckpointStore::new(store_dir)?;
+    let checkpoints = store.list()?;
+
+    let items: Vec<QueueItem> = checkpoints
+        .iter()
+        .filter(|cp| {
+            if let Some(ref t) = type_filter {
+                if !cp.workflow_type.to_lowercase().contains(&t.to_lowercase()) {
+                    return false;
+                }
+            }
+            if pending_only && cp.is_complete() {
+                return false;
+            }
+            true
+        })
+        .map(|cp| {
+            let status = if cp.is_complete() {
+                if cp.failed.is_empty() {
+                    "completed".to_string()
+                } else {
+                    "completed (failures)".to_string()
+                }
+            } else if cp.completed.is_empty() && cp.failed.is_empty() {
+                "pending".to_string()
+            } else {
+                "active".to_string()
+            };
+            QueueItem {
+                workflow_id: cp.workflow_id.clone(),
+                workflow_type: cp.workflow_type.clone(),
+                status,
+                total: cp.total_units,
+                completed: cp.completed.len(),
+                failed: cp.failed.len(),
+                remaining: cp.remaining().len(),
+                progress_pct: cp.progress() * 100.0,
+                created_at: cp.created_at.clone(),
+                updated_at: cp.updated_at.clone(),
+            }
+        })
+        .collect();
+
+    match output_format {
+        OutputFormat::Table => {
+            if items.is_empty() {
+                println!("No batch operations in the queue.");
+            } else {
+                println!("{}", "Swarm Queue".bold());
+                println!(
+                    "  {:<20} {:<12} {:<10} {:>6} {:>6} {:>6} {:>8}",
+                    "Workflow", "Type", "Status", "Done", "Fail", "Left", "Progress"
+                );
+                println!("  {}", "─".repeat(74));
+                for item in &items {
+                    let status_colored = match item.status.as_str() {
+                        "completed" => item.status.green().to_string(),
+                        "active" => item.status.yellow().to_string(),
+                        "pending" => item.status.cyan().to_string(),
+                        _ => item.status.clone(),
+                    };
+                    let id_short = if item.workflow_id.len() > 18 {
+                        format!("{}…", &item.workflow_id[..17])
+                    } else {
+                        item.workflow_id.clone()
+                    };
+                    println!(
+                        "  {:<20} {:<12} {:<10} {:>6} {:>6} {:>6} {:>7.0}%",
+                        id_short,
+                        item.workflow_type,
+                        status_colored,
+                        item.completed,
+                        item.failed,
+                        item.remaining,
+                        item.progress_pct,
+                    );
+                }
+                println!(
+                    "\n  Total: {} operations ({} active, {} completed)",
+                    items.len(),
+                    items.iter().filter(|i| i.status == "active" || i.status == "pending").count(),
+                    items.iter().filter(|i| i.status.starts_with("completed")).count(),
+                );
+            }
+        }
+        _ => {
+            output_format.write(&items)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------------------
+
+fn swarm_reset(target: &str, _output_format: OutputFormat) -> Result<()> {
+    match target {
+        "circuit-breakers" | "cb" => {
+            raps_kernel::circuit_breaker::registry().reset_all();
+            println!("{} Circuit breakers reset", "✓".green());
+        }
+        "cache" => {
+            raps_kernel::response_cache::cache().clear();
+            println!("{} Response cache cleared", "✓".green());
+        }
+        "rate-budgets" | "rb" => {
+            raps_kernel::rate_budget::registry().reset_all();
+            println!("{} Rate budgets reset", "✓".green());
+        }
+        "all" => {
+            raps_kernel::circuit_breaker::registry().reset_all();
+            raps_kernel::response_cache::cache().clear();
+            raps_kernel::rate_budget::registry().reset_all();
+            println!("{} All swarm state reset (circuit breakers, cache, rate budgets)", "✓".green());
+        }
+        other => {
+            anyhow::bail!("Unknown reset target: '{other}'. Use: circuit-breakers, cache, rate-budgets, or all");
         }
     }
 

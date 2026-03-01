@@ -1327,6 +1327,27 @@ impl RapsServer {
                 let region = Self::optional_arg(&args, "region");
                 self.workflow_batch_translate(urns, output_format, region).await
             }
+            "workflow_compare_versions" => {
+                let urn_a = match Self::required_arg(&args, "urn_a") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let urn_b = match Self::required_arg(&args, "urn_b") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let label_a = Self::optional_arg(&args, "label_a");
+                let label_b = Self::optional_arg(&args, "label_b");
+                self.workflow_compare_versions(urn_a, urn_b, label_a, label_b).await
+            }
+            "workflow_setup_project" => {
+                let project_name = match Self::required_arg(&args, "project_name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let bucket_region = Self::optional_arg(&args, "bucket_region");
+                self.workflow_setup_project(project_name, bucket_region).await
+            }
             "swarm_status" => self.swarm_status_tool().await,
 
             _ => format!("Unknown tool: {}", name),
