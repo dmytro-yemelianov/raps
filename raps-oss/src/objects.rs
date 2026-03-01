@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
@@ -165,6 +165,12 @@ impl OssClient {
 
         // Create progress bar (hidden in non-interactive mode)
         let pb = progress::file_progress(total_size, &format!("Downloading {}", object_key));
+
+        // Validate output path stays within current directory
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        if cwd.exists() && output_path.is_absolute() {
+            raps_kernel::security::validate_path_within(output_path, &cwd)?;
+        }
 
         // Stream download
         let mut file = File::create(output_path)

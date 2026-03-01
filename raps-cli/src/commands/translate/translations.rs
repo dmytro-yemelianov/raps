@@ -488,7 +488,7 @@ pub(super) async fn download_derivatives(
     let mut total_size: u64 = 0;
 
     for derivative in to_download {
-        let file_path = output_path.join(&derivative.name);
+        let file_path = raps_kernel::security::safe_join(&output_path, &derivative.name)?;
 
         match client
             .download_derivative(urn, &derivative.urn, &file_path)

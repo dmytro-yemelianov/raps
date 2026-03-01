@@ -192,7 +192,8 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Token exchange failed ({status}): {error_text}");
+            let redacted = crate::logging::redact_secrets(&error_text);
+            anyhow::bail!("Token exchange failed ({status}): {redacted}");
         }
 
         let token: TokenResponse = response

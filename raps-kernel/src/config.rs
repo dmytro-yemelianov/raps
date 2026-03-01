@@ -368,7 +368,7 @@ pub fn save_profiles(data: &ProfilesData) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("Failed to get project directories"))?;
 
     let config_dir = proj_dirs.config_dir();
-    std::fs::create_dir_all(config_dir)?;
+    crate::security::create_dir_restricted(config_dir)?;
 
     let profiles_path = config_dir.join("profiles.json");
     let content = serde_json::to_string_pretty(data)?;

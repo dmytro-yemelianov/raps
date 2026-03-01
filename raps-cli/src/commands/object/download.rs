@@ -63,7 +63,13 @@ pub(super) async fn download_object(
     }
 
     // File-based download
-    let output_path = output.unwrap_or_else(|| PathBuf::from(&object_key));
+    let output_path = match output {
+        Some(p) => p,
+        None => {
+            let safe = raps_kernel::security::sanitize_filename(&object_key)?;
+            PathBuf::from(safe)
+        }
+    };
 
     // Check if output file exists (respects --yes flag)
     if output_path.exists() {

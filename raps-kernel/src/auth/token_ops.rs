@@ -103,7 +103,8 @@ impl AuthClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to validate token ({status}): {error_text}");
+            let redacted = crate::logging::redact_secrets(&error_text);
+            anyhow::bail!("Failed to validate token ({status}): {redacted}");
         }
 
         let user: UserInfo = response.json().await.context("Failed to parse user info")?;

@@ -235,7 +235,7 @@ impl DerivativeClient {
         let mut results = Vec::new();
 
         for derivative in filtered {
-            let output_path = output_dir.join(&derivative.name);
+            let output_path = raps_kernel::security::safe_join(output_dir, &derivative.name)?;
             let size = self
                 .download_derivative(source_urn, &derivative.urn, &output_path)
                 .await?;

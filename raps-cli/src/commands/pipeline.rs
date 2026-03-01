@@ -174,9 +174,17 @@ async fn run_pipeline(
             continue;
         }
 
-        // Substitute variables in command
+        // Validate and substitute variables in command
         let mut command = step.command.clone();
         for (key, value) in &pipeline.variables {
+            // Reject shell metacharacters in variable values
+            const SHELL_META: &[char] = &['|', '&', ';', '$', '`', '(', ')', '{', '}', '<', '>'];
+            if value.contains(SHELL_META) {
+                anyhow::bail!(
+                    "Pipeline variable '{}' contains shell metacharacters",
+                    key
+                );
+            }
             command = command.replace(&format!("${{{}}}", key), value);
             command = command.replace(&format!("${}", key), value);
         }
@@ -261,8 +269,9 @@ fn execute_raps_command(command: &str) -> Result<i32> {
     // Get the current executable path
     let exe_path = std::env::current_exe().context("Failed to get current executable path")?;
 
-    // Split command into args
-    let args: Vec<&str> = command.split_whitespace().collect();
+    // Split command into args (shell-aware quoting)
+    let args = shlex::split(command)
+        .ok_or_else(|| anyhow::anyhow!("Invalid quoting in pipeline command: {}", command))?;
 
     // Execute raps with the given arguments
     let output = Command::new(&exe_path)

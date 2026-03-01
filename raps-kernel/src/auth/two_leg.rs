@@ -68,7 +68,7 @@ impl AuthClient {
             anyhow::bail!(
                 "Authentication failed with status {}: {}",
                 status,
-                error_text
+                crate::logging::redact_secrets(&error_text)
             );
         }
 

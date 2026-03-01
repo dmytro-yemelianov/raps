@@ -9,17 +9,17 @@
 | Chapter | Total Checked | Met | Partial | N/A | Gap |
 |---------|---------------|-----|---------|-----|-----|
 | V2 Authentication | 6 | 6 | 0 | 0 | 0 |
-| V5 Validation | 6 | 4 | 1 | 0 | 1 |
+| V5 Validation | 6 | 6 | 0 | 0 | 0 |
 | V6 Cryptography | 3 | 3 | 0 | 0 | 0 |
-| V7 Error/Logging | 6 | 3 | 2 | 0 | 1 |
-| V8 Data Protection | 2 | 1 | 0 | 0 | 1 |
+| V7 Error/Logging | 6 | 6 | 0 | 0 | 0 |
+| V8 Data Protection | 2 | 2 | 0 | 0 | 0 |
 | V9 Communications | 3 | 3 | 0 | 0 | 0 |
 | V10 Malicious Code | 2 | 0 | 1 | 0 | 1 |
-| V12 Files/Resources | 3 | 2 | 0 | 0 | 1 |
+| V12 Files/Resources | 3 | 3 | 0 | 0 | 0 |
 | V14 Configuration | 3 | 3 | 0 | 0 | 0 |
-| **Total** | **34** | **25** | **4** | **0** | **5** |
+| **Total** | **34** | **32** | **1** | **0** | **1** |
 
-**Compliance Rate: 74% Met, 12% Partial, 14% Gap**
+**Compliance Rate: 94% Met, 3% Partial, 3% Gap**
 
 ## V2 — Authentication
 
@@ -41,8 +41,8 @@ See: `docs/security/asvs-v2-auth-audit.md`
 | V5.1 | URL validation / SSRF prevention | Met | `http.rs:15-45` | Domain allowlist with subdomain boundary checks |
 | V5.2 | URL encoding in API calls | Met | `objects.rs:331,366,412` | `urlencoding::encode()` for object keys |
 | V5.3 | CSV input validated | Met | `csv_ops.rs:72-116` | Email, required fields, error aggregation |
-| V5.4 | Pipeline execution safety | Partial | `pipeline.rs:260-282` | Uses current_exe (no shell), but variable injection possible |
-| V5.5 | Download path traversal protection | Gap | `download.rs:66`, `objects.rs:170` | Object key used directly as output path |
+| V5.4 | Pipeline execution safety | Met | `pipeline.rs:179-182,265` | Shell metachar validation + shlex quoting |
+| V5.5 | Download path traversal protection | Met | `security.rs`, `download.rs:66` | sanitize_filename + validate_path_within |
 | V5.6 | Filter expression parsing safety | Met | `filter.rs:77-163` | Strict key-value parsing, known keys only |
 
 See: `docs/security/asvs-v5-v12-input-files-audit.md`
@@ -62,10 +62,10 @@ See: `docs/security/asvs-v6-v9-crypto-comms-audit.md`
 | ID | Requirement | Status | Evidence | Notes |
 |----|-------------|--------|----------|-------|
 | V7.1 | Structured logging framework | Met | `logging.rs:34-117` | tracing + tracing-subscriber |
-| V7.2 | Secret redaction patterns | Partial | `logging.rs:141-163` | Covers tokens/keys, misses HTTP headers |
-| V7.3 | Automatic redaction in log output | Gap | `logging.rs:141` | Redaction is opt-in, not automatic |
+| V7.2 | Secret redaction patterns | Met | `logging.rs:141-221` | Covers tokens, keys, auth headers, cookies, URL params |
+| V7.3 | Automatic redaction in log output | Met | `logging.rs:RedactingMakeWriter` | All log layers use RedactingMakeWriter |
 | V7.4 | Log rotation and retention | Met | `logging.rs:80,167-188` | Daily rotation, 7 file limit, 50MB cap |
-| V7.5 | Error info leakage in release builds | Partial | `device_code.rs:195` | Raw server error text exposed to user |
+| V7.5 | Error info leakage in release builds | Met | `auth/*.rs` | All bail!() error text passed through redact_secrets() |
 | V7.6 | Non-blocking file logging | Met | `logging.rs:81-84` | tracing_appender::non_blocking |
 
 See: `docs/security/asvs-v7-logging-audit.md`
@@ -75,7 +75,7 @@ See: `docs/security/asvs-v7-logging-audit.md`
 | ID | Requirement | Status | Evidence | Notes |
 |----|-------------|--------|----------|-------|
 | V8.1 | Token-at-rest encryption | Met | `storage.rs` | OS keyring (DPAPI/Keychain/SecretService) |
-| V8.2 | Log directory permissions | Gap | `logging.rs:77` | create_dir_all without explicit permissions |
+| V8.2 | Log directory permissions | Met | `security.rs:create_dir_restricted` | Mode 0o700 on Unix for log and config dirs |
 
 ## V9 — Communications
 
@@ -102,7 +102,7 @@ See: `docs/security/plugin-trust-model.md`
 |----|-------------|--------|----------|-------|
 | V12.1 | Streaming downloads (no memory exhaustion) | Met | `objects.rs:174-184` | bytes_stream() with chunked writes |
 | V12.2 | Pagination safety | Met | `objects.rs:242-243` | MAX_PAGES = 100 hard limit |
-| V12.3 | Path traversal in downloads | Gap | `download.rs:66` | Object key used as filename without sanitization |
+| V12.3 | Path traversal in downloads | Met | `security.rs`, `download.rs:66` | sanitize_filename strips traversal + validate_path_within |
 
 ## V14 — Configuration
 
@@ -114,10 +114,10 @@ See: `docs/security/plugin-trust-model.md`
 
 ## Remediation Priority
 
-| Priority | Gap | Impact | Effort |
+| Priority | Gap | Impact | Status |
 |----------|-----|--------|--------|
-| P1 | Download path traversal (V5.5/V12.3) | Arbitrary file write | Low |
-| P1 | Automatic log redaction (V7.3) | Credential leak in logs | Medium |
-| P2 | Log directory permissions (V8.2) | Logs readable by other users | Low |
-| P2 | Plugin signature verification (V10.2) | Malicious plugin execution | High |
-| P3 | Pipeline variable injection (V5.4) | Argument injection via variables | Medium |
+| P1 | Download path traversal (V5.5/V12.3) | Arbitrary file write | **Fixed** — `security.rs` |
+| P1 | Automatic log redaction (V7.3) | Credential leak in logs | **Fixed** — `RedactingMakeWriter` |
+| P2 | Log directory permissions (V8.2) | Logs readable by other users | **Fixed** — `create_dir_restricted` |
+| P2 | Plugin signature verification (V10.2) | Malicious plugin execution | Open |
+| P3 | Pipeline variable injection (V5.4) | Argument injection via variables | **Fixed** — metachar validation + shlex |

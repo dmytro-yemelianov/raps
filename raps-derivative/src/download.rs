@@ -63,6 +63,12 @@ impl DerivativeClient {
             .unwrap_or("derivative");
         pb.set_message(format!("Downloading {}", filename));
 
+        // Validate output path stays within current directory
+        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        if cwd.exists() && output_path.is_absolute() {
+            raps_kernel::security::validate_path_within(output_path, &cwd)?;
+        }
+
         // Create parent directories if needed
         if let Some(parent) = output_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
