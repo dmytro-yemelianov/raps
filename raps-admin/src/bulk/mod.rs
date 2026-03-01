@@ -4,5 +4,4 @@
 //! Bulk operation orchestration module
 
 pub mod executor;
-pub mod retry;
 pub mod state;

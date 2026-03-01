@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 
-use crate::bulk::retry::exponential_backoff;
+use raps_kernel::http::calculate_delay;
 
 /// Configuration for bulk execution
 #[derive(Debug, Clone)]
@@ -311,7 +311,7 @@ where
     F: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = ItemResult> + Send,
 {
-    let max_delay = Duration::from_secs(60);
+    let max_wait = 60u64;
     let mut attempts = 0u32;
 
     loop {
@@ -327,8 +327,8 @@ where
                     return (result, attempts);
                 }
 
-                // Wait before retry with exponential backoff
-                let delay = exponential_backoff(attempts - 1, base_delay, max_delay);
+                // Wait before retry with exponential backoff + jitter
+                let delay = calculate_delay(attempts - 1, base_delay.as_secs(), max_wait);
                 tokio::time::sleep(delay).await;
             }
         }

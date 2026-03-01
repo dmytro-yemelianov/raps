@@ -7,9 +7,23 @@
 
 use anyhow::{Context, Result};
 use reqwest::Client;
+use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::sleep;
 use url::Url;
+
+/// Resolve a configuration parameter with precedence: CLI flag > env var > default.
+fn resolve_param<T: FromStr + Copy>(flag: Option<T>, env_var: &str, default: T) -> T {
+    if let Some(v) = flag {
+        return v;
+    }
+    if let Ok(val) = std::env::var(env_var)
+        && let Ok(parsed) = val.parse::<T>()
+    {
+        return parsed;
+    }
+    default
+}
 
 /// Allowed domains for custom API calls (APS domains only)
 pub const ALLOWED_DOMAINS: &[&str] = &[
@@ -81,19 +95,34 @@ impl HttpClientConfig {
             .context("Failed to create HTTP client")
     }
 
-    /// Create HTTP client config from CLI flags and environment variables
-    /// Precedence: CLI flag > environment variable > default
+    /// Create HTTP client config from CLI flags and environment variables.
+    ///
+    /// Precedence: CLI flag > environment variable > default.
+    /// Use [`from_cli_and_env_full`] to pass all retry parameters.
     pub fn from_cli_and_env(timeout_flag: Option<u64>) -> Self {
-        let timeout = timeout_flag
-            .or_else(|| {
-                std::env::var("RAPS_TIMEOUT")
-                    .ok()
-                    .and_then(|v| v.parse().ok())
-            })
-            .unwrap_or(120);
+        Self::from_cli_and_env_full(timeout_flag, None, None, None)
+    }
+
+    /// Create HTTP client config from CLI flags and environment variables
+    /// with full control over retry parameters.
+    ///
+    /// Precedence: CLI flag > environment variable > default
+    pub fn from_cli_and_env_full(
+        timeout_flag: Option<u64>,
+        max_retries_flag: Option<u32>,
+        base_delay_flag: Option<u64>,
+        max_wait_flag: Option<u64>,
+    ) -> Self {
+        let timeout = resolve_param(timeout_flag, "RAPS_TIMEOUT", 120);
+        let max_retries = resolve_param(max_retries_flag, "RAPS_MAX_RETRIES", 3);
+        let base_delay = resolve_param(base_delay_flag, "RAPS_BASE_DELAY", 1);
+        let max_wait = resolve_param(max_wait_flag, "RAPS_MAX_WAIT", 60);
 
         Self {
             timeout,
+            max_retries,
+            base_delay,
+            max_wait,
             ..Self::default()
         }
     }
@@ -194,7 +223,7 @@ where
 }
 
 /// Calculate delay with exponential backoff and jitter
-fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
+pub fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
     use rand::Rng;
 
     // Exponential backoff: base_delay * 2^attempt (saturating to avoid overflow)
@@ -280,6 +309,46 @@ mod tests {
         assert_eq!(config.timeout, 120); // Falls back to default
         unsafe {
             std::env::remove_var("RAPS_TIMEOUT");
+        }
+    }
+
+    #[test]
+    fn test_http_config_full_cli_flags() {
+        let config = HttpClientConfig::from_cli_and_env_full(Some(30), Some(5), Some(2), Some(120));
+        assert_eq!(config.timeout, 30);
+        assert_eq!(config.max_retries, 5);
+        assert_eq!(config.base_delay, 2);
+        assert_eq!(config.max_wait, 120);
+    }
+
+    #[test]
+    fn test_http_config_full_env_vars() {
+        // SAFETY: Test runs with --test-threads=1 or in isolation
+        unsafe {
+            std::env::set_var("RAPS_MAX_RETRIES", "7");
+            std::env::set_var("RAPS_BASE_DELAY", "3");
+            std::env::set_var("RAPS_MAX_WAIT", "90");
+        }
+        let config = HttpClientConfig::from_cli_and_env_full(None, None, None, None);
+        assert_eq!(config.max_retries, 7);
+        assert_eq!(config.base_delay, 3);
+        assert_eq!(config.max_wait, 90);
+        unsafe {
+            std::env::remove_var("RAPS_MAX_RETRIES");
+            std::env::remove_var("RAPS_BASE_DELAY");
+            std::env::remove_var("RAPS_MAX_WAIT");
+        }
+    }
+
+    #[test]
+    fn test_http_config_full_cli_overrides_env() {
+        unsafe {
+            std::env::set_var("RAPS_MAX_RETRIES", "10");
+        }
+        let config = HttpClientConfig::from_cli_and_env_full(None, Some(2), None, None);
+        assert_eq!(config.max_retries, 2); // CLI wins
+        unsafe {
+            std::env::remove_var("RAPS_MAX_RETRIES");
         }
     }
 

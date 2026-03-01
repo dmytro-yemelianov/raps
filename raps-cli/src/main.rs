@@ -161,6 +161,18 @@ struct Cli {
     #[arg(long, value_name = "SECONDS", global = true)]
     timeout: Option<u64>,
 
+    /// Maximum number of retries for 429/5xx responses (default: 3)
+    #[arg(long, value_name = "N", global = true)]
+    max_retries: Option<u32>,
+
+    /// Base delay in seconds for exponential backoff (default: 1)
+    #[arg(long, value_name = "SECONDS", global = true)]
+    base_delay: Option<u64>,
+
+    /// Maximum wait time in seconds between retries (default: 60)
+    #[arg(long, value_name = "SECONDS", global = true)]
+    max_wait: Option<u64>,
+
     /// Maximum concurrent operations for bulk commands (default: 5)
     #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
@@ -429,7 +441,7 @@ async fn run(cli: Cli) -> Result<()> {
     #[cfg(feature = "dashboard")]
     if let Commands::Dashboard = &command {
         let config = Config::from_env_lenient()?;
-        let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
+        let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, cli.max_retries, cli.base_delay, cli.max_wait);
         return commands::dashboard::run_dashboard(config, http_config).await;
     }
 
@@ -463,7 +475,7 @@ async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env_lenient()?;
 
     // Create HTTP client with shared config
-    let http_config = HttpClientConfig::from_cli_and_env(cli.timeout);
+    let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, cli.max_retries, cli.base_delay, cli.max_wait);
 
     if let Commands::Shell = command {
         credits::shell_welcome();
@@ -643,7 +655,7 @@ async fn run(cli: Cli) -> Result<()> {
                     };
 
                     let sub_output_format = OutputFormat::determine(sub_cli.output);
-                    let sub_http_config = HttpClientConfig::from_cli_and_env(sub_cli.timeout);
+                    let sub_http_config = HttpClientConfig::from_cli_and_env_full(sub_cli.timeout, sub_cli.max_retries, sub_cli.base_delay, sub_cli.max_wait);
 
                     let sub_command = match sub_cli.command {
                         Some(cmd) => cmd,
@@ -738,7 +750,7 @@ async fn run_piped_stdin(
         };
 
         let sub_output_format = OutputFormat::determine(sub_cli.output.or(output));
-        let sub_http_config = HttpClientConfig::from_cli_and_env(sub_cli.timeout.or(timeout));
+        let sub_http_config = HttpClientConfig::from_cli_and_env_full(sub_cli.timeout.or(timeout), sub_cli.max_retries, sub_cli.base_delay, sub_cli.max_wait);
 
         let sub_command = match sub_cli.command {
             Some(cmd) => cmd,
