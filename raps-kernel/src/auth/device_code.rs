@@ -96,10 +96,13 @@ impl AuthClient {
         println!("{}", "-".repeat(50));
 
         // --- Prompt user for the callback URL / code ---
-        let input: String = dialoguer::Input::new()
-            .with_prompt("Callback URL or authorization code")
-            .interact_text()
-            .context("Failed to read user input")?;
+        let input: String = crate::prompts::spawn_prompt(|| {
+            Ok(dialoguer::Input::new()
+                .with_prompt("Callback URL or authorization code")
+                .interact_text()?)
+        })
+        .await
+        .context("Failed to read user input")?;
 
         let input = input.trim().to_string();
         if input.is_empty() {

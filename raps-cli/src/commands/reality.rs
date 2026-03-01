@@ -215,9 +215,12 @@ async fn create_photoscene(
                     "Photoscene name is required in non-interactive mode. Use --name flag."
                 );
             }
-            Input::new()
-                .with_prompt("Enter photoscene name")
-                .interact_text()?
+            raps_kernel::prompts::spawn_prompt(|| {
+                Ok(Input::new()
+                    .with_prompt("Enter photoscene name")
+                    .interact_text()?)
+            })
+            .await?
         }
     };
 
@@ -233,11 +236,14 @@ async fn create_photoscene(
             if interactive::is_non_interactive() {
                 SceneType::Object
             } else {
-                let types = vec!["aerial (drone/outdoor)", "object (turntable/indoor)"];
-                let selection = Select::new()
-                    .with_prompt("Select scene type")
-                    .items(&types)
-                    .interact()?;
+                let selection = raps_kernel::prompts::spawn_prompt(|| {
+                    let types = vec!["aerial (drone/outdoor)", "object (turntable/indoor)"];
+                    Ok(Select::new()
+                        .with_prompt("Select scene type")
+                        .items(&types)
+                        .interact()?)
+                })
+                .await?;
                 if selection == 0 {
                     SceneType::Aerial
                 } else {
@@ -261,11 +267,14 @@ async fn create_photoscene(
                     .map(|f| format!("{} - {}", f, f.description()))
                     .collect();
 
-                let selection = Select::new()
-                    .with_prompt("Select output format")
-                    .items(&format_labels)
-                    .default(2) // OBJ is usually a good default
-                    .interact()?;
+                let selection = raps_kernel::prompts::spawn_prompt(move || {
+                    Ok(Select::new()
+                        .with_prompt("Select output format")
+                        .items(&format_labels)
+                        .default(2) // OBJ is usually a good default
+                        .interact()?)
+                })
+                .await?;
 
                 formats[selection]
             }

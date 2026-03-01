@@ -11,6 +11,19 @@ use dialoguer::{Confirm, Input, MultiSelect, Select};
 
 use crate::interactive;
 
+/// Run a blocking interactive prompt on a dedicated thread so it does not
+/// block the async runtime.  Wraps `tokio::task::spawn_blocking`.
+///
+/// The closure must return `anyhow::Result<T>` so callers can use `?`
+/// inside it to convert `std::io::Error` (from dialoguer) automatically.
+pub async fn spawn_prompt<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T> + Send + 'static,
+) -> Result<T> {
+    tokio::task::spawn_blocking(f)
+        .await
+        .context("Interactive prompt thread panicked")?
+}
+
 /// Prompt for text input with validation
 ///
 /// Returns an error in non-interactive mode if no default is provided.

@@ -185,9 +185,12 @@ pub(super) async fn create_issue(
             if interactive::is_non_interactive() {
                 anyhow::bail!("Issue title is required in non-interactive mode. Use --title flag.");
             }
-            Input::new()
-                .with_prompt("Enter issue title")
-                .interact_text()?
+            raps_kernel::prompts::spawn_prompt(|| {
+                Ok(Input::new()
+                    .with_prompt("Enter issue title")
+                    .interact_text()?)
+            })
+            .await?
         }
     };
 
@@ -199,10 +202,13 @@ pub(super) async fn create_issue(
             if interactive::is_non_interactive() {
                 None
             } else {
-                let desc: String = Input::new()
-                    .with_prompt("Enter description (optional)")
-                    .allow_empty(true)
-                    .interact_text()?;
+                let desc: String = raps_kernel::prompts::spawn_prompt(|| {
+                    Ok(Input::new()
+                        .with_prompt("Enter description (optional)")
+                        .allow_empty(true)
+                        .interact_text()?)
+                })
+                .await?;
                 if desc.is_empty() { None } else { Some(desc) }
             }
         }
@@ -432,13 +438,17 @@ pub(super) async fn update_issue(
                 );
             }
             // Prompt for status if no updates provided
-            let statuses = vec!["open", "answered", "closed"];
-            let selection = Select::new()
-                .with_prompt("Select new status")
-                .items(&statuses)
-                .default(0)
-                .interact()?;
-            Some(statuses[selection].to_string())
+            let new = raps_kernel::prompts::spawn_prompt(|| {
+                let statuses = vec!["open", "answered", "closed"];
+                let selection = Select::new()
+                    .with_prompt("Select new status")
+                    .items(&statuses)
+                    .default(0)
+                    .interact()?;
+                Ok(statuses[selection].to_string())
+            })
+            .await?;
+            Some(new)
         }
         None => None,
     };

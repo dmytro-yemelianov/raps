@@ -72,12 +72,14 @@ pub(super) async fn transition_issue(
             // Interactive: show allowed transitions
             println!("{} Current status: {}", "→".cyan(), current_status.bold());
 
-            let selection = Select::new()
-                .with_prompt("Select new status")
-                .items(&allowed)
-                .interact()?;
-
-            allowed[selection].to_string()
+            raps_kernel::prompts::spawn_prompt(move || {
+                let selection = Select::new()
+                    .with_prompt("Select new status")
+                    .items(&allowed)
+                    .interact()?;
+                Ok(allowed[selection].to_string())
+            })
+            .await?
         }
     };
 

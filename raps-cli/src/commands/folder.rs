@@ -280,9 +280,12 @@ async fn create_folder(
             if interactive::is_non_interactive() {
                 anyhow::bail!("Folder name is required in non-interactive mode. Use --name flag.");
             }
-            Input::new()
-                .with_prompt("Enter folder name")
-                .interact_text()?
+            raps_kernel::prompts::spawn_prompt(|| {
+                Ok(Input::new()
+                    .with_prompt("Enter folder name")
+                    .interact_text()?)
+            })
+            .await?
         }
     };
 
@@ -338,9 +341,12 @@ async fn rename_folder(
             if interactive::is_non_interactive() {
                 anyhow::bail!("Folder name is required in non-interactive mode. Use --name flag.");
             }
-            Input::new()
-                .with_prompt("Enter new folder name")
-                .interact_text()?
+            raps_kernel::prompts::spawn_prompt(|| {
+                Ok(Input::new()
+                    .with_prompt("Enter new folder name")
+                    .interact_text()?)
+            })
+            .await?
         }
     };
 

@@ -22,9 +22,12 @@ pub(super) async fn init(args: InitArgs, output_format: OutputFormat) -> Result<
         if raps_kernel::interactive::is_non_interactive() {
             anyhow::bail!("Plugin name is required in non-interactive mode. Use --name flag.");
         }
-        Input::with_theme(&ColorfulTheme::default())
-            .with_prompt("Plugin name")
-            .interact_text()?
+        raps_kernel::prompts::spawn_prompt(|| {
+            Ok(Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Plugin name")
+                .interact_text()?)
+        })
+        .await?
     };
 
     let author = if let Some(a) = args.author {
@@ -33,9 +36,12 @@ pub(super) async fn init(args: InitArgs, output_format: OutputFormat) -> Result<
         if raps_kernel::interactive::is_non_interactive() {
             anyhow::bail!("Author is required in non-interactive mode. Use --author flag.");
         }
-        Input::with_theme(&ColorfulTheme::default())
-            .with_prompt("Author")
-            .interact_text()?
+        raps_kernel::prompts::spawn_prompt(|| {
+            Ok(Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Author")
+                .interact_text()?)
+        })
+        .await?
     };
 
     let publisher = PluginPublisher::new();
@@ -223,19 +229,22 @@ pub(super) async fn review(args: ReviewArgs, output_format: OutputFormat) -> Res
                 "Rating and Comment are required in non-interactive mode. Use --rating and --comment flags."
             );
         }
-        let selections = &[
-            "★☆☆☆☆ (1)",
-            "★★☆☆☆ (2)",
-            "★★★☆☆ (3)",
-            "★★★★☆ (4)",
-            "★★★★★ (5)",
-        ];
-        let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("Rating")
-            .items(selections)
-            .default(4)
-            .interact()?;
-        (selection + 1) as u8
+        raps_kernel::prompts::spawn_prompt(|| {
+            let selections = &[
+                "★☆☆☆☆ (1)",
+                "★★☆☆☆ (2)",
+                "★★★☆☆ (3)",
+                "★★★★☆ (4)",
+                "★★★★★ (5)",
+            ];
+            let selection = Select::with_theme(&ColorfulTheme::default())
+                .with_prompt("Rating")
+                .items(selections)
+                .default(4)
+                .interact()?;
+            Ok((selection + 1) as u8)
+        })
+        .await?
     };
 
     let comment = if let Some(c) = args.comment {
@@ -244,10 +253,13 @@ pub(super) async fn review(args: ReviewArgs, output_format: OutputFormat) -> Res
         if raps_kernel::interactive::is_non_interactive() {
             None
         } else {
-            let input: String = Input::with_theme(&ColorfulTheme::default())
-                .with_prompt("Comment (optional)")
-                .allow_empty(true)
-                .interact_text()?;
+            let input: String = raps_kernel::prompts::spawn_prompt(|| {
+                Ok(Input::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Comment (optional)")
+                    .allow_empty(true)
+                    .interact_text()?)
+            })
+            .await?;
             if input.is_empty() { None } else { Some(input) }
         }
     };

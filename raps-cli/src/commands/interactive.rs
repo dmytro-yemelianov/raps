@@ -52,10 +52,13 @@ pub async fn prompt_for_hub(client: &DataManagementClient) -> Result<String> {
         .map(|h| format!("{} ({})", h.attributes.name, h.id))
         .collect();
 
-    let selection = Select::new()
-        .with_prompt("Select a Hub")
-        .items(&hub_names)
-        .interact()?;
+    let selection = raps_kernel::prompts::spawn_prompt(move || {
+        Ok(Select::new()
+            .with_prompt("Select a Hub")
+            .items(&hub_names)
+            .interact()?)
+    })
+    .await?;
 
     Ok(hubs[selection].id.clone())
 }
@@ -103,10 +106,13 @@ pub async fn prompt_for_project(client: &DataManagementClient, hub_id: &str) -> 
         .map(|p| format!("{} ({})", p.attributes.name, p.id))
         .collect();
 
-    let selection = Select::new()
-        .with_prompt("Select a Project")
-        .items(&project_names)
-        .interact()?;
+    let selection = raps_kernel::prompts::spawn_prompt(move || {
+        Ok(Select::new()
+            .with_prompt("Select a Project")
+            .items(&project_names)
+            .interact()?)
+    })
+    .await?;
 
     Ok(projects[selection].id.clone())
 }
@@ -168,10 +174,13 @@ pub async fn prompt_for_folder(
         })
         .collect();
 
-    let selection = Select::new()
-        .with_prompt("Select a Folder")
-        .items(&folder_names)
-        .interact()?;
+    let selection = raps_kernel::prompts::spawn_prompt(move || {
+        Ok(Select::new()
+            .with_prompt("Select a Folder")
+            .items(&folder_names)
+            .interact()?)
+    })
+    .await?;
 
     Ok(folders[selection].id.clone())
 }
@@ -222,10 +231,13 @@ pub async fn prompt_for_rfi(client: &RfiClient, project_id: &str) -> Result<Stri
         })
         .collect();
 
-    let selection = Select::new()
-        .with_prompt("Select an RFI")
-        .items(&rfi_names)
-        .interact()?;
+    let selection = raps_kernel::prompts::spawn_prompt(move || {
+        Ok(Select::new()
+            .with_prompt("Select an RFI")
+            .items(&rfi_names)
+            .interact()?)
+    })
+    .await?;
 
     Ok(rfis[selection].id.clone())
 }
