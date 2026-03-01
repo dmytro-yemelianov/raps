@@ -39,7 +39,9 @@
 //! ```
 
 use anyhow::{Context, Result};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -68,6 +70,18 @@ pub struct PluginEntry {
     pub path: Option<String>,
     /// Plugin description
     pub description: Option<String>,
+    /// SHA-256 hash of the plugin binary (TOFU — trust on first use)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sha256: Option<String>,
+    /// Ed25519 public key (hex-encoded) for signature verification
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key: Option<String>,
+    /// Ed25519 signature (hex-encoded) of the plugin binary
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+    /// Whether the user has explicitly trusted this plugin
+    #[serde(default)]
+    pub trusted: bool,
 }
 
 fn default_true() -> bool {
@@ -119,6 +133,52 @@ impl PluginConfig {
     pub fn get_alias(&self, name: &str) -> Option<&str> {
         self.aliases.get(name).map(|s| s.as_str())
     }
+}
+
+/// Result of verifying a plugin's integrity
+#[derive(Debug)]
+pub struct PluginVerifyResult {
+    pub name: String,
+    pub path: PathBuf,
+    pub current_hash: String,
+    pub recorded_hash: Option<String>,
+    pub hash_match: bool,
+    pub has_signature: bool,
+    pub signature_valid: bool,
+    pub trusted: bool,
+}
+
+/// Compute SHA-256 hash of a file
+pub fn compute_binary_hash(path: &Path) -> Result<String> {
+    let data = std::fs::read(path)
+        .with_context(|| format!("Failed to read plugin binary: {}", path.display()))?;
+    let hash = Sha256::digest(&data);
+    Ok(hex::encode(hash))
+}
+
+/// Verify ed25519 signature of a plugin binary
+fn verify_ed25519_signature(path: &Path, sig_hex: &str, pubkey_hex: &str) -> Result<()> {
+    let data = std::fs::read(path)
+        .with_context(|| format!("Failed to read plugin binary: {}", path.display()))?;
+
+    let pubkey_bytes = hex::decode(pubkey_hex).context("Invalid public key hex")?;
+    let pubkey_array: [u8; 32] = pubkey_bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Public key must be 32 bytes"))?;
+    let verifying_key =
+        VerifyingKey::from_bytes(&pubkey_array).context("Invalid ed25519 public key")?;
+
+    let sig_bytes = hex::decode(sig_hex).context("Invalid signature hex")?;
+    let sig_array: [u8; 64] = sig_bytes
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("Signature must be 64 bytes"))?;
+    let signature = Signature::from_bytes(&sig_array);
+
+    verifying_key
+        .verify_strict(&data, &signature)
+        .context("Ed25519 signature verification failed")?;
+
+    Ok(())
 }
 
 /// Plugin manager for discovering and executing plugins
@@ -216,27 +276,175 @@ impl PluginManager {
                 anyhow::bail!("Plugin '{name}' is disabled");
             }
             if let Some(ref path) = entry.path {
-                return self.run_plugin(path, args);
+                return self.run_plugin(path, name, args);
             }
         }
 
         // Try to find in discovered plugins
         let discovered = self.discover_plugins();
         if let Some(plugin) = discovered.iter().find(|p| p.name == name) {
-            return self.run_plugin(&plugin.path.to_string_lossy(), args);
+            return self.run_plugin(&plugin.path.to_string_lossy(), name, args);
         }
 
         anyhow::bail!("Plugin '{name}' not found")
     }
 
-    /// Run a plugin executable
-    fn run_plugin(&self, path: &str, args: &[&str]) -> Result<i32> {
+    /// Run a plugin executable after verifying integrity
+    fn run_plugin(&self, path: &str, name: &str, args: &[&str]) -> Result<i32> {
+        self.verify_plugin_integrity(name, Path::new(path))?;
+
         let output = Command::new(path)
             .args(args)
             .status()
             .with_context(|| format!("Failed to execute plugin: {}", path))?;
 
         Ok(output.code().unwrap_or(-1))
+    }
+
+    /// Verify plugin integrity via TOFU hash and optional ed25519 signature.
+    ///
+    /// - First run: compute hash, record it, warn user
+    /// - Subsequent runs: verify hash matches recorded value
+    /// - If signature + public_key present: verify ed25519 signature
+    fn verify_plugin_integrity(&self, name: &str, path: &Path) -> Result<()> {
+        let current_hash = compute_binary_hash(path)?;
+
+        if let Some(entry) = self.config.plugins.get(name) {
+            // Check ed25519 signature if present
+            if let (Some(sig_hex), Some(key_hex)) = (&entry.signature, &entry.public_key) {
+                verify_ed25519_signature(path, sig_hex, key_hex).with_context(|| {
+                    format!("Plugin '{name}' signature verification failed — binary may have been tampered with")
+                })?;
+                return Ok(());
+            }
+
+            // Check TOFU hash
+            if let Some(ref recorded_hash) = entry.sha256 {
+                if *recorded_hash != current_hash {
+                    anyhow::bail!(
+                        "Plugin '{name}' binary has changed since it was trusted!\n\
+                         Recorded: {recorded_hash}\n\
+                         Current:  {current_hash}\n\
+                         Run `raps plugin trust {name}` to re-trust the new version."
+                    );
+                }
+                return Ok(());
+            }
+        }
+
+        // First execution — record hash (TOFU)
+        tracing::warn!(
+            plugin = name,
+            hash = %current_hash,
+            "First execution of plugin '{}' — recording SHA-256 hash (TOFU)",
+            name
+        );
+        eprintln!(
+            "Warning: First execution of plugin '{}'. SHA-256: {}",
+            name, current_hash
+        );
+
+        let mut config = PluginConfig::load().unwrap_or_default();
+        let entry = config.plugins.entry(name.to_string()).or_insert(PluginEntry {
+            enabled: true,
+            path: Some(path.to_string_lossy().to_string()),
+            description: None,
+            sha256: None,
+            public_key: None,
+            signature: None,
+            trusted: false,
+        });
+        entry.sha256 = Some(current_hash);
+        entry.trusted = true;
+        let _ = config.save();
+
+        Ok(())
+    }
+
+    /// Trust a plugin by recording its current hash
+    pub fn trust_plugin(&self, name: &str) -> Result<String> {
+        // Find plugin path
+        let path = self.resolve_plugin_path(name)?;
+        let hash = compute_binary_hash(&path)?;
+
+        let mut config = PluginConfig::load().unwrap_or_default();
+        let entry = config.plugins.entry(name.to_string()).or_insert(PluginEntry {
+            enabled: true,
+            path: Some(path.to_string_lossy().to_string()),
+            description: None,
+            sha256: None,
+            public_key: None,
+            signature: None,
+            trusted: false,
+        });
+        entry.sha256 = Some(hash.clone());
+        entry.trusted = true;
+        config.save()?;
+
+        Ok(hash)
+    }
+
+    /// Verify a plugin's integrity and return status
+    pub fn verify_plugin(&self, name: &str) -> Result<PluginVerifyResult> {
+        let path = self.resolve_plugin_path(name)?;
+        let current_hash = compute_binary_hash(&path)?;
+
+        if let Some(entry) = self.config.plugins.get(name) {
+            let hash_match = entry.sha256.as_ref() == Some(&current_hash);
+
+            // Check signature
+            if let (Some(sig_hex), Some(key_hex)) = (&entry.signature, &entry.public_key) {
+                let sig_ok = verify_ed25519_signature(&path, sig_hex, key_hex).is_ok();
+                return Ok(PluginVerifyResult {
+                    name: name.to_string(),
+                    path,
+                    current_hash,
+                    recorded_hash: entry.sha256.clone(),
+                    hash_match,
+                    has_signature: true,
+                    signature_valid: sig_ok,
+                    trusted: entry.trusted,
+                });
+            }
+
+            // Check TOFU hash
+            return Ok(PluginVerifyResult {
+                name: name.to_string(),
+                path,
+                current_hash,
+                recorded_hash: entry.sha256.clone(),
+                hash_match,
+                has_signature: false,
+                signature_valid: false,
+                trusted: entry.trusted,
+            });
+        }
+
+        Ok(PluginVerifyResult {
+            name: name.to_string(),
+            path,
+            current_hash,
+            recorded_hash: None,
+            hash_match: false,
+            has_signature: false,
+            signature_valid: false,
+            trusted: false,
+        })
+    }
+
+    /// Resolve a plugin name to its filesystem path
+    fn resolve_plugin_path(&self, name: &str) -> Result<PathBuf> {
+        if let Some(entry) = self.config.plugins.get(name)
+            && let Some(ref path) = entry.path
+        {
+            return Ok(PathBuf::from(path));
+        }
+        let discovered = self.discover_plugins();
+        discovered
+            .iter()
+            .find(|p| p.name == name)
+            .map(|p| p.path.clone())
+            .ok_or_else(|| anyhow::anyhow!("Plugin '{name}' not found"))
     }
 
     /// Run pre-command hooks
@@ -408,6 +616,10 @@ mod tests {
         let json = r#"{"path": "/usr/bin/raps-test"}"#;
         let entry: PluginEntry = serde_json::from_str(json).unwrap();
         assert!(entry.enabled); // default_true()
+        assert!(entry.sha256.is_none());
+        assert!(entry.public_key.is_none());
+        assert!(entry.signature.is_none());
+        assert!(!entry.trusted);
     }
 
     #[test]
@@ -551,6 +763,96 @@ mod tests {
         // Test whitespace only
         let result = manager.parse_hook_command("   ").unwrap();
         assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_compute_binary_hash() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"hello world").unwrap();
+        let hash = compute_binary_hash(tmp.path()).unwrap();
+        // SHA-256 of "hello world"
+        assert_eq!(
+            hash,
+            "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+        );
+    }
+
+    #[test]
+    fn test_compute_binary_hash_changes_on_modification() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"version 1").unwrap();
+        let hash1 = compute_binary_hash(tmp.path()).unwrap();
+
+        std::fs::write(tmp.path(), b"version 2").unwrap();
+        let hash2 = compute_binary_hash(tmp.path()).unwrap();
+
+        assert_ne!(hash1, hash2);
+    }
+
+    #[test]
+    fn test_ed25519_signature_verification() {
+        use ed25519_dalek::{Signer, SigningKey};
+        use rand::rngs::OsRng;
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"plugin binary content").unwrap();
+
+        // Generate a keypair
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let verifying_key = signing_key.verifying_key();
+
+        // Sign the binary
+        let data = std::fs::read(tmp.path()).unwrap();
+        let signature: ed25519_dalek::Signature = signing_key.sign(&data);
+
+        let sig_hex = hex::encode(signature.to_bytes());
+        let key_hex = hex::encode(verifying_key.to_bytes());
+
+        // Verification should succeed
+        assert!(verify_ed25519_signature(tmp.path(), &sig_hex, &key_hex).is_ok());
+
+        // Tamper with the file
+        std::fs::write(tmp.path(), b"tampered content").unwrap();
+        assert!(verify_ed25519_signature(tmp.path(), &sig_hex, &key_hex).is_err());
+    }
+
+    #[test]
+    fn test_ed25519_invalid_signature_fails() {
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(tmp.path(), b"plugin binary").unwrap();
+
+        // Valid key format but wrong signature
+        let fake_key = "0".repeat(64); // 32 zero bytes in hex
+        let fake_sig = "0".repeat(128); // 64 zero bytes in hex
+
+        // Should fail verification (bad key/signature)
+        assert!(verify_ed25519_signature(tmp.path(), &fake_sig, &fake_key).is_err());
+    }
+
+    #[test]
+    fn test_plugin_entry_with_trust_fields() {
+        let json = r#"{
+            "enabled": true,
+            "path": "/usr/bin/raps-test",
+            "sha256": "abc123",
+            "trusted": true,
+            "public_key": "deadbeef",
+            "signature": "cafebabe"
+        }"#;
+        let entry: PluginEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.sha256.as_deref(), Some("abc123"));
+        assert!(entry.trusted);
+        assert_eq!(entry.public_key.as_deref(), Some("deadbeef"));
+        assert_eq!(entry.signature.as_deref(), Some("cafebabe"));
+    }
+
+    #[test]
+    fn test_plugin_entry_trust_fields_optional() {
+        // Old-format JSON without trust fields should still parse
+        let json = r#"{"enabled": true}"#;
+        let entry: PluginEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.sha256.is_none());
+        assert!(!entry.trusted);
     }
 
     #[test]

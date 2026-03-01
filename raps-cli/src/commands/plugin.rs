@@ -31,6 +31,18 @@ pub enum PluginCommands {
         name: String,
     },
 
+    /// Trust a plugin by recording its current SHA-256 hash
+    Trust {
+        /// Plugin name
+        name: String,
+    },
+
+    /// Verify a plugin's integrity (hash and optional signature)
+    Verify {
+        /// Plugin name
+        name: String,
+    },
+
     /// Manage command aliases
     #[command(subcommand)]
     Alias(AliasCommands),
@@ -62,6 +74,8 @@ impl PluginCommands {
             PluginCommands::List => list_plugins(output_format),
             PluginCommands::Enable { name } => enable_plugin(&name, output_format),
             PluginCommands::Disable { name } => disable_plugin(&name, output_format),
+            PluginCommands::Trust { name } => trust_plugin(&name, output_format),
+            PluginCommands::Verify { name } => verify_plugin(&name, output_format),
             PluginCommands::Alias(cmd) => cmd.execute(output_format),
         }
     }
@@ -159,6 +173,10 @@ fn enable_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
                 enabled: true,
                 path: None,
                 description: None,
+                sha256: None,
+                public_key: None,
+                signature: None,
+                trusted: false,
             },
         );
     }
@@ -193,6 +211,10 @@ fn disable_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
                 enabled: false,
                 path: None,
                 description: None,
+                sha256: None,
+                public_key: None,
+                signature: None,
+                trusted: false,
             },
         );
     }
@@ -319,6 +341,93 @@ fn remove_alias(name: &str, output_format: OutputFormat) -> Result<()> {
                     "error": "not found"
                 }))?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn trust_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
+    let manager = PluginManager::default();
+    let hash = manager.trust_plugin(name)?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!(
+                "{} Plugin '{}' trusted with SHA-256: {}",
+                "✓".green().bold(),
+                name.cyan(),
+                &hash[..16]
+            );
+        }
+        _ => {
+            output_format.write(&serde_json::json!({
+                "plugin": name,
+                "trusted": true,
+                "sha256": hash
+            }))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn verify_plugin(name: &str, output_format: OutputFormat) -> Result<()> {
+    let manager = PluginManager::default();
+    let result = manager.verify_plugin(name)?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} {}", "Plugin:".bold(), result.name.cyan());
+            println!("  {:<16} {}", "Path:".dimmed(), result.path.display());
+            println!("  {:<16} {}", "SHA-256:".dimmed(), result.current_hash);
+
+            if let Some(ref recorded) = result.recorded_hash {
+                let status = if result.hash_match {
+                    "match".green().to_string()
+                } else {
+                    "MISMATCH".red().bold().to_string()
+                };
+                println!("  {:<16} {} ({})", "Recorded:".dimmed(), recorded, status);
+            } else {
+                println!(
+                    "  {:<16} {}",
+                    "Recorded:".dimmed(),
+                    "none (not yet trusted)".yellow()
+                );
+            }
+
+            if result.has_signature {
+                let sig_status = if result.signature_valid {
+                    "valid".green().bold().to_string()
+                } else {
+                    "INVALID".red().bold().to_string()
+                };
+                println!("  {:<16} {}", "Signature:".dimmed(), sig_status);
+            }
+
+            let trust_status = if result.has_signature && result.signature_valid {
+                "signed + verified".green().to_string()
+            } else if result.hash_match && result.trusted {
+                "TOFU hash verified".green().to_string()
+            } else if !result.hash_match && result.recorded_hash.is_some() {
+                "UNTRUSTED — hash changed".red().bold().to_string()
+            } else {
+                "not yet trusted".yellow().to_string()
+            };
+            println!("  {:<16} {}", "Trust:".dimmed(), trust_status);
+        }
+        _ => {
+            output_format.write(&serde_json::json!({
+                "plugin": result.name,
+                "path": result.path.to_string_lossy(),
+                "sha256": result.current_hash,
+                "recorded_sha256": result.recorded_hash,
+                "hash_match": result.hash_match,
+                "has_signature": result.has_signature,
+                "signature_valid": result.signature_valid,
+                "trusted": result.trusted,
+            }))?;
         }
     }
 

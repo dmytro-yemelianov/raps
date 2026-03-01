@@ -1,7 +1,7 @@
 # ASVS L2 Compliance Matrix (CLI-Scoped)
 
 **Last Updated:** 2026-02-28
-**RAPS Version:** 4.14.1
+**RAPS Version:** 4.15.0
 **ASVS Version:** 4.0.3
 
 ## Summary
@@ -14,12 +14,12 @@
 | V7 Error/Logging | 6 | 6 | 0 | 0 | 0 |
 | V8 Data Protection | 2 | 2 | 0 | 0 | 0 |
 | V9 Communications | 3 | 3 | 0 | 0 | 0 |
-| V10 Malicious Code | 2 | 0 | 1 | 0 | 1 |
+| V10 Malicious Code | 2 | 2 | 0 | 0 | 0 |
 | V12 Files/Resources | 3 | 3 | 0 | 0 | 0 |
 | V14 Configuration | 3 | 3 | 0 | 0 | 0 |
-| **Total** | **34** | **32** | **1** | **0** | **1** |
+| **Total** | **34** | **34** | **0** | **0** | **0** |
 
-**Compliance Rate: 94% Met, 3% Partial, 3% Gap**
+**Compliance Rate: 100% Met**
 
 ## V2 — Authentication
 
@@ -91,8 +91,8 @@ See: `docs/security/asvs-v6-v9-crypto-comms-audit.md`
 
 | ID | Requirement | Status | Evidence | Notes |
 |----|-------------|--------|----------|-------|
-| V10.1 | Plugin trust model documented | Partial | `plugins.rs` | Plugins run with full user permissions, no docs |
-| V10.2 | Plugin signature verification | Gap | — | ed25519-dalek in deps but not integrated |
+| V10.1 | Plugin trust model documented | Met | `plugin-trust-model.md`, `plugins.rs` | Trust model documented, TOFU hash tracking, trust/verify commands |
+| V10.2 | Plugin signature verification | Met | `plugins.rs:verify_ed25519_signature` | Ed25519 signature verification + TOFU SHA-256 hash tracking |
 
 See: `docs/security/plugin-trust-model.md`
 
@@ -119,5 +119,5 @@ See: `docs/security/plugin-trust-model.md`
 | P1 | Download path traversal (V5.5/V12.3) | Arbitrary file write | **Fixed** — `security.rs` |
 | P1 | Automatic log redaction (V7.3) | Credential leak in logs | **Fixed** — `RedactingMakeWriter` |
 | P2 | Log directory permissions (V8.2) | Logs readable by other users | **Fixed** — `create_dir_restricted` |
-| P2 | Plugin signature verification (V10.2) | Malicious plugin execution | Open |
+| P2 | Plugin signature verification (V10.2) | Malicious plugin execution | **Fixed** — TOFU + ed25519 |
 | P3 | Pipeline variable injection (V5.4) | Argument injection via variables | **Fixed** — metachar validation + shlex |
