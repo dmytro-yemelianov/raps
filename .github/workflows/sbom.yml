@@ -1,5 +1,8 @@
 name: Generate SBOM
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
