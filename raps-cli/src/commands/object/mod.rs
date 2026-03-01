@@ -75,6 +75,10 @@ pub enum ObjectCommands {
     List {
         /// Bucket key
         bucket: Option<String>,
+
+        /// Maximum number of objects to return
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
     },
 
     /// Delete an object from a bucket
@@ -187,7 +191,9 @@ impl ObjectCommands {
                 object,
                 out_file,
             } => download_object(client, bucket, object, out_file, output_format).await,
-            ObjectCommands::List { bucket } => list_objects(client, bucket, output_format).await,
+            ObjectCommands::List { bucket, limit } => {
+                list_objects(client, bucket, limit, output_format).await
+            }
             ObjectCommands::Delete {
                 bucket,
                 object,

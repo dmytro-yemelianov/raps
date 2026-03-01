@@ -251,6 +251,15 @@ impl OssClient {
 
     /// List objects in a bucket
     pub async fn list_objects(&self, bucket_key: &str) -> Result<Vec<ObjectItem>> {
+        self.list_objects_with_limit(bucket_key, None).await
+    }
+
+    /// List objects in a bucket, returning at most `limit` items if specified.
+    pub async fn list_objects_with_limit(
+        &self,
+        bucket_key: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<ObjectItem>> {
         const MAX_PAGES: usize = 100;
         let token = self.auth.get_token().await?;
         let mut all_objects = Vec::new();
@@ -292,6 +301,14 @@ impl OssClient {
                 .with_context(|| format!("Failed to parse objects response: {}", response_text))?;
 
             all_objects.extend(objects_response.items);
+
+            // Stop early if we've reached the requested limit
+            if let Some(max) = limit
+                && all_objects.len() >= max
+            {
+                all_objects.truncate(max);
+                break;
+            }
 
             if objects_response.next.is_none() {
                 break;

@@ -133,6 +133,7 @@ struct ObjectListOutput {
 pub(super) async fn list_objects(
     client: &OssClient,
     bucket: Option<String>,
+    limit: Option<usize>,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Select bucket
@@ -145,7 +146,9 @@ pub(super) async fn list_objects(
         );
     }
 
-    let objects = client.list_objects(&bucket_key).await?;
+    let objects = client
+        .list_objects_with_limit(&bucket_key, limit)
+        .await?;
 
     let object_outputs: Vec<ObjectListOutput> = objects
         .iter()

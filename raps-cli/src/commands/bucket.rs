@@ -35,7 +35,11 @@ pub enum BucketCommands {
     },
 
     /// List all buckets
-    List,
+    List {
+        /// Maximum number of buckets to return
+        #[arg(long, short = 'n')]
+        limit: Option<usize>,
+    },
 
     /// Show bucket details
     Info {
@@ -62,7 +66,7 @@ impl BucketCommands {
                 policy,
                 region,
             } => create_bucket(client, key, policy, region, output_format).await,
-            BucketCommands::List => list_buckets(client, output_format).await,
+            BucketCommands::List { limit } => list_buckets(client, limit, output_format).await,
             BucketCommands::Info { bucket_key } => {
                 bucket_info(client, &bucket_key, output_format).await
             }
@@ -251,15 +255,19 @@ async fn create_bucket(
     Ok(())
 }
 
-async fn list_buckets(client: &OssClient, output_format: OutputFormat) -> Result<()> {
+async fn list_buckets(
+    client: &OssClient,
+    limit: Option<usize>,
+    output_format: OutputFormat,
+) -> Result<()> {
     match output_format {
-        OutputFormat::Table => list_buckets_streaming(client).await,
-        _ => list_buckets_batch(client, output_format).await,
+        OutputFormat::Table => list_buckets_streaming(client, limit).await,
+        _ => list_buckets_batch(client, limit, output_format).await,
     }
 }
 
 /// Streaming bucket listing for Table mode — displays results per-region as they arrive.
-async fn list_buckets_streaming(client: &OssClient) -> Result<()> {
+async fn list_buckets_streaming(client: &OssClient, limit: Option<usize>) -> Result<()> {
     use raps_kernel::api_health;
 
     let spinner = raps_kernel::progress::spinner("Fetching buckets from US, EMEA...");
@@ -319,6 +327,10 @@ async fn list_buckets_streaming(client: &OssClient) -> Result<()> {
         }
     }
 
+    if let Some(max) = limit {
+        all_outputs.truncate(max);
+    }
+
     if all_outputs.is_empty() {
         println!("{}", "No buckets found.".yellow());
         return Ok(());
@@ -350,7 +362,11 @@ async fn list_buckets_streaming(client: &OssClient) -> Result<()> {
 }
 
 /// Batch bucket listing for structured output (JSON/YAML/CSV).
-async fn list_buckets_batch(client: &OssClient, output_format: OutputFormat) -> Result<()> {
+async fn list_buckets_batch(
+    client: &OssClient,
+    limit: Option<usize>,
+    output_format: OutputFormat,
+) -> Result<()> {
     let buckets = client
         .list_buckets()
         .await
@@ -361,7 +377,7 @@ async fn list_buckets_batch(client: &OssClient, output_format: OutputFormat) -> 
         return Ok(());
     }
 
-    let bucket_outputs: Vec<BucketOutput> = buckets
+    let mut bucket_outputs: Vec<BucketOutput> = buckets
         .iter()
         .map(|b| BucketOutput {
             bucket_key: b.bucket_key.clone(),
@@ -372,6 +388,10 @@ async fn list_buckets_batch(client: &OssClient, output_format: OutputFormat) -> 
             region: b.region.as_deref().unwrap_or("US").to_string(),
         })
         .collect();
+
+    if let Some(max) = limit {
+        bucket_outputs.truncate(max);
+    }
 
     output_format.write(&bucket_outputs)?;
     Ok(())
