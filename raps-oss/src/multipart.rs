@@ -177,8 +177,13 @@ impl OssClient {
         use tokio::sync::Mutex;
 
         const MAX_CONCURRENT_UPLOADS: usize = 5;
+        /// Save state to disk every N completed parts instead of every part,
+        /// reducing I/O overhead for large files with many chunks.
+        const STATE_FLUSH_INTERVAL: usize = 5;
+
         let semaphore = Arc::new(Semaphore::new(MAX_CONCURRENT_UPLOADS));
         let upload_key = state.upload_key.clone();
+        let parts_since_flush = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let state_mutex = Arc::new(Mutex::new(state));
         let pb_arc = Arc::new(Mutex::new(pb));
         let file_path_clone = file_path.to_path_buf();
@@ -195,6 +200,7 @@ impl OssClient {
                 let client = self.http_client.clone();
                 let semaphore = semaphore.clone();
                 let state_mutex = state_mutex.clone();
+                let parts_since_flush = parts_since_flush.clone();
                 let pb_arc = pb_arc.clone();
                 let object_key = object_key.to_string();
                 let file_path = file_path_clone.clone();
@@ -246,13 +252,20 @@ impl OssClient {
                                     .map(|s| s.trim_matches('"').to_string())
                                     .unwrap_or_default();
 
-                                // Update state atomically
+                                // Update state atomically, flush to disk periodically
                                 {
                                     let mut state_guard = state_mutex.lock().await;
                                     state_guard.completed_parts.push(part_num);
                                     state_guard.part_etags.insert(part_num, etag);
-                                    if let Err(e) = state_guard.save() {
-                                        tracing::warn!(error = %e, "Failed to save upload state");
+                                    let count = parts_since_flush
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                                        + 1;
+                                    if count >= STATE_FLUSH_INTERVAL {
+                                        parts_since_flush
+                                            .store(0, std::sync::atomic::Ordering::Relaxed);
+                                        if let Err(e) = state_guard.save() {
+                                            tracing::warn!(error = %e, "Failed to save upload state");
+                                        }
                                     }
                                 }
 
@@ -326,6 +339,14 @@ impl OssClient {
                 Err(e) => {
                     return Err(e);
                 }
+            }
+        }
+
+        // Final state flush — ensure all completed parts are persisted before completion
+        {
+            let state_guard = state_mutex.lock().await;
+            if let Err(e) = state_guard.save() {
+                tracing::warn!(error = %e, "Failed to save final upload state");
             }
         }
 
