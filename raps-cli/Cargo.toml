@@ -114,6 +114,7 @@ hostname = { workspace = true, optional = true }
 
 # Redis client (optional, for distributed worker)
 redis = { workspace = true, optional = true }
+deadpool-redis = { workspace = true, optional = true }
 
 # HTTP server for Kubernetes service components (optional)
 axum = { workspace = true, optional = true }
@@ -121,7 +122,7 @@ axum = { workspace = true, optional = true }
 [features]
 default = []
 dashboard = ["ratatui", "crossterm"]
-redis = ["raps-kernel/redis", "dep:hostname", "dep:redis"]
+redis = ["raps-kernel/redis", "dep:hostname", "dep:redis", "dep:deadpool-redis"]
 kubernetes = ["raps-kernel/kubernetes", "redis", "dep:axum"]
 
 [dev-dependencies]

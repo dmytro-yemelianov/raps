@@ -26,6 +26,9 @@ use raps_kernel::job_queue::{Job, JobPayload, JobPriority, JobProducer};
 use raps_kernel::prometheus_metrics::PrometheusExporter;
 use raps_kernel::redis_backend::RedisBackend;
 
+/// Redis XREVRANGE result type: Vec<(entry_id, [(field, value), ...])>
+type StreamEntries = Vec<(String, Vec<(String, String)>)>;
+
 // ---------------------------------------------------------------------------
 // CLI subcommands
 // ---------------------------------------------------------------------------
@@ -294,8 +297,7 @@ async fn proxy_forward(
     // Check rate budget — group by first two path segments (e.g. /oss/v2 → "oss")
     let endpoint = path
         .split('/')
-        .filter(|s| !s.is_empty())
-        .next()
+        .find(|s| !s.is_empty())
         .unwrap_or("unknown")
         .to_string();
     let registry = raps_kernel::rate_budget::registry();
@@ -480,7 +482,7 @@ async fn list_jobs(State(state): State<ServiceState>) -> impl IntoResponse {
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<Vec<(String, Vec<(String, String)>)>, redis::RedisError> =
+        let result: Result<StreamEntries, redis::RedisError> =
             redis::cmd("XREVRANGE")
                 .arg(stream)
                 .arg("+")
@@ -493,17 +495,17 @@ async fn list_jobs(State(state): State<ServiceState>) -> impl IntoResponse {
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
                 let data = fields.iter().find(|(k, _)| k == "data").map(|(_, v)| v);
-                if let Some(json_str) = data {
-                    if let Ok(job) = serde_json::from_str::<Job>(json_str) {
-                        all_jobs.push(serde_json::json!({
-                            "entry_id": entry_id,
-                            "id": job.id,
-                            "priority": job.priority,
-                            "payload_type": payload_type_name(&job.payload),
-                            "attempts": job.attempts,
-                            "created_at": job.created_at,
-                        }));
-                    }
+                if let Some(json_str) = data
+                    && let Ok(job) = serde_json::from_str::<Job>(json_str)
+                {
+                    all_jobs.push(serde_json::json!({
+                        "entry_id": entry_id,
+                        "id": job.id,
+                        "priority": job.priority,
+                        "payload_type": payload_type_name(&job.payload),
+                        "attempts": job.attempts,
+                        "created_at": job.created_at,
+                    }));
                 }
             }
         }
@@ -527,7 +529,7 @@ async fn get_job(
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<Vec<(String, Vec<(String, String)>)>, redis::RedisError> =
+        let result: Result<StreamEntries, redis::RedisError> =
             redis::cmd("XREVRANGE")
                 .arg(stream)
                 .arg("+")
@@ -540,25 +542,24 @@ async fn get_job(
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
                 let data = fields.iter().find(|(k, _)| k == "data").map(|(_, v)| v);
-                if let Some(json_str) = data {
-                    if let Ok(job) = serde_json::from_str::<Job>(json_str) {
-                        if job.id == id {
-                            return (
-                                StatusCode::OK,
-                                Json(serde_json::json!({
-                                    "entry_id": entry_id,
-                                    "id": job.id,
-                                    "priority": job.priority,
-                                    "payload": job.payload,
-                                    "attempts": job.attempts,
-                                    "max_attempts": job.max_attempts,
-                                    "created_at": job.created_at,
-                                    "enqueued_by": job.enqueued_by,
-                                })),
-                            )
-                                .into_response();
-                        }
-                    }
+                if let Some(json_str) = data
+                    && let Ok(job) = serde_json::from_str::<Job>(json_str)
+                    && job.id == id
+                {
+                    return (
+                        StatusCode::OK,
+                        Json(serde_json::json!({
+                            "entry_id": entry_id,
+                            "id": job.id,
+                            "priority": job.priority,
+                            "payload": job.payload,
+                            "attempts": job.attempts,
+                            "max_attempts": job.max_attempts,
+                            "created_at": job.created_at,
+                            "enqueued_by": job.enqueued_by,
+                        })),
+                    )
+                        .into_response();
                 }
             }
         }
@@ -952,7 +953,7 @@ async fn dashboard_queues(State(state): State<ServiceState>) -> impl IntoRespons
         .into_response()
 }
 
-async fn dashboard_metrics(State(state): State<ServiceState>) -> impl IntoResponse {
+async fn dashboard_metrics(State(_state): State<ServiceState>) -> impl IntoResponse {
     // Aggregate rate budget snapshot
     let rate_budgets = raps_kernel::rate_budget::registry().snapshot();
     let cache_stats = raps_kernel::response_cache::cache();
@@ -989,7 +990,7 @@ async fn dashboard_recent_jobs(State(state): State<ServiceState>) -> impl IntoRe
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<Vec<(String, Vec<(String, String)>)>, redis::RedisError> =
+        let result: Result<StreamEntries, redis::RedisError> =
             redis::cmd("XREVRANGE")
                 .arg(stream)
                 .arg("+")
@@ -1002,17 +1003,17 @@ async fn dashboard_recent_jobs(State(state): State<ServiceState>) -> impl IntoRe
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
                 let data = fields.iter().find(|(k, _)| k == "data").map(|(_, v)| v);
-                if let Some(json_str) = data {
-                    if let Ok(job) = serde_json::from_str::<Job>(json_str) {
-                        jobs.push(serde_json::json!({
-                            "entry_id": entry_id,
-                            "id": job.id,
-                            "priority": job.priority,
-                            "type": payload_type_name(&job.payload),
-                            "attempts": job.attempts,
-                            "created_at": job.created_at,
-                        }));
-                    }
+                if let Some(json_str) = data
+                    && let Ok(job) = serde_json::from_str::<Job>(json_str)
+                {
+                    jobs.push(serde_json::json!({
+                        "entry_id": entry_id,
+                        "id": job.id,
+                        "priority": job.priority,
+                        "type": payload_type_name(&job.payload),
+                        "attempts": job.attempts,
+                        "created_at": job.created_at,
+                    }));
                 }
             }
         }
