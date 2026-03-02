@@ -51,7 +51,7 @@ use std::io::{self, BufRead, IsTerminal};
 use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
-    ItemCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
+    ItemCommands, JobCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
     RealityCommands, ReportCommands, RfiCommands, TemplateCommands, TranslateCommands,
     WebhookCommands,
 };
@@ -304,6 +304,10 @@ enum Commands {
     /// Run pipeline from YAML/JSON file
     #[command(subcommand)]
     Pipeline(PipelineCommands),
+
+    /// Manage serverless jobs (Fly.io machines)
+    #[command(subcommand)]
+    Job(JobCommands),
 
     /// Generate shell completions for bash, zsh, fish, PowerShell, or elvish
     Completions {
@@ -872,6 +876,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Demo(_) => "demo",
         Commands::Config(_) => "config",
         Commands::Pipeline(_) => "pipeline",
+        Commands::Job(_) => "job",
         Commands::Completions { .. } => "completions",
         Commands::Shell => "shell",
         #[cfg(feature = "dashboard")]
@@ -1059,6 +1064,8 @@ async fn execute_command(
 
         Commands::Pipeline(cmd) => cmd.execute(output_format).await?,
 
+        Commands::Job(cmd) => cmd.execute(output_format).await?,
+
         Commands::Completions { .. } => {
             unreachable!()
         }
@@ -1080,7 +1087,7 @@ async fn execute_command(
         }
 
         Commands::Swarm(cmd) => {
-            cmd.execute(output_format)?;
+            cmd.execute(output_format).await?;
         }
 
         Commands::Schema(cmd) => {

@@ -1,0 +1,17 @@
+name = "raps-webhook-gateway"
+main = "src/index.js"
+compatibility_date = "2025-12-01"
+
+# Durable Object binding for event backlog
+[durable_objects]
+bindings = [
+  { name = "EVENT_BACKLOG", class_name = "EventBacklog" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["EventBacklog"]
+
+# Secrets (set via `wrangler secret put`):
+#   APS_WEBHOOK_SECRET  — HMAC signing key for APS webhooks
+#   RAPS_GATEWAY_API_KEY — Bearer token for /events drain endpoint

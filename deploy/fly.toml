@@ -1,0 +1,47 @@
+# Fly.io configuration for RAPS serverless translation workers.
+#
+# Deploy:  fly deploy
+# Scale:   fly scale count 0 (scale-to-zero by default)
+# Logs:    fly logs
+# Status:  fly status
+
+app = "raps-translation-orchestrator"
+primary_region = "iad"
+
+[build]
+  image = "rapscli/raps-worker:latest"
+
+[env]
+  RUST_LOG = "info"
+
+# Scale-to-zero: machines start on demand and stop when idle.
+# No minimum machines running — fully serverless.
+
+[http_service]
+  internal_port = 9090
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    hard_limit = 25
+    soft_limit = 20
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "512mb"
+
+[metrics]
+  port = 9091
+  path = "/metrics"
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 9090
+    path = "/health"
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"

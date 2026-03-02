@@ -4,7 +4,8 @@
 //! Swarm orchestration commands.
 //!
 //! Introspect resilience layer state: circuit breakers, rate budgets,
-//! response cache, metrics, checkpoints.
+//! response cache, metrics, checkpoints. When built with the `redis`
+//! feature, also provides distributed worker management.
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -52,6 +53,37 @@ pub enum SwarmCommands {
         #[arg(default_value = "all")]
         target: String,
     },
+
+    /// Start a distributed worker that consumes jobs from Redis Streams
+    #[cfg(feature = "redis")]
+    Worker {
+        #[command(subcommand)]
+        cmd: WorkerCommands,
+    },
+}
+
+/// Worker subcommands (requires `redis` feature).
+#[cfg(feature = "redis")]
+#[derive(Debug, Subcommand)]
+pub enum WorkerCommands {
+    /// Start consuming jobs from Redis Streams
+    Start {
+        /// Redis connection URL
+        #[arg(long, env = "RAPS_REDIS_URL", default_value = "redis://127.0.0.1:6379")]
+        redis_url: String,
+
+        /// Maximum concurrent jobs
+        #[arg(long, default_value = "4")]
+        concurrency: usize,
+
+        /// Heartbeat interval in seconds
+        #[arg(long, default_value = "30")]
+        heartbeat_secs: u64,
+
+        /// Comma-separated queue priorities to consume (critical,normal,background)
+        #[arg(long, default_value = "critical,normal,background")]
+        queues: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +124,7 @@ struct CheckpointInfo {
 }
 
 impl SwarmCommands {
-    pub fn execute(self, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
         match self {
             SwarmCommands::Status => swarm_status(output_format),
             SwarmCommands::Metrics => swarm_metrics(output_format),
@@ -100,6 +132,8 @@ impl SwarmCommands {
             SwarmCommands::Resume => swarm_resume(output_format),
             SwarmCommands::Audit { date, limit } => swarm_audit(date, limit, output_format),
             SwarmCommands::Reset { target } => swarm_reset(&target, output_format),
+            #[cfg(feature = "redis")]
+            SwarmCommands::Worker { cmd } => cmd.execute(output_format).await,
         }
     }
 }
@@ -479,4 +513,200 @@ fn swarm_reset(target: &str, _output_format: OutputFormat) -> Result<()> {
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Worker (feature = "redis")
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "redis")]
+impl WorkerCommands {
+    pub async fn execute(self, _output_format: OutputFormat) -> Result<()> {
+        match self {
+            WorkerCommands::Start {
+                redis_url,
+                concurrency,
+                heartbeat_secs,
+                queues: _,
+            } => {
+                worker_start(&redis_url, concurrency, heartbeat_secs).await
+            }
+        }
+    }
+}
+
+#[cfg(feature = "redis")]
+async fn worker_start(
+    redis_url: &str,
+    concurrency: usize,
+    heartbeat_secs: u64,
+) -> Result<()> {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use tokio::sync::Semaphore;
+
+    use raps_kernel::job_queue::JobConsumer;
+    use raps_kernel::redis_backend::RedisBackend;
+
+    let consumer_id = format!(
+        "{}-{}",
+        hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "unknown".into()),
+        std::process::id(),
+    );
+
+    println!("{}", "RAPS Distributed Worker".bold());
+    println!("  Redis:       {}", redis_url);
+    println!("  Consumer:    {}", consumer_id);
+    println!("  Concurrency: {}", concurrency);
+    println!("  Heartbeat:   {}s", heartbeat_secs);
+    println!();
+
+    // Build Redis pool via RedisBackend (reuse the pool)
+    let backend = RedisBackend::new(redis_url, concurrency + 2, "raps:worker")?;
+    let pool = backend.pool().clone();
+
+    // Consumer setup
+    let consumer = Arc::new(JobConsumer::new(pool.clone(), consumer_id.clone()));
+    consumer.ensure_consumer_groups().await?;
+    println!("{} Consumer groups ready", "✓".green());
+
+    // Concurrency limiter
+    let semaphore = Arc::new(Semaphore::new(concurrency));
+
+    // Graceful shutdown flag
+    let shutdown = Arc::new(AtomicBool::new(false));
+    let shutdown_signal = shutdown.clone();
+
+    // SIGTERM / Ctrl+C handler
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await.ok();
+        println!("\n{} Shutdown signal received, draining in-flight jobs...", "!".yellow());
+        shutdown_signal.store(true, Ordering::SeqCst);
+    });
+
+    // Heartbeat task
+    let hb_pool = pool.clone();
+    let hb_id = consumer_id.clone();
+    let hb_shutdown = shutdown.clone();
+    tokio::spawn(async move {
+        let ttl = heartbeat_secs * 3;
+        loop {
+            if hb_shutdown.load(Ordering::SeqCst) {
+                break;
+            }
+            if let Ok(mut conn) = hb_pool.get().await {
+                let key = format!("raps:worker:heartbeat:{}", hb_id);
+                let ts = chrono::Utc::now().to_rfc3339();
+                let _: Result<String, redis::RedisError> = redis::cmd("SETEX")
+                    .arg(&key)
+                    .arg(ttl)
+                    .arg(&ts)
+                    .query_async(&mut *conn)
+                    .await;
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(heartbeat_secs)).await;
+        }
+    });
+
+    println!("{} Worker running — press Ctrl+C to stop", "✓".green());
+
+    // Main consume loop
+    loop {
+        if shutdown.load(Ordering::SeqCst) {
+            // Wait for all in-flight jobs to complete
+            let _ = semaphore.acquire_many(concurrency as u32).await;
+            println!("{} All in-flight jobs drained. Shutting down.", "✓".green());
+            break;
+        }
+
+        // Acquire permit before blocking on dequeue
+        let permit = semaphore.clone().acquire_owned().await?;
+
+        let consumer = consumer.clone();
+        let shutdown = shutdown.clone();
+
+        tokio::spawn(async move {
+            let _permit = permit; // held until job completes
+
+            match consumer.dequeue_one(2000).await {
+                Ok(Some((priority, entry_id, job))) => {
+                    tracing::info!(job_id = %job.id, ?priority, "Processing job");
+                    let result = process_job(&job).await;
+                    match result {
+                        Ok(()) => {
+                            if let Err(e) = consumer.ack(priority, &entry_id).await {
+                                tracing::error!(error = %e, "Failed to ACK job");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!(job_id = %job.id, error = %e, "Job failed");
+                            if job.attempts >= job.max_attempts {
+                                let _ = consumer.nack_to_dlq(&job, &e.to_string()).await;
+                            }
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // No job available within timeout — normal, just loop
+                }
+                Err(e) => {
+                    if !shutdown.load(Ordering::SeqCst) {
+                        tracing::error!(error = %e, "Dequeue error");
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        });
+    }
+
+    Ok(())
+}
+
+/// Dispatch a job to the appropriate handler.
+#[cfg(feature = "redis")]
+async fn process_job(job: &raps_kernel::job_queue::Job) -> Result<()> {
+    use raps_kernel::job_queue::JobPayload;
+
+    match &job.payload {
+        JobPayload::Translate(t) => {
+            tracing::info!(urn = %t.urn, format = %t.output_format, "Processing translate job");
+            // TODO: invoke raps_derivative translation API
+            println!(
+                "  {} Translate job {} — URN: {} -> {}",
+                "▶".cyan(),
+                job.id,
+                t.urn,
+                t.output_format,
+            );
+            Ok(())
+        }
+        JobPayload::Upload(u) => {
+            tracing::info!(bucket = %u.bucket_key, object = %u.object_key, "Processing upload job");
+            println!(
+                "  {} Upload job {} — {}/{}",
+                "▶".cyan(),
+                job.id,
+                u.bucket_key,
+                u.object_key,
+            );
+            Ok(())
+        }
+        JobPayload::ExtractProps(e) => {
+            tracing::info!(urn = %e.urn, "Processing extract-props job");
+            println!("  {} ExtractProps job {} — URN: {}", "▶".cyan(), job.id, e.urn);
+            Ok(())
+        }
+        JobPayload::Pipeline(p) => {
+            tracing::info!(pipeline = %p.pipeline_name, "Processing pipeline job");
+            println!(
+                "  {} Pipeline job {} — {}",
+                "▶".cyan(),
+                job.id,
+                p.pipeline_name,
+            );
+            Ok(())
+        }
+    }
 }

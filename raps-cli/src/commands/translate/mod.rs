@@ -45,6 +45,14 @@ pub enum TranslateCommands {
         /// to preserve existing manifests.
         #[arg(long)]
         force: bool,
+
+        /// Dispatch to a serverless Fly.io machine instead of running locally
+        #[arg(long)]
+        serverless: bool,
+
+        /// Send a Slack notification when the job completes (requires swarm.toml)
+        #[arg(long)]
+        notify: bool,
     },
 
     /// Check translation status
@@ -230,18 +238,34 @@ impl TranslateCommands {
                 wait,
                 region,
                 force,
+                serverless,
+                notify,
             } => {
-                translations::start_translation(
-                    client,
-                    urn,
-                    format,
-                    root_filename,
-                    wait,
-                    output_format,
-                    region,
-                    force,
-                )
-                .await
+                if serverless {
+                    translations::start_serverless(
+                        urn,
+                        format,
+                        root_filename,
+                        region,
+                        force,
+                        wait,
+                        notify,
+                        output_format,
+                    )
+                    .await
+                } else {
+                    translations::start_translation(
+                        client,
+                        urn,
+                        format,
+                        root_filename,
+                        wait,
+                        output_format,
+                        region,
+                        force,
+                    )
+                    .await
+                }
             }
             TranslateCommands::Status { urn, wait } => {
                 translations::check_status(client, &urn, wait, output_format).await

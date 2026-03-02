@@ -1,0 +1,98 @@
+# RAPS Distributed Orchestration Stack
+# Usage: docker compose -f deploy/docker-compose.yml up -d
+#
+# Requires: .env file (copy from .env.example)
+# Images:   rapscli/ namespace on Docker Hub (built in raps-docker repo)
+
+services:
+  # ---------------------------------------------------------------------------
+  # Redis — message broker + cache
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >
+      redis-server
+        --appendonly yes
+        --maxmemory 256mb
+        --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # Worker pool — consumes jobs from Redis Streams
+  # ---------------------------------------------------------------------------
+  raps-worker:
+    image: rapscli/raps-worker:${RAPS_VERSION:-latest}
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      RAPS_REDIS_URL: redis://redis:6379
+      APS_CLIENT_ID: ${APS_CLIENT_ID}
+      APS_CLIENT_SECRET: ${APS_CLIENT_SECRET}
+      RUST_LOG: ${RUST_LOG:-info}
+    command: >
+      raps swarm worker start
+        --redis-url redis://redis:6379
+        --concurrency 4
+        --heartbeat-secs 30
+    stop_grace_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Reverse proxy (optional — for HTTPS termination)
+  # ---------------------------------------------------------------------------
+  raps-proxy:
+    image: rapscli/raps-proxy:${RAPS_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "443:443"
+    depends_on:
+      - raps-worker
+    environment:
+      UPSTREAM_WORKERS: raps-worker:9090
+
+  # ---------------------------------------------------------------------------
+  # Webhook receiver — forwards APS webhook events to Redis
+  # ---------------------------------------------------------------------------
+  raps-webhook:
+    image: rapscli/raps-webhook:${RAPS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "9000:9000"
+    environment:
+      RAPS_REDIS_URL: redis://redis:6379
+      APS_WEBHOOK_SECRET: ${APS_WEBHOOK_SECRET}
+      RUST_LOG: ${RUST_LOG:-info}
+
+  # ---------------------------------------------------------------------------
+  # Dashboard — TUI/web monitoring (optional)
+  # ---------------------------------------------------------------------------
+  raps-dashboard:
+    image: rapscli/raps-dashboard:${RAPS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      RAPS_REDIS_URL: redis://redis:6379
+      RUST_LOG: ${RUST_LOG:-info}
+
+volumes:
+  redis-data:

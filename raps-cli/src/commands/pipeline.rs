@@ -47,6 +47,36 @@ pub enum PipelineCommands {
         #[arg(long = "out-file", default_value = "pipeline.yaml")]
         out_file: PathBuf,
     },
+
+    /// Create a scheduled/triggered pipeline definition
+    Create {
+        /// Pipeline name
+        name: String,
+
+        /// Source URN or bucket/object path
+        #[arg(long)]
+        source: Option<String>,
+
+        /// Cron schedule expression (e.g. "0 2 * * *")
+        #[arg(long)]
+        cron: Option<String>,
+
+        /// Action to perform: translate, upload, extract-props, pipeline
+        #[arg(long, default_value = "translate")]
+        action: String,
+
+        /// Send notifications on completion (Slack webhook URL from swarm.toml)
+        #[arg(long)]
+        notify: bool,
+
+        /// Dispatch steps to serverless Fly.io machines
+        #[arg(long)]
+        serverless: bool,
+
+        /// Output pipeline definition to file
+        #[arg(long = "out-file", default_value = ".pipeline.yaml")]
+        out_file: PathBuf,
+    },
 }
 
 /// Pipeline definition
@@ -157,6 +187,24 @@ impl PipelineCommands {
             } => run_pipeline(&file, ignore_failure, dry_run, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
+            PipelineCommands::Create {
+                name,
+                source,
+                cron,
+                action,
+                notify,
+                serverless,
+                out_file,
+            } => create_pipeline(
+                &name,
+                source,
+                cron,
+                &action,
+                notify,
+                serverless,
+                &out_file,
+                output_format,
+            ),
         }
     }
 }
@@ -1347,4 +1395,126 @@ steps:
         assert_eq!(retry.max_attempts, 2);
         assert_eq!(retry.delay, "3s");
     }
+}
+
+// ---------------------------------------------------------------------------
+// Create
+// ---------------------------------------------------------------------------
+
+/// Trigger type for a scheduled pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum PipelineTrigger {
+    Manual,
+    Cron { expression: String },
+    Webhook { event: String },
+}
+
+/// A scheduled pipeline definition written to `.pipeline.yaml`.
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+struct ScheduledPipeline {
+    name: String,
+    trigger: PipelineTrigger,
+    #[serde(default)]
+    source: Option<String>,
+    action: String,
+    #[serde(default)]
+    notify: bool,
+    #[serde(default)]
+    serverless: bool,
+    #[serde(default)]
+    steps: Vec<Step>,
+}
+
+fn create_pipeline(
+    name: &str,
+    source: Option<String>,
+    cron: Option<String>,
+    action: &str,
+    notify: bool,
+    serverless: bool,
+    out_file: &PathBuf,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let trigger = if let Some(ref expr) = cron {
+        PipelineTrigger::Cron {
+            expression: expr.clone(),
+        }
+    } else {
+        PipelineTrigger::Manual
+    };
+
+    // Build a default step based on the action
+    let step_command = match action {
+        "translate" => {
+            let mut cmd = "translate start".to_string();
+            if let Some(ref s) = source {
+                cmd.push_str(&format!(" {}", s));
+            }
+            if serverless {
+                cmd.push_str(" --serverless");
+            }
+            cmd.push_str(" --wait");
+            cmd
+        }
+        "upload" => {
+            let mut cmd = "object upload".to_string();
+            if let Some(ref s) = source {
+                cmd.push_str(&format!(" {}", s));
+            }
+            cmd
+        }
+        "extract-props" => {
+            let mut cmd = "translate properties".to_string();
+            if let Some(ref s) = source {
+                cmd.push_str(&format!(" {}", s));
+            }
+            cmd
+        }
+        other => other.to_string(),
+    };
+
+    let step = Step {
+        name: format!("{} step", action),
+        command: Some(step_command),
+        ..Step::default()
+    };
+
+    let pipeline = ScheduledPipeline {
+        name: name.to_string(),
+        trigger,
+        source: source.clone(),
+        action: action.to_string(),
+        notify,
+        serverless,
+        steps: vec![step],
+    };
+
+    let yaml = serde_yaml::to_string(&pipeline).context("Failed to serialize pipeline")?;
+    std::fs::write(out_file, &yaml)
+        .with_context(|| format!("Failed to write {}", out_file.display()))?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Pipeline created: {}", "✓".green(), out_file.display());
+            println!("  Name:       {}", name);
+            println!("  Action:     {}", action);
+            if let Some(ref expr) = cron {
+                println!("  Cron:       {}", expr);
+            } else {
+                println!("  Trigger:    manual");
+            }
+            if serverless {
+                println!("  Dispatch:   serverless (Fly.io)");
+            }
+            if notify {
+                println!("  Notify:     enabled");
+            }
+        }
+        _ => {
+            output_format.write(&pipeline)?;
+        }
+    }
+
+    Ok(())
 }

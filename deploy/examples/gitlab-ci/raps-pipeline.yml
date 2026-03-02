@@ -1,0 +1,70 @@
+# Example GitLab CI pipeline: translate models using RAPS.
+#
+# Three stages: setup (install + auth), translate (serverless dispatch),
+# and verify (check translation status).
+#
+# Required CI/CD variables:
+#   APS_CLIENT_ID, APS_CLIENT_SECRET, FLY_API_TOKEN, FLY_APP
+
+variables:
+  RAPS_VERSION: "5.1.0"
+
+stages:
+  - setup
+  - translate
+  - verify
+
+# ---------------------------------------------------------------------------
+# Setup: install RAPS and verify authentication
+# ---------------------------------------------------------------------------
+setup:
+  stage: setup
+  image: ubuntu:latest
+  script:
+    - apt-get update -qq && apt-get install -y -qq curl
+    - curl -fsSL https://rapscli.xyz/install.sh | bash -s -- --version $RAPS_VERSION
+    - export PATH="$HOME/.raps/bin:$PATH"
+    - raps auth test
+  artifacts:
+    paths:
+      - $HOME/.raps/
+    expire_in: 1 hour
+
+# ---------------------------------------------------------------------------
+# Translate: dispatch via serverless Fly.io machines
+# ---------------------------------------------------------------------------
+translate:
+  stage: translate
+  image: ubuntu:latest
+  needs: [setup]
+  script:
+    - export PATH="$HOME/.raps/bin:$PATH"
+    - |
+      raps translate start "$MODEL_URN" \
+        --format "${OUTPUT_FORMAT:-svf2}" \
+        --serverless \
+        --wait \
+        --output json | tee translation-result.json
+  artifacts:
+    paths:
+      - translation-result.json
+    expire_in: 1 week
+  rules:
+    - if: $MODEL_URN
+      when: always
+    - when: manual
+
+# ---------------------------------------------------------------------------
+# Verify: check that translation completed successfully
+# ---------------------------------------------------------------------------
+verify:
+  stage: verify
+  image: ubuntu:latest
+  needs: [translate]
+  script:
+    - export PATH="$HOME/.raps/bin:$PATH"
+    - raps translate status "$MODEL_URN" --output json
+  rules:
+    - if: $MODEL_URN
+      when: always
+    - when: manual
