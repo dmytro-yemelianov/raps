@@ -520,13 +520,19 @@ mod tests {
 }
 
 /// Integration tests using raps-mock
+///
+/// The mock's `create_webhook` response is missing the `event` field required
+/// by the `Webhook` type, so `create_webhook` client method fails to parse.
+/// Also, `get_webhook` and `update_webhook` routes are not registered in the mock.
+/// All CRUD operations therefore use raw HTTP to verify the request/response cycle.
+/// The `list_webhooks` and `list_all_webhooks` client methods work since the mock's
+/// list response includes all required fields.
 #[cfg(test)]
 mod integration_tests {
     use super::*;
     use raps_kernel::auth::AuthClient;
     use raps_kernel::config::Config;
 
-    /// Create a Webhooks client configured to use the mock server
     fn create_mock_webhooks_client(mock_url: &str) -> WebhooksClient {
         let config = Config {
             client_id: "test-client-id".to_string(),
@@ -540,58 +546,323 @@ mod integration_tests {
         WebhooksClient::new(config, auth)
     }
 
+    async fn acquire_mock_token(mock_url: &str) -> String {
+        let http = reqwest::Client::new();
+        let resp = http
+            .post(format!("{}/authentication/v2/token", mock_url))
+            .json(&serde_json::json!({
+                "grant_type": "client_credentials",
+                "client_id": "test-client-id",
+                "client_secret": "test-client-secret"
+            }))
+            .send()
+            .await
+            .expect("token request failed");
+        assert!(
+            resp.status().is_success(),
+            "token endpoint returned {}",
+            resp.status()
+        );
+        let body: serde_json::Value = resp.json().await.expect("invalid token JSON");
+        body["access_token"]
+            .as_str()
+            .expect("no access_token")
+            .to_string()
+    }
+
+    async fn setup_client_with_token(mock_url: &str) -> (WebhooksClient, String) {
+        let client = create_mock_webhooks_client(mock_url);
+        let token = acquire_mock_token(mock_url).await;
+        client
+            .auth
+            .set_2leg_token_for_testing(token.clone(), 3600)
+            .await;
+        (client, token)
+    }
+
+    /// Create a webhook via raw HTTP and return the hook_id
+    async fn create_webhook_raw(
+        mock_url: &str,
+        token: &str,
+        event: &str,
+        callback_url: &str,
+    ) -> String {
+        let http = reqwest::Client::new();
+        let resp = http
+            .post(format!(
+                "{}/webhooks/v1/systems/data/events/{}/hooks",
+                mock_url, event
+            ))
+            .bearer_auth(token)
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "callbackUrl": callback_url,
+                "scope": { "folder": null },
+                "autoReactivateHook": true
+            }))
+            .send()
+            .await
+            .expect("create webhook request failed");
+        assert!(
+            resp.status().is_success() || resp.status().as_u16() == 201,
+            "create webhook returned {}",
+            resp.status()
+        );
+        let body: serde_json::Value = resp.json().await.unwrap();
+        body["hookId"]
+            .as_str()
+            .expect("response should contain hookId")
+            .to_string()
+    }
+
     #[tokio::test]
     async fn test_webhooks_client_creation() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
         let client = create_mock_webhooks_client(&server.url);
-
-        // Verify client is configured correctly
         assert!(client.auth.config().base_url.starts_with("http://"));
     }
 
     #[tokio::test]
-    async fn test_list_webhooks_with_mock_server() {
+    async fn test_create_webhook_raw_http() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_webhooks_client(&server.url);
+        let token = acquire_mock_token(&server.url).await;
 
-        // raps-mock auto-generates responses from OpenAPI specs
-        let result = client.list_webhooks("data", "dm.version.added").await;
-        // The test verifies the client can make requests to the mock server
-        // Response handling depends on OpenAPI spec examples
-        let _ = result;
+        let http = reqwest::Client::new();
+        let resp = http
+            .post(format!(
+                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks",
+                server.url
+            ))
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "callbackUrl": "https://example.com/webhook",
+                "scope": { "folder": "urn:adsk.wipprod:fs.folder:test-folder" },
+                "autoReactivateHook": true
+            }))
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success() || resp.status().as_u16() == 201,
+            "create webhook returned {}",
+            resp.status()
+        );
+        let body: serde_json::Value = resp.json().await.unwrap();
+        assert!(body["hookId"].is_string(), "response should contain hookId");
+        assert!(body["status"].is_string(), "response should contain status");
+        assert_eq!(body["status"], "active");
     }
 
     #[tokio::test]
-    async fn test_list_all_webhooks_with_mock_server() {
+    async fn test_create_webhook_without_folder_raw_http() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_webhooks_client(&server.url);
+        let token = acquire_mock_token(&server.url).await;
+
+        let http = reqwest::Client::new();
+        let resp = http
+            .post(format!(
+                "{}/webhooks/v1/systems/data/events/dm.folder.added/hooks",
+                server.url
+            ))
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&serde_json::json!({
+                "callbackUrl": "https://example.com/folder-hook",
+                "scope": {}
+            }))
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success() || resp.status().as_u16() == 201,
+            "create webhook without folder returned {}",
+            resp.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_webhooks_raw_http() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let token = acquire_mock_token(&server.url).await;
+
+        // Create a webhook first
+        create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/list-test",
+        )
+        .await;
+
+        let http = reqwest::Client::new();
+        let resp = http
+            .get(format!(
+                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks",
+                server.url
+            ))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success(),
+            "list webhooks returned {}",
+            resp.status()
+        );
+        let body: serde_json::Value = resp.json().await.unwrap();
+        let data = body["data"].as_array().expect("data should be an array");
+        assert!(!data.is_empty(), "webhook list should not be empty after create");
+        assert!(data[0]["hookId"].is_string(), "each webhook should have hookId");
+    }
+
+    #[tokio::test]
+    async fn test_list_all_webhooks_raw_http() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let token = acquire_mock_token(&server.url).await;
+
+        create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/all-test",
+        )
+        .await;
+
+        let http = reqwest::Client::new();
+        let resp = http
+            .get(format!("{}/webhooks/v1/hooks", server.url))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success(),
+            "list all webhooks returned {}",
+            resp.status()
+        );
+        let body: serde_json::Value = resp.json().await.unwrap();
+        let data = body["data"].as_array().expect("data should be an array");
+        assert!(!data.is_empty(), "all-webhooks list should not be empty");
+    }
+
+    #[tokio::test]
+    async fn test_delete_webhook_raw_http() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let token = acquire_mock_token(&server.url).await;
+
+        let hook_id = create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/delete-test",
+        )
+        .await;
+
+        let http = reqwest::Client::new();
+        let resp = http
+            .delete(format!(
+                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks/{}",
+                server.url, hook_id
+            ))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_success() || resp.status().as_u16() == 204,
+            "delete webhook returned {}",
+            resp.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_webhook_create_list_delete_lifecycle() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let token = acquire_mock_token(&server.url).await;
+        let http = reqwest::Client::new();
+
+        // Create
+        let hook_id = create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/lifecycle",
+        )
+        .await;
+        assert!(!hook_id.is_empty());
+
+        // List - should contain the created hook
+        let list_resp = http
+            .get(format!(
+                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks",
+                server.url
+            ))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
+        let list_body: serde_json::Value = list_resp.json().await.unwrap();
+        let hooks = list_body["data"].as_array().unwrap();
+        let has_hook = hooks
+            .iter()
+            .any(|h| h["hookId"].as_str() == Some(&hook_id));
+        assert!(has_hook, "created hook should appear in list");
+
+        // Delete
+        let del_resp = http
+            .delete(format!(
+                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks/{}",
+                server.url, hook_id
+            ))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
+        assert!(
+            del_resp.status().is_success() || del_resp.status().as_u16() == 204,
+            "delete failed"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_list_webhooks_client_method_after_raw_create() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let (client, token) = setup_client_with_token(&server.url).await;
+
+        // Create via raw HTTP (since client create fails to parse response)
+        create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/client-list-test",
+        )
+        .await;
+
+        // List via client method (mock list response has all required Webhook fields)
+        let result = client.list_webhooks("data", "dm.version.added").await;
+        assert!(result.is_ok(), "list_webhooks failed: {:?}", result.err());
+        let webhooks = result.unwrap();
+        assert!(!webhooks.is_empty(), "webhook list should not be empty");
+        assert_eq!(webhooks[0].system, "data");
+    }
+
+    #[tokio::test]
+    async fn test_list_all_webhooks_client_method_after_raw_create() {
+        let server = raps_mock::TestServer::start_default().await.unwrap();
+        let (client, token) = setup_client_with_token(&server.url).await;
+
+        create_webhook_raw(
+            &server.url,
+            &token,
+            "dm.version.added",
+            "https://example.com/client-all-test",
+        )
+        .await;
 
         let result = client.list_all_webhooks().await;
-        let _ = result;
-    }
-
-    #[tokio::test]
-    async fn test_get_webhook_with_mock() {
-        let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_webhooks_client(&server.url);
-        let result = client
-            .get_webhook("data", "dm.version.added", "hook-123")
-            .await;
-        let _ = result;
-    }
-
-    #[tokio::test]
-    async fn test_update_webhook_with_mock() {
-        let server = raps_mock::TestServer::start_default().await.unwrap();
-        let client = create_mock_webhooks_client(&server.url);
-        let request = UpdateWebhookRequest {
-            callback_url: Some("https://new-callback.com".to_string()),
-            status: None,
-            filter: None,
-        };
-        let result = client
-            .update_webhook("data", "dm.version.added", "hook-123", request)
-            .await;
-        let _ = result;
+        assert!(result.is_ok(), "list_all_webhooks failed: {:?}", result.err());
+        let webhooks = result.unwrap();
+        assert!(!webhooks.is_empty(), "all-webhooks list should not be empty");
     }
 }
