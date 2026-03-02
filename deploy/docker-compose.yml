@@ -50,18 +50,48 @@ services:
     stop_grace_period: 30s
 
   # ---------------------------------------------------------------------------
-  # Reverse proxy (optional — for HTTPS termination)
+  # API Proxy — reverse proxy with response cache + rate limiting
   # ---------------------------------------------------------------------------
   raps-proxy:
     image: rapscli/raps-proxy:${RAPS_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "8080:8080"
-      - "443:443"
     depends_on:
-      - raps-worker
+      redis:
+        condition: service_healthy
+      raps-worker:
+        condition: service_started
     environment:
-      UPSTREAM_WORKERS: raps-worker:9090
+      RAPS_REDIS_URL: redis://redis:6379
+      APS_CLIENT_ID: ${APS_CLIENT_ID}
+      APS_CLIENT_SECRET: ${APS_CLIENT_SECRET}
+      RUST_LOG: ${RUST_LOG:-info}
+    command: >
+      raps serve proxy
+        --port 8080
+        --redis-url redis://redis:6379
+
+  # ---------------------------------------------------------------------------
+  # Job Coordinator — enqueues jobs to Redis Streams
+  # ---------------------------------------------------------------------------
+  raps-coordinator:
+    image: rapscli/raps-coordinator:${RAPS_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      RAPS_REDIS_URL: redis://redis:6379
+      APS_CLIENT_ID: ${APS_CLIENT_ID}
+      APS_CLIENT_SECRET: ${APS_CLIENT_SECRET}
+      RUST_LOG: ${RUST_LOG:-info}
+    command: >
+      raps serve coordinator
+        --port 8081
+        --redis-url redis://redis:6379
 
   # ---------------------------------------------------------------------------
   # Webhook receiver — forwards APS webhook events to Redis
@@ -78,9 +108,13 @@ services:
       RAPS_REDIS_URL: redis://redis:6379
       APS_WEBHOOK_SECRET: ${APS_WEBHOOK_SECRET}
       RUST_LOG: ${RUST_LOG:-info}
+    command: >
+      raps serve webhook
+        --port 9000
+        --redis-url redis://redis:6379
 
   # ---------------------------------------------------------------------------
-  # Dashboard — TUI/web monitoring (optional)
+  # Dashboard — web monitoring UI
   # ---------------------------------------------------------------------------
   raps-dashboard:
     image: rapscli/raps-dashboard:${RAPS_VERSION:-latest}
@@ -93,6 +127,10 @@ services:
     environment:
       RAPS_REDIS_URL: redis://redis:6379
       RUST_LOG: ${RUST_LOG:-info}
+    command: >
+      raps serve dashboard
+        --port 3000
+        --redis-url redis://redis:6379
 
 volumes:
   redis-data:
