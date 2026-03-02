@@ -19,7 +19,21 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "rapscli/raps-webhook:5.2.0"
+          value: "ghcr.io/dmytro-yemelianov/raps-webhook:5.2.0"
+
+  - it: should have correct command
+    template: templates/webhook-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - raps
+            - serve
+            - webhook
+            - --port
+            - "9000"
+            - --redis-url
+            - redis://RELEASE-NAME-redis-master:6379
 
   - it: should expose webhook port
     template: templates/webhook-deployment.yaml

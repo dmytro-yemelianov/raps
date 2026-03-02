@@ -14,6 +14,20 @@ tests:
           path: spec.replicas
           value: 1
 
+  - it: should have correct command
+    template: templates/dashboard-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - raps
+            - serve
+            - dashboard
+            - --port
+            - "3000"
+            - --redis-url
+            - redis://RELEASE-NAME-redis-master:6379
+
   - it: should not use envFrom with credentials
     template: templates/dashboard-deployment.yaml
     asserts:

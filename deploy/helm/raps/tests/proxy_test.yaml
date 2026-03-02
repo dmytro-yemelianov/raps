@@ -25,7 +25,22 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "rapscli/raps-proxy:5.2.0"
+          value: "ghcr.io/dmytro-yemelianov/raps-proxy:5.2.0"
+
+
+  - it: should have correct command
+    template: templates/proxy-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - raps
+            - serve
+            - proxy
+            - --port
+            - "8080"
+            - --redis-url
+            - redis://RELEASE-NAME-redis-master:6379
 
   - it: should have liveness and readiness probes
     template: templates/proxy-deployment.yaml

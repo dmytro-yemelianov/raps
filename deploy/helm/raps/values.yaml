@@ -1,7 +1,7 @@
 # -- Global configuration
 global:
   image:
-    registry: ""
+    registry: "ghcr.io/dmytro-yemelianov"
     tag: "5.2.0"
   namespace: ""
 
@@ -13,7 +13,7 @@ proxy:
   replicaCount: 2
   image:
     registry: ""
-    repository: rapscli/raps-proxy
+    repository: raps-proxy
     tag: ""
   resources:
     requests:
@@ -39,7 +39,7 @@ workers:
   metricsPort: 9091
   image:
     registry: ""
-    repository: rapscli/raps-worker
+    repository: raps-worker
     tag: ""
   resources:
     requests:
@@ -82,7 +82,7 @@ coordinator:
   replicaCount: 2
   image:
     registry: ""
-    repository: rapscli/raps-coordinator
+    repository: raps-coordinator
     tag: ""
   resources:
     requests:
@@ -99,7 +99,7 @@ coordinator:
 webhook:
   image:
     registry: ""
-    repository: rapscli/raps-webhook
+    repository: raps-webhook
     tag: ""
   resources:
     requests:
@@ -126,7 +126,7 @@ dashboard:
   replicaCount: 1
   image:
     registry: ""
-    repository: rapscli/raps-dashboard
+    repository: raps-dashboard
     tag: ""
   resources:
     requests:
