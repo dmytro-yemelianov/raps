@@ -167,3 +167,54 @@ fn generate_all() -> Result<()> {
     println!("{}", json);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_schema_registry_not_empty() {
+        let registry = schema_registry();
+        assert!(!registry.is_empty());
+    }
+
+    #[test]
+    fn test_schema_registry_no_duplicate_names() {
+        let registry = schema_registry();
+        let mut seen = std::collections::HashSet::new();
+        for entry in &registry {
+            assert!(
+                seen.insert(entry.name),
+                "duplicate schema name: {}",
+                entry.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_schema_registry_all_have_category() {
+        let registry = schema_registry();
+        for entry in &registry {
+            assert!(
+                !entry.category.is_empty(),
+                "schema '{}' has empty category",
+                entry.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_schema_registry_generators_work() {
+        let registry = schema_registry();
+        for entry in &registry {
+            let schema = (entry.generate)();
+            let json = serde_json::to_value(&schema);
+            assert!(
+                json.is_ok(),
+                "schema '{}' failed to serialize: {:?}",
+                entry.name,
+                json.err()
+            );
+        }
+    }
+}

@@ -384,3 +384,143 @@ pub fn get_tool_availability_summary(state: &AuthState) -> String {
 
     summary
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_auth_state(
+        has_client_id: bool,
+        has_client_secret: bool,
+        two_legged_valid: bool,
+        three_legged_valid: bool,
+        three_legged_expired: bool,
+    ) -> AuthState {
+        AuthState {
+            has_client_id,
+            has_client_secret,
+            two_legged_valid,
+            three_legged_valid,
+            three_legged_expired,
+        }
+    }
+
+    // --- has_any_credentials ---
+
+    #[test]
+    fn test_has_any_credentials_both() {
+        let state = make_auth_state(true, true, false, false, false);
+        assert!(state.has_any_credentials());
+    }
+
+    #[test]
+    fn test_has_any_credentials_one() {
+        let state = make_auth_state(true, false, false, false, false);
+        assert!(state.has_any_credentials());
+    }
+
+    #[test]
+    fn test_has_any_credentials_none() {
+        let state = make_auth_state(false, false, false, false, false);
+        assert!(!state.has_any_credentials());
+    }
+
+    // --- has_complete_2leg_credentials ---
+
+    #[test]
+    fn test_has_complete_2leg_both() {
+        let state = make_auth_state(true, true, false, false, false);
+        assert!(state.has_complete_2leg_credentials());
+    }
+
+    #[test]
+    fn test_has_complete_2leg_partial() {
+        let state = make_auth_state(true, false, false, false, false);
+        assert!(!state.has_complete_2leg_credentials());
+    }
+
+    // --- get_tool_auth_requirement ---
+
+    #[test]
+    fn test_tool_auth_oss_is_two_legged() {
+        assert_eq!(
+            get_tool_auth_requirement("bucket_list"),
+            AuthRequirement::TwoLegged
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_dm_is_three_legged() {
+        assert_eq!(
+            get_tool_auth_requirement("hub_list"),
+            AuthRequirement::ThreeLegged
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_auth_is_either() {
+        assert_eq!(
+            get_tool_auth_requirement("auth_test"),
+            AuthRequirement::Either
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_unknown_defaults() {
+        assert_eq!(
+            get_tool_auth_requirement("unknown_tool"),
+            AuthRequirement::TwoLegged
+        );
+    }
+
+    // --- format_error_guidance ---
+
+    #[test]
+    fn test_format_error_guidance_client_id() {
+        let result = format_error_guidance("missing client_id");
+        assert!(result.contains("Client ID"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_unauthorized() {
+        let result = format_error_guidance("401 unauthorized");
+        assert!(result.contains("Invalid Credentials"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_network() {
+        let result = format_error_guidance("connection refused");
+        assert!(result.contains("Network Issue"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_expired() {
+        let result = format_error_guidance("token expired");
+        assert!(result.contains("Token Expired"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_generic() {
+        let result = format_error_guidance("something weird");
+        assert!(result.contains("Authentication Error"));
+        assert!(result.contains("something weird"));
+    }
+
+    // --- get_tool_availability_summary ---
+
+    #[test]
+    fn test_availability_summary_all_valid() {
+        let state = make_auth_state(true, true, true, true, false);
+        let summary = get_tool_availability_summary(&state);
+        assert!(!summary.contains("✗"));
+        assert!(summary.contains("✓"));
+    }
+
+    #[test]
+    fn test_availability_summary_no_auth() {
+        let state = make_auth_state(false, false, false, false, false);
+        let summary = get_tool_availability_summary(&state);
+        assert!(!summary.contains("✓"));
+        assert!(summary.contains("✗"));
+    }
+}

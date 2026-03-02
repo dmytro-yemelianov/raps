@@ -57,3 +57,73 @@ fn test_hints() {
     let (display, _) = hint.unwrap();
     assert!(display.contains("BUCKET_KEY"));
 }
+
+#[test]
+fn test_completions_unknown_command() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let completions = get_completions_raw(&commands, &map, "xyz");
+    assert!(completions.is_empty());
+}
+
+#[test]
+fn test_completions_flag_suggestions() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let completions = get_completions_raw(&commands, &map, "auth login ");
+    assert!(completions.iter().any(|(r, _)| r.starts_with("--")));
+}
+
+#[test]
+fn test_completions_case_insensitive() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let completions = get_completions_raw(&commands, &map, "AU");
+    assert!(completions.iter().any(|(r, _)| r == "auth"));
+}
+
+#[test]
+fn test_completions_subcommand_with_trailing_space() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let completions = get_completions_raw(&commands, &map, "bucket create ");
+    // bucket create has flags like --retention
+    assert!(completions.iter().any(|(r, _)| r.starts_with("--")));
+}
+
+#[test]
+fn test_hint_empty_input() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let hint = get_hint_raw(&commands, &map, "");
+    assert!(hint.is_none());
+}
+
+#[test]
+fn test_hint_unknown_command() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let hint = get_hint_raw(&commands, &map, "xyz");
+    assert!(hint.is_none());
+}
+
+#[test]
+fn test_hint_complete_subcommand_shows_params() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let hint = get_hint_raw(&commands, &map, "object upload ");
+    assert!(hint.is_some());
+    let (display, _) = hint.unwrap();
+    assert!(display.contains("BUCKET_KEY"));
+}
+
+#[test]
+fn test_hint_partial_subcommand() {
+    let commands = build_command_tree();
+    let map = build_command_map(&commands);
+    let hint = get_hint_raw(&commands, &map, "auth log");
+    assert!(hint.is_some());
+    let (display, _) = hint.unwrap();
+    // Should hint toward completing "login" or "logout" (suffix starts with "in" or "out")
+    assert!(display.starts_with("in") || display.starts_with("out"));
+}
