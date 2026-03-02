@@ -1,0 +1,12 @@
+---
+source: raps-kernel/src/audit.rs
+assertion_line: 286
+expression: json
+---
+{
+  "timestamp": "2025-01-15T10:30:00+00:00",
+  "operation": "upload",
+  "resource": "bucket/file.rvt",
+  "result": "success",
+  "duration_ms": 1500
+}

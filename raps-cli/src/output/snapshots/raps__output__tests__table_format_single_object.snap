@@ -1,0 +1,7 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 85
+expression: result
+---
+id    123
+name  Test

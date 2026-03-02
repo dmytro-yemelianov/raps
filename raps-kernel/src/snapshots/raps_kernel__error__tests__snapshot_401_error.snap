@@ -1,0 +1,14 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 676
+expression: formatted
+---
+
+Error: Authentication failed. Your token is invalid, expired, or missing.
+  Code: invalid_token (HTTP 401)
+  Details: Token expired
+
+Suggestions:
+  - Run 'raps auth login' to re-authenticate
+  - Check that your client credentials are correct
+  - Verify RAPS_CLIENT_ID and RAPS_CLIENT_SECRET environment variables

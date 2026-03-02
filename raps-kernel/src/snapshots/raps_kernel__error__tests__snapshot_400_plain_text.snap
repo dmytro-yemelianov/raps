@@ -1,0 +1,12 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 724
+expression: formatted
+---
+
+Error: Request failed (HTTP 400)
+  Code: BadRequest (HTTP 400)
+  Details: Bad request: invalid parameter
+
+Suggestions:
+  - Check the error details

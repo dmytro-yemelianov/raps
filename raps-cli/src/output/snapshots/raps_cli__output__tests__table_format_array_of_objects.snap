@@ -1,0 +1,11 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 65
+expression: result
+---
+count  name   status 
+─────────────────────
+42     Alpha  active 
+7      Beta   pending
+
+2 row(s)

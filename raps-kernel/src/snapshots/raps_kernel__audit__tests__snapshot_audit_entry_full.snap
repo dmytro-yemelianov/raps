@@ -1,0 +1,14 @@
+---
+source: raps-kernel/src/audit.rs
+assertion_line: 301
+expression: json
+---
+{
+  "timestamp": "2025-01-15T10:30:00+00:00",
+  "operation": "permission",
+  "resource": "project/abc-123",
+  "result": "success",
+  "duration_ms": 50,
+  "user": "user@example.com",
+  "details": "granted admin access"
+}

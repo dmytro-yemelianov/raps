@@ -1,0 +1,13 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 282
+expression: guidance
+---
+Authentication Error
+
+An error occurred during authentication. Please check your setup:
+1. Verify APS_CLIENT_ID and APS_CLIENT_SECRET are set correctly
+2. Check your network connection
+3. Visit https://rapscli.xyz/docs/troubleshooting for more help
+
+Error details: Some unknown error occurred

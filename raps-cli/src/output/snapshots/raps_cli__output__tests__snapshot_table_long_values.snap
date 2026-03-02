@@ -1,0 +1,10 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 156
+expression: result
+---
+description                                         name
+────────────────────────────────────────────────────────
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...  Test
+
+1 row(s)

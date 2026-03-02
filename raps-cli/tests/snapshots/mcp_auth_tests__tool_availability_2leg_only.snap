@@ -1,0 +1,12 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 223
+expression: summary
+---
+
+Tool Availability:
+  ✓ OSS (bucket_*, object_*) - available
+  ✓ Derivative (translate_*) - available
+  ✓ Admin (admin_*) - available
+  ✗ Data Management (hub_*, project_*, folder_*, item_*) - requires 3-legged auth
+  ✗ ACC (issue_*, rfi_*, acc_*) - requires 3-legged auth

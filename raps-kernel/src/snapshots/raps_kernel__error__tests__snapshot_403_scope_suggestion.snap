@@ -1,0 +1,14 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 686
+expression: formatted
+---
+
+Error: Permission denied. Your token lacks required scopes.
+  Code: insufficient_scope (HTTP 403)
+  Details: Missing data:read scope
+
+Suggestions:
+  - Check that your app has the required scopes enabled in APS Portal
+  - Run 'raps auth login' with the necessary scopes
+  - Add 'data:read'/'data:write' scopes for Data Management

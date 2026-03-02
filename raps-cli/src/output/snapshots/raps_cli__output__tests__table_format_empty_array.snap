@@ -1,0 +1,6 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 96
+expression: result
+---
+(empty)

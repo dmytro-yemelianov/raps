@@ -1,0 +1,12 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 444
+expression: formatted
+---
+
+Error: Authentication failed
+  Code: Unauthorized (HTTP 401)
+  Details: Token expired
+
+Suggestions:
+  - Run 'raps auth login'

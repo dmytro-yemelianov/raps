@@ -441,10 +441,7 @@ mod tests {
         };
 
         let formatted = format_interpreted_error(&error, false);
-        assert!(formatted.contains("Authentication failed"));
-        assert!(formatted.contains("Unauthorized"));
-        assert!(formatted.contains("401"));
-        assert!(formatted.contains("raps auth login"));
+        insta::assert_snapshot!(formatted);
     }
 
     #[test]
@@ -622,9 +619,7 @@ mod tests {
             original_message: "".to_string(),
         };
         let formatted = format_interpreted_error(&error, false);
-        assert!(formatted.contains("Bad request"));
-        // Empty message shouldn't add extra "Details:" line
-        assert!(!formatted.contains("Details:") || formatted.contains("Details: \n"));
+        insta::assert_snapshot!(formatted);
     }
 
     #[test]
@@ -653,8 +648,7 @@ mod tests {
             original_message: "Invalid input".to_string(),
         };
         let formatted = format_interpreted_error(&error, false);
-        // Should not have "Suggestions:" section
-        assert!(!formatted.contains("Suggestions:"));
+        insta::assert_snapshot!(formatted);
     }
 
     #[test]
@@ -667,8 +661,66 @@ mod tests {
             original_message: "Same message".to_string(),
         };
         let formatted = format_interpreted_error(&error, false);
-        // Note: Current implementation shows both, which is acceptable behavior
-        // The test verifies the format function works with matching messages
-        assert!(formatted.contains("Same message"));
+        insta::assert_snapshot!(formatted);
+    }
+
+    // ==================== Pipeline Snapshot Tests ====================
+
+    #[test]
+    fn test_snapshot_401_error() {
+        let error = interpret_error(
+            401,
+            r#"{"error":"invalid_token","error_description":"Token expired"}"#,
+        );
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_403_scope_suggestion() {
+        let error = interpret_error(
+            403,
+            r#"{"error":"insufficient_scope","detail":"Missing data:read scope"}"#,
+        );
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_403_bucket_suggestion() {
+        let error = interpret_error(
+            403,
+            r#"{"error":"forbidden","detail":"Missing bucket:create scope"}"#,
+        );
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_404_error() {
+        let error = interpret_error(404, r#"{"message":"Bucket not found"}"#);
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_429_error() {
+        let error = interpret_error(429, "Rate limit exceeded");
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_500_error() {
+        let error = interpret_error(500, "Internal server error");
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
+    }
+
+    #[test]
+    fn test_snapshot_400_plain_text() {
+        let error = interpret_error(400, "Bad request: invalid parameter");
+        let formatted = format_interpreted_error(&error, false);
+        insta::assert_snapshot!(formatted);
     }
 }

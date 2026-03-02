@@ -124,3 +124,4 @@ kubernetes = ["raps-kernel/kubernetes", "redis"]
 assert_cmd.workspace = true
 predicates.workspace = true
 dotenvy.workspace = true
+insta.workspace = true

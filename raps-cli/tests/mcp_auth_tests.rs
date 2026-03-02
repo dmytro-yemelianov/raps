@@ -205,12 +205,7 @@ fn test_tool_availability_no_auth() {
 
     let summary = get_tool_availability_summary(&state);
 
-    // All should show as unavailable
-    assert!(summary.contains("✗ OSS"));
-    assert!(summary.contains("✗ Derivative"));
-    assert!(summary.contains("✗ Admin"));
-    assert!(summary.contains("✗ Data Management"));
-    assert!(summary.contains("✗ ACC"));
+    insta::assert_snapshot!(summary);
 }
 
 #[test]
@@ -225,14 +220,7 @@ fn test_tool_availability_2leg_only() {
 
     let summary = get_tool_availability_summary(&state);
 
-    // 2-legged tools should be available
-    assert!(summary.contains("✓ OSS"));
-    assert!(summary.contains("✓ Derivative"));
-    assert!(summary.contains("✓ Admin"));
-
-    // 3-legged tools should be unavailable
-    assert!(summary.contains("✗ Data Management"));
-    assert!(summary.contains("✗ ACC"));
+    insta::assert_snapshot!(summary);
 }
 
 #[test]
@@ -247,12 +235,7 @@ fn test_tool_availability_full_auth() {
 
     let summary = get_tool_availability_summary(&state);
 
-    // All should be available
-    assert!(summary.contains("✓ OSS"));
-    assert!(summary.contains("✓ Derivative"));
-    assert!(summary.contains("✓ Admin"));
-    assert!(summary.contains("✓ Data Management"));
-    assert!(summary.contains("✓ ACC"));
+    insta::assert_snapshot!(summary);
 }
 
 // ==================== Error Guidance Tests ====================
@@ -261,58 +244,49 @@ fn test_tool_availability_full_auth() {
 fn test_error_guidance_missing_client_id() {
     let guidance = format_error_guidance("Missing APS_CLIENT_ID environment variable");
 
-    assert!(guidance.contains("Missing Client ID"));
-    assert!(guidance.contains("aps.autodesk.com"));
+    insta::assert_snapshot!(guidance);
 }
 
 #[test]
 fn test_error_guidance_missing_client_secret() {
     let guidance = format_error_guidance("Missing APS_CLIENT_SECRET");
 
-    assert!(guidance.contains("Missing Client Secret"));
-    assert!(guidance.contains("aps.autodesk.com"));
+    insta::assert_snapshot!(guidance);
 }
 
 #[test]
 fn test_error_guidance_unauthorized() {
     let guidance = format_error_guidance("HTTP 401 Unauthorized");
 
-    assert!(guidance.contains("Invalid Credentials"));
-    assert!(guidance.contains("Troubleshooting"));
+    insta::assert_snapshot!(guidance);
 }
 
 #[test]
 fn test_error_guidance_network_error() {
     let guidance = format_error_guidance("Connection timeout");
 
-    assert!(guidance.contains("Network Issue"));
-    assert!(guidance.contains("internet connection"));
+    insta::assert_snapshot!(guidance);
 }
 
 #[test]
 fn test_error_guidance_expired_token() {
     let guidance = format_error_guidance("Token expired");
 
-    assert!(guidance.contains("Token Expired"));
-    assert!(guidance.contains("auth_login"));
+    insta::assert_snapshot!(guidance);
 }
 
 #[test]
 fn test_error_guidance_generic_error() {
     let guidance = format_error_guidance("Some unknown error occurred");
 
-    assert!(guidance.contains("Authentication Error"));
-    assert!(guidance.contains("rapscli.xyz"));
+    insta::assert_snapshot!(guidance);
 }
 
 // ==================== Constant Content Tests ====================
 
 #[test]
 fn test_setup_instructions_content() {
-    assert!(SETUP_INSTRUCTIONS.contains("aps.autodesk.com"));
-    assert!(SETUP_INSTRUCTIONS.contains("APS_CLIENT_ID"));
-    assert!(SETUP_INSTRUCTIONS.contains("APS_CLIENT_SECRET"));
-    assert!(SETUP_INSTRUCTIONS.contains("mcpServers"));
+    insta::assert_snapshot!(SETUP_INSTRUCTIONS);
 }
 
 #[test]

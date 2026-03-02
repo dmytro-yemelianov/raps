@@ -1,0 +1,6 @@
+---
+source: raps-kernel/src/audit.rs
+assertion_line: 316
+expression: jsonl
+---
+{"timestamp":"2025-01-15T10:30:00+00:00","operation":"translate","resource":"urn:adsk.objects:os.object:bucket/model.rvt","result":"success","duration_ms":45000,"user":"admin@company.com"}

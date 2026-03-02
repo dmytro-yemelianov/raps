@@ -270,4 +270,49 @@ mod tests {
         assert_eq!(removed, 1);
         assert!(!old_path.exists());
     }
+
+    #[test]
+    fn test_snapshot_audit_entry_minimal() {
+        let entry = AuditEntry {
+            timestamp: "2025-01-15T10:30:00+00:00".to_string(),
+            operation: "upload".to_string(),
+            resource: "bucket/file.rvt".to_string(),
+            result: "success".to_string(),
+            duration_ms: 1500,
+            user: None,
+            details: None,
+        };
+        let json = serde_json::to_string_pretty(&entry).unwrap();
+        insta::assert_snapshot!(json);
+    }
+
+    #[test]
+    fn test_snapshot_audit_entry_full() {
+        let entry = AuditEntry {
+            timestamp: "2025-01-15T10:30:00+00:00".to_string(),
+            operation: "permission".to_string(),
+            resource: "project/abc-123".to_string(),
+            result: "success".to_string(),
+            duration_ms: 50,
+            user: Some("user@example.com".to_string()),
+            details: Some("granted admin access".to_string()),
+        };
+        let json = serde_json::to_string_pretty(&entry).unwrap();
+        insta::assert_snapshot!(json);
+    }
+
+    #[test]
+    fn test_snapshot_audit_entry_jsonl() {
+        let entry = AuditEntry {
+            timestamp: "2025-01-15T10:30:00+00:00".to_string(),
+            operation: "translate".to_string(),
+            resource: "urn:adsk.objects:os.object:bucket/model.rvt".to_string(),
+            result: "success".to_string(),
+            duration_ms: 45000,
+            user: Some("admin@company.com".to_string()),
+            details: None,
+        };
+        let jsonl = serde_json::to_string(&entry).unwrap();
+        insta::assert_snapshot!(jsonl);
+    }
 }

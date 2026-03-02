@@ -1,0 +1,13 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 710
+expression: formatted
+---
+
+Error: Rate limit exceeded.
+  Code: TooManyRequests (HTTP 429)
+  Details: Rate limit exceeded
+
+Suggestions:
+  - Wait and retry the request
+  - Reduce request frequency

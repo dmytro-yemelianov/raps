@@ -1,0 +1,13 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 268
+expression: guidance
+---
+Authentication Error: Network Issue
+
+Unable to reach Autodesk authentication servers. Troubleshooting steps:
+1. Check your internet connection
+2. Verify firewall settings allow access to *.autodesk.com
+3. Try again in a few moments
+
+Error details: Connection timeout

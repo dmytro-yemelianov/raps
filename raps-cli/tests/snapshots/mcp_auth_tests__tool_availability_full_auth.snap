@@ -1,0 +1,12 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 238
+expression: summary
+---
+
+Tool Availability:
+  ✓ OSS (bucket_*, object_*) - available
+  ✓ Derivative (translate_*) - available
+  ✓ Admin (admin_*) - available
+  ✓ Data Management (hub_*, project_*, folder_*, item_*) - available
+  ✓ ACC (issue_*, rfi_*, acc_*) - available

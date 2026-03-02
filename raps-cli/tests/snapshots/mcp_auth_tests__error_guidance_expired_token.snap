@@ -1,0 +1,12 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 275
+expression: guidance
+---
+Authentication Error: Token Expired
+
+Your 3-legged authentication token has expired. To re-authenticate:
+1. Use the `auth_login` tool, or
+2. Run `raps auth login` in your terminal
+
+Error details: Token expired

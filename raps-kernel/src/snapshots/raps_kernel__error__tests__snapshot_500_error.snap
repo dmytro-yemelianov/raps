@@ -1,0 +1,13 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 717
+expression: formatted
+---
+
+Error: APS server error (temporary).
+  Code: InternalServerError (HTTP 500)
+  Details: Internal server error
+
+Suggestions:
+  - Wait and retry
+  - Check APS status page

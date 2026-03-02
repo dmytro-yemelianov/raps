@@ -1,0 +1,14 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 261
+expression: guidance
+---
+Authentication Error: Invalid Credentials
+
+Your credentials were rejected by Autodesk. Troubleshooting steps:
+1. Verify APS_CLIENT_ID is correct (typically 32 characters)
+2. Verify APS_CLIENT_SECRET is correct (typically 64 characters)
+3. Check that your app is active at https://aps.autodesk.com/
+4. Ensure credentials are for the correct environment (production vs sandbox)
+
+Error details: HTTP 401 Unauthorized

@@ -1,0 +1,14 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 703
+expression: formatted
+---
+
+Error: Resource not found.
+  Code: NotFound (HTTP 404)
+  Details: Bucket not found
+
+Suggestions:
+  - Verify the resource ID is correct
+  - Check that the resource exists
+  - Ensure you have access to the resource

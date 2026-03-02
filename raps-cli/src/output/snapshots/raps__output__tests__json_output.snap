@@ -1,0 +1,9 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 22
+expression: output
+---
+{
+  "name": "test",
+  "value": 42
+}

@@ -1,0 +1,8 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 124
+expression: result
+---
+count,name,value
+42,Alpha,"hello, world"
+7,Beta,"foo""bar"

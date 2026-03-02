@@ -1,0 +1,37 @@
+---
+source: raps-cli/tests/mcp_auth_tests.rs
+assertion_line: 289
+expression: SETUP_INSTRUCTIONS
+---
+
+To set up authentication for RAPS MCP Server:
+
+1. Go to https://aps.autodesk.com/ (Autodesk Platform Services)
+2. Sign in or create an Autodesk account
+3. Create a new application or select an existing one
+4. Copy your Client ID and Client Secret
+5. Set environment variables before starting the MCP server:
+
+   For Unix/macOS:
+     export APS_CLIENT_ID="your_client_id"
+     export APS_CLIENT_SECRET="your_client_secret"
+
+   For Windows (PowerShell):
+     $env:APS_CLIENT_ID="your_client_id"
+     $env:APS_CLIENT_SECRET="your_client_secret"
+
+   Or add to your MCP server configuration (claude_desktop_config.json):
+     {
+       "mcpServers": {
+         "raps": {
+           "command": "raps",
+           "args": ["serve"],
+           "env": {
+             "APS_CLIENT_ID": "your_client_id",
+             "APS_CLIENT_SECRET": "your_client_secret"
+           }
+         }
+       }
+     }
+
+For more information: https://rapscli.xyz/docs/auth

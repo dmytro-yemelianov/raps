@@ -1,0 +1,9 @@
+---
+source: raps-kernel/src/error.rs
+assertion_line: 664
+expression: formatted
+---
+
+Error: Same message
+  Code: BadRequest (HTTP 400)
+  Details: Same message
