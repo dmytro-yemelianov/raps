@@ -497,7 +497,12 @@ async fn run(cli: Cli) -> Result<()> {
     #[cfg(feature = "dashboard")]
     if let Commands::Dashboard = &command {
         let config = Config::from_env_lenient()?;
-        let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, cli.max_retries, cli.base_delay, cli.max_wait);
+        let http_config = HttpClientConfig::from_cli_and_env_full(
+            cli.timeout,
+            cli.max_retries,
+            cli.base_delay,
+            cli.max_wait,
+        );
         return commands::dashboard::run_dashboard(config, http_config).await;
     }
 
@@ -531,8 +536,17 @@ async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env_lenient()?;
 
     // Create HTTP client with shared config
-    let max_retries = if cli.no_retry { Some(0) } else { cli.max_retries };
-    let http_config = HttpClientConfig::from_cli_and_env_full(cli.timeout, max_retries, cli.base_delay, cli.max_wait);
+    let max_retries = if cli.no_retry {
+        Some(0)
+    } else {
+        cli.max_retries
+    };
+    let http_config = HttpClientConfig::from_cli_and_env_full(
+        cli.timeout,
+        max_retries,
+        cli.base_delay,
+        cli.max_wait,
+    );
 
     if let Commands::Shell = command {
         credits::shell_welcome();
@@ -712,7 +726,12 @@ async fn run(cli: Cli) -> Result<()> {
                     };
 
                     let sub_output_format = OutputFormat::determine(sub_cli.output);
-                    let sub_http_config = HttpClientConfig::from_cli_and_env_full(sub_cli.timeout, sub_cli.max_retries, sub_cli.base_delay, sub_cli.max_wait);
+                    let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+                        sub_cli.timeout,
+                        sub_cli.max_retries,
+                        sub_cli.base_delay,
+                        sub_cli.max_wait,
+                    );
 
                     let sub_command = match sub_cli.command {
                         Some(cmd) => cmd,
@@ -817,7 +836,12 @@ async fn run_piped_stdin(
         };
 
         let sub_output_format = OutputFormat::determine(sub_cli.output.or(output));
-        let sub_http_config = HttpClientConfig::from_cli_and_env_full(sub_cli.timeout.or(timeout), sub_cli.max_retries, sub_cli.base_delay, sub_cli.max_wait);
+        let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+            sub_cli.timeout.or(timeout),
+            sub_cli.max_retries,
+            sub_cli.base_delay,
+            sub_cli.max_wait,
+        );
 
         let sub_command = match sub_cli.command {
             Some(cmd) => cmd,

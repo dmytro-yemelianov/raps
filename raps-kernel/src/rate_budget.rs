@@ -74,7 +74,10 @@ impl RateBudget {
 
         // If past reset time, budget has refreshed
         if now >= reset_at && reset_at > 0 {
-            return RateStatus::Ok { remaining: limit, limit };
+            return RateStatus::Ok {
+                remaining: limit,
+                limit,
+            };
         }
 
         if remaining == 0 {
@@ -119,19 +122,31 @@ impl RateBudgetRegistry {
         // APS known rate limits
         reg.known_limits.insert(
             "authentication".to_string(),
-            KnownLimit { limit: 500, window: Duration::from_secs(60) },
+            KnownLimit {
+                limit: 500,
+                window: Duration::from_secs(60),
+            },
         );
         reg.known_limits.insert(
             "data-management".to_string(),
-            KnownLimit { limit: 100, window: Duration::from_secs(60) },
+            KnownLimit {
+                limit: 100,
+                window: Duration::from_secs(60),
+            },
         );
         reg.known_limits.insert(
             "model-derivative".to_string(),
-            KnownLimit { limit: 20, window: Duration::from_secs(60) },
+            KnownLimit {
+                limit: 20,
+                window: Duration::from_secs(60),
+            },
         );
         reg.known_limits.insert(
             "oss".to_string(),
-            KnownLimit { limit: 500, window: Duration::from_secs(60) },
+            KnownLimit {
+                limit: 500,
+                window: Duration::from_secs(60),
+            },
         );
 
         reg
@@ -205,11 +220,7 @@ impl RateBudgetRegistry {
             budget.update(rem, lim, reset_millis);
 
             if rem == 0 {
-                tracing::warn!(
-                    endpoint,
-                    limit = lim,
-                    "rate limit exhausted"
-                );
+                tracing::warn!(endpoint, limit = lim, "rate limit exhausted");
             } else if rem <= (lim as f64 * 0.1).ceil() as u32 {
                 tracing::debug!(
                     endpoint,
@@ -333,7 +344,10 @@ mod tests {
 
         assert!(matches!(
             reg.check("model-derivative"),
-            RateStatus::NearLimit { remaining: 5, limit: 100 }
+            RateStatus::NearLimit {
+                remaining: 5,
+                limit: 100
+            }
         ));
     }
 

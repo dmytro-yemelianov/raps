@@ -17,6 +17,12 @@ static STRICT: AtomicBool = AtomicBool::new(false);
 #[cfg(test)]
 pub(crate) static MOCK_IS_TERMINAL: AtomicBool = AtomicBool::new(true);
 
+/// Mutex to serialize all tests (across modules) that manipulate the global
+/// `NON_INTERACTIVE`, `YES`, and `STRICT` atomic flags.  Every test that calls
+/// `init`, `init_full`, or `init_exact` must hold this lock.
+#[cfg(test)]
+pub static INTERACTIVE_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Initialize interactive mode flags.
 ///
 /// Also checks environment variables as fallback:
@@ -158,10 +164,6 @@ pub fn should_proceed_destructive(action: &str) -> bool {
 mod tests {
     use super::*;
 
-    // Serializes tests that manipulate environment variables to prevent leaking
-    // env state to other parallel tests in the same process.
-    static ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     fn reset_state() {
         init_exact(false, false, false);
         MOCK_IS_TERMINAL.store(true, Ordering::Relaxed);
@@ -169,6 +171,7 @@ mod tests {
 
     #[test]
     fn test_init_non_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(true, false, false);
         assert!(is_non_interactive());
@@ -178,6 +181,7 @@ mod tests {
 
     #[test]
     fn test_init_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(false, true, false);
         assert!(!is_non_interactive());
@@ -187,6 +191,7 @@ mod tests {
 
     #[test]
     fn test_init_both() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(true, true, false);
         assert!(is_non_interactive());
@@ -196,6 +201,7 @@ mod tests {
 
     #[test]
     fn test_default_state() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         assert!(!is_non_interactive());
         assert!(!is_yes());
@@ -203,6 +209,7 @@ mod tests {
 
     #[test]
     fn test_require_value_some() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         let result = require_value(Some("test"), "name");
         assert!(result.is_ok());
@@ -211,6 +218,7 @@ mod tests {
 
     #[test]
     fn test_require_value_none_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         let result = require_value::<String>(None, "name");
         assert!(result.is_err());
@@ -221,6 +229,7 @@ mod tests {
 
     #[test]
     fn test_require_value_none_non_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(true, false, false);
         let result = require_value::<String>(None, "name");
@@ -233,6 +242,7 @@ mod tests {
 
     #[test]
     fn test_should_proceed_destructive_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(false, true, false); // --yes flag set
         assert!(should_proceed_destructive("delete bucket"));
@@ -241,6 +251,7 @@ mod tests {
 
     #[test]
     fn test_should_proceed_destructive_non_interactive_no_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(true, false, false); // non-interactive but no --yes
         assert!(!should_proceed_destructive("delete bucket"));
@@ -249,6 +260,7 @@ mod tests {
 
     #[test]
     fn test_should_proceed_destructive_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(false, false, false); // interactive mode
         assert!(!should_proceed_destructive("delete bucket")); // Should prompt
@@ -257,6 +269,7 @@ mod tests {
 
     #[test]
     fn test_should_proceed_destructive_non_interactive_with_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(true, true, false); // non-interactive with --yes
         assert!(should_proceed_destructive("delete bucket"));
@@ -265,6 +278,7 @@ mod tests {
 
     #[test]
     fn test_strict_implies_non_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         init_exact(false, false, true);
         assert!(is_strict());
@@ -274,10 +288,9 @@ mod tests {
 
     #[test]
     fn test_strict_env_var() {
-        // Acquire env mutex to prevent env var leaking to other tests.
-        let _guard = ENV_TEST_LOCK.lock().unwrap();
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
-        // SAFETY: protected by ENV_TEST_LOCK mutex; no other test reads
+        // SAFETY: protected by INTERACTIVE_TEST_LOCK mutex; no other test reads
         // this env var concurrently.
         unsafe { std::env::set_var("RAPS_STRICT", "1") };
         // Use a scope + cleanup pattern so remove_var runs even on panic.
@@ -293,6 +306,7 @@ mod tests {
 
     #[test]
     fn test_not_strict_by_default() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         reset_state();
         assert!(!is_strict());
     }

@@ -413,14 +413,8 @@ impl ChecklistCommands {
                 checklist_id,
                 yes,
             } => {
-                checklists::delete_checklist(
-                    client,
-                    &project_id,
-                    &checklist_id,
-                    yes,
-                    output_format,
-                )
-                .await
+                checklists::delete_checklist(client, &project_id, &checklist_id, yes, output_format)
+                    .await
             }
             ChecklistCommands::Templates { project_id } => {
                 checklists::list_templates(client, &project_id, output_format).await

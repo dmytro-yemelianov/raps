@@ -334,12 +334,7 @@ pub(crate) async fn execute_csv_update(
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
-                    println!(
-                        "  {} {} - {}",
-                        "✗".red(),
-                        err.email,
-                        err.error.dimmed()
-                    );
+                    println!("  {} {} - {}", "✗".red(), err.email, err.error.dimmed());
                 }
             }
 
@@ -539,12 +534,7 @@ pub(crate) async fn execute_csv_import(
             if !output.errors.is_empty() {
                 println!("\n{}", "Errors:".red().bold());
                 for err in &output.errors {
-                    println!(
-                        "  {} {} - {}",
-                        "✗".red(),
-                        err.email,
-                        err.error.dimmed()
-                    );
+                    println!("  {} {} - {}", "✗".red(), err.email, err.error.dimmed());
                 }
             }
 

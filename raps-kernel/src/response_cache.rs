@@ -261,7 +261,13 @@ mod tests {
     #[test]
     fn test_purge_expired() {
         let cache = ResponseCache::new(10, Duration::from_secs(60));
-        cache.put_with_ttl("short".to_string(), 200, vec![], None, Duration::from_millis(1));
+        cache.put_with_ttl(
+            "short".to_string(),
+            200,
+            vec![],
+            None,
+            Duration::from_millis(1),
+        );
         cache.put("long".to_string(), 200, vec![], None);
         std::thread::sleep(Duration::from_millis(5));
         cache.purge_expired();
@@ -271,10 +277,22 @@ mod tests {
 
     #[test]
     fn test_is_cacheable_url() {
-        assert!(is_cacheable_url("https://developer.api.autodesk.com/data/v1/projects", "GET"));
-        assert!(!is_cacheable_url("https://developer.api.autodesk.com/data/v1/projects", "POST"));
-        assert!(!is_cacheable_url("https://developer.api.autodesk.com/oss/v2/signeds3download", "GET"));
-        assert!(!is_cacheable_url("https://developer.api.autodesk.com/authentication/v2/token", "GET"));
+        assert!(is_cacheable_url(
+            "https://developer.api.autodesk.com/data/v1/projects",
+            "GET"
+        ));
+        assert!(!is_cacheable_url(
+            "https://developer.api.autodesk.com/data/v1/projects",
+            "POST"
+        ));
+        assert!(!is_cacheable_url(
+            "https://developer.api.autodesk.com/oss/v2/signeds3download",
+            "GET"
+        ));
+        assert!(!is_cacheable_url(
+            "https://developer.api.autodesk.com/authentication/v2/token",
+            "GET"
+        ));
     }
 
     #[test]
@@ -284,11 +302,15 @@ mod tests {
             300
         );
         assert_eq!(
-            ttl_for_url("https://developer.api.autodesk.com/data/v1/folders/xxx/contents").as_secs(),
+            ttl_for_url("https://developer.api.autodesk.com/data/v1/folders/xxx/contents")
+                .as_secs(),
             60
         );
         assert_eq!(
-            ttl_for_url("https://developer.api.autodesk.com/modelderivative/v2/designdata/xxx/manifest").as_secs(),
+            ttl_for_url(
+                "https://developer.api.autodesk.com/modelderivative/v2/designdata/xxx/manifest"
+            )
+            .as_secs(),
             600
         );
         assert_eq!(

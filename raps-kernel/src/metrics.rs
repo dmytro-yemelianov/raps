@@ -8,8 +8,8 @@
 //! and reporting.
 
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{Context, Result};
 use dashmap::DashMap;
@@ -39,7 +39,8 @@ impl ApiMetrics {
 
     pub fn record_request(&self, latency_ms: u64) {
         self.request_count.fetch_add(1, Ordering::Relaxed);
-        self.total_latency_ms.fetch_add(latency_ms, Ordering::Relaxed);
+        self.total_latency_ms
+            .fetch_add(latency_ms, Ordering::Relaxed);
     }
 
     pub fn record_error(&self) {
@@ -138,19 +139,28 @@ impl MetricsCollector {
 
     /// Record an API request.
     pub fn record_api_request(&self, endpoint: &str, latency_ms: u64) {
-        let entry = self.api_metrics.entry(endpoint.to_string()).or_insert_with(ApiMetrics::new);
+        let entry = self
+            .api_metrics
+            .entry(endpoint.to_string())
+            .or_insert_with(ApiMetrics::new);
         entry.record_request(latency_ms);
     }
 
     /// Record an API error.
     pub fn record_api_error(&self, endpoint: &str) {
-        let entry = self.api_metrics.entry(endpoint.to_string()).or_insert_with(ApiMetrics::new);
+        let entry = self
+            .api_metrics
+            .entry(endpoint.to_string())
+            .or_insert_with(ApiMetrics::new);
         entry.record_error();
     }
 
     /// Record a cache hit.
     pub fn record_cache_hit(&self, endpoint: &str) {
-        let entry = self.api_metrics.entry(endpoint.to_string()).or_insert_with(ApiMetrics::new);
+        let entry = self
+            .api_metrics
+            .entry(endpoint.to_string())
+            .or_insert_with(ApiMetrics::new);
         entry.record_cache_hit();
     }
 
@@ -246,11 +256,19 @@ mod tests {
         mc.record_api_request("data-management", 50);
 
         let snap = mc.snapshot();
-        let oss = snap.api_metrics.iter().find(|m| m.endpoint == "oss").unwrap();
+        let oss = snap
+            .api_metrics
+            .iter()
+            .find(|m| m.endpoint == "oss")
+            .unwrap();
         assert_eq!(oss.request_count, 2);
         assert_eq!(oss.avg_latency_ms, 150);
 
-        let dm = snap.api_metrics.iter().find(|m| m.endpoint == "data-management").unwrap();
+        let dm = snap
+            .api_metrics
+            .iter()
+            .find(|m| m.endpoint == "data-management")
+            .unwrap();
         assert_eq!(dm.request_count, 1);
     }
 
@@ -262,7 +280,11 @@ mod tests {
         mc.record_api_error("oss");
 
         let snap = mc.snapshot();
-        let oss = snap.api_metrics.iter().find(|m| m.endpoint == "oss").unwrap();
+        let oss = snap
+            .api_metrics
+            .iter()
+            .find(|m| m.endpoint == "oss")
+            .unwrap();
         assert_eq!(oss.error_count, 1);
         assert!((oss.error_rate - 0.5).abs() < f64::EPSILON);
     }
@@ -303,7 +325,11 @@ mod tests {
         mc.record_cache_hit("data-management");
 
         let snap = mc.snapshot();
-        let dm = snap.api_metrics.iter().find(|m| m.endpoint == "data-management").unwrap();
+        let dm = snap
+            .api_metrics
+            .iter()
+            .find(|m| m.endpoint == "data-management")
+            .unwrap();
         assert_eq!(dm.cache_hits, 3);
     }
 }

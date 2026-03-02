@@ -122,7 +122,9 @@ impl PrometheusExporter {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
         let mut buffer = Vec::new();
-        encoder.encode(&metric_families, &mut buffer).expect("encode metrics");
+        encoder
+            .encode(&metric_families, &mut buffer)
+            .expect("encode metrics");
         String::from_utf8(buffer).expect("metrics UTF-8")
     }
 
@@ -167,9 +169,7 @@ impl PrometheusExporter {
 
     /// Set the queue depth gauge for a given priority level.
     pub fn set_queue_depth(&self, priority: &str, depth: f64) {
-        self.queue_depth
-            .with_label_values(&[priority])
-            .set(depth);
+        self.queue_depth.with_label_values(&[priority]).set(depth);
     }
 }
 

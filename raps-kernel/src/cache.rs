@@ -193,11 +193,11 @@ pub fn prune_older_than(max_age: std::time::Duration) -> Result<usize> {
                 let inner = inner?;
                 if inner.file_type()?.is_file() {
                     let modified = inner.metadata()?.modified()?;
-                    if let Ok(age) = now.duration_since(modified) {
-                        if age > max_age {
-                            std::fs::remove_file(inner.path())?;
-                            removed += 1;
-                        }
+                    if let Ok(age) = now.duration_since(modified)
+                        && age > max_age
+                    {
+                        std::fs::remove_file(inner.path())?;
+                        removed += 1;
                     }
                 }
             }
@@ -266,9 +266,7 @@ pub fn parse_age(s: &str) -> Result<std::time::Duration> {
         anyhow::bail!("Empty duration string");
     }
     let (num_str, unit) = s.split_at(s.len() - 1);
-    let num: u64 = num_str
-        .parse()
-        .context("Invalid number in duration")?;
+    let num: u64 = num_str.parse().context("Invalid number in duration")?;
     match unit {
         "s" => Ok(std::time::Duration::from_secs(num)),
         "m" => Ok(std::time::Duration::from_secs(num * 60)),
@@ -286,9 +284,7 @@ pub fn parse_size(s: &str) -> Result<u64> {
         anyhow::bail!("Empty size string");
     }
     let (num_str, unit) = s.split_at(s.len() - 1);
-    let num: u64 = num_str
-        .parse()
-        .context("Invalid number in size")?;
+    let num: u64 = num_str.parse().context("Invalid number in size")?;
     match unit {
         "B" | "b" => Ok(num),
         "K" | "k" => Ok(num * 1024),

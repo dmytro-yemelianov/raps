@@ -125,9 +125,8 @@ async fn inspect_zip(
     let mut bytes_downloaded = tail.len() as u64;
 
     // Find End of Central Directory record (signature 0x06054b50)
-    let eocd_pos = find_eocd(&tail).context(
-        "Could not find zip End of Central Directory — file may not be a zip archive",
-    )?;
+    let eocd_pos = find_eocd(&tail)
+        .context("Could not find zip End of Central Directory — file may not be a zip archive")?;
 
     // Parse EOCD
     let eocd = &tail[eocd_pos..];
@@ -147,12 +146,7 @@ async fn inspect_zip(
     } else {
         // Need to fetch the central directory separately
         let cd_bytes = client
-            .fetch_range(
-                &bucket_key,
-                &object_key,
-                cd_offset,
-                cd_offset + cd_size - 1,
-            )
+            .fetch_range(&bucket_key, &object_key, cd_offset, cd_offset + cd_size - 1)
             .await
             .context("Failed to fetch zip central directory")?;
         bytes_downloaded += cd_bytes.len() as u64;
@@ -249,9 +243,9 @@ fn find_eocd(data: &[u8]) -> Option<usize> {
     if data.len() < 22 {
         return None;
     }
-    (0..=data.len() - 22)
-        .rev()
-        .find(|&i| data[i] == 0x50 && data[i + 1] == 0x4b && data[i + 2] == 0x05 && data[i + 3] == 0x06)
+    (0..=data.len() - 22).rev().find(|&i| {
+        data[i] == 0x50 && data[i + 1] == 0x4b && data[i + 2] == 0x05 && data[i + 3] == 0x06
+    })
 }
 
 struct CdEntry {
@@ -279,16 +273,21 @@ fn parse_central_directory(data: &[u8], expected_count: usize) -> Result<Vec<CdE
             anyhow::bail!("Invalid central directory entry at offset {}", offset);
         }
 
-        let compressed_size =
-            u32::from_le_bytes([data[offset + 20], data[offset + 21], data[offset + 22], data[offset + 23]]) as u64;
-        let uncompressed_size =
-            u32::from_le_bytes([data[offset + 24], data[offset + 25], data[offset + 26], data[offset + 27]]) as u64;
-        let name_len =
-            u16::from_le_bytes([data[offset + 28], data[offset + 29]]) as usize;
-        let extra_len =
-            u16::from_le_bytes([data[offset + 30], data[offset + 31]]) as usize;
-        let comment_len =
-            u16::from_le_bytes([data[offset + 32], data[offset + 33]]) as usize;
+        let compressed_size = u32::from_le_bytes([
+            data[offset + 20],
+            data[offset + 21],
+            data[offset + 22],
+            data[offset + 23],
+        ]) as u64;
+        let uncompressed_size = u32::from_le_bytes([
+            data[offset + 24],
+            data[offset + 25],
+            data[offset + 26],
+            data[offset + 27],
+        ]) as u64;
+        let name_len = u16::from_le_bytes([data[offset + 28], data[offset + 29]]) as usize;
+        let extra_len = u16::from_le_bytes([data[offset + 30], data[offset + 31]]) as usize;
+        let comment_len = u16::from_le_bytes([data[offset + 32], data[offset + 33]]) as usize;
 
         let name_start = offset + 46;
         let name_end = name_start + name_len;

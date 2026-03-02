@@ -174,7 +174,9 @@ fn cache_prune(
         let max_age = raps_kernel::cache::parse_age(age_str)?;
         if dry_run {
             let (before_count, _) = raps_kernel::cache::stats()?;
-            strategies.push(format!("older-than={age_str} (dry run, {before_count} entries total)"));
+            strategies.push(format!(
+                "older-than={age_str} (dry run, {before_count} entries total)"
+            ));
         } else {
             let removed = raps_kernel::cache::prune_older_than(max_age)?;
             total_removed += removed;
@@ -207,11 +209,7 @@ fn cache_prune(
     match output_format {
         OutputFormat::Table => {
             if dry_run {
-                println!(
-                    "{} Dry run — strategy: {}",
-                    "ℹ".cyan().bold(),
-                    strategy
-                );
+                println!("{} Dry run — strategy: {}", "ℹ".cyan().bold(), strategy);
             } else if total_removed > 0 {
                 println!(
                     "{} Pruned {} cached artifact(s) ({})",

@@ -237,6 +237,7 @@ pub fn confirm_destructive<S: Into<String>>(prompt: S) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interactive::INTERACTIVE_TEST_LOCK;
 
     // Helper to reset interactive state between tests.
     // Uses init_exact to avoid reading env vars (prevents races
@@ -261,6 +262,7 @@ mod tests {
 
     #[test]
     fn test_input_non_interactive_with_default() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = input("Enter name:", Some("default_value"));
         assert!(result.is_ok());
@@ -270,6 +272,7 @@ mod tests {
 
     #[test]
     fn test_input_non_interactive_without_default() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = input("Enter name:", None);
         assert!(result.is_err());
@@ -281,6 +284,7 @@ mod tests {
 
     #[test]
     fn test_input_validated_non_interactive_with_default() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = input_validated("Enter email:", Some("test@example.com"), |_| Ok(()));
         assert!(result.is_ok());
@@ -290,6 +294,7 @@ mod tests {
 
     #[test]
     fn test_input_validated_non_interactive_without_default() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = input_validated::<_, fn(&String) -> Result<(), &'static str>>(
             "Enter email:",
@@ -304,6 +309,7 @@ mod tests {
 
     #[test]
     fn test_select_non_interactive_fails() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let items = vec!["Option 1".to_string(), "Option 2".to_string()];
         let result = select("Choose:", &items);
@@ -315,6 +321,7 @@ mod tests {
 
     #[test]
     fn test_select_with_default_non_interactive() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let items = vec!["Option 1".to_string(), "Option 2".to_string()];
         let result = select_with_default("Choose:", &items, 1);
@@ -327,6 +334,7 @@ mod tests {
 
     #[test]
     fn test_multi_select_non_interactive_fails() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let items = vec!["Option 1".to_string(), "Option 2".to_string()];
         let result = multi_select("Choose multiple:", &items);
@@ -340,6 +348,7 @@ mod tests {
 
     #[test]
     fn test_confirm_yes_mode() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_yes_mode();
         let result = confirm("Proceed?", false);
         assert!(result.is_ok());
@@ -349,6 +358,7 @@ mod tests {
 
     #[test]
     fn test_confirm_non_interactive_no_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = confirm("Proceed?", true);
         assert!(result.is_ok());
@@ -358,6 +368,7 @@ mod tests {
 
     #[test]
     fn test_confirm_non_interactive_with_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive_with_yes();
         let result = confirm("Proceed?", false);
         assert!(result.is_ok());
@@ -369,6 +380,7 @@ mod tests {
 
     #[test]
     fn test_confirm_destructive_yes_mode() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_yes_mode();
         let result = confirm_destructive("Delete all?");
         assert!(result.is_ok());
@@ -378,6 +390,7 @@ mod tests {
 
     #[test]
     fn test_confirm_destructive_non_interactive_no_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = confirm_destructive("Delete all?");
         assert!(result.is_ok());
@@ -387,6 +400,7 @@ mod tests {
 
     #[test]
     fn test_confirm_destructive_non_interactive_with_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive_with_yes();
         let result = confirm_destructive("Delete all?");
         assert!(result.is_ok());
@@ -402,6 +416,7 @@ mod tests {
 
     #[test]
     fn test_select_with_default_strict_fails() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_strict();
         let items = vec!["Option 1".to_string(), "Option 2".to_string()];
         let result = select_with_default("Choose:", &items, 0);
@@ -413,6 +428,7 @@ mod tests {
 
     #[test]
     fn test_confirm_strict_fails_without_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_strict();
         let result = confirm("Proceed?", false);
         assert!(result.is_err());
@@ -424,6 +440,7 @@ mod tests {
 
     #[test]
     fn test_confirm_destructive_strict_fails_without_yes() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_strict();
         let result = confirm_destructive("Delete all?");
         assert!(result.is_err());
@@ -434,6 +451,7 @@ mod tests {
 
     #[test]
     fn test_confirm_strict_with_yes_succeeds() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         interactive::init_exact(false, true, true); // --yes + --strict
         let result = confirm("Proceed?", false);
         assert!(result.is_ok());
@@ -443,6 +461,7 @@ mod tests {
 
     #[test]
     fn test_select_strict_includes_available_items() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_strict();
         let items = vec!["alpha".to_string(), "beta".to_string()];
         let result = select("Choose:", &items);
@@ -457,6 +476,7 @@ mod tests {
 
     #[test]
     fn test_input_trims_colon_in_error() {
+        let _guard = INTERACTIVE_TEST_LOCK.lock().unwrap();
         set_non_interactive();
         let result = input("Enter name:", None);
         let err = result.unwrap_err().to_string();

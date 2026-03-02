@@ -79,19 +79,9 @@ fn schema_registry() -> Vec<SchemaEntry> {
             "Bucket list item",
             Vec<BucketOutput>
         ),
-        schema_entry!(
-            "bucket.info",
-            "bucket",
-            "Bucket details",
-            BucketInfoOutput
-        ),
+        schema_entry!("bucket.info", "bucket", "Bucket details", BucketInfoOutput),
         // Objects
-        schema_entry!(
-            "object.upload",
-            "object",
-            "Upload result",
-            UploadOutput
-        ),
+        schema_entry!("object.upload", "object", "Upload result", UploadOutput),
         schema_entry!(
             "object.upload-batch",
             "object",
@@ -122,12 +112,7 @@ fn schema_registry() -> Vec<SchemaEntry> {
             "Signed URL result",
             SignedUrlOutput
         ),
-        schema_entry!(
-            "object.info",
-            "object",
-            "Object details",
-            ObjectInfoOutput
-        ),
+        schema_entry!("object.info", "object", "Object details", ObjectInfoOutput),
     ]
 }
 
@@ -155,15 +140,12 @@ fn list_schemas() -> Result<()> {
 fn generate_schema(name: &str) -> Result<()> {
     let registry = schema_registry();
 
-    let entry = registry
-        .iter()
-        .find(|e| e.name == name)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Unknown schema '{}'. Use 'raps schema list' to see available types.",
-                name
-            )
-        })?;
+    let entry = registry.iter().find(|e| e.name == name).ok_or_else(|| {
+        anyhow::anyhow!(
+            "Unknown schema '{}'. Use 'raps schema list' to see available types.",
+            name
+        )
+    })?;
 
     let schema = (entry.generate)();
     let json = serde_json::to_string_pretty(&schema)?;

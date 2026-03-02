@@ -1426,6 +1426,7 @@ struct ScheduledPipeline {
     steps: Vec<Step>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_pipeline(
     name: &str,
     source: Option<String>,

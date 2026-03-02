@@ -38,6 +38,11 @@ pub trait CacheBackend: Send + Sync + 'static {
 
     /// Number of entries currently stored.
     async fn len(&self) -> usize;
+
+    /// Whether the cache is empty.
+    async fn is_empty(&self) -> bool {
+        self.len().await == 0
+    }
 }
 
 /// Type-erased cache backend behind an `Arc`.

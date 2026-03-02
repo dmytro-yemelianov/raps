@@ -584,6 +584,7 @@ fn truncate_str(s: &str, max_len: usize) -> String {
 // ---------------------------------------------------------------------------
 
 /// Dispatch a translation job to a serverless Fly.io machine.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn start_serverless(
     urn: Option<String>,
     format: Option<String>,
@@ -670,20 +671,18 @@ pub(super) async fn start_serverless(
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
             match agent.machine_status(&receipt.machine_id).await {
-                Ok(status) => {
-                    match status.state.as_str() {
-                        "stopped" | "destroyed" => {
-                            println!("{} Machine finished (state: {})", "✓".green(), status.state);
-                            break;
-                        }
-                        "failed" => {
-                            anyhow::bail!("Machine failed — check Fly.io dashboard");
-                        }
-                        _ => {
-                            println!("  State: {} ...", status.state);
-                        }
+                Ok(status) => match status.state.as_str() {
+                    "stopped" | "destroyed" => {
+                        println!("{} Machine finished (state: {})", "✓".green(), status.state);
+                        break;
                     }
-                }
+                    "failed" => {
+                        anyhow::bail!("Machine failed — check Fly.io dashboard");
+                    }
+                    _ => {
+                        println!("  State: {} ...", status.state);
+                    }
+                },
                 Err(e) => {
                     eprintln!("{} Status check failed: {}", "!".yellow(), e);
                 }

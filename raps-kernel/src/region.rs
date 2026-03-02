@@ -135,7 +135,11 @@ impl RegionCache {
     }
 
     /// Try to detect and cache region from hub metadata.
-    pub fn detect_and_cache_hub(&self, hub_id: &str, hub_json: &serde_json::Value) -> Option<Region> {
+    pub fn detect_and_cache_hub(
+        &self,
+        hub_id: &str,
+        hub_json: &serde_json::Value,
+    ) -> Option<Region> {
         if let Some(cached) = self.get(hub_id) {
             return Some(cached);
         }

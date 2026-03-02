@@ -69,7 +69,13 @@ fn test_swarm_worker_start_missing_redis() {
     // Worker start should fail gracefully when Redis is unreachable.
     // Use a bogus URL to ensure no accidental connection to a real instance.
     raps()
-        .args(["swarm", "worker", "start", "--redis-url", "redis://127.0.0.1:1"])
+        .args([
+            "swarm",
+            "worker",
+            "start",
+            "--redis-url",
+            "redis://127.0.0.1:1",
+        ])
         .timeout(std::time::Duration::from_secs(10))
         .assert()
         .failure();

@@ -17,16 +17,14 @@ pub mod audit;
 pub mod auth;
 pub mod cache;
 pub mod cache_backend;
-#[cfg(feature = "redis")]
-pub mod job_queue;
-#[cfg(feature = "redis")]
-pub mod redis_backend;
 pub mod checkpoint;
 pub mod circuit_breaker;
 pub mod config;
 pub mod error;
 pub mod http;
 pub mod interactive;
+#[cfg(feature = "redis")]
+pub mod job_queue;
 pub mod logging;
 pub mod metrics;
 pub mod output;
@@ -34,11 +32,13 @@ pub mod profiler;
 pub mod progress;
 pub mod prompts;
 pub mod rate_budget;
+#[cfg(feature = "redis")]
+pub mod redis_backend;
 pub mod region;
 pub mod response_cache;
-pub mod serverless;
 pub mod retry_policy;
 pub mod security;
+pub mod serverless;
 pub mod storage;
 pub mod types;
 

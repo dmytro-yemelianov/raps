@@ -190,8 +190,14 @@ impl WebhookCommands {
                 webhook_secret,
                 relay_url,
             } => {
-                webhook_serve(serverless, account_id, webhook_secret, relay_url, output_format)
-                    .await
+                webhook_serve(
+                    serverless,
+                    account_id,
+                    webhook_secret,
+                    relay_url,
+                    output_format,
+                )
+                .await
             }
             WebhookCommands::Drain {
                 gateway_url,
@@ -782,7 +788,10 @@ async fn webhook_serve(
         );
     }
 
-    println!("{}", "Deploying RAPS Webhook Gateway to Cloudflare Workers...".bold());
+    println!(
+        "{}",
+        "Deploying RAPS Webhook Gateway to Cloudflare Workers...".bold()
+    );
 
     // Set secrets via wrangler if provided
     if let Some(ref secret) = webhook_secret {
@@ -849,7 +858,11 @@ async fn webhook_drain(
     limit: u32,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let url = format!("{}/events?limit={}", gateway_url.trim_end_matches('/'), limit);
+    let url = format!(
+        "{}/events?limit={}",
+        gateway_url.trim_end_matches('/'),
+        limit
+    );
 
     let client = reqwest::Client::new();
     let mut req = client.get(&url);
@@ -858,7 +871,10 @@ async fn webhook_drain(
         req = req.bearer_auth(key);
     }
 
-    let resp = req.send().await.context("Failed to reach webhook gateway")?;
+    let resp = req
+        .send()
+        .await
+        .context("Failed to reach webhook gateway")?;
 
     if !resp.status().is_success() {
         let status = resp.status();

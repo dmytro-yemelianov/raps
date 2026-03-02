@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Top-level swarm configuration file (`swarm.toml`).
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct SwarmConfig {
     #[serde(default)]
     pub serverless: ServerlessConfig,
@@ -88,11 +88,7 @@ fn default_heartbeat_secs() -> u64 {
     30
 }
 fn default_queues() -> Vec<String> {
-    vec![
-        "critical".into(),
-        "normal".into(),
-        "background".into(),
-    ]
+    vec!["critical".into(), "normal".into(), "background".into()]
 }
 
 /// Serverless (Fly.io) dispatch settings.
@@ -154,8 +150,7 @@ impl SwarmConfig {
         if path.exists() {
             let content = std::fs::read_to_string(&path)
                 .with_context(|| format!("Failed to read {}", path.display()))?;
-            toml::from_str(&content)
-                .with_context(|| format!("Failed to parse {}", path.display()))
+            toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))
         } else {
             Ok(Self::default())
         }
@@ -166,16 +161,6 @@ impl SwarmConfig {
         directories::ProjectDirs::from("xyz", "rapscli", "raps")
             .map(|dirs| dirs.config_dir().join("swarm.toml"))
             .unwrap_or_else(|| PathBuf::from("swarm.toml"))
-    }
-}
-
-impl Default for SwarmConfig {
-    fn default() -> Self {
-        Self {
-            serverless: ServerlessConfig::default(),
-            redis: RedisConfig::default(),
-            worker: WorkerConfig::default(),
-        }
     }
 }
 
@@ -226,8 +211,14 @@ pub struct ServerlessDispatchAgent {
 
 impl ServerlessDispatchAgent {
     pub fn new(config: ServerlessConfig) -> Result<Self> {
-        anyhow::ensure!(!config.fly_app.is_empty(), "fly_app must be set in swarm.toml [serverless]");
-        anyhow::ensure!(!config.fly_token.is_empty(), "fly_token must be set (swarm.toml or FLY_API_TOKEN env)");
+        anyhow::ensure!(
+            !config.fly_app.is_empty(),
+            "fly_app must be set in swarm.toml [serverless]"
+        );
+        anyhow::ensure!(
+            !config.fly_token.is_empty(),
+            "fly_token must be set (swarm.toml or FLY_API_TOKEN env)"
+        );
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
@@ -253,10 +244,7 @@ impl ServerlessDispatchAgent {
     }
 
     /// Dispatch a translate job as an ephemeral Fly Machine.
-    pub async fn dispatch_translate(
-        &self,
-        job: &TranslateJobRequest,
-    ) -> Result<DispatchReceipt> {
+    pub async fn dispatch_translate(&self, job: &TranslateJobRequest) -> Result<DispatchReceipt> {
         let url = format!(
             "{}/v1/apps/{}/machines",
             self.config.api_url, self.config.fly_app
@@ -301,7 +289,10 @@ impl ServerlessDispatchAgent {
         let machine: serde_json::Value = resp.json().await.context("Invalid Fly API response")?;
         Ok(DispatchReceipt {
             machine_id: machine["id"].as_str().unwrap_or("unknown").to_string(),
-            region: machine["region"].as_str().unwrap_or(&self.config.preferred_region).to_string(),
+            region: machine["region"]
+                .as_str()
+                .unwrap_or(&self.config.preferred_region)
+                .to_string(),
             state: machine["state"].as_str().unwrap_or("created").to_string(),
             app: self.config.fly_app.clone(),
         })

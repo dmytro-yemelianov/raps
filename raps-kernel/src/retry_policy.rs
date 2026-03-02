@@ -131,7 +131,10 @@ pub enum BackoffStrategy {
     /// Exponential backoff: base * 2^attempt, capped at max.
     Exponential { base: Duration, max: Duration },
     /// Use the Retry-After header value; fall back to exponential.
-    HeaderBased { fallback_base: Duration, max: Duration },
+    HeaderBased {
+        fallback_base: Duration,
+        max: Duration,
+    },
 }
 
 /// Policy for retrying a specific failure type.
@@ -144,7 +147,11 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
     /// Compute delay for the given attempt (0-indexed).
-    pub fn delay_for_attempt(&self, attempt: u32, retry_after_header: Option<Duration>) -> Duration {
+    pub fn delay_for_attempt(
+        &self,
+        attempt: u32,
+        retry_after_header: Option<Duration>,
+    ) -> Duration {
         match &self.backoff {
             BackoffStrategy::Fixed(d) => *d,
             BackoffStrategy::Exponential { base, max } => {
@@ -256,10 +263,22 @@ mod tests {
 
     #[test]
     fn test_from_status() {
-        assert_eq!(FailureType::from_status(429), Some(FailureType::RateLimited));
-        assert_eq!(FailureType::from_status(401), Some(FailureType::Unauthorized));
-        assert_eq!(FailureType::from_status(500), Some(FailureType::ServerError));
-        assert_eq!(FailureType::from_status(503), Some(FailureType::ServiceUnavailable));
+        assert_eq!(
+            FailureType::from_status(429),
+            Some(FailureType::RateLimited)
+        );
+        assert_eq!(
+            FailureType::from_status(401),
+            Some(FailureType::Unauthorized)
+        );
+        assert_eq!(
+            FailureType::from_status(500),
+            Some(FailureType::ServerError)
+        );
+        assert_eq!(
+            FailureType::from_status(503),
+            Some(FailureType::ServiceUnavailable)
+        );
         assert_eq!(FailureType::from_status(200), None);
         assert_eq!(FailureType::from_status(404), None);
     }

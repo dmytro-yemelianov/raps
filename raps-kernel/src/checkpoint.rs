@@ -39,7 +39,12 @@ pub struct Checkpoint {
 
 impl Checkpoint {
     /// Create a new checkpoint for a workflow.
-    pub fn new(workflow_id: String, workflow_type: String, input_hash: String, total_units: usize) -> Self {
+    pub fn new(
+        workflow_id: String,
+        workflow_type: String,
+        input_hash: String,
+        total_units: usize,
+    ) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
             workflow_id,
@@ -70,7 +75,8 @@ impl Checkpoint {
     /// Indices that still need processing.
     pub fn remaining(&self) -> Vec<usize> {
         let done: std::collections::HashSet<usize> = self.completed.iter().copied().collect();
-        let failed: std::collections::HashSet<usize> = self.failed.iter().map(|(i, _)| *i).collect();
+        let failed: std::collections::HashSet<usize> =
+            self.failed.iter().map(|(i, _)| *i).collect();
         (0..self.total_units)
             .filter(|i| !done.contains(i) && !failed.contains(i))
             .collect()
@@ -140,22 +146,23 @@ impl CheckpointStore {
     }
 
     /// Find a resumable checkpoint matching the workflow type and input hash.
-    pub fn find_resumable(&self, workflow_type: &str, input_hash: &str) -> Result<Option<Checkpoint>> {
+    pub fn find_resumable(
+        &self,
+        workflow_type: &str,
+        input_hash: &str,
+    ) -> Result<Option<Checkpoint>> {
         let entries = std::fs::read_dir(&self.dir)?;
         for entry in entries {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
-                if let Ok(data) = std::fs::read_to_string(&path) {
-                    if let Ok(cp) = serde_json::from_str::<Checkpoint>(&data) {
-                        if cp.workflow_type == workflow_type
-                            && cp.input_hash == input_hash
-                            && !cp.is_complete()
-                        {
-                            return Ok(Some(cp));
-                        }
-                    }
-                }
+            if path.extension().is_some_and(|e| e == "json")
+                && let Ok(data) = std::fs::read_to_string(&path)
+                && let Ok(cp) = serde_json::from_str::<Checkpoint>(&data)
+                && cp.workflow_type == workflow_type
+                && cp.input_hash == input_hash
+                && !cp.is_complete()
+            {
+                return Ok(Some(cp));
             }
         }
         Ok(None)
@@ -179,12 +186,11 @@ impl CheckpointStore {
         for entry in std::fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().is_some_and(|e| e == "json") {
-                if let Ok(data) = std::fs::read_to_string(&path) {
-                    if let Ok(cp) = serde_json::from_str::<Checkpoint>(&data) {
-                        results.push(cp);
-                    }
-                }
+            if path.extension().is_some_and(|e| e == "json")
+                && let Ok(data) = std::fs::read_to_string(&path)
+                && let Ok(cp) = serde_json::from_str::<Checkpoint>(&data)
+            {
+                results.push(cp);
             }
         }
         Ok(results)
@@ -195,13 +201,12 @@ impl CheckpointStore {
         let cutoff = chrono::Utc::now() - chrono::Duration::from_std(max_age).unwrap_or_default();
         let mut removed = 0;
         for cp in self.list()? {
-            if cp.is_complete() {
-                if let Ok(updated) = chrono::DateTime::parse_from_rfc3339(&cp.updated_at) {
-                    if updated < cutoff {
-                        self.remove(&cp.workflow_id)?;
-                        removed += 1;
-                    }
-                }
+            if cp.is_complete()
+                && let Ok(updated) = chrono::DateTime::parse_from_rfc3339(&cp.updated_at)
+                && updated < cutoff
+            {
+                self.remove(&cp.workflow_id)?;
+                removed += 1;
             }
         }
         Ok(removed)
@@ -278,13 +283,23 @@ mod tests {
         let (_dir, store) = temp_store();
 
         // Complete checkpoint — should NOT be found
-        let mut cp1 = Checkpoint::new("wf-a".to_string(), "upload".to_string(), "hash1".to_string(), 2);
+        let mut cp1 = Checkpoint::new(
+            "wf-a".to_string(),
+            "upload".to_string(),
+            "hash1".to_string(),
+            2,
+        );
         cp1.mark_completed(0);
         cp1.mark_completed(1);
         store.save(&cp1).unwrap();
 
         // Incomplete checkpoint — should be found
-        let mut cp2 = Checkpoint::new("wf-b".to_string(), "upload".to_string(), "hash1".to_string(), 3);
+        let mut cp2 = Checkpoint::new(
+            "wf-b".to_string(),
+            "upload".to_string(),
+            "hash1".to_string(),
+            3,
+        );
         cp2.mark_completed(0);
         store.save(&cp2).unwrap();
 
@@ -293,7 +308,12 @@ mod tests {
         assert_eq!(found.unwrap().workflow_id, "wf-b");
 
         // No match for different type
-        assert!(store.find_resumable("translate", "hash1").unwrap().is_none());
+        assert!(
+            store
+                .find_resumable("translate", "hash1")
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
@@ -310,8 +330,22 @@ mod tests {
     #[test]
     fn test_list() {
         let (_dir, store) = temp_store();
-        store.save(&Checkpoint::new("a".to_string(), "t".to_string(), "h".to_string(), 1)).unwrap();
-        store.save(&Checkpoint::new("b".to_string(), "t".to_string(), "h".to_string(), 1)).unwrap();
+        store
+            .save(&Checkpoint::new(
+                "a".to_string(),
+                "t".to_string(),
+                "h".to_string(),
+                1,
+            ))
+            .unwrap();
+        store
+            .save(&Checkpoint::new(
+                "b".to_string(),
+                "t".to_string(),
+                "h".to_string(),
+                1,
+            ))
+            .unwrap();
         assert_eq!(store.list().unwrap().len(), 2);
     }
 

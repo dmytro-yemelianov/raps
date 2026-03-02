@@ -182,9 +182,7 @@ pub(super) async fn list_objects(
         );
     }
 
-    let objects = client
-        .list_objects_with_limit(&bucket_key, limit)
-        .await?;
+    let objects = client.list_objects_with_limit(&bucket_key, limit).await?;
 
     let object_outputs: Vec<ObjectListOutput> = objects
         .iter()

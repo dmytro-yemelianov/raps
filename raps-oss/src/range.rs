@@ -46,7 +46,10 @@ impl OssClient {
             anyhow::bail!("Range request failed ({status}): {error_text}");
         }
 
-        let bytes = response.bytes().await.context("Failed to read range response")?;
+        let bytes = response
+            .bytes()
+            .await
+            .context("Failed to read range response")?;
         Ok(bytes.to_vec())
     }
 }

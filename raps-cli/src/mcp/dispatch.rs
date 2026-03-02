@@ -1308,7 +1308,8 @@ impl RapsServer {
                 };
                 let bucket_key = Self::optional_arg(&args, "bucket_key");
                 let object_key = Self::optional_arg(&args, "object_key");
-                self.workflow_prepare_for_viewing(file_path, bucket_key, object_key).await
+                self.workflow_prepare_for_viewing(file_path, bucket_key, object_key)
+                    .await
             }
             "workflow_analyze_model" => {
                 let urn = match Self::required_arg(&args, "urn") {
@@ -1325,7 +1326,8 @@ impl RapsServer {
                 };
                 let output_format = Self::optional_arg(&args, "output_format");
                 let region = Self::optional_arg(&args, "region");
-                self.workflow_batch_translate(urns, output_format, region).await
+                self.workflow_batch_translate(urns, output_format, region)
+                    .await
             }
             "workflow_compare_versions" => {
                 let urn_a = match Self::required_arg(&args, "urn_a") {
@@ -1338,7 +1340,8 @@ impl RapsServer {
                 };
                 let label_a = Self::optional_arg(&args, "label_a");
                 let label_b = Self::optional_arg(&args, "label_b");
-                self.workflow_compare_versions(urn_a, urn_b, label_a, label_b).await
+                self.workflow_compare_versions(urn_a, urn_b, label_a, label_b)
+                    .await
             }
             "workflow_setup_project" => {
                 let project_name = match Self::required_arg(&args, "project_name") {
@@ -1346,13 +1349,40 @@ impl RapsServer {
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
                 let bucket_region = Self::optional_arg(&args, "bucket_region");
-                self.workflow_setup_project(project_name, bucket_region).await
+                self.workflow_setup_project(project_name, bucket_region)
+                    .await
             }
             "swarm_status" => self.swarm_status_tool().await,
 
             _ => format!("Unknown tool: {}", name),
         };
 
+        // Enrich auth-related errors with actionable guidance
+        let result = Self::enrich_error(&result);
+
         CallToolResult::success(vec![Content::text(result)])
+    }
+
+    /// If the result string looks like an auth error, append user-friendly guidance.
+    fn enrich_error(result: &str) -> String {
+        const AUTH_KEYWORDS: &[&str] = &[
+            "401",
+            "unauthorized",
+            "client_id",
+            "client_secret",
+            "expired",
+            "authentication failed",
+            "not configured or invalid",
+        ];
+
+        let lower = result.to_lowercase();
+        let is_auth_error = AUTH_KEYWORDS.iter().any(|kw| lower.contains(kw));
+
+        if is_auth_error {
+            let guidance = super::auth_guidance::format_error_guidance(result);
+            format!("{result}\n\n{guidance}")
+        } else {
+            result.to_string()
+        }
     }
 }

@@ -80,8 +80,8 @@ async fn job_status(
 ) -> Result<()> {
     use raps_kernel::serverless::ServerlessDispatchAgent;
 
-    let agent = ServerlessDispatchAgent::from_config()
-        .context("Failed to load serverless config")?;
+    let agent =
+        ServerlessDispatchAgent::from_config().context("Failed to load serverless config")?;
 
     loop {
         let status = agent.machine_status(id).await?;
@@ -129,8 +129,8 @@ async fn job_status(
 async fn job_list(state_filter: Option<String>, output_format: OutputFormat) -> Result<()> {
     use raps_kernel::serverless::ServerlessDispatchAgent;
 
-    let agent = ServerlessDispatchAgent::from_config()
-        .context("Failed to load serverless config")?;
+    let agent =
+        ServerlessDispatchAgent::from_config().context("Failed to load serverless config")?;
 
     let machines = agent.list_machines().await?;
 
@@ -164,10 +164,7 @@ async fn job_list(state_filter: Option<String>, output_format: OutputFormat) -> 
                 println!("No machines found.");
             } else {
                 println!("{}", "Serverless Machines".bold());
-                println!(
-                    "  {:<26} {:<12} {:<8}",
-                    "Machine ID", "State", "Region"
-                );
+                println!("  {:<26} {:<12} {:<8}", "Machine ID", "State", "Region");
                 println!("  {}", "─".repeat(50));
                 for m in &out.machines {
                     println!(
@@ -191,14 +188,19 @@ async fn job_list(state_filter: Option<String>, output_format: OutputFormat) -> 
 async fn job_cancel(machine_id: &str, _output_format: OutputFormat) -> Result<()> {
     use raps_kernel::serverless::ServerlessDispatchAgent;
 
-    let agent = ServerlessDispatchAgent::from_config()
-        .context("Failed to load serverless config")?;
+    let agent =
+        ServerlessDispatchAgent::from_config().context("Failed to load serverless config")?;
 
     // First check current state
     let status = agent.machine_status(machine_id).await?;
     match status.state.as_str() {
         "stopped" | "destroyed" => {
-            println!("{} Machine {} is already {}", "!".yellow(), machine_id, status.state);
+            println!(
+                "{} Machine {} is already {}",
+                "!".yellow(),
+                machine_id,
+                status.state
+            );
             return Ok(());
         }
         _ => {}

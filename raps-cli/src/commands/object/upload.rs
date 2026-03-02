@@ -714,11 +714,7 @@ pub(crate) fn upload_status(output_format: OutputFormat) -> Result<()> {
             Err(_) => {
                 corrupt_count += 1;
                 if output_format.supports_colors() {
-                    println!(
-                        "{} Corrupt state file: {}",
-                        "⚠".yellow(),
-                        path.display()
-                    );
+                    println!("{} Corrupt state file: {}", "⚠".yellow(), path.display());
                 }
             }
         }
@@ -776,11 +772,7 @@ pub(crate) fn upload_status(output_format: OutputFormat) -> Result<()> {
 }
 
 /// Abort a resumable upload and clean up its state file
-pub(crate) fn upload_abort(
-    bucket: &str,
-    object: &str,
-    output_format: OutputFormat,
-) -> Result<()> {
+pub(crate) fn upload_abort(bucket: &str, object: &str, output_format: OutputFormat) -> Result<()> {
     use raps_oss::MultipartUploadState;
 
     let state = MultipartUploadState::load(bucket, object)?;

@@ -97,7 +97,9 @@ fn now_millis() -> u64 {
 
 /// Error returned when the circuit is open and requests are blocked.
 #[derive(Debug, thiserror::Error)]
-#[error("Circuit breaker open for '{endpoint}' — API is unhealthy, retrying in {retry_after_secs}s")]
+#[error(
+    "Circuit breaker open for '{endpoint}' — API is unhealthy, retrying in {retry_after_secs}s"
+)]
 pub struct CircuitOpen {
     pub endpoint: String,
     pub retry_after_secs: u64,
@@ -128,14 +130,13 @@ impl CircuitBreaker {
         let s = CircuitState::from_u8(self.state.load(Ordering::Acquire));
 
         // If open, check if probe interval has elapsed → transition to HalfOpen
-        if s == CircuitState::Open {
-            let opened = self.opened_at.load(Ordering::Acquire);
-            let elapsed = now_millis().saturating_sub(opened);
-            if elapsed >= self.config.probe_interval.as_millis() as u64 {
-                self.state
-                    .store(CircuitState::HalfOpen.to_u8(), Ordering::Release);
-                return CircuitState::HalfOpen;
-            }
+        if s == CircuitState::Open
+            && now_millis().saturating_sub(self.opened_at.load(Ordering::Acquire))
+                >= self.config.probe_interval.as_millis() as u64
+        {
+            self.state
+                .store(CircuitState::HalfOpen.to_u8(), Ordering::Release);
+            return CircuitState::HalfOpen;
         }
         s
     }
@@ -457,6 +458,9 @@ mod tests {
         assert!(reg.check("model-derivative").is_ok());
 
         let snap = reg.snapshot();
-        assert!(snap.iter().any(|(name, state, _)| name == "oss" && *state == CircuitState::Open));
+        assert!(
+            snap.iter()
+                .any(|(name, state, _)| name == "oss" && *state == CircuitState::Open)
+        );
     }
 }

@@ -139,10 +139,7 @@ pub(crate) fn display_bulk_result(
             // Summary
             println!();
             if result.failed == 0 && result.total > 0 {
-                println!(
-                    "{} Operation completed successfully!",
-                    "✓".green().bold()
-                );
+                println!("{} Operation completed successfully!", "✓".green().bold());
             } else if result.failed > 0 {
                 println!(
                     "{} Operation completed with {} failure(s)",
@@ -282,11 +279,7 @@ impl OperationCommands {
                 let pending = state_manager.get_pending_projects(&state);
                 if pending.is_empty() {
                     if output_format.supports_colors() {
-                        println!(
-                            "{} Operation {} is already complete",
-                            "✓".green(),
-                            op_id
-                        );
+                        println!("{} Operation {} is already complete", "✓".green(), op_id);
                     }
                     return Ok(());
                 }

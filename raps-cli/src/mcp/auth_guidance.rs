@@ -12,6 +12,7 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 
 /// Authentication requirement for MCP tools
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthRequirement {
     /// Requires 2-legged OAuth (client credentials)
@@ -23,6 +24,7 @@ pub enum AuthRequirement {
 }
 
 /// Current authentication state
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AuthState {
     /// Whether APS_CLIENT_ID is configured
@@ -37,6 +39,7 @@ pub struct AuthState {
     pub three_legged_expired: bool,
 }
 
+#[allow(dead_code)]
 impl AuthState {
     /// Check if any credentials are configured
     pub fn has_any_credentials(&self) -> bool {
@@ -54,6 +57,7 @@ impl AuthState {
 // ============================================================================
 
 /// Full onboarding guide for first-time users
+#[allow(dead_code)]
 pub const SETUP_INSTRUCTIONS: &str = r#"
 To set up authentication for RAPS MCP Server:
 
@@ -113,6 +117,7 @@ Note: Keep your Client Secret secure and never share it publicly.
 "#;
 
 /// Prompt to perform 3-legged authentication
+#[allow(dead_code)]
 pub const THREE_LEGGED_PROMPT: &str = r#"
 To access BIM 360/ACC data (hubs, projects, folders, files, issues, RFIs), you need to log in with your Autodesk account.
 
@@ -130,6 +135,7 @@ pub const TOOL_AVAILABILITY_HEADER: &str = "\nTool Availability:\n";
 // ============================================================================
 
 /// Get the authentication requirement for a tool
+#[allow(dead_code)]
 pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
     match tool_name {
         // Auth tools - work with either
@@ -212,6 +218,7 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
 // ============================================================================
 
 /// Compute current authentication state from config and auth client
+#[allow(dead_code)]
 pub async fn get_auth_state(config: &Config, auth_client: &AuthClient) -> AuthState {
     let has_client_id = !config.client_id.is_empty();
     let has_client_secret = !config.client_secret.is_empty();

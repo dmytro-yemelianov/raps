@@ -1296,10 +1296,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         Tool::new(
             "swarm_status",
             "Get swarm orchestration health: circuit breaker states, rate limit budgets, and response cache stats. Useful for diagnosing API connectivity issues.",
-            schema(
-                json!({}),
-                &[],
-            ),
+            schema(json!({}), &[]),
         ),
     ]
 }

@@ -83,10 +83,7 @@ pub async fn execute(output_format: OutputFormat) -> Result<()> {
         failed,
     };
 
-    let output = DoctorOutput {
-        checks,
-        summary,
-    };
+    let output = DoctorOutput { checks, summary };
 
     match output_format {
         OutputFormat::Table => {
@@ -177,13 +174,21 @@ async fn check_three_leg_auth() -> CheckResult {
                     &format!("Logged in (expires in {hours}h {minutes}m)"),
                 )
             } else {
-                check("3-Legged Auth", Status::Warn, "Token expired (will auto-refresh)")
+                check(
+                    "3-Legged Auth",
+                    Status::Warn,
+                    "Token expired (will auto-refresh)",
+                )
             }
         } else {
             check("3-Legged Auth", Status::Pass, "Logged in")
         }
     } else {
-        check("3-Legged Auth", Status::Warn, "Not logged in (run: raps auth login)")
+        check(
+            "3-Legged Auth",
+            Status::Warn,
+            "Not logged in (run: raps auth login)",
+        )
     }
 }
 
@@ -196,8 +201,7 @@ fn check_cache() -> CheckResult {
             match raps_kernel::cache::stats() {
                 Ok((count, size)) => {
                     let size_str = format_size(size);
-                    let writable =
-                        std::fs::create_dir_all(&dir).is_ok() || dir.exists();
+                    let writable = std::fs::create_dir_all(&dir).is_ok() || dir.exists();
                     if writable {
                         check(
                             "Cache",

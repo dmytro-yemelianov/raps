@@ -144,8 +144,7 @@ impl JobProducer {
     /// Enqueue a job at the given priority. Returns the stream entry ID.
     pub async fn enqueue(&self, payload: JobPayload, priority: JobPriority) -> Result<String> {
         let job = Job::new(payload, priority);
-        let data =
-            serde_json::to_string(&job).context("Failed to serialize job")?;
+        let data = serde_json::to_string(&job).context("Failed to serialize job")?;
         let stream = priority.stream_key();
 
         let mut conn = self.pool.get().await.context("Redis pool exhausted")?;
@@ -200,9 +199,7 @@ impl JobConsumer {
                     tracing::debug!(stream, "Consumer group already exists");
                 }
                 Err(e) => {
-                    return Err(e).context(format!(
-                        "Failed to create consumer group on {stream}"
-                    ));
+                    return Err(e).context(format!("Failed to create consumer group on {stream}"));
                 }
             }
         }
@@ -216,10 +213,7 @@ impl JobConsumer {
     pub async fn dequeue_one(&self, block_ms: u64) -> Result<Option<(JobPriority, String, Job)>> {
         let mut conn = self.pool.get().await.context("Redis pool exhausted")?;
 
-        let streams: Vec<&str> = JobPriority::all()
-            .iter()
-            .map(|p| p.stream_key())
-            .collect();
+        let streams: Vec<&str> = JobPriority::all().iter().map(|p| p.stream_key()).collect();
 
         // XREADGROUP GROUP raps-workers {id} COUNT 1 BLOCK {ms} STREAMS s1 s2 s3 > > >
         let mut cmd = redis::cmd("XREADGROUP");

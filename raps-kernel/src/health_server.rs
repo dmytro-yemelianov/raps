@@ -8,16 +8,10 @@
 //! - `GET /ready`  — readiness probe (200 when ready, 503 otherwise)
 //! - `GET /metrics` — Prometheus text format
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::get,
-    Router,
-};
+use axum::{Router, extract::State, http::StatusCode, response::IntoResponse, routing::get};
 
 use crate::prometheus_metrics::PrometheusExporter;
 
@@ -31,10 +25,7 @@ pub struct HealthServerState {
 /// Start the health/metrics HTTP server on the given port.
 ///
 /// This spawns an axum server that will run until the process exits.
-pub async fn start_health_server(
-    port: u16,
-    state: HealthServerState,
-) -> anyhow::Result<()> {
+pub async fn start_health_server(port: u16, state: HealthServerState) -> anyhow::Result<()> {
     let app = Router::new()
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
@@ -49,14 +40,18 @@ pub async fn start_health_server(
 }
 
 async fn health_handler() -> impl IntoResponse {
-    (StatusCode::OK, axum::Json(serde_json::json!({"status": "ok"})))
+    (
+        StatusCode::OK,
+        axum::Json(serde_json::json!({"status": "ok"})),
+    )
 }
 
-async fn ready_handler(
-    State(state): State<HealthServerState>,
-) -> impl IntoResponse {
+async fn ready_handler(State(state): State<HealthServerState>) -> impl IntoResponse {
     if state.ready.load(Ordering::Relaxed) {
-        (StatusCode::OK, axum::Json(serde_json::json!({"status": "ready"})))
+        (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({"status": "ready"})),
+        )
     } else {
         (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -65,13 +60,14 @@ async fn ready_handler(
     }
 }
 
-async fn metrics_handler(
-    State(state): State<HealthServerState>,
-) -> impl IntoResponse {
+async fn metrics_handler(State(state): State<HealthServerState>) -> impl IntoResponse {
     let body = state.exporter.render();
     (
         StatusCode::OK,
-        [(axum::http::header::CONTENT_TYPE, "text/plain; version=0.0.4; charset=utf-8")],
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "text/plain; version=0.0.4; charset=utf-8",
+        )],
         body,
     )
 }
@@ -102,7 +98,12 @@ mod tests {
     async fn test_health_endpoint() {
         let state = test_state(true);
         let response = app(state)
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -118,7 +119,12 @@ mod tests {
     async fn test_ready_endpoint_when_ready() {
         let state = test_state(true);
         let response = app(state)
-            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -129,7 +135,12 @@ mod tests {
     async fn test_ready_endpoint_when_not_ready() {
         let state = test_state(false);
         let response = app(state)
-            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -187,7 +198,12 @@ mod tests {
     async fn test_health_response_body() {
         let state = test_state(true);
         let response = app(state)
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -202,7 +218,12 @@ mod tests {
     async fn test_ready_response_body() {
         let state = test_state(true);
         let response = app(state)
-            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
@@ -217,7 +238,12 @@ mod tests {
     async fn test_not_ready_response_body() {
         let state = test_state(false);
         let response = app(state)
-            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/ready")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 

@@ -21,21 +21,49 @@ impl RapsServer {
 
     pub(crate) async fn auth_status(&self) -> String {
         let auth = self.get_auth_client().await;
+        let config = self.config();
         let mut status = String::new();
 
         // Check 2-legged
-        match auth.get_token().await {
-            Ok(_) => status.push_str("2-legged OAuth: Valid\n"),
-            Err(_) => status.push_str("2-legged OAuth: Not configured or invalid\n"),
-        }
+        let two_legged_valid = match auth.get_token().await {
+            Ok(_) => {
+                status.push_str("2-legged OAuth: Valid\n");
+                true
+            }
+            Err(_) => {
+                status.push_str("2-legged OAuth: Not configured or invalid\n");
+                false
+            }
+        };
 
         // Check 3-legged
-        match auth.get_3leg_token().await {
-            Ok(_) => status.push_str("3-legged OAuth: Valid (user logged in)\n"),
-            Err(_) => {
-                status.push_str("3-legged OAuth: Not logged in (run 'raps auth login' to log in)\n")
+        let (three_legged_valid, three_legged_expired) = match auth.get_3leg_token().await {
+            Ok(_) => {
+                status.push_str("3-legged OAuth: Valid (user logged in)\n");
+                (true, false)
             }
-        }
+            Err(e) => {
+                status
+                    .push_str("3-legged OAuth: Not logged in (run 'raps auth login' to log in)\n");
+                let err_msg = e.to_string().to_lowercase();
+                (
+                    false,
+                    err_msg.contains("expired") || err_msg.contains("refresh"),
+                )
+            }
+        };
+
+        // Append tool availability summary
+        let auth_state = super::auth_guidance::AuthState {
+            has_client_id: !config.client_id.is_empty(),
+            has_client_secret: !config.client_secret.is_empty(),
+            two_legged_valid,
+            three_legged_valid,
+            three_legged_expired,
+        };
+        status.push_str(&super::auth_guidance::get_tool_availability_summary(
+            &auth_state,
+        ));
 
         status
     }

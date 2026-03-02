@@ -185,7 +185,10 @@ fn swarm_status(output_format: OutputFormat) -> Result<()> {
                         "HalfOpen" => cb.state.yellow().to_string(),
                         _ => cb.state.clone(),
                     };
-                    println!("  {} {} (failures: {})", cb.endpoint, state_colored, cb.failures);
+                    println!(
+                        "  {} {} (failures: {})",
+                        cb.endpoint, state_colored, cb.failures
+                    );
                 }
             }
 
@@ -206,7 +209,10 @@ fn swarm_status(output_format: OutputFormat) -> Result<()> {
                     } else {
                         "EXHAUSTED".red().to_string()
                     };
-                    println!("  {} {}/{} ({})", rb.endpoint, rb.remaining, rb.limit, status);
+                    println!(
+                        "  {} {}/{} ({})",
+                        rb.endpoint, rb.remaining, rb.limit, status
+                    );
                 }
             }
 
@@ -401,10 +407,10 @@ fn swarm_queue(
     let items: Vec<QueueItem> = checkpoints
         .iter()
         .filter(|cp| {
-            if let Some(ref t) = type_filter {
-                if !cp.workflow_type.to_lowercase().contains(&t.to_lowercase()) {
-                    return false;
-                }
+            if let Some(ref t) = type_filter
+                && !cp.workflow_type.to_lowercase().contains(&t.to_lowercase())
+            {
+                return false;
             }
             if pending_only && cp.is_complete() {
                 return false;
@@ -475,8 +481,14 @@ fn swarm_queue(
                 println!(
                     "\n  Total: {} operations ({} active, {} completed)",
                     items.len(),
-                    items.iter().filter(|i| i.status == "active" || i.status == "pending").count(),
-                    items.iter().filter(|i| i.status.starts_with("completed")).count(),
+                    items
+                        .iter()
+                        .filter(|i| i.status == "active" || i.status == "pending")
+                        .count(),
+                    items
+                        .iter()
+                        .filter(|i| i.status.starts_with("completed"))
+                        .count(),
                 );
             }
         }
@@ -510,10 +522,15 @@ fn swarm_reset(target: &str, _output_format: OutputFormat) -> Result<()> {
             raps_kernel::circuit_breaker::registry().reset_all();
             raps_kernel::response_cache::cache().clear();
             raps_kernel::rate_budget::registry().reset_all();
-            println!("{} All swarm state reset (circuit breakers, cache, rate budgets)", "✓".green());
+            println!(
+                "{} All swarm state reset (circuit breakers, cache, rate budgets)",
+                "✓".green()
+            );
         }
         other => {
-            anyhow::bail!("Unknown reset target: '{other}'. Use: circuit-breakers, cache, rate-budgets, or all");
+            anyhow::bail!(
+                "Unknown reset target: '{other}'. Use: circuit-breakers, cache, rate-budgets, or all"
+            );
         }
     }
 
@@ -534,9 +551,7 @@ impl WorkerCommands {
                 heartbeat_secs,
                 queues: _,
                 metrics_port,
-            } => {
-                worker_start(&redis_url, concurrency, heartbeat_secs, metrics_port).await
-            }
+            } => worker_start(&redis_url, concurrency, heartbeat_secs, metrics_port).await,
         }
     }
 }
@@ -598,7 +613,11 @@ async fn worker_start(
             }
         });
 
-        println!("{} Health server listening on 0.0.0.0:{}", "✓".green(), port);
+        println!(
+            "{} Health server listening on 0.0.0.0:{}",
+            "✓".green(),
+            port
+        );
 
         // Mark as ready
         ready.store(true, Ordering::Relaxed);
@@ -619,8 +638,10 @@ async fn worker_start(
                     if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
                         for priority in &["critical", "normal", "background"] {
                             let stream_key = format!("raps:queue:{priority}");
-                            let len: Result<f64, _> =
-                                redis::cmd("XLEN").arg(&stream_key).query_async(&mut conn).await;
+                            let len: Result<f64, _> = redis::cmd("XLEN")
+                                .arg(&stream_key)
+                                .query_async(&mut conn)
+                                .await;
                             if let Ok(depth) = len {
                                 exporter_poll.set_queue_depth(priority, depth);
                             }
@@ -655,7 +676,10 @@ async fn worker_start(
     // SIGTERM / Ctrl+C handler
     tokio::spawn(async move {
         tokio::signal::ctrl_c().await.ok();
-        println!("\n{} Shutdown signal received, draining in-flight jobs...", "!".yellow());
+        println!(
+            "\n{} Shutdown signal received, draining in-flight jobs...",
+            "!".yellow()
+        );
         shutdown_signal.store(true, Ordering::SeqCst);
     });
 
@@ -767,7 +791,12 @@ async fn process_job(job: &raps_kernel::job_queue::Job) -> Result<()> {
         }
         JobPayload::ExtractProps(e) => {
             tracing::info!(urn = %e.urn, "Processing extract-props job");
-            println!("  {} ExtractProps job {} — URN: {}", "▶".cyan(), job.id, e.urn);
+            println!(
+                "  {} ExtractProps job {} — URN: {}",
+                "▶".cyan(),
+                job.id,
+                e.urn
+            );
             Ok(())
         }
         JobPayload::Pipeline(p) => {

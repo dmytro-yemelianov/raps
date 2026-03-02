@@ -74,7 +74,10 @@ impl AuditLogger {
     pub fn new(dir: PathBuf, retention_days: u32) -> Result<Self> {
         fs::create_dir_all(&dir)
             .with_context(|| format!("failed to create audit dir: {}", dir.display()))?;
-        Ok(Self { dir, retention_days })
+        Ok(Self {
+            dir,
+            retention_days,
+        })
     }
 
     /// Default audit log directory: `~/.local/share/raps/audit/`
@@ -104,8 +107,7 @@ impl AuditLogger {
 
     /// Prune audit files older than the retention period.
     pub fn prune(&self) -> Result<usize> {
-        let cutoff = chrono::Utc::now()
-            - chrono::Duration::days(self.retention_days as i64);
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(self.retention_days as i64);
         let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
         let mut removed = 0;
 
@@ -116,14 +118,12 @@ impl AuditLogger {
         for entry in fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
-            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                // Files are named YYYY-MM-DD.jsonl
-                if stem < cutoff_str.as_str()
-                    && path.extension().is_some_and(|e| e == "jsonl")
-                {
-                    fs::remove_file(&path)?;
-                    removed += 1;
-                }
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str())
+                && stem < cutoff_str.as_str()
+                && path.extension().is_some_and(|e| e == "jsonl")
+            {
+                fs::remove_file(&path)?;
+                removed += 1;
             }
         }
         Ok(removed)
@@ -153,10 +153,10 @@ impl AuditLogger {
         }
         for entry in fs::read_dir(&self.dir)? {
             let entry = entry?;
-            if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str()) {
-                if entry.path().extension().is_some_and(|e| e == "jsonl") {
-                    dates.push(stem.to_string());
-                }
+            if let Some(stem) = entry.path().file_stem().and_then(|s| s.to_str())
+                && entry.path().extension().is_some_and(|e| e == "jsonl")
+            {
+                dates.push(stem.to_string());
             }
         }
         dates.sort();
@@ -180,10 +180,10 @@ pub fn init(retention_days: u32) -> Result<()> {
 
 /// Log an operation to the global audit logger (no-op if not initialized).
 pub fn log_operation(entry: &AuditEntry) {
-    if let Some(logger) = AUDIT_LOGGER.get() {
-        if let Err(e) = logger.log(entry) {
-            tracing::warn!("audit log failed: {e}");
-        }
+    if let Some(logger) = AUDIT_LOGGER.get()
+        && let Err(e) = logger.log(entry)
+    {
+        tracing::warn!("audit log failed: {e}");
     }
 }
 
@@ -217,9 +217,15 @@ mod tests {
     #[test]
     fn test_multiple_entries() {
         let (_dir, logger) = temp_logger();
-        logger.log(&AuditEntry::new("upload", "a.rvt", "success", 100)).unwrap();
-        logger.log(&AuditEntry::new("translate", "urn:xxx", "success", 5000)).unwrap();
-        logger.log(&AuditEntry::new("download", "b.ifc", "error", 200)).unwrap();
+        logger
+            .log(&AuditEntry::new("upload", "a.rvt", "success", 100))
+            .unwrap();
+        logger
+            .log(&AuditEntry::new("translate", "urn:xxx", "success", 5000))
+            .unwrap();
+        logger
+            .log(&AuditEntry::new("download", "b.ifc", "error", 200))
+            .unwrap();
 
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         let entries = logger.read_date(&today).unwrap();
@@ -238,7 +244,9 @@ mod tests {
     #[test]
     fn test_available_dates() {
         let (_dir, logger) = temp_logger();
-        logger.log(&AuditEntry::new("test", "resource", "ok", 0)).unwrap();
+        logger
+            .log(&AuditEntry::new("test", "resource", "ok", 0))
+            .unwrap();
         let dates = logger.available_dates().unwrap();
         assert_eq!(dates.len(), 1);
     }

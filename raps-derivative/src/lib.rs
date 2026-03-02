@@ -7,7 +7,6 @@
 //! Handles translation of CAD files and retrieval of derivative manifests.
 //! Supports downloading translated derivatives directly from manifest.
 
-
 mod download;
 mod metadata;
 mod translations;
