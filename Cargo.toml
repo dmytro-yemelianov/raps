@@ -132,7 +132,7 @@ hex = "0.4"
 semver = { version = "1.0", features = ["serde"] }
 
 # TOML parsing for plugin manifests
-toml = "0.8"
+toml = "1.0"
 
 # Compression for plugin packages
 flate2 = "1.0"
