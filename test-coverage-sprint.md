@@ -28,7 +28,13 @@
 - commands/schema.rs: 4 tests (registry validation — not empty, no duplicates, categories, generators)
 - raps-cli: 781 tests (255 unit + 526 integration), 0 failures
 
+## Phase 5: MCP Definitions, Dashboard Utils & Translation Presets ✅
+- mcp/definitions.rs: 8 tests (schema() helper, get_tools() registry — structure, uniqueness, descriptions, core tools)
+- dashboard/util.rs: 14 tests (format_timestamp, format_size, status_color, da_status_color — behind `dashboard` feature)
+- translate/presets.rs: 5 tests (default_presets — not empty, no duplicates, format validation, serialization roundtrip)
+- raps-cli: 835 tests (268 unit + 526 integration + 41 dashboard), 0 failures
+
 ## Current State
-- **All 4 phases complete**
-- **raps-cli: 781 tests, 0 failures**
+- **All 5 phases complete**
+- **raps-cli: 835 tests, 0 failures** (with `--features dashboard`)
 - **Codecov: ~25% → improved** (exact number pending CI run)
