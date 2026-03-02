@@ -150,7 +150,7 @@ dashmap = "6"
 lru = "0.12"
 
 # Redis (feature-gated)
-deadpool-redis = "0.18"
+deadpool-redis = "0.23"
 redis = { version = "0.27", features = ["tokio-comp", "streams", "aio"] }
 
 # Worker hostname
