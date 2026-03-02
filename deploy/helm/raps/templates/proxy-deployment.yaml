@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "raps.fullname" . }}-proxy
+  namespace: {{ include "raps.namespace" . }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    app.kubernetes.io/component: proxy
+spec:
+  replicas: {{ .Values.proxy.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "raps.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: proxy
+  template:
+    metadata:
+      labels:
+        {{- include "raps.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: proxy
+    spec:
+      containers:
+        - name: proxy
+          image: {{ include "raps.image" (dict "image" .Values.proxy.image "global" .Values.global) }}
+          env:
+            - name: RUST_LOG
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "raps.fullname" . }}-config
+                  key: RUST_LOG
+            - name: RAPS_REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "raps.fullname" . }}-config
+                  key: RAPS_REDIS_URL
+          ports:
+            - name: http
+              containerPort: {{ .Values.proxy.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.proxy.resources | nindent 12 }}

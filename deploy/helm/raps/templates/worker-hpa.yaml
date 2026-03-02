@@ -1,0 +1,40 @@
+{{- range .Values.workers.regions }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "raps.fullname" $ }}-worker-{{ .name }}
+  namespace: {{ include "raps.namespace" $ }}
+  labels:
+    {{- include "raps.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: worker
+    raps.io/region: {{ .name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "raps.fullname" $ }}-worker-{{ .name }}
+  minReplicas: {{ $.Values.workers.minReplicas }}
+  maxReplicas: {{ $.Values.workers.maxReplicas }}
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: {{ $.Values.workers.hpa.metric }}
+        target:
+          type: AverageValue
+          averageValue: {{ $.Values.workers.hpa.targetValue | quote }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ $.Values.workers.hpa.scaleUp.stabilizationWindowSeconds }}
+      policies:
+        - type: Pods
+          value: {{ $.Values.workers.hpa.scaleUp.maxPods }}
+          periodSeconds: {{ $.Values.workers.hpa.scaleUp.periodSeconds }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ $.Values.workers.hpa.scaleDown.stabilizationWindowSeconds }}
+      policies:
+        - type: Pods
+          value: {{ $.Values.workers.hpa.scaleDown.maxPods }}
+          periodSeconds: {{ $.Values.workers.hpa.scaleDown.periodSeconds }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if .Values.monitoring.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "raps.fullname" . }}-workers
+  namespace: {{ .Values.monitoring.prometheus.serviceMonitor.namespace | default (include "raps.namespace" .) }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    {{- with .Values.monitoring.prometheus.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "raps.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  namespaceSelector:
+    matchNames:
+      - {{ include "raps.namespace" . }}
+  endpoints:
+    - port: metrics
+      interval: {{ .Values.monitoring.prometheus.serviceMonitor.interval }}
+      path: /metrics
+{{- end }}

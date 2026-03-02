@@ -1,0 +1,67 @@
+name: Deploy RAPS to Kubernetes
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/helm/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  HELM_RELEASE: raps
+  HELM_CHART: ./deploy/helm/raps
+  NAMESPACE: raps-system
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint ${{ env.HELM_CHART }}
+
+  deploy:
+    needs: lint
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - uses: azure/setup-kubectl@v4
+
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Helm upgrade
+        run: |
+          helm upgrade --install ${{ env.HELM_RELEASE }} ${{ env.HELM_CHART }} \
+            --namespace ${{ env.NAMESPACE }} \
+            --create-namespace \
+            --set global.image.tag=${{ github.sha }} \
+            --set secrets.apsCredentials.clientId=${{ secrets.APS_CLIENT_ID }} \
+            --set secrets.apsCredentials.clientSecret=${{ secrets.APS_CLIENT_SECRET }} \
+            --wait --timeout 5m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/${{ env.HELM_RELEASE }}-raps-worker-us \
+            -n ${{ env.NAMESPACE }} --timeout=120s
+          kubectl get pods -n ${{ env.NAMESPACE }}
+          kubectl get hpa -n ${{ env.NAMESPACE }}

@@ -150,10 +150,16 @@ lru = "0.12"
 
 # Redis (feature-gated)
 deadpool-redis = "0.18"
-redis = { version = "0.27", features = ["tokio-comp", "streams"] }
+redis = { version = "0.27", features = ["tokio-comp", "streams", "aio"] }
 
 # Worker hostname
 hostname = "0.4"
+
+# Prometheus metrics
+prometheus = { version = "0.13", default-features = false }
+
+# Lightweight HTTP server (health + metrics endpoints)
+axum = "0.8"
 
 # Testing
 assert_cmd = "2.1"

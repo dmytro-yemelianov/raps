@@ -42,6 +42,12 @@ pub mod security;
 pub mod storage;
 pub mod types;
 
+#[cfg(feature = "prometheus")]
+pub mod prometheus_metrics;
+
+#[cfg(feature = "kubernetes")]
+pub mod health_server;
+
 /// Test utilities for mocking API responses
 /// Only available when running tests
 #[cfg(test)]

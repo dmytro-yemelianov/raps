@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "raps.fullname" . }}-webhook
+  namespace: {{ include "raps.namespace" . }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook
+spec:
+  type: {{ .Values.webhook.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.webhook.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "raps.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: webhook

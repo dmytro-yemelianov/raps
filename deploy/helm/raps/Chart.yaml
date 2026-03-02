@@ -1,0 +1,23 @@
+apiVersion: v2
+name: raps
+description: RAPS - Rust Autodesk Platform Services distributed orchestration
+type: application
+version: 0.1.0
+appVersion: "5.2.0"
+maintainers:
+  - name: Dmytro Yemelianov
+    url: https://rapscli.xyz
+home: https://rapscli.xyz
+sources:
+  - https://github.com/dmytro-yemelianov/raps
+keywords:
+  - autodesk
+  - aps
+  - bim360
+  - translation
+  - orchestration
+dependencies:
+  - name: redis
+    version: "~19.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: messageBus.redis.enabled

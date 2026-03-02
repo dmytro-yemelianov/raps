@@ -1,18 +1,20 @@
-# RAPS Distributed Deployment
+# RAPS Deployment
 
-Docker Compose stack for running RAPS distributed workers with Redis-backed job queues.
+Deployment configurations for running RAPS in production environments.
 
-## Quick Start
+## Deployment Options
+
+### Docker Compose (Development / Small Scale)
+
+Single-host deployment with Redis, workers, proxy, webhook gateway, and dashboard.
 
 ```bash
-cd deploy
 cp .env.example .env
 # Edit .env with your APS credentials
-
 docker compose up -d
 ```
 
-## Services
+See `docker-compose.yml` for the full stack definition.
 
 | Service | Port | Description |
 |---------|------|-------------|
@@ -22,23 +24,42 @@ docker compose up -d
 | raps-webhook | 9000 | APS webhook receiver |
 | raps-dashboard | 3000 | Monitoring dashboard |
 
-## Scaling Workers
-
 ```bash
+# Scale workers
 docker compose up -d --scale raps-worker=8
 ```
 
-## Monitoring
+### Fly.io (Serverless)
+
+Scale-to-zero serverless deployment. See `fly.toml`.
 
 ```bash
-# Check worker heartbeats
-redis-cli keys "raps:worker:heartbeat:*"
-
-# View queue lengths
-redis-cli xlen raps:queue:critical
-redis-cli xlen raps:queue:normal
-redis-cli xlen raps:queue:background
-
-# View dead-letter queue
-redis-cli xlen raps:queue:dlq
+fly deploy
 ```
+
+### Kubernetes (Enterprise)
+
+Production-grade Kubernetes deployment with:
+- Helm chart with Bitnami Redis subchart
+- HPA auto-scaling based on queue depth (2-20 pods)
+- Regional worker pools (US/EMEA)
+- Multi-tenant namespace isolation
+- NetworkPolicies and RBAC
+- Sealed Secrets for credential management
+- Prometheus ServiceMonitor + Grafana dashboards
+- CronJobs for scheduled pipelines
+
+```bash
+helm install raps ./helm/raps/ \
+  --namespace raps-system --create-namespace \
+  --set secrets.apsCredentials.clientId=YOUR_ID \
+  --set secrets.apsCredentials.clientSecret=YOUR_SECRET
+```
+
+See [helm/raps/README.md](helm/raps/README.md) for the full configuration reference.
+
+## CI/CD Examples
+
+- **GitHub Actions**: `examples/github-actions/translate-models.yml`
+- **GitLab CI**: `examples/gitlab-ci/raps-pipeline.yml`
+- **GitHub Actions (K8s)**: `examples/github-actions/k8s-deploy.yml`

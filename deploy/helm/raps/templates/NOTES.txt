@@ -1,0 +1,39 @@
+RAPS v{{ .Chart.AppVersion }} has been deployed!
+
+Namespace: {{ .Release.Namespace }}
+
+Components:
+  - Proxy:       {{ .Values.proxy.replicaCount }} replicas
+  - Coordinator: {{ .Values.coordinator.replicaCount }} replicas
+  - Workers:     {{ .Values.workers.minReplicas }}-{{ .Values.workers.maxReplicas }} replicas (HPA)
+  - Dashboard:   {{ .Values.dashboard.replicaCount }} replica
+  - Webhook:     1 replica
+
+{{- if .Values.dashboard.ingress.enabled }}
+
+Dashboard: https://{{ .Values.dashboard.ingress.host }}
+{{- end }}
+
+{{- if .Values.webhook.ingress.enabled }}
+
+Webhook:   https://{{ .Values.webhook.ingress.host }}
+{{- end }}
+
+To check worker status:
+  kubectl get pods -l app.kubernetes.io/component=worker -n {{ .Release.Namespace }}
+
+To view HPA status:
+  kubectl get hpa -n {{ .Release.Namespace }}
+
+{{- if .Values.monitoring.prometheus.serviceMonitor.enabled }}
+
+Prometheus ServiceMonitor is enabled. Metrics will be scraped every {{ .Values.monitoring.prometheus.serviceMonitor.interval }}.
+{{- end }}
+
+{{- if .Values.tenants.enabled }}
+
+Multi-tenant mode is enabled. Tenant namespaces:
+{{- range .Values.tenants.list }}
+  - raps-tenant-{{ .name }}
+{{- end }}
+{{- end }}

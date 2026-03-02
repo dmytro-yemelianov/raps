@@ -1,0 +1,86 @@
+{{- range .Values.workers.regions }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "raps.fullname" $ }}-worker-{{ .name }}
+  namespace: {{ include "raps.namespace" $ }}
+  labels:
+    {{- include "raps.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: worker
+    raps.io/region: {{ .name }}
+spec:
+  replicas: {{ .replicas | default $.Values.workers.minReplicas }}
+  selector:
+    matchLabels:
+      {{- include "raps.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: worker
+      raps.io/region: {{ .name }}
+  template:
+    metadata:
+      labels:
+        {{- include "raps.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: worker
+        raps.io/region: {{ .name }}
+    spec:
+      serviceAccountName: {{ include "raps.fullname" $ }}-worker
+      {{- if .nodeSelector }}
+      nodeSelector:
+        {{- toYaml .nodeSelector | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: worker
+          image: {{ include "raps.image" (dict "image" $.Values.workers.image "global" $.Values.global) }}
+          command:
+            - raps
+            - swarm
+            - worker
+            - start
+            - --redis-url
+            - {{ include "raps.redisUrl" $ }}
+            - --concurrency
+            - {{ $.Values.workers.concurrency | quote }}
+            - --metrics-port
+            - {{ $.Values.workers.metricsPort | quote }}
+          env:
+            - name: RUST_LOG
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "raps.fullname" $ }}-config
+                  key: RUST_LOG
+            - name: RAPS_REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "raps.fullname" $ }}-config
+                  key: RAPS_REDIS_URL
+            {{- if .env }}
+            {{- range $key, $value := .env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ include "raps.fullname" $ }}-aps-credentials
+          ports:
+            - name: http
+              containerPort: 9090
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ $.Values.workers.metricsPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml $.Values.workers.resources | nindent 12 }}
+{{- end }}

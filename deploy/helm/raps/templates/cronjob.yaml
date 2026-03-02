@@ -1,0 +1,56 @@
+{{- range .Values.cronJobs }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "raps.fullname" $ }}-{{ .name }}
+  namespace: {{ include "raps.namespace" $ }}
+  labels:
+    {{- include "raps.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: cronjob
+spec:
+  schedule: {{ .schedule | quote }}
+  concurrencyPolicy: {{ .concurrencyPolicy | default "Forbid" }}
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: {{ .backoffLimit | default 2 }}
+      activeDeadlineSeconds: {{ .activeDeadlineSeconds | default 7200 }}
+      template:
+        metadata:
+          labels:
+            {{- include "raps.selectorLabels" $ | nindent 12 }}
+            app.kubernetes.io/component: cronjob
+            raps.io/cronjob: {{ .name }}
+        spec:
+          serviceAccountName: {{ include "raps.fullname" $ }}-worker
+          restartPolicy: Never
+          containers:
+            - name: {{ .name }}
+              image: {{ include "raps.image" (dict "image" $.Values.workers.image "global" $.Values.global) }}
+              command:
+                - raps
+                - pipeline
+                - run
+                {{- if .pipeline }}
+                - --file
+                - {{ .pipeline }}
+                {{- end }}
+              env:
+                - name: RUST_LOG
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "raps.fullname" $ }}-config
+                      key: RUST_LOG
+                - name: RAPS_REDIS_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: {{ include "raps.fullname" $ }}-config
+                      key: RAPS_REDIS_URL
+              envFrom:
+                - secretRef:
+                    name: {{ include "raps.fullname" $ }}-aps-credentials
+              resources:
+                {{- toYaml $.Values.workers.resources | nindent 16 }}
+{{- end }}

@@ -1,0 +1,12 @@
+{{- if .Values.tenants.enabled }}
+{{- range .Values.tenants.list }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: raps-tenant-{{ .name }}
+  labels:
+    {{- include "raps.labels" $ | nindent 4 }}
+    raps.io/tenant: {{ .name }}
+{{- end }}
+{{- end }}

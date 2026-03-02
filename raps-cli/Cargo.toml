@@ -111,13 +111,14 @@ hex.workspace = true
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
 
-# Redis (optional, for distributed worker)
+# Redis client (optional, for distributed worker)
 redis = { workspace = true, optional = true }
 
 [features]
 default = []
 dashboard = ["ratatui", "crossterm"]
 redis = ["raps-kernel/redis", "dep:hostname", "dep:redis"]
+kubernetes = ["raps-kernel/kubernetes", "redis"]
 
 [dev-dependencies]
 assert_cmd.workspace = true

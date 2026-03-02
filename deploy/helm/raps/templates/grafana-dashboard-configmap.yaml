@@ -1,0 +1,15 @@
+{{- if and .Values.monitoring.grafana.enabled .Values.monitoring.grafana.dashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "raps.fullname" . }}-grafana-dashboards
+  namespace: {{ include "raps.namespace" . }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    {{ .Values.monitoring.grafana.dashboards.label }}: {{ .Values.monitoring.grafana.dashboards.labelValue | quote }}
+data:
+  raps-overview.json: |-
+    {{- .Files.Get "dashboards/raps-overview.json" | nindent 4 }}
+  raps-workers.json: |-
+    {{- .Files.Get "dashboards/raps-workers.json" | nindent 4 }}
+{{- end }}

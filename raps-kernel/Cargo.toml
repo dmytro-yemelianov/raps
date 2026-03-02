@@ -12,6 +12,8 @@ rust-version.workspace = true
 default = []
 test-utils = []
 redis = ["dep:deadpool-redis", "dep:redis", "dep:hostname"]
+prometheus = ["dep:prometheus"]
+kubernetes = ["dep:axum", "prometheus"]
 
 [dependencies]
 # Error handling
@@ -94,7 +96,14 @@ deadpool-redis = { workspace = true, optional = true }
 redis = { workspace = true, optional = true }
 hostname = { workspace = true, optional = true }
 
+# Prometheus metrics (optional)
+prometheus = { workspace = true, optional = true }
+
+# Lightweight HTTP server for health/metrics endpoints (optional)
+axum = { workspace = true, optional = true }
+
 [dev-dependencies]
 raps-mock.workspace = true
 tokio-test.workspace = true
 tempfile.workspace = true
+tower = { version = "0.5", features = ["util"] }

@@ -1,0 +1,41 @@
+{{- if .Values.tenants.enabled }}
+{{- range .Values.tenants.list }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "raps.fullname" $ }}-tenant-{{ .name }}
+  namespace: raps-tenant-{{ .name }}
+  labels:
+    {{- include "raps.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: tenant
+    raps.io/tenant: {{ .name }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from raps-system namespace only
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "raps.namespace" $ }}
+  egress:
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow traffic to raps-system namespace
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ include "raps.namespace" $ }}
+    # Allow external HTTPS (APS APIs)
+    - ports:
+        - port: 443
+          protocol: TCP
+{{- end }}
+{{- end }}

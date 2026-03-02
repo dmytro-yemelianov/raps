@@ -83,6 +83,11 @@ pub enum WorkerCommands {
         /// Comma-separated queue priorities to consume (critical,normal,background)
         #[arg(long, default_value = "critical,normal,background")]
         queues: String,
+
+        /// Port for health/metrics HTTP server (requires kubernetes feature)
+        #[cfg_attr(feature = "kubernetes", arg(long, default_value = "9091"))]
+        #[cfg_attr(not(feature = "kubernetes"), arg(long))]
+        metrics_port: Option<u16>,
     },
 }
 
@@ -528,8 +533,9 @@ impl WorkerCommands {
                 concurrency,
                 heartbeat_secs,
                 queues: _,
+                metrics_port,
             } => {
-                worker_start(&redis_url, concurrency, heartbeat_secs).await
+                worker_start(&redis_url, concurrency, heartbeat_secs, metrics_port).await
             }
         }
     }
@@ -540,6 +546,7 @@ async fn worker_start(
     redis_url: &str,
     concurrency: usize,
     heartbeat_secs: u64,
+    metrics_port: Option<u16>,
 ) -> Result<()> {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -571,6 +578,72 @@ async fn worker_start(
     let consumer = Arc::new(JobConsumer::new(pool.clone(), consumer_id.clone()));
     consumer.ensure_consumer_groups().await?;
     println!("{} Consumer groups ready", "✓".green());
+
+    // Start health/metrics server if kubernetes feature is enabled
+    #[cfg(feature = "kubernetes")]
+    {
+        let port = metrics_port.unwrap_or(9091);
+        let exporter = Arc::new(raps_kernel::prometheus_metrics::PrometheusExporter::new());
+        let ready = Arc::new(AtomicBool::new(false));
+
+        let state = raps_kernel::health_server::HealthServerState {
+            ready: ready.clone(),
+            exporter: exporter.clone(),
+        };
+
+        // Spawn health server in background
+        tokio::spawn(async move {
+            if let Err(e) = raps_kernel::health_server::start_health_server(port, state).await {
+                eprintln!("Health server error: {e}");
+            }
+        });
+
+        println!("{} Health server listening on 0.0.0.0:{}", "✓".green(), port);
+
+        // Mark as ready
+        ready.store(true, Ordering::Relaxed);
+
+        // Spawn queue depth polling task (every 15s)
+        let exporter_poll = exporter.clone();
+        let redis_url_poll = redis_url.to_string();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(15));
+            loop {
+                interval.tick().await;
+                // Sync internal metrics to Prometheus
+                let collector = raps_kernel::metrics::collector();
+                exporter_poll.sync_from_collector(collector);
+
+                // Poll queue depths via XLEN
+                if let Ok(client) = redis::Client::open(redis_url_poll.as_str()) {
+                    if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
+                        for priority in &["critical", "normal", "background"] {
+                            let stream_key = format!("raps:queue:{priority}");
+                            let len: Result<f64, _> =
+                                redis::cmd("XLEN").arg(&stream_key).query_async(&mut conn).await;
+                            if let Ok(depth) = len {
+                                exporter_poll.set_queue_depth(priority, depth);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Set worker info gauge
+        exporter
+            .worker_info
+            .with_label_values(&[&consumer_id, env!("CARGO_PKG_VERSION")])
+            .set(1.0);
+    }
+
+    #[cfg(not(feature = "kubernetes"))]
+    if metrics_port.is_some() {
+        println!(
+            "{} --metrics-port requires the 'kubernetes' feature. Ignoring.",
+            "!".yellow(),
+        );
+    }
 
     // Concurrency limiter
     let semaphore = Arc::new(Semaphore::new(concurrency));
@@ -672,7 +745,6 @@ async fn process_job(job: &raps_kernel::job_queue::Job) -> Result<()> {
     match &job.payload {
         JobPayload::Translate(t) => {
             tracing::info!(urn = %t.urn, format = %t.output_format, "Processing translate job");
-            // TODO: invoke raps_derivative translation API
             println!(
                 "  {} Translate job {} — URN: {} -> {}",
                 "▶".cyan(),

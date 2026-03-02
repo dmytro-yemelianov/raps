@@ -1,0 +1,34 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "raps.fullname" . }}-worker
+  namespace: {{ include "raps.namespace" . }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - {{ include "raps.fullname" . }}-aps-credentials
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "raps.fullname" . }}-worker
+  namespace: {{ include "raps.namespace" . }}
+  labels:
+    {{- include "raps.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "raps.fullname" . }}-worker
+    namespace: {{ include "raps.namespace" . }}
+roleRef:
+  kind: Role
+  name: {{ include "raps.fullname" . }}-worker
+  apiGroup: rbac.authorization.k8s.io
