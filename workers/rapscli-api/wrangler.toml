@@ -11,8 +11,9 @@ routes = [
   { pattern = "rapscli.xyz/install", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/install.sh", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/install.ps1", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/api/version*", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/api/badge/*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/api/*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/urn*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/s/*", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/health", zone_name = "rapscli.xyz" }
 ]
 
