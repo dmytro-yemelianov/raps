@@ -1095,3 +1095,83 @@ const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
 </body>
 </html>
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use raps_kernel::job_queue::*;
+
+    #[test]
+    fn test_payload_type_name_translate() {
+        let payload = JobPayload::Translate(TranslateJob {
+            urn: String::new(),
+            output_format: String::new(),
+            root_filename: None,
+            region: None,
+            force: false,
+        });
+        assert_eq!(payload_type_name(&payload), "translate");
+    }
+
+    #[test]
+    fn test_payload_type_name_upload() {
+        let payload = JobPayload::Upload(UploadJob {
+            bucket_key: String::new(),
+            object_key: String::new(),
+            file_path: String::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "upload");
+    }
+
+    #[test]
+    fn test_payload_type_name_extract_props() {
+        let payload = JobPayload::ExtractProps(ExtractPropsJob {
+            urn: String::new(),
+            view_guid: None,
+            output_path: String::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "extract_props");
+    }
+
+    #[test]
+    fn test_payload_type_name_pipeline() {
+        let payload = JobPayload::Pipeline(PipelineJob {
+            pipeline_name: String::new(),
+            pipeline_file: String::new(),
+            variables: std::collections::HashMap::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "pipeline");
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_valid() {
+        use sha2::Sha256;
+        use hmac::{Hmac, Mac};
+
+        let secret = "test-secret";
+        let body = b"hello world";
+
+        // Compute expected signature
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = hex::encode(mac.finalize().into_bytes());
+
+        assert!(verify_webhook_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_invalid() {
+        assert!(!verify_webhook_signature("secret", b"body", "0000000000000000000000000000000000000000000000000000000000000000"));
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_bad_hex() {
+        assert!(!verify_webhook_signature("secret", b"body", "not-hex!"));
+    }
+
+    #[test]
+    fn test_default_priority() {
+        assert!(matches!(default_priority(), JobPriority::Normal));
+    }
+}

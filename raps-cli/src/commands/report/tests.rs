@@ -178,4 +178,74 @@ mod tests {
         let result = get_account_id(None);
         assert!(result.is_err());
     }
+
+    // --- count_status ---
+
+    struct MockStatusItem {
+        status: String,
+    }
+
+    impl HasStatus for MockStatusItem {
+        fn status(&self) -> &str {
+            &self.status
+        }
+    }
+
+    #[test]
+    fn test_count_status_matches() {
+        let items = vec![
+            MockStatusItem { status: "open".to_string() },
+            MockStatusItem { status: "closed".to_string() },
+            MockStatusItem { status: "open".to_string() },
+        ];
+        assert_eq!(count_status(&items, "open"), 2);
+    }
+
+    #[test]
+    fn test_count_status_case_insensitive() {
+        let items = vec![
+            MockStatusItem { status: "Open".to_string() },
+            MockStatusItem { status: "OPEN".to_string() },
+        ];
+        assert_eq!(count_status(&items, "open"), 2);
+    }
+
+    #[test]
+    fn test_count_status_no_matches() {
+        let items = vec![
+            MockStatusItem { status: "closed".to_string() },
+        ];
+        assert_eq!(count_status(&items, "open"), 0);
+    }
+
+    #[test]
+    fn test_count_status_empty() {
+        let items: Vec<MockStatusItem> = vec![];
+        assert_eq!(count_status(&items, "open"), 0);
+    }
+
+    // --- parse_project_filter ---
+
+    #[test]
+    fn test_parse_project_filter_none() {
+        let filter = parse_project_filter(&None).unwrap();
+        // Empty filter should not error
+        assert!(format!("{:?}", filter).contains("ProjectFilter"));
+    }
+
+    // --- truncate_name boundary ---
+
+    #[test]
+    fn test_truncate_name_exactly_28() {
+        let name = "a".repeat(28);
+        assert_eq!(truncate_name(&name), name);
+    }
+
+    #[test]
+    fn test_truncate_name_29_chars() {
+        let name = "a".repeat(29);
+        let result = truncate_name(&name);
+        assert!(result.ends_with("..."));
+        assert_eq!(result.len(), 28);
+    }
 }
