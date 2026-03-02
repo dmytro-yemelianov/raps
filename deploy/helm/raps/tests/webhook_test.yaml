@@ -1,0 +1,89 @@
+suite: webhook
+templates:
+  - templates/webhook-deployment.yaml
+  - templates/webhook-ingress.yaml
+  - templates/webhook-service.yaml
+tests:
+  # Deployment tests
+  - it: should create webhook Deployment
+    template: templates/webhook-deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should have correct image
+    template: templates/webhook-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "rapscli/raps-webhook:5.2.0"
+
+  - it: should expose webhook port
+    template: templates/webhook-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 9000
+
+  # Ingress tests
+  - it: should not render ingress when disabled
+    template: templates/webhook-ingress.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ingress when enabled
+    template: templates/webhook-ingress.yaml
+    set:
+      webhook.ingress.enabled: true
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+
+  - it: should set ingress host
+    template: templates/webhook-ingress.yaml
+    set:
+      webhook.ingress.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: hooks.rapscli.xyz
+
+  - it: should set TLS when enabled
+    template: templates/webhook-ingress.yaml
+    set:
+      webhook.ingress.enabled: true
+      webhook.ingress.tls.enabled: true
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: raps-webhook-tls
+      - contains:
+          path: spec.tls[0].hosts
+          content: hooks.rapscli.xyz
+
+  - it: should set annotations
+    template: templates/webhook-ingress.yaml
+    set:
+      webhook.ingress.enabled: true
+    asserts:
+      - isSubset:
+          path: metadata.annotations
+          content:
+            cert-manager.io/cluster-issuer: letsencrypt-prod
+
+  # Service tests
+  - it: should create webhook Service
+    template: templates/webhook-service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].port
+          value: 9000

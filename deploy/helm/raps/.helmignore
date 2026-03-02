@@ -7,3 +7,5 @@
 *.bak
 *.tmp
 *.orig
+tests/
+ci/

@@ -1,0 +1,48 @@
+suite: coordinator
+templates:
+  - templates/coordinator-deployment.yaml
+  - templates/coordinator-service.yaml
+tests:
+  # Deployment tests
+  - it: should create coordinator Deployment
+    template: templates/coordinator-deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-coordinator
+
+  - it: should have default 2 replicas
+    template: templates/coordinator-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  - it: should use envFrom with aps-credentials secret
+    template: templates/coordinator-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: RELEASE-NAME-raps-aps-credentials
+
+  - it: should expose coordinator port
+    template: templates/coordinator-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8081
+
+  # Service tests
+  - it: should create coordinator Service
+    template: templates/coordinator-service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - equal:
+          path: spec.ports[0].port
+          value: 8081

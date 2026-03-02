@@ -1,0 +1,53 @@
+suite: networkpolicy
+templates:
+  - templates/networkpolicy.yaml
+tests:
+  - it: should create a NetworkPolicy
+    asserts:
+      - isKind:
+          of: NetworkPolicy
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-worker
+
+  - it: should select worker pods
+    asserts:
+      - isSubset:
+          path: spec.podSelector.matchLabels
+          content:
+            app.kubernetes.io/component: worker
+
+  - it: should enforce both Ingress and Egress
+    asserts:
+      - equal:
+          path: spec.policyTypes
+          value:
+            - Ingress
+            - Egress
+
+  - it: should allow Prometheus scraping on metrics port
+    asserts:
+      - equal:
+          path: spec.ingress[0].ports[0].port
+          value: 9091
+
+  - it: should allow DNS egress
+    asserts:
+      - equal:
+          path: spec.egress[0].ports[0].port
+          value: 53
+      - equal:
+          path: spec.egress[0].ports[0].protocol
+          value: UDP
+
+  - it: should allow Redis egress on port 6379
+    asserts:
+      - equal:
+          path: spec.egress[1].ports[0].port
+          value: 6379
+
+  - it: should allow external HTTPS egress on port 443
+    asserts:
+      - equal:
+          path: spec.egress[2].ports[0].port
+          value: 443

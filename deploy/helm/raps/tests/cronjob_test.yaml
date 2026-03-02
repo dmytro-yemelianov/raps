@@ -1,0 +1,77 @@
+suite: cronjob
+templates:
+  - templates/cronjob.yaml
+tests:
+  - it: should render no CronJobs by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render CronJob when configured
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+          pipeline: pipelines/nightly.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: CronJob
+
+  - it: should set correct schedule
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "0 2 * * *"
+
+  - it: should default concurrencyPolicy to Forbid
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+    asserts:
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+
+  - it: should include pipeline arg when set
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+          pipeline: pipelines/nightly.yaml
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].command
+          value:
+            - raps
+            - pipeline
+            - run
+            - --file
+            - pipelines/nightly.yaml
+
+  - it: should use worker image
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].image
+          value: "rapscli/raps-worker:5.2.0"
+
+  - it: should render multiple CronJobs
+    set:
+      cronJobs:
+        - name: nightly-translate
+          schedule: "0 2 * * *"
+        - name: weekly-audit
+          schedule: "0 0 * * 0"
+    asserts:
+      - hasDocuments:
+          count: 2

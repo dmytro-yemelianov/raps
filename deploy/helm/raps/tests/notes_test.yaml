@@ -1,0 +1,29 @@
+suite: notes
+templates:
+  - templates/NOTES.txt
+tests:
+  - it: should contain app version
+    asserts:
+      - matchRegexRaw:
+          pattern: "RAPS v5\\.2\\.0"
+
+  - it: should show component replica counts
+    asserts:
+      - matchRegexRaw:
+          pattern: "Proxy:.*2 replicas"
+      - matchRegexRaw:
+          pattern: "Coordinator:.*2 replicas"
+      - matchRegexRaw:
+          pattern: "Workers:.*2-20 replicas"
+
+  - it: should show dashboard URL when ingress enabled
+    set:
+      dashboard.ingress.enabled: true
+    asserts:
+      - matchRegexRaw:
+          pattern: "Dashboard:.*dashboard\\.rapscli\\.xyz"
+
+  - it: should not show dashboard URL when ingress disabled
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "Dashboard:.*https://"

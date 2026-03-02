@@ -1,0 +1,138 @@
+suite: tenants
+templates:
+  - templates/tenant-namespace.yaml
+  - templates/tenant-networkpolicy.yaml
+  - templates/tenant-worker-deployment.yaml
+tests:
+  # Disabled by default
+  - it: should not render tenant namespaces when disabled
+    template: templates/tenant-namespace.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render tenant networkpolicies when disabled
+    template: templates/tenant-networkpolicy.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render tenant worker deployments when disabled
+    template: templates/tenant-worker-deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # With tenants enabled
+  - it: should create namespace per tenant
+    template: templates/tenant-namespace.yaml
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+        - name: globex
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should name tenant namespace correctly
+    template: templates/tenant-namespace.yaml
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+    asserts:
+      - equal:
+          path: metadata.name
+          value: raps-tenant-acme
+      - isSubset:
+          path: metadata.labels
+          content:
+            raps.io/tenant: acme
+
+  - it: should create networkpolicy per tenant
+    template: templates/tenant-networkpolicy.yaml
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+    asserts:
+      - isKind:
+          of: NetworkPolicy
+      - equal:
+          path: metadata.namespace
+          value: raps-tenant-acme
+
+  # Tenant worker deployment tests (renders 2 docs per tenant: Deployment + Secret)
+  - it: should create deployment and secret per tenant
+    template: templates/tenant-worker-deployment.yaml
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+          clientId: "acme-id"
+          clientSecret: "acme-secret"
+          workerReplicas: 3
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should set tenant worker replicas
+    template: templates/tenant-worker-deployment.yaml
+    documentIndex: 0
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+          workerReplicas: 5
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 5
+
+  - it: should use default replicas when not specified
+    template: templates/tenant-worker-deployment.yaml
+    documentIndex: 0
+    set:
+      tenants.enabled: true
+      tenants.defaultWorkerReplicas: 3
+      tenants.list:
+        - name: acme
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should create tenant credentials secret
+    template: templates/tenant-worker-deployment.yaml
+    documentIndex: 1
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+          clientId: "acme-id"
+          clientSecret: "acme-secret"
+    asserts:
+      - isKind:
+          of: Secret
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-tenant-acme-credentials
+      - equal:
+          path: stringData.APS_CLIENT_ID
+          value: "acme-id"
+      - equal:
+          path: stringData.APS_CLIENT_SECRET
+          value: "acme-secret"
+
+  - it: should reference tenant credentials in deployment
+    template: templates/tenant-worker-deployment.yaml
+    documentIndex: 0
+    set:
+      tenants.enabled: true
+      tenants.list:
+        - name: acme
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: RELEASE-NAME-raps-tenant-acme-credentials

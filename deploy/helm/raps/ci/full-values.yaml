@@ -1,0 +1,68 @@
+# Full values — all optional features enabled
+secrets:
+  apsCredentials:
+    clientId: "test-client-id"
+    clientSecret: "test-client-secret"
+  webhookSecret: "test-webhook-secret"
+
+webhook:
+  ingress:
+    enabled: true
+    className: nginx
+    host: hooks.example.com
+    tls:
+      enabled: true
+      secretName: raps-webhook-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+
+dashboard:
+  ingress:
+    enabled: true
+    className: nginx
+    host: dashboard.example.com
+    tls:
+      enabled: true
+      secretName: raps-dashboard-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+
+monitoring:
+  prometheus:
+    serviceMonitor:
+      enabled: true
+      interval: "15s"
+      namespace: monitoring
+      labels:
+        release: prometheus
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+
+tenants:
+  enabled: true
+  isolation: namespace
+  defaultWorkerReplicas: 2
+  maxWorkerReplicas: 10
+  list:
+    - name: acme
+      clientId: "acme-client-id"
+      clientSecret: "acme-client-secret"
+      workerReplicas: 3
+    - name: globex
+      clientId: "globex-client-id"
+      clientSecret: "globex-client-secret"
+
+cronJobs:
+  - name: nightly-translate
+    schedule: "0 2 * * *"
+    pipeline: pipelines/nightly.yaml
+    concurrencyPolicy: Forbid
+    backoffLimit: 2
+    activeDeadlineSeconds: 7200
+  - name: weekly-audit
+    schedule: "0 0 * * 0"
+    pipeline: pipelines/audit.yaml

@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "global": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": { "type": "string" },
+            "tag": { "type": "string" }
+          }
+        },
+        "namespace": { "type": "string" }
+      }
+    },
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "proxy": {
+      "type": "object",
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/definitions/image" },
+        "resources": { "$ref": "#/definitions/resources" },
+        "service": { "$ref": "#/definitions/service" },
+        "cache": {
+          "type": "object",
+          "properties": {
+            "backend": { "type": "string" },
+            "ttlSeconds": { "type": "integer", "minimum": 0 },
+            "maxEntries": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "workers": {
+      "type": "object",
+      "required": ["minReplicas", "maxReplicas", "regions"],
+      "properties": {
+        "minReplicas": { "type": "integer", "minimum": 1 },
+        "maxReplicas": { "type": "integer", "minimum": 1 },
+        "concurrency": { "type": "integer", "minimum": 1 },
+        "heartbeatSecs": { "type": "integer", "minimum": 1 },
+        "metricsPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "image": { "$ref": "#/definitions/image" },
+        "resources": { "$ref": "#/definitions/resources" },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "$ref": "#/definitions/serviceType" },
+            "port": { "$ref": "#/definitions/port" },
+            "metricsPort": { "$ref": "#/definitions/port" }
+          }
+        },
+        "hpa": {
+          "type": "object",
+          "properties": {
+            "metric": { "type": "string" },
+            "targetValue": { "type": "integer", "minimum": 1 },
+            "scaleUp": {
+              "type": "object",
+              "properties": {
+                "stabilizationWindowSeconds": { "type": "integer", "minimum": 0 },
+                "maxPods": { "type": "integer", "minimum": 1 },
+                "periodSeconds": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "scaleDown": {
+              "type": "object",
+              "properties": {
+                "stabilizationWindowSeconds": { "type": "integer", "minimum": 0 },
+                "maxPods": { "type": "integer", "minimum": 1 },
+                "periodSeconds": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        },
+        "regions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "nodeSelector": { "type": "object" },
+              "env": { "type": "object" },
+              "replicas": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "coordinator": {
+      "type": "object",
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/definitions/image" },
+        "resources": { "$ref": "#/definitions/resources" },
+        "service": { "$ref": "#/definitions/service" }
+      }
+    },
+    "webhook": {
+      "type": "object",
+      "properties": {
+        "image": { "$ref": "#/definitions/image" },
+        "resources": { "$ref": "#/definitions/resources" },
+        "service": { "$ref": "#/definitions/service" },
+        "ingress": { "$ref": "#/definitions/ingress" }
+      }
+    },
+    "dashboard": {
+      "type": "object",
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 1 },
+        "image": { "$ref": "#/definitions/image" },
+        "resources": { "$ref": "#/definitions/resources" },
+        "service": { "$ref": "#/definitions/service" },
+        "ingress": { "$ref": "#/definitions/ingress" }
+      }
+    },
+    "messageBus": {
+      "type": "object",
+      "properties": {
+        "redis": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "external": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "url": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tenants": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "isolation": { "type": "string", "enum": ["namespace"] },
+        "defaultWorkerReplicas": { "type": "integer", "minimum": 1 },
+        "maxWorkerReplicas": { "type": "integer", "minimum": 1 },
+        "list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "clientId": { "type": "string" },
+              "clientSecret": { "type": "string" },
+              "workerReplicas": { "type": "integer", "minimum": 1 }
+            }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "properties": {
+        "prometheus": {
+          "type": "object",
+          "properties": {
+            "serviceMonitor": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "interval": { "type": "string" },
+                "namespace": { "type": "string" },
+                "labels": { "type": "object" }
+              }
+            }
+          }
+        },
+        "grafana": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "dashboards": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "label": { "type": "string" },
+                "labelValue": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "sealedSecrets": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "apsCredentials": {
+          "type": "object",
+          "properties": {
+            "encryptedData": {
+              "type": "object",
+              "properties": {
+                "clientId": { "type": "string" },
+                "clientSecret": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "apsCredentials": {
+          "type": "object",
+          "properties": {
+            "clientId": { "type": "string" },
+            "clientSecret": { "type": "string" }
+          }
+        },
+        "webhookSecret": { "type": "string" }
+      }
+    },
+    "cronJobs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "schedule"],
+        "properties": {
+          "name": { "type": "string" },
+          "schedule": { "type": "string" },
+          "pipeline": { "type": "string" },
+          "concurrencyPolicy": { "type": "string", "enum": ["Allow", "Forbid", "Replace"] },
+          "backoffLimit": { "type": "integer", "minimum": 0 },
+          "activeDeadlineSeconds": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "properties": {
+        "RUST_LOG": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": { "type": "string" },
+        "repository": { "type": "string" },
+        "tag": { "type": "string" }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "object",
+          "properties": {
+            "memory": { "type": "string" },
+            "cpu": { "type": "string" }
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "memory": { "type": "string" },
+            "cpu": { "type": "string" }
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": { "$ref": "#/definitions/serviceType" },
+        "port": { "$ref": "#/definitions/port" }
+      }
+    },
+    "serviceType": {
+      "type": "string",
+      "enum": ["ClusterIP", "NodePort", "LoadBalancer"]
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "className": { "type": "string" },
+        "host": { "type": "string" },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretName": { "type": "string" }
+          }
+        },
+        "annotations": { "type": "object" }
+      }
+    }
+  }
+}

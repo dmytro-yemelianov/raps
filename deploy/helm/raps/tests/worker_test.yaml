@@ -1,0 +1,160 @@
+suite: worker
+templates:
+  - templates/worker-deployment.yaml
+  - templates/worker-hpa.yaml
+  - templates/worker-service.yaml
+  - templates/worker-serviceaccount.yaml
+tests:
+  # Deployment tests — multi-region
+  - it: should render 2 deployments (us + emea)
+    template: templates/worker-deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should name deployments by region
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-worker-us
+
+  - it: should name emea deployment
+    template: templates/worker-deployment.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-worker-emea
+
+  - it: should set region label
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            raps.io/region: us
+
+  - it: should set nodeSelector for us region
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.nodeSelector
+          value:
+            topology.kubernetes.io/region: us-east-1
+
+  - it: should set ADS_REGION env for us
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: ADS_REGION
+            value: "US"
+
+  - it: should use worker command
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - raps
+            - swarm
+            - worker
+            - start
+            - --redis-url
+            - "redis://RELEASE-NAME-redis-master:6379"
+            - --concurrency
+            - "4"
+            - --metrics-port
+            - "9091"
+
+  - it: should use serviceAccount
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.serviceAccountName
+          value: RELEASE-NAME-raps-worker
+
+  - it: should expose http and metrics ports
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 9090
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 9091
+
+  - it: should set default replicas from region config
+    template: templates/worker-deployment.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 2
+
+  # HPA tests
+  - it: should render 2 HPAs (us + emea)
+    template: templates/worker-hpa.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should target correct deployment
+    template: templates/worker-hpa.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: RELEASE-NAME-raps-worker-us
+
+  - it: should set HPA metric and behavior
+    template: templates/worker-hpa.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 20
+      - equal:
+          path: spec.metrics[0].external.metric.name
+          value: raps_queue_depth
+      - equal:
+          path: spec.behavior.scaleUp.stabilizationWindowSeconds
+          value: 30
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+
+  # Service tests
+  - it: should render 2 services (us + emea)
+    template: templates/worker-service.yaml
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  # ServiceAccount tests
+  - it: should create worker ServiceAccount
+    template: templates/worker-serviceaccount.yaml
+    asserts:
+      - isKind:
+          of: ServiceAccount
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-worker

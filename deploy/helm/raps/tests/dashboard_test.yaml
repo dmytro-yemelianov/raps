@@ -1,0 +1,66 @@
+suite: dashboard
+templates:
+  - templates/dashboard-deployment.yaml
+  - templates/dashboard-ingress.yaml
+  - templates/dashboard-service.yaml
+tests:
+  # Deployment tests
+  - it: should create dashboard Deployment
+    template: templates/dashboard-deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should not use envFrom with credentials
+    template: templates/dashboard-deployment.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: should expose dashboard port
+    template: templates/dashboard-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 3000
+
+  # Ingress tests
+  - it: should not render ingress when disabled
+    template: templates/dashboard-ingress.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ingress when enabled
+    template: templates/dashboard-ingress.yaml
+    set:
+      dashboard.ingress.enabled: true
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].host
+          value: dashboard.rapscli.xyz
+
+  - it: should set dashboard TLS
+    template: templates/dashboard-ingress.yaml
+    set:
+      dashboard.ingress.enabled: true
+      dashboard.ingress.tls.enabled: true
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: raps-dashboard-tls
+
+  # Service tests
+  - it: should create dashboard Service
+    template: templates/dashboard-service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].port
+          value: 3000

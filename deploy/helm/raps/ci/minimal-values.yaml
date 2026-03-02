@@ -1,0 +1,5 @@
+# Minimal production-like — just APS credentials
+secrets:
+  apsCredentials:
+    clientId: "prod-client-id"
+    clientSecret: "prod-client-secret"

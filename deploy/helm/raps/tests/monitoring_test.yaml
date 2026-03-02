@@ -1,0 +1,84 @@
+suite: monitoring
+templates:
+  - templates/servicemonitor.yaml
+  - templates/grafana-dashboard-configmap.yaml
+tests:
+  # ServiceMonitor tests
+  - it: should not render ServiceMonitor when disabled
+    template: templates/servicemonitor.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ServiceMonitor when enabled
+    template: templates/servicemonitor.yaml
+    set:
+      monitoring.prometheus.serviceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-raps-workers
+
+  - it: should set scrape interval
+    template: templates/servicemonitor.yaml
+    set:
+      monitoring.prometheus.serviceMonitor.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: "30s"
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+
+  - it: should use custom namespace
+    template: templates/servicemonitor.yaml
+    set:
+      monitoring.prometheus.serviceMonitor.enabled: true
+      monitoring.prometheus.serviceMonitor.namespace: monitoring
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: monitoring
+
+  - it: should include custom labels
+    template: templates/servicemonitor.yaml
+    set:
+      monitoring.prometheus.serviceMonitor.enabled: true
+      monitoring.prometheus.serviceMonitor.labels:
+        release: prometheus
+    asserts:
+      - isSubset:
+          path: metadata.labels
+          content:
+            release: prometheus
+
+  # Grafana dashboard tests
+  - it: should not render grafana configmap when disabled
+    template: templates/grafana-dashboard-configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render grafana configmap when only grafana enabled
+    template: templates/grafana-dashboard-configmap.yaml
+    set:
+      monitoring.grafana.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render grafana configmap when fully enabled
+    template: templates/grafana-dashboard-configmap.yaml
+    set:
+      monitoring.grafana.enabled: true
+      monitoring.grafana.dashboards.enabled: true
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - isSubset:
+          path: metadata.labels
+          content:
+            grafana_dashboard: "1"
