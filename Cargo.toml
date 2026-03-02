@@ -146,7 +146,7 @@ async-trait = "0.1"
 
 # Concurrent data structures
 dashmap = "6"
-lru = "0.12"
+lru = "0.16"
 
 # Redis (feature-gated)
 deadpool-redis = "0.18"
