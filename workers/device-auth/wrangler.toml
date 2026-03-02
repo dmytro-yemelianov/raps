@@ -4,8 +4,7 @@ compatibility_date = "2025-12-01"
 
 routes = [
   { pattern = "rapscli.xyz/device/*", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/device", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/health", zone_name = "rapscli.xyz" }
+  { pattern = "rapscli.xyz/device", zone_name = "rapscli.xyz" }
 ]
 
 # Durable Object binding for device auth sessions

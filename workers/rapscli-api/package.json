@@ -1,0 +1,17 @@
+{
+  "name": "@raps/rapscli-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker — install scripts, version API, and badges for rapscli.xyz",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0",
+    "vitest": "^3.0.0"
+  }
+}
