@@ -180,4 +180,81 @@ mod tests {
             .unwrap();
         assert!(content_type.contains("text/plain"));
     }
+
+    // ==================== Snapshot Contract Tests ====================
+
+    #[tokio::test]
+    async fn test_health_response_body() {
+        let state = test_state(true);
+        let response = app(state)
+            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        insta::assert_json_snapshot!(json);
+    }
+
+    #[tokio::test]
+    async fn test_ready_response_body() {
+        let state = test_state(true);
+        let response = app(state)
+            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        insta::assert_json_snapshot!(json);
+    }
+
+    #[tokio::test]
+    async fn test_not_ready_response_body() {
+        let state = test_state(false);
+        let response = app(state)
+            .oneshot(Request::builder().uri("/ready").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        insta::assert_json_snapshot!(json);
+    }
+
+    #[tokio::test]
+    async fn test_metrics_response_with_data() {
+        let state = test_state(true);
+        state.exporter.set_queue_depth("high", 5.0);
+        state.exporter.set_queue_depth("normal", 12.0);
+        state
+            .exporter
+            .jobs_processed_total
+            .with_label_values(&["high", "success"])
+            .inc_by(50.0);
+
+        let response = app(state)
+            .oneshot(
+                Request::builder()
+                    .uri("/metrics")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let text = String::from_utf8(body.to_vec()).unwrap();
+        insta::assert_snapshot!(text);
+    }
 }

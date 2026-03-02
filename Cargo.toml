@@ -167,6 +167,7 @@ predicates = "3.1"
 raps-mock = { git = "https://github.com/dmytro-yemelianov/raps-mock.git", tag = "v0.2.0" }
 tokio-test = "0.4"
 tempfile = "3.26"
+insta = { version = "1.42", features = ["yaml", "json", "redactions"] }
 
 # The profile that 'dist' will build with
 [profile.dist]

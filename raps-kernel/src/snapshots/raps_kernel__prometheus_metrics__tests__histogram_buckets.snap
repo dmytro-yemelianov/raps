@@ -1,0 +1,19 @@
+---
+source: raps-kernel/src/prometheus_metrics.rs
+assertion_line: 308
+expression: output
+---
+# HELP raps_job_duration_seconds Job processing duration in seconds
+# TYPE raps_job_duration_seconds histogram
+raps_job_duration_seconds_bucket{job_type="translate",le="1"} 0
+raps_job_duration_seconds_bucket{job_type="translate",le="5"} 0
+raps_job_duration_seconds_bucket{job_type="translate",le="15"} 0
+raps_job_duration_seconds_bucket{job_type="translate",le="30"} 0
+raps_job_duration_seconds_bucket{job_type="translate",le="60"} 1
+raps_job_duration_seconds_bucket{job_type="translate",le="120"} 1
+raps_job_duration_seconds_bucket{job_type="translate",le="300"} 1
+raps_job_duration_seconds_bucket{job_type="translate",le="600"} 1
+raps_job_duration_seconds_bucket{job_type="translate",le="1800"} 1
+raps_job_duration_seconds_bucket{job_type="translate",le="+Inf"} 1
+raps_job_duration_seconds_sum{job_type="translate"} 45
+raps_job_duration_seconds_count{job_type="translate"} 1

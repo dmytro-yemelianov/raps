@@ -1,0 +1,12 @@
+---
+source: raps-kernel/src/health_server.rs
+assertion_line: 258
+expression: text
+---
+# HELP raps_jobs_processed_total Total jobs processed
+# TYPE raps_jobs_processed_total counter
+raps_jobs_processed_total{priority="high",status="success"} 50
+# HELP raps_queue_depth Number of jobs waiting in queue
+# TYPE raps_queue_depth gauge
+raps_queue_depth{priority="high"} 5
+raps_queue_depth{priority="normal"} 12
