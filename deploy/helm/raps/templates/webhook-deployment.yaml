@@ -21,6 +21,14 @@ spec:
       containers:
         - name: webhook
           image: {{ include "raps.image" (dict "image" .Values.webhook.image "global" .Values.global) }}
+          command:
+            - raps
+            - serve
+            - webhook
+            - --port
+            - {{ .Values.webhook.service.port | quote }}
+            - --redis-url
+            - {{ include "raps.redisUrl" . }}
           env:
             - name: RUST_LOG
               valueFrom:

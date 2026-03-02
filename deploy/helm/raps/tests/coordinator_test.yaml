@@ -20,6 +20,20 @@ tests:
           path: spec.replicas
           value: 2
 
+  - it: should have correct command
+    template: templates/coordinator-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - raps
+            - serve
+            - coordinator
+            - --port
+            - "8081"
+            - --redis-url
+            - redis://RELEASE-NAME-redis-master:6379
+
   - it: should use envFrom with aps-credentials secret
     template: templates/coordinator-deployment.yaml
     asserts:
