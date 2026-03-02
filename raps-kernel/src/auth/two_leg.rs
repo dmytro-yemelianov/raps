@@ -87,7 +87,6 @@ impl AuthClient {
     }
 
     /// Clear the cached 2-legged token
-    #[allow(dead_code)]
     pub async fn clear_cache(&self) {
         let mut cache = self.cached_2leg_token.write().await;
         *cache = None;

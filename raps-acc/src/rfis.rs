@@ -167,7 +167,6 @@ pub struct RfiClient {
 
 impl RfiClient {
     /// Create a new RFI client
-    #[allow(dead_code)]
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
     }

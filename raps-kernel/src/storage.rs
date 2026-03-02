@@ -297,13 +297,11 @@ impl TokenStorage {
     }
 
     /// Get the current backend being used
-    #[allow(dead_code)]
     pub fn backend(&self) -> StorageBackend {
         self.backend
     }
 
     /// Migrate tokens from file storage to keychain storage
-    #[allow(dead_code)]
     pub fn migrate_to_keychain() -> Result<()> {
         println!("Migrating tokens from file storage to secure keychain storage...");
 

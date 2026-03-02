@@ -90,14 +90,12 @@ fn default_true() -> bool {
 
 /// Discovered plugin information
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct DiscoveredPlugin {
     pub name: String,
     pub path: PathBuf,
     pub enabled: bool,
 }
 
-#[allow(dead_code)]
 impl PluginConfig {
     /// Load plugin configuration from file
     pub fn load() -> Result<Self> {
@@ -130,6 +128,7 @@ impl PluginConfig {
     }
 
     /// Get an alias command if defined
+    #[allow(dead_code)]
     pub fn get_alias(&self, name: &str) -> Option<&str> {
         self.aliases.get(name).map(|s| s.as_str())
     }
@@ -182,12 +181,10 @@ fn verify_ed25519_signature(path: &Path, sig_hex: &str, pubkey_hex: &str) -> Res
 }
 
 /// Plugin manager for discovering and executing plugins
-#[allow(dead_code)]
 pub struct PluginManager {
     config: PluginConfig,
 }
 
-#[allow(dead_code)]
 impl PluginManager {
     /// Create a new plugin manager
     pub fn new() -> Result<Self> {
@@ -454,12 +451,14 @@ impl PluginManager {
     }
 
     /// Run pre-command hooks
+    #[allow(dead_code)]
     pub fn run_pre_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("pre_{}", command);
         self.run_hooks(&hook_key)
     }
 
     /// Run post-command hooks
+    #[allow(dead_code)]
     pub fn run_post_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("post_{}", command);
         self.run_hooks(&hook_key)
