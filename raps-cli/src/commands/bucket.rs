@@ -562,3 +562,77 @@ fn chrono_humanize(timestamp_ms: u64) -> String {
         "in the future".to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn now_ms() -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+    }
+
+    #[test]
+    fn test_chrono_humanize_seconds() {
+        let ts = now_ms() - 30_000; // 30 seconds ago
+        let result = chrono_humanize(ts);
+        assert!(
+            result.contains("seconds ago"),
+            "Expected 'seconds ago', got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_chrono_humanize_minutes() {
+        let ts = now_ms() - 120_000; // 2 minutes ago
+        let result = chrono_humanize(ts);
+        assert!(
+            result.contains("minutes ago"),
+            "Expected 'minutes ago', got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_chrono_humanize_hours() {
+        let ts = now_ms() - 10_800_000; // 3 hours ago
+        let result = chrono_humanize(ts);
+        assert!(
+            result.contains("hours ago"),
+            "Expected 'hours ago', got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_chrono_humanize_days() {
+        let ts = now_ms() - 172_800_000; // 2 days ago
+        let result = chrono_humanize(ts);
+        assert!(
+            result.contains("days ago"),
+            "Expected 'days ago', got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_chrono_humanize_future() {
+        let ts = now_ms() + 60_000_000; // far in the future
+        let result = chrono_humanize(ts);
+        assert_eq!(result, "in the future");
+    }
+
+    #[test]
+    fn test_chrono_humanize_epoch() {
+        let result = chrono_humanize(0);
+        assert!(
+            result.contains("days ago"),
+            "Expected 'days ago' for epoch, got: {}",
+            result
+        );
+    }
+}
