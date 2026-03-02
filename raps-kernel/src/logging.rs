@@ -120,7 +120,6 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
 }
 
 /// Check if colors should be disabled
-#[allow(dead_code)] // May be used in future
 pub fn no_color() -> bool {
     NO_COLOR.load(Ordering::Relaxed)
 }

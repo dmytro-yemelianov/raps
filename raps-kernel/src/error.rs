@@ -20,7 +20,6 @@ use std::process;
 
 /// Exit codes following standard conventions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)] // Success is used implicitly when no error occurs
 pub enum ExitCode {
     /// Success
     Success = 0,
