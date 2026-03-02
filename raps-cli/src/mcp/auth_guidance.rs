@@ -89,6 +89,11 @@ To set up authentication for RAPS MCP Server:
        }
      }
 
+For 3-legged auth in MCP/headless environments, use the device code flow:
+  raps auth login --device
+This will give you a short code to enter at https://rapscli.xyz/device — no
+browser on the same machine required.
+
 For more information: https://rapscli.xyz/docs/auth
 "#;
 
@@ -125,6 +130,10 @@ Use the `auth_login` tool to start the authentication process, or run:
   raps auth login
 
 This will open a browser window for you to sign in with your Autodesk credentials.
+
+In headless or MCP environments (no browser available), use the device code flow:
+  raps auth login --device
+You'll receive a short code to enter at https://rapscli.xyz/device from any device.
 "#;
 
 /// Tool availability summary header

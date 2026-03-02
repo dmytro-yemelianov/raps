@@ -345,9 +345,12 @@ async fn login(
     let device = if !device && raps_kernel::interactive::is_headless() {
         eprintln!(
             "{}",
-            "Headless environment detected (no browser available). \
-             Switching to device code flow automatically."
+            "Headless environment detected. Using device code flow."
                 .yellow()
+        );
+        eprintln!(
+            "{}",
+            "   You'll be given a short code to enter at https://rapscli.xyz/device".dimmed()
         );
         eprintln!(
             "{}",
