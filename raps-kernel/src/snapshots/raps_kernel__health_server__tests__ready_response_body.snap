@@ -1,0 +1,8 @@
+---
+source: raps-kernel/src/health_server.rs
+assertion_line: 213
+expression: json
+---
+{
+  "status": "ready"
+}

@@ -1,0 +1,14 @@
+---
+source: raps-kernel/src/prometheus_metrics.rs
+assertion_line: 296
+expression: output
+---
+# HELP raps_api_errors_total Total API errors
+# TYPE raps_api_errors_total counter
+raps_api_errors_total{endpoint="oss"} 1
+# HELP raps_api_requests_total Total API requests
+# TYPE raps_api_requests_total counter
+raps_api_requests_total{endpoint="oss"} 2
+# HELP raps_cache_hits_total Total cache hits
+# TYPE raps_cache_hits_total counter
+raps_cache_hits_total{endpoint="oss"} 1

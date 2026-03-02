@@ -1,0 +1,6 @@
+---
+source: raps-kernel/src/prometheus_metrics.rs
+assertion_line: 216
+expression: output
+---
+

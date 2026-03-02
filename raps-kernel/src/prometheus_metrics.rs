@@ -177,57 +177,14 @@ impl PrometheusExporter {
 mod tests {
     use super::*;
 
+    // ==================== Behavioral Tests ====================
+
     #[test]
     fn test_new_exporter() {
         let exporter = PrometheusExporter::new();
         let output = exporter.render();
         // Empty registry should still produce valid output
         assert!(output.is_empty() || output.contains("# HELP") || !output.contains("ERROR"));
-    }
-
-    #[test]
-    fn test_queue_depth() {
-        let exporter = PrometheusExporter::new();
-        exporter.set_queue_depth("high", 42.0);
-        exporter.set_queue_depth("normal", 10.0);
-        let output = exporter.render();
-        assert!(output.contains("raps_queue_depth"));
-        assert!(output.contains("42"));
-    }
-
-    #[test]
-    fn test_jobs_processed() {
-        let exporter = PrometheusExporter::new();
-        exporter
-            .jobs_processed_total
-            .with_label_values(&["high", "success"])
-            .inc_by(5.0);
-        let output = exporter.render();
-        assert!(output.contains("raps_jobs_processed_total"));
-        assert!(output.contains("5"));
-    }
-
-    #[test]
-    fn test_job_duration() {
-        let exporter = PrometheusExporter::new();
-        exporter
-            .job_duration_seconds
-            .with_label_values(&["translate"])
-            .observe(45.0);
-        let output = exporter.render();
-        assert!(output.contains("raps_job_duration_seconds"));
-    }
-
-    #[test]
-    fn test_worker_info() {
-        let exporter = PrometheusExporter::new();
-        exporter
-            .worker_info
-            .with_label_values(&["worker-1", "5.2.0"])
-            .set(1.0);
-        let output = exporter.render();
-        assert!(output.contains("raps_worker_info"));
-        assert!(output.contains("worker-1"));
     }
 
     #[test]
@@ -250,13 +207,104 @@ mod tests {
         assert!(output.contains("raps_cache_hits_total"));
     }
 
+    // ==================== Snapshot Contract Tests ====================
+
     #[test]
-    fn test_render_format() {
+    fn test_render_empty() {
         let exporter = PrometheusExporter::new();
-        exporter.set_queue_depth("high", 1.0);
         let output = exporter.render();
-        // Should be valid Prometheus text format
-        assert!(output.contains("# HELP raps_queue_depth"));
-        assert!(output.contains("# TYPE raps_queue_depth gauge"));
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_render_queue_depth() {
+        let exporter = PrometheusExporter::new();
+        exporter.set_queue_depth("high", 42.0);
+        exporter.set_queue_depth("normal", 10.0);
+        let output = exporter.render();
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_render_full_metrics() {
+        let exporter = PrometheusExporter::new();
+
+        // Queue depths
+        exporter.set_queue_depth("critical", 3.0);
+        exporter.set_queue_depth("normal", 15.0);
+        exporter.set_queue_depth("background", 42.0);
+
+        // Jobs processed
+        exporter
+            .jobs_processed_total
+            .with_label_values(&["critical", "success"])
+            .inc_by(100.0);
+        exporter
+            .jobs_processed_total
+            .with_label_values(&["normal", "failure"])
+            .inc_by(2.0);
+
+        // Job duration
+        exporter
+            .job_duration_seconds
+            .with_label_values(&["translate"])
+            .observe(45.0);
+
+        // API requests
+        exporter
+            .api_requests_total
+            .with_label_values(&["/oss/v2/buckets"])
+            .inc_by(500.0);
+
+        // API errors
+        exporter
+            .api_errors_total
+            .with_label_values(&["/oss/v2/buckets"])
+            .inc_by(3.0);
+
+        // Cache hits
+        exporter
+            .cache_hits_total
+            .with_label_values(&["/oss/v2/buckets"])
+            .inc_by(120.0);
+
+        // Worker info
+        exporter
+            .worker_info
+            .with_label_values(&["worker-1", "5.0.0"])
+            .set(1.0);
+
+        let output = exporter.render();
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_sync_from_collector_render() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("metrics.json");
+        let collector = MetricsCollector::new(path).unwrap();
+
+        collector.record_api_request("oss", 100);
+        collector.record_api_request("oss", 200);
+        collector.record_api_error("oss");
+        collector.record_cache_hit("oss");
+
+        let exporter = PrometheusExporter::new();
+        exporter.sync_from_collector(&collector);
+
+        let output = exporter.render();
+        insta::assert_snapshot!(output);
+    }
+
+    #[test]
+    fn test_histogram_buckets() {
+        let exporter = PrometheusExporter::new();
+        // Observe a single value to force bucket output
+        exporter
+            .job_duration_seconds
+            .with_label_values(&["translate"])
+            .observe(45.0);
+        let output = exporter.render();
+        insta::assert_snapshot!(output);
     }
 }

@@ -1,0 +1,9 @@
+---
+source: raps-kernel/src/prometheus_metrics.rs
+assertion_line: 225
+expression: output
+---
+# HELP raps_queue_depth Number of jobs waiting in queue
+# TYPE raps_queue_depth gauge
+raps_queue_depth{priority="high"} 42
+raps_queue_depth{priority="normal"} 10
