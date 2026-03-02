@@ -1,0 +1,10 @@
+---
+source: raps-kernel/src/auth/tests.rs
+assertion_line: 400
+expression: response
+---
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.test-token-payload",
+  "token_type": "Bearer",
+  "expires_in": 3600
+}

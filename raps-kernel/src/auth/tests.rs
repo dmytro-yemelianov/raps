@@ -390,3 +390,26 @@ mod integration_tests {
         );
     }
 }
+
+// ==================== Contract Tests ====================
+
+#[test]
+fn test_contract_token_response() {
+    let json = include_str!("../../../tests/fixtures/token_response.json");
+    let response: TokenResponse = serde_json::from_str(json).unwrap();
+    insta::assert_json_snapshot!(response);
+}
+
+#[test]
+fn test_contract_error_401() {
+    let json = include_str!("../../../tests/fixtures/error_401.json");
+    let response: crate::error::ApsErrorResponse = serde_json::from_str(json).unwrap();
+    insta::assert_debug_snapshot!(response);
+}
+
+#[test]
+fn test_contract_error_429() {
+    let json = include_str!("../../../tests/fixtures/error_429.json");
+    let response: crate::error::ApsErrorResponse = serde_json::from_str(json).unwrap();
+    insta::assert_debug_snapshot!(response);
+}

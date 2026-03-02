@@ -380,6 +380,7 @@ pub fn save_profiles(data: &ProfilesData) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     fn create_test_config() -> Config {
         Config {
@@ -392,83 +393,27 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_auth_url() {
+    #[rstest]
+    #[case(Config::auth_url as fn(&Config) -> String, "/authentication/v2/token")]
+    #[case(Config::authorize_url as fn(&Config) -> String, "/authentication/v2/authorize")]
+    #[case(Config::oss_url as fn(&Config) -> String, "/oss/v2")]
+    #[case(Config::derivative_url as fn(&Config) -> String, "/modelderivative/v2")]
+    #[case(Config::project_url as fn(&Config) -> String, "/project/v1")]
+    #[case(Config::data_url as fn(&Config) -> String, "/data/v1")]
+    #[case(Config::webhooks_url as fn(&Config) -> String, "/webhooks/v1")]
+    #[case(Config::da_url as fn(&Config) -> String, "/da/us-east/v3")]
+    #[case(Config::issues_url as fn(&Config) -> String, "/construction/issues/v1")]
+    #[case(Config::reality_capture_url as fn(&Config) -> String, "/photo-to-3d/v1")]
+    #[case(Config::rfi_url as fn(&Config) -> String, "/construction/rfis/v2")]
+    #[case(Config::assets_url as fn(&Config) -> String, "/construction/assets/v1")]
+    #[case(Config::submittals_url as fn(&Config) -> String, "/construction/submittals/v1")]
+    #[case(Config::checklists_url as fn(&Config) -> String, "/construction/checklists/v1")]
+    fn test_url_builder(#[case] method: fn(&Config) -> String, #[case] suffix: &str) {
         let config = create_test_config();
-        let url = config.auth_url();
         assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/authentication/v2/token"
+            method(&config),
+            format!("https://developer.api.autodesk.com{suffix}")
         );
-    }
-
-    #[test]
-    fn test_authorize_url() {
-        let config = create_test_config();
-        let url = config.authorize_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/authentication/v2/authorize"
-        );
-    }
-
-    #[test]
-    fn test_oss_url() {
-        let config = create_test_config();
-        let url = config.oss_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/oss/v2");
-    }
-
-    #[test]
-    fn test_derivative_url() {
-        let config = create_test_config();
-        let url = config.derivative_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/modelderivative/v2");
-    }
-
-    #[test]
-    fn test_project_url() {
-        let config = create_test_config();
-        let url = config.project_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/project/v1");
-    }
-
-    #[test]
-    fn test_data_url() {
-        let config = create_test_config();
-        let url = config.data_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/data/v1");
-    }
-
-    #[test]
-    fn test_webhooks_url() {
-        let config = create_test_config();
-        let url = config.webhooks_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/webhooks/v1");
-    }
-
-    #[test]
-    fn test_da_url() {
-        let config = create_test_config();
-        let url = config.da_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/da/us-east/v3");
-    }
-
-    #[test]
-    fn test_issues_url() {
-        let config = create_test_config();
-        let url = config.issues_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/construction/issues/v1"
-        );
-    }
-
-    #[test]
-    fn test_reality_capture_url() {
-        let config = create_test_config();
-        let url = config.reality_capture_url();
-        assert_eq!(url, "https://developer.api.autodesk.com/photo-to-3d/v1");
     }
 
     #[test]
@@ -526,46 +471,6 @@ mod tests {
         assert!(config.submittals_url().starts_with(base));
         assert!(config.checklists_url().starts_with(base));
         assert!(config.aec_graphql_url().starts_with(base));
-    }
-
-    #[test]
-    fn test_rfi_url() {
-        let config = create_test_config();
-        let url = config.rfi_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/construction/rfis/v2"
-        );
-    }
-
-    #[test]
-    fn test_assets_url() {
-        let config = create_test_config();
-        let url = config.assets_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/construction/assets/v1"
-        );
-    }
-
-    #[test]
-    fn test_submittals_url() {
-        let config = create_test_config();
-        let url = config.submittals_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/construction/submittals/v1"
-        );
-    }
-
-    #[test]
-    fn test_checklists_url() {
-        let config = create_test_config();
-        let url = config.checklists_url();
-        assert_eq!(
-            url,
-            "https://developer.api.autodesk.com/construction/checklists/v1"
-        );
     }
 
     #[test]

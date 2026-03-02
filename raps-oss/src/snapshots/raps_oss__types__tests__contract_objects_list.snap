@@ -1,0 +1,37 @@
+---
+source: raps-oss/src/types.rs
+assertion_line: 710
+expression: response
+---
+ObjectsResponse {
+    items: [
+        ObjectItem {
+            bucket_key: "test-bucket",
+            object_key: "model.rvt",
+            object_id: "urn:adsk.objects:os.object:test-bucket/model.rvt",
+            sha1: Some(
+                "abc123def456789",
+            ),
+            size: 15728640,
+        },
+        ObjectItem {
+            bucket_key: "test-bucket",
+            object_key: "drawing.dwg",
+            object_id: "urn:adsk.objects:os.object:test-bucket/drawing.dwg",
+            sha1: Some(
+                "def789abc123456",
+            ),
+            size: 2097152,
+        },
+        ObjectItem {
+            bucket_key: "test-bucket",
+            object_key: "site-plan.ifc",
+            object_id: "urn:adsk.objects:os.object:test-bucket/site-plan.ifc",
+            sha1: Some(
+                "789def123abc456",
+            ),
+            size: 5242880,
+        },
+    ],
+    next: None,
+}

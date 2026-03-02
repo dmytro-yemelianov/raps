@@ -356,29 +356,27 @@ pub fn format_interpreted_error(error: &InterpretedError, use_colors: bool) -> S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn test_exit_code_from_auth_error() {
-        let err = anyhow::anyhow!("authentication failed: unauthorized");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
-    }
-
-    #[test]
-    fn test_exit_code_from_not_found_error() {
-        let err = anyhow::anyhow!("Resource not found");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::NotFound);
-    }
-
-    #[test]
-    fn test_exit_code_from_validation_error() {
-        let err = anyhow::anyhow!("Invalid bucket name: must be lowercase");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
-    }
-
-    #[test]
-    fn test_exit_code_from_remote_error() {
-        let err = anyhow::anyhow!("API error: 500 Internal Server Error");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
+    #[rstest]
+    #[case("authentication failed: unauthorized", ExitCode::AuthFailure)]
+    #[case("Resource not found", ExitCode::NotFound)]
+    #[case("Invalid bucket name: must be lowercase", ExitCode::InvalidArguments)]
+    #[case("API error: 500 Internal Server Error", ExitCode::RemoteError)]
+    #[case("403 Forbidden: insufficient permissions", ExitCode::AuthFailure)]
+    #[case("token expired", ExitCode::AuthFailure)]
+    #[case("token invalid", ExitCode::AuthFailure)]
+    #[case("invalid credentials", ExitCode::AuthFailure)]
+    #[case("bucket name is required", ExitCode::InvalidArguments)]
+    #[case("field cannot be empty", ExitCode::InvalidArguments)]
+    #[case("value must be positive", ExitCode::InvalidArguments)]
+    #[case("request timeout after 30s", ExitCode::RemoteError)]
+    #[case("network error: connection reset", ExitCode::RemoteError)]
+    #[case("connection refused", ExitCode::RemoteError)]
+    #[case("something went wrong", ExitCode::InternalError)]
+    fn test_exit_code_mapping(#[case] msg: &str, #[case] expected: ExitCode) {
+        let err = anyhow::anyhow!("{}", msg);
+        assert_eq!(ExitCode::from_error(&err), expected);
     }
 
     #[test]
@@ -444,41 +442,17 @@ mod tests {
         insta::assert_snapshot!(formatted);
     }
 
-    #[test]
-    fn test_status_to_code() {
-        assert_eq!(status_to_code(400), "BadRequest");
-        assert_eq!(status_to_code(401), "Unauthorized");
-        assert_eq!(status_to_code(403), "Forbidden");
-        assert_eq!(status_to_code(404), "NotFound");
-        assert_eq!(status_to_code(429), "TooManyRequests");
-        assert_eq!(status_to_code(500), "InternalServerError");
-        assert_eq!(status_to_code(418), "Error418"); // Custom code
-    }
-
-    // ==================== Additional Exit Code Tests ====================
-
-    #[test]
-    fn test_exit_code_from_forbidden_error() {
-        let err = anyhow::anyhow!("403 Forbidden: insufficient permissions");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
-    }
-
-    #[test]
-    fn test_exit_code_from_token_expired() {
-        let err = anyhow::anyhow!("token expired");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
-    }
-
-    #[test]
-    fn test_exit_code_from_token_invalid() {
-        let err = anyhow::anyhow!("token invalid");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
-    }
-
-    #[test]
-    fn test_exit_code_from_invalid_credentials() {
-        let err = anyhow::anyhow!("invalid credentials");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+    #[rstest]
+    #[case(400, "BadRequest")]
+    #[case(401, "Unauthorized")]
+    #[case(403, "Forbidden")]
+    #[case(404, "NotFound")]
+    #[case(409, "Conflict")]
+    #[case(429, "TooManyRequests")]
+    #[case(500, "InternalServerError")]
+    #[case(418, "Error418")]
+    fn test_status_to_code_mapping(#[case] status: u16, #[case] expected: &str) {
+        assert_eq!(status_to_code(status), expected);
     }
 
     #[test]
@@ -486,48 +460,6 @@ mod tests {
         let inner = anyhow::anyhow!("status: 404");
         let err = inner.context("Failed to fetch resource");
         assert_eq!(ExitCode::from_error(&err), ExitCode::NotFound);
-    }
-
-    #[test]
-    fn test_exit_code_from_missing_required() {
-        let err = anyhow::anyhow!("bucket name is required");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
-    }
-
-    #[test]
-    fn test_exit_code_from_cannot_be_empty() {
-        let err = anyhow::anyhow!("field cannot be empty");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
-    }
-
-    #[test]
-    fn test_exit_code_from_must_be() {
-        let err = anyhow::anyhow!("value must be positive");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::InvalidArguments);
-    }
-
-    #[test]
-    fn test_exit_code_from_timeout() {
-        let err = anyhow::anyhow!("request timeout after 30s");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
-    }
-
-    #[test]
-    fn test_exit_code_from_network() {
-        let err = anyhow::anyhow!("network error: connection reset");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
-    }
-
-    #[test]
-    fn test_exit_code_from_connection() {
-        let err = anyhow::anyhow!("connection refused");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
-    }
-
-    #[test]
-    fn test_exit_code_unknown_defaults_to_internal() {
-        let err = anyhow::anyhow!("something went wrong");
-        assert_eq!(ExitCode::from_error(&err), ExitCode::InternalError);
     }
 
     // ==================== Exit Code Value Tests ====================

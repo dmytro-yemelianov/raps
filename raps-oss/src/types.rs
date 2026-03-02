@@ -693,4 +693,20 @@ mod tests {
         assert!(failure.result.is_err());
         assert_eq!(failure.result.unwrap_err(), "not found");
     }
+
+    // ==================== Contract Tests ====================
+
+    #[test]
+    fn test_contract_buckets_list() {
+        let json = include_str!("../../tests/fixtures/buckets_list.json");
+        let response: BucketsResponse = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+
+    #[test]
+    fn test_contract_objects_list() {
+        let json = include_str!("../../tests/fixtures/objects_list.json");
+        let response: ObjectsResponse = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
 }

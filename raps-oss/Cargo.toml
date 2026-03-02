@@ -49,3 +49,4 @@ raps-kernel = { workspace = true, features = ["test-utils"] }
 raps-mock.workspace = true
 tokio-test.workspace = true
 tempfile.workspace = true
+insta.workspace = true

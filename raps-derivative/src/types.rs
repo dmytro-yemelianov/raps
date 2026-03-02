@@ -726,4 +726,20 @@ mod tests {
         assert!(json.get("fields").is_none());
         assert!(json.get("pagination").is_none());
     }
+
+    // ==================== Contract Tests ====================
+
+    #[test]
+    fn test_contract_manifest_success() {
+        let json = include_str!("../../tests/fixtures/manifest_success.json");
+        let manifest: Manifest = serde_json::from_str(json).unwrap();
+        insta::assert_json_snapshot!(manifest);
+    }
+
+    #[test]
+    fn test_contract_manifest_pending() {
+        let json = include_str!("../../tests/fixtures/manifest_pending.json");
+        let manifest: Manifest = serde_json::from_str(json).unwrap();
+        insta::assert_json_snapshot!(manifest);
+    }
 }

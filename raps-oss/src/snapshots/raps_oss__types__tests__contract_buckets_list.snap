@@ -1,0 +1,28 @@
+---
+source: raps-oss/src/types.rs
+assertion_line: 703
+expression: response
+---
+BucketsResponse {
+    items: [
+        BucketItem {
+            bucket_key: "test-bucket-1",
+            created_date: 1609459200000,
+            policy_key: "transient",
+            region: None,
+        },
+        BucketItem {
+            bucket_key: "test-bucket-2",
+            created_date: 1609545600000,
+            policy_key: "temporary",
+            region: None,
+        },
+        BucketItem {
+            bucket_key: "production-models",
+            created_date: 1609632000000,
+            policy_key: "persistent",
+            region: None,
+        },
+    ],
+    next: None,
+}

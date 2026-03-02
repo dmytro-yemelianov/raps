@@ -1,0 +1,16 @@
+---
+source: raps-kernel/src/auth/tests.rs
+assertion_line: 414
+expression: response
+---
+ApsErrorResponse {
+    error_code: Some(
+        "RATE-001",
+    ),
+    description: None,
+    detail: None,
+    reason: Some(
+        "Rate limit exceeded. Please wait before making more requests.",
+    ),
+    developer_message: None,
+}

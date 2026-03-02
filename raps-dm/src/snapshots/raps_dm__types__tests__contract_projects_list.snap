@@ -1,0 +1,48 @@
+---
+source: raps-dm/src/types.rs
+assertion_line: 280
+expression: response
+---
+JsonApiResponse {
+    data: [
+        Project {
+            project_type: "projects",
+            id: "b.project-001",
+            attributes: ProjectAttributes {
+                name: "Main Office Building",
+                scopes: Some(
+                    [
+                        "docs:read",
+                        "docs:write",
+                        "data:read",
+                        "data:write",
+                    ],
+                ),
+            },
+        },
+        Project {
+            project_type: "projects",
+            id: "b.project-002",
+            attributes: ProjectAttributes {
+                name: "Residential Complex",
+                scopes: Some(
+                    [
+                        "docs:read",
+                        "data:read",
+                    ],
+                ),
+            },
+        },
+    ],
+    included: [],
+    links: Some(
+        JsonApiLinks {
+            self_link: Some(
+                Complex {
+                    href: "https://developer.api.autodesk.com/project/v1/hubs/b.12345678-1234-1234-1234-123456789012/projects",
+                },
+            ),
+            next: None,
+        },
+    ),
+}

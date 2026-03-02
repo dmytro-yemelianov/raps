@@ -261,3 +261,22 @@ pub(crate) struct GqlProject {
 pub(crate) struct GqlAltIds {
     pub(crate) data_management_api_project_id: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_contract_hubs_list() {
+        let json = include_str!("../../tests/fixtures/hubs_list.json");
+        let response: JsonApiResponse<Vec<Hub>> = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+
+    #[test]
+    fn test_contract_projects_list() {
+        let json = include_str!("../../tests/fixtures/projects_list.json");
+        let response: JsonApiResponse<Vec<Project>> = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+}

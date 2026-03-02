@@ -1,0 +1,16 @@
+---
+source: raps-kernel/src/auth/tests.rs
+assertion_line: 407
+expression: response
+---
+ApsErrorResponse {
+    error_code: Some(
+        "AUTH-001",
+    ),
+    description: None,
+    detail: None,
+    reason: None,
+    developer_message: Some(
+        "The access token provided is invalid or has expired.",
+    ),
+}

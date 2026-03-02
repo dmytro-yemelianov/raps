@@ -168,6 +168,7 @@ raps-mock = { git = "https://github.com/dmytro-yemelianov/raps-mock.git", tag = 
 tokio-test = "0.4"
 tempfile = "3.26"
 insta = { version = "1.42", features = ["yaml", "json", "redactions"] }
+rstest = "0.25"
 
 # The profile that 'dist' will build with
 [profile.dist]

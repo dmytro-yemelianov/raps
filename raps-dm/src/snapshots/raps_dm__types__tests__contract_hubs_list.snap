@@ -1,0 +1,54 @@
+---
+source: raps-dm/src/types.rs
+assertion_line: 273
+expression: response
+---
+JsonApiResponse {
+    data: [
+        Hub {
+            hub_type: "hubs",
+            id: "b.12345678-1234-1234-1234-123456789012",
+            attributes: HubAttributes {
+                name: "Acme Construction",
+                region: Some(
+                    "US",
+                ),
+                extension: Some(
+                    HubExtension {
+                        extension_type: Some(
+                            "hubs:autodesk.bim360:Account",
+                        ),
+                    },
+                ),
+            },
+        },
+        Hub {
+            hub_type: "hubs",
+            id: "b.87654321-4321-4321-4321-210987654321",
+            attributes: HubAttributes {
+                name: "Test Organization",
+                region: Some(
+                    "EMEA",
+                ),
+                extension: Some(
+                    HubExtension {
+                        extension_type: Some(
+                            "hubs:autodesk.bim360:Account",
+                        ),
+                    },
+                ),
+            },
+        },
+    ],
+    included: [],
+    links: Some(
+        JsonApiLinks {
+            self_link: Some(
+                Complex {
+                    href: "https://developer.api.autodesk.com/project/v1/hubs",
+                },
+            ),
+            next: None,
+        },
+    ),
+}
