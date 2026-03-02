@@ -1,0 +1,40 @@
+---
+source: raps-da/src/types.rs
+assertion_line: 519
+expression: response
+---
+PaginatedResponse {
+    data: [
+        Activity {
+            id: "myapp.DeleteWallsActivity+prod",
+            engine: "Autodesk.Revit+2024",
+            description: Some(
+                "Deletes all walls from Revit model",
+            ),
+            version: Some(
+                2,
+            ),
+            command_line: Some(
+                [
+                    "$(engine.path)\\\\revitcoreconsole.exe /i \"$(args[inputFile].path)\" /al \"$(appbundles[DeleteWallsBundle].path)\"",
+                ],
+            ),
+            app_bundles: Some(
+                [
+                    "myapp.DeleteWallsBundle+prod",
+                ],
+            ),
+        },
+        Activity {
+            id: "myapp.ExportPDFActivity+dev",
+            engine: "Autodesk.Revit+2024",
+            description: None,
+            version: Some(
+                1,
+            ),
+            command_line: None,
+            app_bundles: None,
+        },
+    ],
+    pagination_token: None,
+}

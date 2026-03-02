@@ -1,0 +1,20 @@
+{
+  "hookId": "b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+  "tenant": "VGVzdFRlbmFudA",
+  "callbackUrl": "https://myapp.example.com/webhooks/aps",
+  "createdBy": "N2FGNUJ3cHFianRmOHpuM2RiNEt6ZW8wNjVFbjJOQWU",
+  "event": "dm.version.added",
+  "createdDate": "2024-06-15T09:30:00.000+0000",
+  "lastUpdatedDate": "2024-08-20T14:15:30.000+0000",
+  "system": "data",
+  "creatorType": "Application",
+  "status": "active",
+  "scope": {
+    "folder": "urn:adsk.wipprod:fs.folder:co.YWJjZGVmZy0xMjM0LTU2Nzg"
+  },
+  "hookAttribute": {
+    "projectId": "b.1234-5678-abcd"
+  },
+  "urn": "urn:adsk.webhooks:events.hook:b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+  "autoReactivateHook": true
+}

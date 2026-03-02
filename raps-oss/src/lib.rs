@@ -63,10 +63,8 @@ impl OssClient {
 
 /// Integration tests using raps-mock
 ///
-/// `list_buckets` and `list_objects` work through the client API.
-/// `create_bucket` and other mutation operations fail because the mock response
-/// is missing required fields (e.g. `bucketOwner`, `permissions`) that the client
-/// `Bucket` type expects. Those operations use raw HTTP to verify the mock endpoints.
+/// `list_buckets`, `list_objects`, and `create_bucket` work through the client API.
+/// Some other mutation operations still use raw HTTP to verify mock endpoints.
 #[cfg(test)]
 mod integration_tests {
     use super::*;
@@ -198,53 +196,36 @@ mod integration_tests {
         assert!(result.is_ok(), "list_objects failed: {:?}", result.err());
     }
 
-    // --- Raw HTTP tests for operations where client parsing fails ---
+    // --- Client method tests for bucket creation (mock now returns full Bucket response) ---
 
     #[tokio::test]
-    async fn test_create_bucket_raw_http() {
+    async fn test_create_bucket_client_method() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let token = acquire_mock_token(&server.url).await;
+        let (client, _token) = setup_client_with_token(&server.url).await;
 
-        let http = reqwest::Client::new();
-        let resp = http
-            .post(format!("{}/oss/v2/buckets", server.url))
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "bucketKey": "test-new-bucket",
-                "policyKey": "transient"
-            }))
-            .send()
-            .await
-            .unwrap();
-        assert!(
-            resp.status().is_success(),
-            "create bucket returned {}",
-            resp.status()
-        );
-        let body: serde_json::Value = resp.json().await.unwrap();
-        assert!(body["bucketKey"].is_string(), "response should contain bucketKey");
-        assert!(body["policyKey"].is_string(), "response should contain policyKey");
+        let result = client
+            .create_bucket("test-new-bucket", RetentionPolicy::Transient, Region::US)
+            .await;
+        assert!(result.is_ok(), "create_bucket failed: {:?}", result.err());
+        let bucket = result.unwrap();
+        assert!(!bucket.bucket_key.is_empty());
+        assert!(!bucket.bucket_owner.is_empty());
+        assert!(!bucket.policy_key.is_empty());
     }
 
     #[tokio::test]
-    async fn test_create_bucket_persistent_policy_raw_http() {
+    async fn test_create_bucket_persistent_policy_client_method() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let token = acquire_mock_token(&server.url).await;
+        let (client, _token) = setup_client_with_token(&server.url).await;
 
-        let http = reqwest::Client::new();
-        let resp = http
-            .post(format!("{}/oss/v2/buckets", server.url))
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "bucketKey": "persistent-bucket",
-                "policyKey": "persistent"
-            }))
-            .send()
-            .await
-            .unwrap();
-        assert!(resp.status().is_success(), "create persistent bucket should succeed");
+        let result = client
+            .create_bucket("persistent-bucket", RetentionPolicy::Persistent, Region::US)
+            .await;
+        assert!(
+            result.is_ok(),
+            "create persistent bucket failed: {:?}",
+            result.err()
+        );
     }
 
     #[tokio::test]

@@ -1,0 +1,37 @@
+---
+source: raps-da/src/types.rs
+assertion_line: 526
+expression: response
+---
+WorkItem {
+    id: "workitem-12345678",
+    status: "success",
+    progress: Some(
+        "100%",
+    ),
+    report_url: Some(
+        "https://developer.api.autodesk.com/da/us-east/v3/workitems/workitem-12345678/report.txt",
+    ),
+    stats: Some(
+        WorkItemStats {
+            time_queued: Some(
+                "2024-01-15T10:00:00Z",
+            ),
+            time_download_started: Some(
+                "2024-01-15T10:00:05Z",
+            ),
+            time_instruction_started: None,
+            time_instruction_ended: None,
+            time_upload_ended: Some(
+                "2024-01-15T10:01:45Z",
+            ),
+            time_finished: None,
+            bytes_downloaded: Some(
+                15728640,
+            ),
+            bytes_uploaded: Some(
+                2097152,
+            ),
+        },
+    ),
+}

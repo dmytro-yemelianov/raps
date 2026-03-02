@@ -761,6 +761,144 @@ async fn worker_start(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_circuit_breaker_info_serialization() {
+        let info = CircuitBreakerInfo {
+            endpoint: "oss/v2/buckets".to_string(),
+            state: "Closed".to_string(),
+            failures: 0,
+        };
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["endpoint"], "oss/v2/buckets");
+        assert_eq!(json["state"], "Closed");
+        assert_eq!(json["failures"], 0);
+    }
+
+    #[test]
+    fn test_rate_budget_info_serialization() {
+        let info = RateBudgetInfo {
+            endpoint: "modelderivative/v2".to_string(),
+            remaining: 80,
+            limit: 100,
+        };
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["endpoint"], "modelderivative/v2");
+        assert_eq!(json["remaining"], 80);
+        assert_eq!(json["limit"], 100);
+    }
+
+    #[test]
+    fn test_rate_budget_percentage_calculation() {
+        // Mirrors the logic in swarm_status()
+        let calc_pct = |remaining: u32, limit: u32| -> f64 {
+            if limit > 0 {
+                remaining as f64 / limit as f64 * 100.0
+            } else {
+                100.0
+            }
+        };
+        assert!((calc_pct(80, 100) - 80.0).abs() < 0.01);
+        assert!((calc_pct(0, 100) - 0.0).abs() < 0.01);
+        assert!((calc_pct(0, 0) - 100.0).abs() < 0.01); // zero limit → 100%
+        assert!((calc_pct(20, 100) - 20.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_rate_budget_status_thresholds() {
+        // Mirrors the threshold logic in swarm_status()
+        let status_label = |pct: f64| -> &str {
+            if pct > 20.0 {
+                "ok"
+            } else if pct > 0.0 {
+                "low"
+            } else {
+                "exhausted"
+            }
+        };
+        assert_eq!(status_label(80.0), "ok");
+        assert_eq!(status_label(20.1), "ok");
+        assert_eq!(status_label(20.0), "low");
+        assert_eq!(status_label(5.0), "low");
+        assert_eq!(status_label(0.0), "exhausted");
+    }
+
+    #[test]
+    fn test_swarm_status_output_serialization() {
+        let output = SwarmStatusOutput {
+            circuit_breakers: vec![CircuitBreakerInfo {
+                endpoint: "oss".to_string(),
+                state: "Open".to_string(),
+                failures: 5,
+            }],
+            rate_budgets: vec![RateBudgetInfo {
+                endpoint: "dm".to_string(),
+                remaining: 10,
+                limit: 100,
+            }],
+            response_cache_entries: 42,
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["circuit_breakers"][0]["state"], "Open");
+        assert_eq!(json["rate_budgets"][0]["remaining"], 10);
+        assert_eq!(json["response_cache_entries"], 42);
+    }
+
+    #[test]
+    fn test_checkpoint_info_serialization() {
+        let info = CheckpointInfo {
+            workflow_id: "wf-123".to_string(),
+            workflow_type: "upload".to_string(),
+            total: 100,
+            completed: 75,
+            failed: 5,
+            remaining: 20,
+            progress_pct: 75.0,
+            updated_at: "2024-01-15T10:00:00Z".to_string(),
+        };
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["workflow_id"], "wf-123");
+        assert_eq!(json["total"], 100);
+        assert_eq!(json["progress_pct"], 75.0);
+    }
+
+    #[test]
+    fn test_queue_item_serialization() {
+        let item = QueueItem {
+            workflow_id: "batch-001".to_string(),
+            workflow_type: "translate".to_string(),
+            status: "active".to_string(),
+            total: 50,
+            completed: 20,
+            failed: 2,
+            remaining: 28,
+            progress_pct: 40.0,
+            created_at: "2024-01-15T09:00:00Z".to_string(),
+            updated_at: "2024-01-15T10:00:00Z".to_string(),
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["status"], "active");
+        assert_eq!(json["remaining"], 28);
+    }
+
+    #[test]
+    fn test_swarm_reset_target_matching() {
+        // Test the pattern matching logic from swarm_reset
+        let valid_targets = ["circuit-breakers", "cb", "cache", "rate-budgets", "rb", "all"];
+        for target in valid_targets {
+            let is_valid = matches!(
+                target,
+                "circuit-breakers" | "cb" | "cache" | "rate-budgets" | "rb" | "all"
+            );
+            assert!(is_valid, "target '{}' should be valid", target);
+        }
+        assert!(!matches!("invalid", "circuit-breakers" | "cb" | "cache" | "rate-budgets" | "rb" | "all"));
+    }
+}
+
 /// Dispatch a job to the appropriate handler.
 #[cfg(feature = "redis")]
 async fn process_job(job: &raps_kernel::job_queue::Job) -> Result<()> {

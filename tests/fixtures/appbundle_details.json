@@ -1,0 +1,21 @@
+{
+  "id": "myapp.DeleteWallsBundle+prod",
+  "engine": "Autodesk.Revit+2024",
+  "description": "Deletes all walls from a Revit model",
+  "version": 3,
+  "package": "https://developer.api.autodesk.com/da/us-east/v3/appbundles/myapp.DeleteWallsBundle+prod",
+  "uploadParameters": {
+    "endpointUrl": "https://dasprod-store.s3.amazonaws.com",
+    "formData": {
+      "key": "apps/myapp/DeleteWallsBundle/3/bundle.zip",
+      "content-type": "application/octet-stream",
+      "policy": "eyJjb25kaXRpb25zIjpbXX0=",
+      "success_action_status": "200",
+      "success_action_redirect": "",
+      "x-amz-signature": "a1b2c3d4e5f6",
+      "x-amz-credential": "AKIAIOSFODNN7EXAMPLE/20240115/us-east-1/s3/aws4_request",
+      "x-amz-algorithm": "AWS4-HMAC-SHA256",
+      "x-amz-date": "20240115T000000Z"
+    }
+  }
+}

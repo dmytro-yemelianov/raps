@@ -517,16 +517,29 @@ mod tests {
         assert!(json.contains("active"));
         assert!(!json.contains("callbackUrl"));
     }
+
+    // ==================== Contract Tests ====================
+
+    #[test]
+    fn test_contract_webhook() {
+        let json = include_str!("../../tests/fixtures/webhook.json");
+        let response: Webhook = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+
+    #[test]
+    fn test_contract_webhooks_response() {
+        let json = include_str!("../../tests/fixtures/webhooks_response.json");
+        let response: WebhooksResponse = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
 }
 
 /// Integration tests using raps-mock
 ///
-/// The mock's `create_webhook` response is missing the `event` field required
-/// by the `Webhook` type, so `create_webhook` client method fails to parse.
-/// Also, `get_webhook` and `update_webhook` routes are not registered in the mock.
-/// All CRUD operations therefore use raw HTTP to verify the request/response cycle.
-/// The `list_webhooks` and `list_all_webhooks` client methods work since the mock's
-/// list response includes all required fields.
+/// Create, list, and delete operations use the client API.
+/// `get_webhook` and `update_webhook` routes are not registered in the mock,
+/// so those operations still use raw HTTP to verify the request/response cycle.
 #[cfg(test)]
 mod integration_tests {
     use super::*;
@@ -623,61 +636,46 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn test_create_webhook_raw_http() {
+    async fn test_create_webhook_client_method() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let token = acquire_mock_token(&server.url).await;
+        let (client, _token) = setup_client_with_token(&server.url).await;
 
-        let http = reqwest::Client::new();
-        let resp = http
-            .post(format!(
-                "{}/webhooks/v1/systems/data/events/dm.version.added/hooks",
-                server.url
-            ))
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "callbackUrl": "https://example.com/webhook",
-                "scope": { "folder": "urn:adsk.wipprod:fs.folder:test-folder" },
-                "autoReactivateHook": true
-            }))
-            .send()
-            .await
-            .unwrap();
+        let result = client
+            .create_webhook(
+                "data",
+                "dm.version.added",
+                "https://example.com/webhook",
+                Some("urn:adsk.wipprod:fs.folder:test-folder"),
+            )
+            .await;
         assert!(
-            resp.status().is_success() || resp.status().as_u16() == 201,
-            "create webhook returned {}",
-            resp.status()
+            result.is_ok(),
+            "create_webhook failed: {:?}",
+            result.err()
         );
-        let body: serde_json::Value = resp.json().await.unwrap();
-        assert!(body["hookId"].is_string(), "response should contain hookId");
-        assert!(body["status"].is_string(), "response should contain status");
-        assert_eq!(body["status"], "active");
+        let webhook = result.unwrap();
+        assert!(!webhook.hook_id.is_empty());
+        assert_eq!(webhook.status, "active");
+        assert_eq!(webhook.callback_url, "https://example.com/webhook");
     }
 
     #[tokio::test]
-    async fn test_create_webhook_without_folder_raw_http() {
+    async fn test_create_webhook_without_folder_client_method() {
         let server = raps_mock::TestServer::start_default().await.unwrap();
-        let token = acquire_mock_token(&server.url).await;
+        let (client, _token) = setup_client_with_token(&server.url).await;
 
-        let http = reqwest::Client::new();
-        let resp = http
-            .post(format!(
-                "{}/webhooks/v1/systems/data/events/dm.folder.added/hooks",
-                server.url
-            ))
-            .bearer_auth(&token)
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({
-                "callbackUrl": "https://example.com/folder-hook",
-                "scope": {}
-            }))
-            .send()
-            .await
-            .unwrap();
+        let result = client
+            .create_webhook(
+                "data",
+                "dm.folder.added",
+                "https://example.com/folder-hook",
+                None,
+            )
+            .await;
         assert!(
-            resp.status().is_success() || resp.status().as_u16() == 201,
-            "create webhook without folder returned {}",
-            resp.status()
+            result.is_ok(),
+            "create_webhook without folder failed: {:?}",
+            result.err()
         );
     }
 

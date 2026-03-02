@@ -1395,6 +1395,213 @@ steps:
         assert_eq!(retry.max_attempts, 2);
         assert_eq!(retry.delay, "3s");
     }
+
+    // ==================== Variable Substitution Tests ====================
+
+    #[test]
+    fn test_substitute_variables_basic() {
+        let mut vars = HashMap::new();
+        vars.insert("BUCKET".to_string(), "my-bucket".to_string());
+        let result = substitute_variables("bucket info ${BUCKET}", &vars).unwrap();
+        assert_eq!(result, "bucket info my-bucket");
+    }
+
+    #[test]
+    fn test_substitute_variables_multiple() {
+        let mut vars = HashMap::new();
+        vars.insert("BUCKET".to_string(), "my-bucket".to_string());
+        vars.insert("FILE".to_string(), "model.rvt".to_string());
+        let result =
+            substitute_variables("object upload ${BUCKET} ${FILE}", &vars).unwrap();
+        assert_eq!(result, "object upload my-bucket model.rvt");
+    }
+
+    #[test]
+    fn test_substitute_variables_no_vars() {
+        let vars = HashMap::new();
+        let result = substitute_variables("auth test", &vars).unwrap();
+        assert_eq!(result, "auth test");
+    }
+
+    #[test]
+    fn test_substitute_variables_shell_metachar_rejected() {
+        let mut vars = HashMap::new();
+        vars.insert("BAD".to_string(), "value; rm -rf /".to_string());
+        let result = substitute_variables("echo ${BAD}", &vars);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("metacharacters")
+        );
+    }
+
+    #[test]
+    fn test_substitute_variables_pipe_rejected() {
+        let mut vars = HashMap::new();
+        vars.insert("CMD".to_string(), "ls | cat".to_string());
+        assert!(substitute_variables("${CMD}", &vars).is_err());
+    }
+
+    #[test]
+    fn test_substitute_variables_dollar_sign_in_value() {
+        let mut vars = HashMap::new();
+        vars.insert("VAR".to_string(), "has$dollar".to_string());
+        assert!(substitute_variables("${VAR}", &vars).is_err());
+    }
+
+    // ==================== Validate Steps Tests ====================
+
+    #[test]
+    fn test_validate_steps_valid_command() {
+        let steps = vec![Step {
+            name: "Valid".to_string(),
+            command: Some("bucket list".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_steps_no_action() {
+        let steps = vec![Step {
+            name: "Empty".to_string(),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("must have at least one of"));
+    }
+
+    #[test]
+    fn test_validate_steps_for_each_without_command_or_steps() {
+        let steps = vec![Step {
+            name: "Bad ForEach".to_string(),
+            for_each: Some(ForEachConfig {
+                var: "x".to_string(),
+                items: vec!["a".to_string()],
+                parallel: false,
+                max_concurrency: None,
+            }),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("no command or steps")));
+    }
+
+    #[test]
+    fn test_validate_steps_if_and_unless_warning() {
+        let steps = vec![Step {
+            name: "Both Conditions".to_string(),
+            command: Some("auth test".to_string()),
+            if_expr: Some("true".to_string()),
+            unless: Some("false".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.is_empty());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("both 'if' and 'unless'"));
+    }
+
+    #[test]
+    fn test_validate_steps_invalid_retry() {
+        let steps = vec![Step {
+            name: "Bad Retry".to_string(),
+            command: Some("auth test".to_string()),
+            retry: Some(RetryConfig {
+                max_attempts: 0,
+                backoff: BackoffStrategy::Fixed,
+                delay: "5s".to_string(),
+                on: vec![],
+            }),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("max_attempts must be >= 1")));
+    }
+
+    #[test]
+    fn test_validate_steps_invalid_timeout() {
+        let steps = vec![Step {
+            name: "Bad Timeout".to_string(),
+            command: Some("auth test".to_string()),
+            timeout: Some("not-a-duration".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("not a valid duration")));
+    }
+
+    // ==================== Expression Evaluation Tests ====================
+
+    #[test]
+    fn test_eval_expr_and() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 0 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_and_false() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 1 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(!eval_expression(
+            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_or() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 1 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 0 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_negation() {
+        let mut ctx = HashMap::new();
+        ctx.insert("step1".to_string(), StepResult { exit_code: 1 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ !steps.step1.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_parse_duration_edge_cases() {
+        assert_eq!(parse_duration("0s").unwrap(), std::time::Duration::from_secs(0));
+        assert_eq!(parse_duration("1s").unwrap(), std::time::Duration::from_secs(1));
+        assert_eq!(parse_duration("1m").unwrap(), std::time::Duration::from_secs(60));
+        assert_eq!(parse_duration("1h").unwrap(), std::time::Duration::from_secs(3600));
+        assert!(parse_duration("5d").is_err());
+        assert!(parse_duration("  ").is_err());
+    }
 }
 
 // ---------------------------------------------------------------------------

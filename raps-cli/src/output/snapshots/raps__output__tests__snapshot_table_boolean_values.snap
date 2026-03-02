@@ -1,0 +1,11 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 217
+expression: result
+---
+enabled  name     
+──────────────────
+true     Feature A
+false    Feature B
+
+2 row(s)

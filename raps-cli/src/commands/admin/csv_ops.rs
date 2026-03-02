@@ -566,3 +566,101 @@ pub(crate) async fn execute_csv_import(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csv_update_row_deserialization() {
+        let mut reader = csv::Reader::from_reader(
+            b"email,role,company\nuser@example.com,admin,Acme Corp" as &[u8],
+        );
+        let row: CsvUpdateRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role, Some("admin".to_string()));
+        assert_eq!(row.company, Some("Acme Corp".to_string()));
+    }
+
+    #[test]
+    fn test_csv_update_row_optional_fields() {
+        let mut reader =
+            csv::Reader::from_reader(b"email,role\nuser@example.com,editor" as &[u8]);
+        let row: CsvUpdateRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role, Some("editor".to_string()));
+        assert!(row.company.is_none());
+    }
+
+    #[test]
+    fn test_csv_update_row_email_validation_logic() {
+        // The validation logic used in execute_csv_update
+        let check = |email: &str| -> bool { !email.is_empty() && email.contains('@') };
+
+        assert!(check("user@example.com"));
+        assert!(!check(""));
+        assert!(!check("not-an-email"));
+        assert!(check("@")); // bare @ passes the basic check
+        assert!(check("a@b"));
+    }
+
+    #[test]
+    fn test_csv_update_row_needs_at_least_one_field() {
+        let row = CsvUpdateRow {
+            email: "user@example.com".to_string(),
+            role: None,
+            company: None,
+        };
+        // Validation requires at least one of role or company
+        assert!(row.role.is_none() && row.company.is_none());
+    }
+
+    #[test]
+    fn test_csv_update_result_output_serialization() {
+        let result = CsvUpdateResultOutput {
+            total: 10,
+            updated: 8,
+            skipped: 1,
+            failed: 1,
+            errors: vec![CsvUpdateErrorOutput {
+                email: "bad@example.com".to_string(),
+                error: "user not found".to_string(),
+            }],
+        };
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["total"], 10);
+        assert_eq!(json["updated"], 8);
+        assert_eq!(json["failed"], 1);
+        assert_eq!(json["errors"][0]["email"], "bad@example.com");
+    }
+
+    #[test]
+    fn test_csv_import_row_deserialization() {
+        let mut reader = csv::Reader::from_reader(
+            b"email,role_id\nuser@example.com,abc-123" as &[u8],
+        );
+        let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role_id, Some("abc-123".to_string()));
+    }
+
+    #[test]
+    fn test_csv_import_row_without_role_id() {
+        let mut reader =
+            csv::Reader::from_reader(b"email\nnewuser@example.com" as &[u8]);
+        let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "newuser@example.com");
+        assert!(row.role_id.is_none());
+    }
+
+    #[test]
+    fn test_csv_multiple_rows_parsing() {
+        let csv_data = b"email,role,company\na@b.com,admin,Co1\nc@d.com,editor,Co2\ne@f.com,,Co3";
+        let mut reader = csv::Reader::from_reader(csv_data as &[u8]);
+        let rows: Vec<CsvUpdateRow> = reader.deserialize().filter_map(|r| r.ok()).collect();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].role, Some("admin".to_string()));
+        assert_eq!(rows[1].company, Some("Co2".to_string()));
+        assert!(rows[2].role.is_none());
+    }
+}

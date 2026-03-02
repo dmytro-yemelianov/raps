@@ -1,0 +1,35 @@
+---
+source: raps-da/src/types.rs
+assertion_line: 505
+expression: response
+---
+PaginatedResponse {
+    data: [
+        Engine {
+            id: "Autodesk.Revit+2024",
+            description: Some(
+                "Revit 2024 Engine",
+            ),
+            product_version: Some(
+                "2024.0.1",
+            ),
+        },
+        Engine {
+            id: "Autodesk.AutoCAD+24",
+            description: Some(
+                "AutoCAD 2024 Engine",
+            ),
+            product_version: Some(
+                "24.0",
+            ),
+        },
+        Engine {
+            id: "Autodesk.3dsMax+2024",
+            description: None,
+            product_version: None,
+        },
+    ],
+    pagination_token: Some(
+        "next-engine-page",
+    ),
+}

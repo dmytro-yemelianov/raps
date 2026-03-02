@@ -1,0 +1,10 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 204
+expression: output
+---
+name: pipeline
+enabled: true
+items:
+- step1
+- step2
