@@ -133,3 +133,50 @@ pub(super) async fn transition_issue(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transitions_from_open() {
+        let allowed = get_allowed_transitions("open");
+        assert!(allowed.contains(&"answered"));
+        assert!(allowed.contains(&"closed"));
+        assert!(!allowed.contains(&"draft"));
+    }
+
+    #[test]
+    fn test_transitions_from_answered() {
+        let allowed = get_allowed_transitions("answered");
+        assert!(allowed.contains(&"open"));
+        assert!(allowed.contains(&"closed"));
+    }
+
+    #[test]
+    fn test_transitions_from_closed() {
+        let allowed = get_allowed_transitions("closed");
+        assert_eq!(allowed, vec!["open"]);
+    }
+
+    #[test]
+    fn test_transitions_from_draft() {
+        let allowed = get_allowed_transitions("draft");
+        assert_eq!(allowed, vec!["open"]);
+    }
+
+    #[test]
+    fn test_transitions_unknown_status_returns_defaults() {
+        let allowed = get_allowed_transitions("unknown");
+        assert!(allowed.contains(&"open"));
+        assert!(allowed.contains(&"answered"));
+        assert!(allowed.contains(&"closed"));
+    }
+
+    #[test]
+    fn test_transitions_case_insensitive() {
+        let allowed = get_allowed_transitions("OPEN");
+        assert!(allowed.contains(&"answered"));
+        assert!(allowed.contains(&"closed"));
+    }
+}

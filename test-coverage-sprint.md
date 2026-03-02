@@ -34,7 +34,14 @@
 - translate/presets.rs: 5 tests (default_presets — not empty, no duplicates, format validation, serialization roundtrip)
 - raps-cli: 835 tests (268 unit + 526 integration + 41 dashboard), 0 failures
 
+## Phase 6: Transitions, Hub Types, Report Helpers & Serve Tests ✅
+- issue/transitions.rs: 6 tests (get_allowed_transitions — open/answered/closed/draft/unknown/case)
+- hub.rs: 6 tests (extract_hub_type — bim360/acc/a360/fusion/unknown/no-colon)
+- report/tests.rs: 7 tests (count_status mock, parse_project_filter, truncate_name boundaries)
+- serve.rs: 8 tests (payload_type_name variants, verify_webhook_signature, default_priority — behind `kubernetes` feature)
+- raps-cli: 892 tests (309 unit + 526 integration + 57 feature-gated), 0 failures
+
 ## Current State
-- **All 5 phases complete**
-- **raps-cli: 835 tests, 0 failures** (with `--features dashboard`)
+- **All 6 phases complete**
+- **raps-cli: 892 tests, 0 failures** (with `--all-features`)
 - **Codecov: ~25% → improved** (exact number pending CI run)

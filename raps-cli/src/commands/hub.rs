@@ -201,3 +201,38 @@ fn extract_hub_type(ext_type: &str) -> String {
             .to_string()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_hub_type_bim360() {
+        assert_eq!(extract_hub_type("hubs:autodesk.bim360:Account"), "BIM 360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_acc() {
+        assert_eq!(extract_hub_type("hubs:autodesk.accproject:Account"), "ACC");
+    }
+
+    #[test]
+    fn test_extract_hub_type_a360() {
+        assert_eq!(extract_hub_type("hubs:autodesk.a360:Personal"), "A360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_fusion() {
+        assert_eq!(extract_hub_type("hubs:autodesk.fusion:Team"), "Fusion");
+    }
+
+    #[test]
+    fn test_extract_hub_type_unknown_uses_last_segment() {
+        assert_eq!(extract_hub_type("hubs:custom:MyType"), "MyType");
+    }
+
+    #[test]
+    fn test_extract_hub_type_no_colon() {
+        assert_eq!(extract_hub_type("something"), "something");
+    }
+}
