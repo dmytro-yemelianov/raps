@@ -1,0 +1,64 @@
+# Example GitHub Actions workflow: translate models using RAPS serverless dispatch.
+#
+# Triggers on push to models/ directory. Installs RAPS, authenticates,
+# and dispatches translations to Fly.io ephemeral machines.
+
+name: Translate Models
+
+on:
+  push:
+    paths:
+      - "models/**"
+  workflow_dispatch:
+    inputs:
+      urn:
+        description: "Model URN to translate"
+        required: true
+      format:
+        description: "Output format (svf2, obj, stl, step)"
+        required: false
+        default: "svf2"
+
+env:
+  RAPS_VERSION: "5.1.0"
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install RAPS
+        run: |
+          curl -fsSL https://rapscli.xyz/install.sh | bash -s -- --version ${{ env.RAPS_VERSION }}
+          echo "$HOME/.raps/bin" >> $GITHUB_PATH
+
+      - name: Authenticate
+        env:
+          APS_CLIENT_ID: ${{ secrets.APS_CLIENT_ID }}
+          APS_CLIENT_SECRET: ${{ secrets.APS_CLIENT_SECRET }}
+        run: raps auth test
+
+      - name: Translate (serverless)
+        env:
+          APS_CLIENT_ID: ${{ secrets.APS_CLIENT_ID }}
+          APS_CLIENT_SECRET: ${{ secrets.APS_CLIENT_SECRET }}
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_APP: ${{ secrets.FLY_APP }}
+        run: |
+          raps translate start \
+            ${{ github.event.inputs.urn || '' }} \
+            --format ${{ github.event.inputs.format || 'svf2' }} \
+            --serverless \
+            --wait \
+            --output json
+
+      - name: Verify translation
+        env:
+          APS_CLIENT_ID: ${{ secrets.APS_CLIENT_ID }}
+          APS_CLIENT_SECRET: ${{ secrets.APS_CLIENT_SECRET }}
+        run: |
+          if [ -n "${{ github.event.inputs.urn }}" ]; then
+            raps translate status ${{ github.event.inputs.urn }}
+          fi

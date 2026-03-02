@@ -1,0 +1,17 @@
+{
+  "name": "@raps/webhook-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker — APS webhook gateway with Durable Object event backlog",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0",
+    "vitest": "^3.0.0"
+  }
+}

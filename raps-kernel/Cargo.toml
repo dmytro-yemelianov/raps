@@ -11,6 +11,7 @@ rust-version.workspace = true
 [features]
 default = []
 test-utils = []
+redis = ["dep:deadpool-redis", "dep:redis", "dep:hostname"]
 
 [dependencies]
 # Error handling
@@ -81,6 +82,17 @@ dashmap.workspace = true
 lru.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
+
+# Async trait for dyn-safe cache/queue traits
+async-trait.workspace = true
+
+# TOML config parsing (swarm.toml)
+toml.workspace = true
+
+# Redis (optional, feature-gated)
+deadpool-redis = { workspace = true, optional = true }
+redis = { workspace = true, optional = true }
+hostname = { workspace = true, optional = true }
 
 [dev-dependencies]
 raps-mock.workspace = true

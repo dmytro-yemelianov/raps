@@ -142,6 +142,8 @@ pub const TOOLS: &[&str] = &[
     "workflow_prepare_for_viewing",
     "workflow_analyze_model",
     "workflow_batch_translate",
+    "workflow_compare_versions",
+    "workflow_setup_project",
     "swarm_status",
 ];
 
@@ -153,8 +155,8 @@ mod tests {
     fn test_tools_array_count() {
         assert_eq!(
             TOOLS.len(),
-            109,
-            "TOOLS array has {} entries, expected 109 — sync with get_tools() in server.rs",
+            111,
+            "TOOLS array has {} entries, expected 111 — sync with get_tools() in server.rs",
             TOOLS.len()
         );
     }

@@ -100,6 +100,44 @@ pub enum WebhookCommands {
         #[arg(long)]
         secret: String,
     },
+
+    /// Deploy the Cloudflare Worker webhook gateway (serverless)
+    Serve {
+        /// Deploy as a serverless Cloudflare Worker
+        #[arg(long)]
+        serverless: bool,
+
+        /// Cloudflare account ID (or CLOUDFLARE_ACCOUNT_ID env)
+        #[arg(long, env = "CLOUDFLARE_ACCOUNT_ID")]
+        account_id: Option<String>,
+
+        /// APS webhook signing secret (set via wrangler secret)
+        #[arg(long)]
+        webhook_secret: Option<String>,
+
+        /// Optional relay URL — forward events to this URL after storing
+        #[arg(long)]
+        relay_url: Option<String>,
+    },
+
+    /// Drain stored events from the Cloudflare Worker gateway
+    Drain {
+        /// Gateway URL (or RAPS_GATEWAY_URL env)
+        #[arg(long, env = "RAPS_GATEWAY_URL")]
+        gateway_url: String,
+
+        /// API key for authentication (or RAPS_GATEWAY_API_KEY env)
+        #[arg(long, env = "RAPS_GATEWAY_API_KEY")]
+        api_key: Option<String>,
+
+        /// Write events to this file (default: stdout)
+        #[arg(long = "out-file")]
+        out_file: Option<std::path::PathBuf>,
+
+        /// Maximum events to drain
+        #[arg(long, default_value = "100")]
+        limit: u32,
+    },
 }
 
 impl WebhookCommands {
@@ -146,6 +184,21 @@ impl WebhookCommands {
                 signature,
                 secret,
             } => verify_signature(&payload, &signature, &secret, output_format),
+            WebhookCommands::Serve {
+                serverless,
+                account_id,
+                webhook_secret,
+                relay_url,
+            } => {
+                webhook_serve(serverless, account_id, webhook_secret, relay_url, output_format)
+                    .await
+            }
+            WebhookCommands::Drain {
+                gateway_url,
+                api_key,
+                out_file,
+                limit,
+            } => webhook_drain(&gateway_url, api_key, out_file, limit, output_format).await,
         }
     }
 }
@@ -705,6 +758,143 @@ fn verify_signature(
         }
         _ => {
             output_format.write(&output)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Serve (deploy Cloudflare Worker)
+// ---------------------------------------------------------------------------
+
+async fn webhook_serve(
+    serverless: bool,
+    _account_id: Option<String>,
+    webhook_secret: Option<String>,
+    relay_url: Option<String>,
+    _output_format: OutputFormat,
+) -> Result<()> {
+    if !serverless {
+        anyhow::bail!(
+            "Use --serverless to deploy the webhook gateway as a Cloudflare Worker.\n\
+             For local webhook testing, use: raps webhook test <url>"
+        );
+    }
+
+    println!("{}", "Deploying RAPS Webhook Gateway to Cloudflare Workers...".bold());
+
+    // Set secrets via wrangler if provided
+    if let Some(ref secret) = webhook_secret {
+        println!("  Setting APS_WEBHOOK_SECRET...");
+        let status = std::process::Command::new("wrangler")
+            .args(["secret", "put", "APS_WEBHOOK_SECRET"])
+            .stdin(std::process::Stdio::piped())
+            .current_dir("workers/webhook-gateway")
+            .spawn()
+            .and_then(|mut child| {
+                use std::io::Write;
+                if let Some(ref mut stdin) = child.stdin {
+                    stdin.write_all(secret.as_bytes())?;
+                }
+                child.wait()
+            })
+            .context("Failed to run wrangler secret put")?;
+
+        if !status.success() {
+            anyhow::bail!("wrangler secret put failed");
+        }
+    }
+
+    // Set relay URL as env if provided
+    if let Some(ref url) = relay_url {
+        println!("  Setting RELAY_CALLBACK_URL: {}", url);
+    }
+
+    // Deploy
+    println!("  Running wrangler deploy...");
+    let output = std::process::Command::new("wrangler")
+        .arg("deploy")
+        .current_dir("workers/webhook-gateway")
+        .output()
+        .context("Failed to run wrangler deploy — is wrangler installed?")?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        println!("{} Webhook gateway deployed", "✓".green());
+
+        // Try to extract the public URL from wrangler output
+        for line in stdout.lines() {
+            if line.contains("https://") {
+                println!("  URL: {}", line.trim());
+            }
+        }
+        println!("\n  Configure your APS webhook callback to: <worker-url>/aps/webhook");
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("wrangler deploy failed:\n{}", stderr);
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Drain (pull events from gateway)
+// ---------------------------------------------------------------------------
+
+async fn webhook_drain(
+    gateway_url: &str,
+    api_key: Option<String>,
+    out_file: Option<std::path::PathBuf>,
+    limit: u32,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let url = format!("{}/events?limit={}", gateway_url.trim_end_matches('/'), limit);
+
+    let client = reqwest::Client::new();
+    let mut req = client.get(&url);
+
+    if let Some(ref key) = api_key {
+        req = req.bearer_auth(key);
+    }
+
+    let resp = req.send().await.context("Failed to reach webhook gateway")?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        anyhow::bail!("Gateway returned {}: {}", status, text);
+    }
+
+    let body: serde_json::Value = resp.json().await.context("Invalid JSON from gateway")?;
+
+    // Write to file or stdout
+    if let Some(ref path) = out_file {
+        let json = serde_json::to_string_pretty(&body)?;
+        std::fs::write(path, &json)
+            .with_context(|| format!("Failed to write {}", path.display()))?;
+        println!("{} Events written to {}", "✓".green(), path.display());
+    } else {
+        match output_format {
+            OutputFormat::Table => {
+                let events = body["events"].as_array();
+                let count = body["count"].as_u64().unwrap_or(0);
+                if count == 0 {
+                    println!("No events in backlog.");
+                } else {
+                    println!("{} ({} events)", "Webhook Events".bold(), count);
+                    if let Some(evts) = events {
+                        for evt in evts {
+                            let id = evt["id"].as_str().unwrap_or("?");
+                            let received = evt["received_at"].as_str().unwrap_or("?");
+                            println!("  {} received_at={}", id, received);
+                        }
+                    }
+                }
+            }
+            _ => {
+                output_format.write(&body)?;
+            }
         }
     }
 

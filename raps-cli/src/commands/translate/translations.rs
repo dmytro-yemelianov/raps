@@ -578,3 +578,118 @@ fn truncate_str(s: &str, max_len: usize) -> String {
         format!("{}...", &s[..max_len - 3])
     }
 }
+
+// ---------------------------------------------------------------------------
+// Serverless dispatch
+// ---------------------------------------------------------------------------
+
+/// Dispatch a translation job to a serverless Fly.io machine.
+pub(super) async fn start_serverless(
+    urn: Option<String>,
+    format: Option<String>,
+    root_filename: Option<String>,
+    region: String,
+    force: bool,
+    wait: bool,
+    notify: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use raps_kernel::serverless::{ServerlessDispatchAgent, TranslateJobRequest};
+
+    let urn = match urn {
+        Some(u) => u,
+        None => prompts::input("URN", None)?,
+    };
+    let format = match format {
+        Some(f) => f,
+        None => prompts::input("Output format", Some("svf2"))?,
+    };
+
+    let job = TranslateJobRequest {
+        urn: urn.clone(),
+        output_format: format.clone(),
+        root_filename,
+        region: Some(region),
+        force,
+    };
+
+    let agent = ServerlessDispatchAgent::from_config()
+        .context("Failed to load serverless config from swarm.toml")?;
+
+    println!(
+        "{} Dispatching to Fly.io: {} -> {}",
+        "▶".cyan(),
+        truncate_str(&urn, 30),
+        format,
+    );
+
+    let receipt = agent.dispatch_translate(&job).await?;
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct ServerlessDispatchOutput {
+        machine_id: String,
+        region: String,
+        state: String,
+        app: String,
+    }
+
+    let out = ServerlessDispatchOutput {
+        machine_id: receipt.machine_id.clone(),
+        region: receipt.region.clone(),
+        state: receipt.state.clone(),
+        app: receipt.app.clone(),
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("{} Dispatched to Fly.io", "✓".green());
+            println!("  Machine: {}", receipt.machine_id);
+            println!("  Region:  {}", receipt.region);
+            println!("  State:   {}", receipt.state);
+            println!("  App:     {}", receipt.app);
+        }
+        _ => {
+            output_format.write(&out)?;
+        }
+    }
+
+    if notify {
+        let msg = format!(
+            "RAPS: Translation dispatched — URN: {}, Machine: {}, Region: {}",
+            truncate_str(&urn, 40),
+            receipt.machine_id,
+            receipt.region,
+        );
+        if let Err(e) = agent.notify_slack(&msg).await {
+            eprintln!("{} Slack notification failed: {}", "!".yellow(), e);
+        }
+    }
+
+    if wait {
+        println!("{} Polling machine status...", "⏳".dimmed());
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            match agent.machine_status(&receipt.machine_id).await {
+                Ok(status) => {
+                    match status.state.as_str() {
+                        "stopped" | "destroyed" => {
+                            println!("{} Machine finished (state: {})", "✓".green(), status.state);
+                            break;
+                        }
+                        "failed" => {
+                            anyhow::bail!("Machine failed — check Fly.io dashboard");
+                        }
+                        _ => {
+                            println!("  State: {} ...", status.state);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("{} Status check failed: {}", "!".yellow(), e);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}

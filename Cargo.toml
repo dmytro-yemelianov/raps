@@ -141,9 +141,19 @@ tar = "0.4"
 # File locking for concurrent operations
 fs2 = "0.4"
 
+# Async trait for dyn-safe async traits
+async-trait = "0.1"
+
 # Concurrent data structures
 dashmap = "6"
 lru = "0.12"
+
+# Redis (feature-gated)
+deadpool-redis = "0.18"
+redis = { version = "0.27", features = ["tokio-comp", "streams"] }
+
+# Worker hostname
+hostname = "0.4"
 
 # Testing
 assert_cmd = "2.1"
