@@ -1,0 +1,15 @@
+# RAPS Webhook Receiver — receives APS webhook POSTs, publishes to Redis Stream
+# Build: docker build -f deploy/docker/Dockerfile.webhook -t rapscli/raps-webhook .
+
+FROM rust:1.88-alpine AS builder
+RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf
+WORKDIR /build
+COPY . .
+RUN cargo build --release --features kubernetes -p raps-cli \
+    && strip target/release/raps
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /build/target/release/raps /usr/local/bin/raps
+ENTRYPOINT ["raps"]
+CMD ["serve", "webhook"]

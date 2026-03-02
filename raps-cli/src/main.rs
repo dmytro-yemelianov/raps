@@ -104,7 +104,8 @@ const GROUPED_COMMANDS_HELP: &str = "\
   config        Configuration management (profiles, settings)
   completions   Generate shell completions for bash, zsh, fish, PowerShell
   shell         Start an interactive shell session
-  serve         Start MCP server for AI assistant integration
+  mcp           Start MCP server for AI assistant integration
+  serve         Start a Kubernetes service component (proxy, coordinator, webhook, dashboard)
   generate      Generate synthetic engineering files for testing
   demo          Run demo scenarios (bucket lifecycle, model pipeline, etc.)
   cache         Manage the download cache (stats, clear)
@@ -324,7 +325,12 @@ enum Commands {
     Dashboard,
 
     /// Start MCP (Model Context Protocol) server for AI assistant integration
-    Serve,
+    Mcp,
+
+    /// Start a Kubernetes service component (proxy, coordinator, webhook, dashboard)
+    #[cfg(feature = "kubernetes")]
+    #[command(subcommand)]
+    Serve(commands::serve::ServeCommands),
 
     /// Run diagnostic checks (auth, cache, config, plugins, API health)
     Doctor,
@@ -507,7 +513,7 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     // Handle MCP server command
-    if let Commands::Serve = &command {
+    if let Commands::Mcp = &command {
         mcp::server::run_server()
             .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
@@ -905,7 +911,9 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Shell => "shell",
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
-        Commands::Serve => "serve",
+        Commands::Mcp => "mcp",
+        #[cfg(feature = "kubernetes")]
+        Commands::Serve(_) => "serve",
         Commands::Doctor => "doctor",
         Commands::Cache(_) => "cache",
         Commands::Swarm(_) => "swarm",
@@ -1098,8 +1106,13 @@ async fn execute_command(
             unreachable!()
         }
 
-        Commands::Serve => {
+        Commands::Mcp => {
             unreachable!()
+        }
+
+        #[cfg(feature = "kubernetes")]
+        Commands::Serve(cmd) => {
+            cmd.execute().await?;
         }
 
         Commands::Doctor => {
