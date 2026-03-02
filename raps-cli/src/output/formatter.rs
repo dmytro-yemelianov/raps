@@ -186,3 +186,67 @@ fn format_value_for_csv(value: &serde_json::Value) -> String {
         serde_json::Value::Object(obj) => serde_json::to_string(obj).unwrap_or_default(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_format_table_null() {
+        assert_eq!(format_value_for_table(&json!(null)), "-");
+    }
+
+    #[test]
+    fn test_format_table_bool() {
+        assert_eq!(format_value_for_table(&json!(true)), "true");
+        assert_eq!(format_value_for_table(&json!(false)), "false");
+    }
+
+    #[test]
+    fn test_format_table_number() {
+        assert_eq!(format_value_for_table(&json!(42)), "42");
+        assert_eq!(format_value_for_table(&json!(3.14)), "3.14");
+    }
+
+    #[test]
+    fn test_format_table_string() {
+        assert_eq!(format_value_for_table(&json!("hello")), "hello");
+    }
+
+    #[test]
+    fn test_format_table_array() {
+        assert_eq!(format_value_for_table(&json!([1, 2])), "1, 2");
+    }
+
+    #[test]
+    fn test_format_table_empty_array() {
+        assert_eq!(format_value_for_table(&json!([])), "-");
+    }
+
+    #[test]
+    fn test_format_table_object() {
+        let obj = json!({"key": "value"});
+        let result = format_value_for_table(&obj);
+        assert!(result.contains("key"));
+        assert!(result.contains("value"));
+    }
+
+    #[test]
+    fn test_format_csv_null() {
+        assert_eq!(format_value_for_csv(&json!(null)), "");
+    }
+
+    #[test]
+    fn test_format_csv_array() {
+        assert_eq!(format_value_for_csv(&json!(["a", "b"])), "a; b");
+    }
+
+    #[test]
+    fn test_format_csv_object() {
+        let obj = json!({"key": "value"});
+        let result = format_value_for_csv(&obj);
+        assert!(result.contains("key"));
+        assert!(result.contains("value"));
+    }
+}
