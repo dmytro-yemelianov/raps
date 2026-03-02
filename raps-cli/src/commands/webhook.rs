@@ -916,3 +916,60 @@ async fn webhook_drain(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_str_exact_max() {
+        let result = truncate_str("hello", 5);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_over_max() {
+        let result = truncate_str("this is a long string", 10);
+        assert_eq!(result, "this is...");
+        assert_eq!(result.len(), 10);
+    }
+
+    #[test]
+    fn test_truncate_str_empty() {
+        let result = truncate_str("", 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_truncate_str_small_max() {
+        let result = truncate_str("abcdefgh", 4);
+        assert_eq!(result, "a...");
+        assert_eq!(result.len(), 4);
+    }
+
+    #[test]
+    fn test_webhook_list_output_serialization() {
+        let output = WebhookListOutput {
+            hook_id: "hook-123".to_string(),
+            event: "dm.version.added".to_string(),
+            callback_url: "https://example.com/webhook".to_string(),
+            status: "active".to_string(),
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["hook_id"], "hook-123");
+        assert_eq!(json["event"], "dm.version.added");
+        assert_eq!(json["callback_url"], "https://example.com/webhook");
+        assert_eq!(json["status"], "active");
+    }
+
+    #[test]
+    fn test_verify_signature_output_serialization() {
+        let output = VerifySignatureOutput {
+            valid: true,
+            message: "Signature verified".to_string(),
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["valid"], true);
+        assert_eq!(json["message"], "Signature verified");
+    }
+}
