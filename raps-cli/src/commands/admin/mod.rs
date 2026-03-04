@@ -503,14 +503,32 @@ pub(crate) async fn resolve_account_id(
     }
 
     // Auto-discover via hub list (requires 3-legged auth)
-    let hubs = dm_client
+    let all_hubs = dm_client
         .list_hubs()
         .await
         .context("Failed to list hubs for account auto-discovery. Use --account or set APS_ACCOUNT_ID.")?;
 
+    // Filter to enterprise ACC/BIM360 hubs only — personal hubs
+    // (extension_type = "hubs:autodesk.core:Hub") do not have Admin API access.
+    let hubs: Vec<_> = all_hubs
+        .into_iter()
+        .filter(|h| {
+            let ext = h
+                .attributes
+                .extension
+                .as_ref()
+                .and_then(|e| e.extension_type.as_deref())
+                .unwrap_or("");
+            !ext.contains("core:Hub")
+        })
+        .collect();
+
     match hubs.len() {
         0 => anyhow::bail!(
-            "No accessible hubs found. Use --account <id> or set APS_ACCOUNT_ID."
+            "No enterprise ACC/BIM360 accounts found.\n\
+             Admin commands require an enterprise Autodesk Construction Cloud or BIM360 account.\n\
+             Personal Autodesk accounts do not have Admin API access.\n\
+             Use --account <id> if you know your enterprise account ID."
         ),
         1 => {
             let id = hubs[0].id.clone();
@@ -521,7 +539,7 @@ pub(crate) async fn resolve_account_id(
             Ok(id)
         }
         _ => {
-            // Multiple hubs: prompt interactively or bail in non-interactive mode
+            // Multiple enterprise hubs: prompt interactively or bail in non-interactive mode
             let items: Vec<String> = hubs
                 .iter()
                 .map(|h| format!("{} — {}", h.id, h.attributes.name))
