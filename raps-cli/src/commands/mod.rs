@@ -35,6 +35,7 @@ pub mod rfi;
 pub mod schema;
 #[cfg(feature = "kubernetes")]
 pub mod serve;
+pub mod status;
 pub mod swarm;
 pub mod template;
 pub mod tracked;
