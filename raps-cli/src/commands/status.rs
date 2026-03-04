@@ -276,8 +276,8 @@ pub async fn run_status(
 
             let fmt_ctx = |val: &Option<String>, env_name: &str| -> String {
                 match val {
-                    Some(v) => format!("{:<44}  env:{}", v, env_name),
-                    None    => format!("{:<44}  env:{}", "(not set)", env_name),
+                    Some(v) => format!("{:<42}  env:{}", truncate(v, 42), env_name),
+                    None    => format!("{:<42}  env:{}", "(not set)", env_name),
                 }
             };
 
