@@ -25,20 +25,18 @@ pub struct HubEntry {
     pub region: Option<String>,
 }
 
-impl HubEntry {
-    /// Derive tier from APS extension_type string.
-    pub fn tier_from_extension(ext: Option<&str>) -> HubTier {
-        match ext {
-            Some(e) if e.contains("autodesk.core:Hub") => HubTier::Personal,
-            Some(e)
-                if e.contains("autodesk.bim360:Account")
-                    || e.contains("autodesk.acc:Account")
-                    || e.contains("autodesk.accproject") =>
-            {
-                HubTier::Enterprise
-            }
-            _ => HubTier::Unknown,
+/// Derive tier from APS extension_type string.
+pub fn tier_from_extension(ext: Option<&str>) -> HubTier {
+    match ext {
+        Some(e) if e.contains("autodesk.core:Hub") => HubTier::Personal,
+        Some(e)
+            if e.contains("autodesk.bim360:Account")
+                || e.contains("autodesk.acc:Account")
+                || e.contains("autodesk.accproject") =>
+        {
+            HubTier::Enterprise
         }
+        _ => HubTier::Unknown,
     }
 }
 
@@ -49,7 +47,7 @@ mod tests {
     #[test]
     fn test_personal_hub_tier() {
         assert_eq!(
-            HubEntry::tier_from_extension(Some("hubs:autodesk.core:Hub")),
+            tier_from_extension(Some("hubs:autodesk.core:Hub")),
             HubTier::Personal
         );
     }
@@ -57,7 +55,7 @@ mod tests {
     #[test]
     fn test_bim360_enterprise_tier() {
         assert_eq!(
-            HubEntry::tier_from_extension(Some("hubs:autodesk.bim360:Account")),
+            tier_from_extension(Some("hubs:autodesk.bim360:Account")),
             HubTier::Enterprise
         );
     }
@@ -65,7 +63,7 @@ mod tests {
     #[test]
     fn test_acc_enterprise_tier() {
         assert_eq!(
-            HubEntry::tier_from_extension(Some("hubs:autodesk.acc:Account")),
+            tier_from_extension(Some("hubs:autodesk.acc:Account")),
             HubTier::Enterprise
         );
     }
@@ -73,16 +71,16 @@ mod tests {
     #[test]
     fn test_accproject_enterprise_tier() {
         assert_eq!(
-            HubEntry::tier_from_extension(Some("hubs:autodesk.accproject:Hub")),
+            tier_from_extension(Some("hubs:autodesk.accproject:Hub")),
             HubTier::Enterprise
         );
     }
 
     #[test]
     fn test_unknown_tier() {
-        assert_eq!(HubEntry::tier_from_extension(None), HubTier::Unknown);
+        assert_eq!(tier_from_extension(None), HubTier::Unknown);
         assert_eq!(
-            HubEntry::tier_from_extension(Some("hubs:autodesk.fusion:Hub")),
+            tier_from_extension(Some("hubs:autodesk.fusion:Hub")),
             HubTier::Unknown
         );
     }
