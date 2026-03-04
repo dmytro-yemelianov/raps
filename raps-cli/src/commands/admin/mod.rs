@@ -250,6 +250,25 @@ pub enum UserCommands {
         #[arg(long, value_name = "FILE")]
         from_csv: PathBuf,
     },
+
+    /// Add a user as Project Admin to all active projects in an account
+    #[command(name = "add-to-all-projects")]
+    AddToAllProjects {
+        /// Email address of the user to add
+        email: String,
+
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
+
+        /// Preview changes without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// Folder permission management subcommands

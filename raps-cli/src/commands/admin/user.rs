@@ -771,6 +771,248 @@ impl UserCommands {
             UserCommands::Import { project, from_csv } => {
                 execute_csv_import(config, auth_client, &project, &from_csv, output_format).await
             }
+
+            UserCommands::AddToAllProjects {
+                email,
+                account,
+                concurrency,
+                dry_run,
+            } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency).min(50);
+                let account_id = get_account_id(account)?;
+                let http_config = HttpClientConfig::default();
+
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config.clone(),
+                );
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                );
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Add user {} as Project Admin to all active projects in account {}",
+                        "→".cyan(),
+                        email.green(),
+                        account_id.cyan()
+                    );
+                    println!("  Concurrency: {}", concurrency);
+                    if dry_run {
+                        println!("  {} Dry-run mode enabled", "⚠".yellow());
+                    }
+                    println!();
+                }
+
+                // Fetch all projects and filter to active
+                let all_projects = admin_client.list_all_projects(&account_id).await?;
+                let active_projects: Vec<_> = all_projects
+                    .into_iter()
+                    .filter(|p| {
+                        p.status
+                            .as_deref()
+                            .map(|s| s.eq_ignore_ascii_case("active"))
+                            .unwrap_or(false)
+                    })
+                    .collect();
+
+                if active_projects.is_empty() {
+                    if output_format.supports_colors() {
+                        println!("{}", "No active projects found.".yellow());
+                    }
+                    return Ok(());
+                }
+
+                if output_format.supports_colors() {
+                    println!(
+                        "  Found {} active project(s)",
+                        active_projects.len().to_string().cyan()
+                    );
+                    println!();
+                }
+
+                if dry_run {
+                    #[derive(Serialize, schemars::JsonSchema)]
+                    struct DryRunOutput {
+                        email: String,
+                        projects: Vec<DryRunProject>,
+                    }
+                    #[derive(Serialize, schemars::JsonSchema)]
+                    struct DryRunProject {
+                        id: String,
+                        name: String,
+                    }
+
+                    let projects: Vec<DryRunProject> = active_projects
+                        .iter()
+                        .map(|p| DryRunProject {
+                            id: p.id.clone(),
+                            name: p.name.clone(),
+                        })
+                        .collect();
+
+                    match output_format {
+                        OutputFormat::Table => {
+                            for p in &projects {
+                                println!(
+                                    "  {} Would add to: {} ({})",
+                                    "→".dimmed(),
+                                    p.name.cyan(),
+                                    p.id.dimmed()
+                                );
+                            }
+                            println!();
+                            println!(
+                                "{} Dry run: {} project(s) would be affected",
+                                "✓".green().bold(),
+                                projects.len()
+                            );
+                        }
+                        _ => {
+                            output_format.write(&DryRunOutput {
+                                email: email.clone(),
+                                projects,
+                            })?;
+                        }
+                    }
+                    return Ok(());
+                }
+
+                // Execute concurrently
+                use futures_util::stream::{self, StreamExt};
+                use std::sync::atomic::{AtomicUsize, Ordering};
+
+                let succeeded = AtomicUsize::new(0);
+                let failed = AtomicUsize::new(0);
+                let skipped = AtomicUsize::new(0);
+
+                #[derive(Serialize, schemars::JsonSchema)]
+                struct ProjectResult {
+                    project_id: String,
+                    project_name: String,
+                    status: String,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    error: Option<String>,
+                }
+
+                let results: Vec<ProjectResult> = stream::iter(active_projects)
+                    .map(|project| {
+                        let users_client = &users_client;
+                        let email = &email;
+                        let succeeded = &succeeded;
+                        let failed = &failed;
+                        let skipped = &skipped;
+                        async move {
+                            let request = raps_acc::users::AddProjectUserRequest {
+                                email: email.clone(),
+                                role_id: None,
+                                products: vec![],
+                            };
+                            match users_client.add_user(&project.id, request).await {
+                                Ok(_) => {
+                                    succeeded.fetch_add(1, Ordering::Relaxed);
+                                    ProjectResult {
+                                        project_id: project.id,
+                                        project_name: project.name,
+                                        status: "added".to_string(),
+                                        error: None,
+                                    }
+                                }
+                                Err(e) => {
+                                    let err_str = e.to_string();
+                                    if err_str.contains("409")
+                                        || err_str.to_lowercase().contains("already")
+                                        || err_str.to_lowercase().contains("exists")
+                                    {
+                                        skipped.fetch_add(1, Ordering::Relaxed);
+                                        ProjectResult {
+                                            project_id: project.id,
+                                            project_name: project.name,
+                                            status: "already_exists".to_string(),
+                                            error: None,
+                                        }
+                                    } else {
+                                        failed.fetch_add(1, Ordering::Relaxed);
+                                        ProjectResult {
+                                            project_id: project.id,
+                                            project_name: project.name,
+                                            status: "failed".to_string(),
+                                            error: Some(err_str),
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
+                    .buffer_unordered(concurrency)
+                    .collect()
+                    .await;
+
+                let total = results.len();
+                let ok = succeeded.load(Ordering::Relaxed);
+                let skip = skipped.load(Ordering::Relaxed);
+                let fail = failed.load(Ordering::Relaxed);
+
+                match output_format {
+                    OutputFormat::Table => {
+                        for r in &results {
+                            let icon = match r.status.as_str() {
+                                "added" => "✓".green().to_string(),
+                                "already_exists" => "○".yellow().to_string(),
+                                _ => "✗".red().to_string(),
+                            };
+                            print!(
+                                "  {} {} ({})",
+                                icon,
+                                r.project_name.cyan(),
+                                r.project_id.dimmed()
+                            );
+                            if let Some(ref e) = r.error {
+                                print!(" — {}", e.red());
+                            }
+                            println!();
+                        }
+
+                        println!();
+                        println!("{}", "─".repeat(60));
+                        println!(
+                            "  Total: {}  Added: {}  Already existed: {}  Failed: {}",
+                            total,
+                            ok.to_string().green(),
+                            skip.to_string().yellow(),
+                            fail.to_string().red()
+                        );
+                    }
+                    _ => {
+                        #[derive(Serialize, schemars::JsonSchema)]
+                        struct AddToAllOutput {
+                            email: String,
+                            total: usize,
+                            added: usize,
+                            already_existed: usize,
+                            failed: usize,
+                            results: Vec<ProjectResult>,
+                        }
+                        output_format.write(&AddToAllOutput {
+                            email: email.clone(),
+                            total,
+                            added: ok,
+                            already_existed: skip,
+                            failed: fail,
+                            results,
+                        })?;
+                    }
+                }
+
+                if fail > 0 {
+                    anyhow::bail!("{} project(s) failed", fail);
+                }
+
+                Ok(())
+            }
         }
     }
 }
