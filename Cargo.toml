@@ -83,7 +83,7 @@ tiny_http = "0.12"
 
 # Secure token storage
 directories = "5.0"
-keyring = "3.6"
+keyring = { version = "3.6", features = ["linux-native", "apple-native", "windows-native"] }
 
 # Memory measurement
 memory-stats = "1.2"
