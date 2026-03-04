@@ -172,8 +172,8 @@ pub(crate) fn truncate(s: &str, max_len: usize) -> String {
 /// Render one content line inside the box.
 /// Format: │  {content padded to BOX_WIDTH-2}  │  (total BOX_WIDTH visible chars)
 pub(crate) fn box_line(content: &str) -> String {
-    let inner_content = format!("  {}", truncate(content, BOX_WIDTH - 4)); // BOX_WIDTH-4 = 76 for content
-    format!("│{:<width$}│", inner_content, width = BOX_WIDTH - 2) // pad to 78
+    let inner_content = format!("  {}", truncate(content, INNER_WIDTH));
+    format!("│{:<width$}│", inner_content, width = INNER_WIDTH + 2)
 }
 
 /// Render the top border: ┌─ {title} ─…─┐  (total BOX_WIDTH visible chars)
@@ -189,7 +189,8 @@ pub(crate) fn box_bottom() -> String {
     format!("└{}┘", "─".repeat(BOX_WIDTH - 2))
 }
 
-/// Strip ANSI escape codes (used for width assertions in tests).
+/// Strip SGR ANSI escape codes (`ESC[...m`) as produced by the `colored` crate.
+/// Does NOT handle cursor-movement or OSC sequences. Used only for test width assertions.
 pub(crate) fn strip_ansi(s: &str) -> String {
     let mut out = String::new();
     let mut in_escape = false;
