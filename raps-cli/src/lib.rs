@@ -9,6 +9,7 @@
 //! components that may be useful for testing or programmatic usage.
 
 pub mod commands;
+pub mod context_banner;
 pub mod credits;
 pub mod mcp;
 pub mod output;

@@ -76,6 +76,13 @@ async fn list_hubs(client: &DataManagementClient, output_format: OutputFormat) -
         })
         .collect();
 
+    // Print context banner in table/interactive mode only
+    if matches!(output_format, crate::output::OutputFormat::Table) {
+        let banner = crate::context_banner::ContextBanner::from_hubs(&hubs);
+        banner.print_inline();
+        eprintln!();
+    }
+
     if hub_outputs.is_empty() {
         match output_format {
             OutputFormat::Table => println!("{}", "No hubs found.".yellow()),
