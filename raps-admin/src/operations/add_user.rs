@@ -16,7 +16,6 @@ use crate::bulk::executor::{
     BulkConfig, BulkExecutor, BulkOperationResult, ItemResult, ProcessItem, ProgressUpdate,
 };
 use crate::bulk::state::{StateManager, StateUpdate};
-use crate::error::AdminError;
 use crate::filter::ProjectFilter;
 use crate::types::OperationType;
 
@@ -61,17 +60,7 @@ pub async fn bulk_add_user<P>(
 where
     P: Fn(ProgressUpdate) + Send + Sync + 'static,
 {
-    // Step 1: Look up user by email to get their user ID
-    let user = admin_client
-        .find_user_by_email(account_id, user_email)
-        .await?
-        .ok_or_else(|| AdminError::UserNotFound {
-            email: user_email.to_string(),
-        })?;
-
-    let user_id = user.id.clone();
-
-    // Step 2: Get list of projects matching the filter
+    // Step 1: Get list of projects matching the filter
     let all_projects = admin_client.list_all_projects(account_id).await?;
     let filtered_projects = project_filter.apply(all_projects);
 
@@ -87,14 +76,13 @@ where
         });
     }
 
-    // Step 3: Create operation state for resumability
+    // Step 2: Create operation state for resumability
     let state_manager = StateManager::new()?;
     let project_ids: Vec<String> = filtered_projects.iter().map(|p| p.id.clone()).collect();
 
     let params = serde_json::json!({
         "account_id": account_id,
         "user_email": user_email,
-        "user_id": user_id,
         "role_id": role_id,
     });
 
@@ -112,7 +100,7 @@ where
         )
         .await?;
 
-    // Step 4: Prepare items for processing
+    // Step 3: Prepare items for processing
     let items: Vec<ProcessItem> = filtered_projects
         .into_iter()
         .map(|p| ProcessItem {
@@ -121,28 +109,28 @@ where
         })
         .collect();
 
-    // Step 5: Create the processor closure
-    let user_id_clone = user_id.clone();
+    // Step 4: Create the processor closure
+    let email_clone = user_email.to_string();
     let role_id_clone = role_id.map(|s| s.to_string());
     let users_client_clone = Arc::clone(&users_client);
 
     let processor = move |project_id: String| {
-        let user_id = user_id_clone.clone();
+        let email = email_clone.clone();
         let role_id = role_id_clone.clone();
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            add_user_to_project(&users_client, &project_id, &user_id, role_id.as_deref()).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref()).await
         }
     };
 
-    // Step 6: Execute bulk operation
+    // Step 5: Execute bulk operation
     let executor = BulkExecutor::new(config);
     let result = executor
         .execute(operation_id, items, processor, on_progress)
         .await;
 
-    // Step 7: Update final operation status
+    // Step 6: Update final operation status
     let final_status = if result.failed > 0 {
         crate::types::OperationStatus::Failed
     } else {
@@ -160,11 +148,11 @@ where
 async fn add_user_to_project(
     users_client: &ProjectUsersClient,
     project_id: &str,
-    user_id: &str,
+    email: &str,
     role_id: Option<&str>,
 ) -> ItemResult {
     // Check if user already exists in the project
-    match users_client.user_exists(project_id, user_id).await {
+    match users_client.user_exists(project_id, email).await {
         Ok(true) => {
             return ItemResult::Skipped {
                 reason: "already_exists".to_string(),
@@ -182,11 +170,12 @@ async fn add_user_to_project(
         }
     }
 
-    // Add the user to the project
+    // Add the user to the project by email; ACC sends an invitation if the
+    // user is not yet an account member.
     let request = AddProjectUserRequest {
-        email: user_id.to_string(),
+        email: email.to_string(),
         role_id: role_id.map(|s| s.to_string()),
-        products: vec![], // Default product access
+        products: vec![],
     };
 
     match users_client.add_user(project_id, request).await {
@@ -230,10 +219,10 @@ where
     let state_manager = StateManager::new()?;
     let state = state_manager.load_operation(operation_id).await?;
 
-    // Get the user ID from saved parameters
-    let user_id = state.parameters["user_id"]
+    // Get the user email from saved parameters
+    let user_email = state.parameters["user_email"]
         .as_str()
-        .context("Missing user_id in operation parameters")?
+        .context("Missing user_email in operation parameters")?
         .to_string();
 
     let role_id = state.parameters["role_id"].as_str().map(|s| s.to_string());
@@ -289,12 +278,12 @@ where
     let users_client_clone = Arc::clone(&users_client);
 
     let processor = move |project_id: String| {
-        let user_id = user_id.clone();
+        let email = user_email.clone();
         let role_id = role_id.clone();
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            add_user_to_project(&users_client, &project_id, &user_id, role_id.as_deref()).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref()).await
         }
     };
 
