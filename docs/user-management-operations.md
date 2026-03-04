@@ -13,21 +13,23 @@ raps auth login          # opens browser for 3-legged OAuth
 raps auth status         # confirm you are logged in as Account Admin
 ```
 
-**Account ID:** Required for all admin commands. Retrieve it via RAPS after logging in:
+**Account ID:** Required for all admin commands. If your Autodesk account has only one hub (the common case for a single company), RAPS auto-detects it and `--account` can be omitted entirely.
+
+To see your hub ID:
 
 ```bash
 raps hub list
 ```
 
-This lists all accessible hubs. The hub ID (e.g. `b.abc123...`) is your Account ID — use it directly:
+The hub ID (e.g. `b.abc123...`) is your Account ID. Set it as an environment variable to avoid repeating it:
 
 ```bash
 export APS_ACCOUNT_ID=<hub-id-from-raps-hub-list>
 ```
 
-Alternatively, find it in the Autodesk Construction Cloud web UI under **Account Settings > Account Info**.
+Or pass it directly on any admin command with `--account <id>`. If you have multiple hubs, RAPS will prompt you to select one when `--account` is omitted.
 
-Alternatively, pass it directly with `--account <id>` on any admin command.
+You can also find the ID in the Autodesk Construction Cloud web UI under **Account Settings > Account Info**.
 
 ---
 
