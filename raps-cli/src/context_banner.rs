@@ -210,6 +210,24 @@ pub(crate) fn strip_ansi(s: &str) -> String {
     out
 }
 
+/// Print a yellow bordered warning box to stderr when no enterprise hub is found.
+/// Called by resolve_account_id when 0 enterprise hubs are available.
+pub fn print_warning_no_enterprise() {
+    let top    = box_top("⚠  Enterprise Account Required");
+    let line1  = box_line("Admin API is not available for personal hubs.");
+    let line2  = box_line("Register your app in ACC Custom Integrations to");
+    let line3  = box_line("enable admin commands for your enterprise account.");
+    let line4  = box_line("Docs: rapscli.xyz/docs/custom-integrations");
+    let bottom = box_bottom();
+
+    eprintln!("{}", top.yellow().bold());
+    eprintln!("{}", line1.yellow());
+    eprintln!("{}", line2.yellow());
+    eprintln!("{}", line3.yellow());
+    eprintln!("{}", line4.yellow());
+    eprintln!("{}", bottom.yellow().bold());
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -356,6 +374,18 @@ mod tests {
             BOX_WIDTH,
             "box_bottom visible width should be {BOX_WIDTH}, got {}",
             bottom.chars().count()
+        );
+    }
+
+    #[test]
+    fn test_warning_box_top_width() {
+        let top = box_top("⚠  Enterprise Account Required");
+        let visible = strip_ansi(&top);
+        assert_eq!(
+            visible.chars().count(),
+            BOX_WIDTH,
+            "warning box_top visible width should be {BOX_WIDTH}, got {}",
+            visible.chars().count()
         );
     }
 }
