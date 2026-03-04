@@ -18,9 +18,11 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
+use raps_dm::DataManagementClient;
+
 use crate::output::OutputFormat;
 
-use super::{create_bulk_progress_bar, get_account_id, parse_filter_with_ids};
+use super::{create_bulk_progress_bar, parse_filter_with_ids, resolve_account_id};
 
 // ============================================================================
 // CSV UPDATE
@@ -58,6 +60,7 @@ pub(crate) struct CsvUpdateErrorOutput {
 pub(crate) async fn execute_csv_update(
     config: &Config,
     auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
     account: Option<String>,
     filter: Option<String>,
     project_ids: Option<PathBuf>,
@@ -66,7 +69,7 @@ pub(crate) async fn execute_csv_update(
     dry_run: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = get_account_id(account)?;
+    let account_id = resolve_account_id(account, dm_client).await?;
 
     // Parse CSV file
     let mut reader = csv::Reader::from_path(csv_path)

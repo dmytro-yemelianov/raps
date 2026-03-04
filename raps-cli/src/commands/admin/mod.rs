@@ -17,11 +17,12 @@ mod user;
 
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Subcommand, ValueEnum};
 use indicatif::ProgressBar;
 
 use raps_admin::{PermissionLevel, ProgressUpdate, ProjectFilter};
+use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 
@@ -484,13 +485,52 @@ pub enum OperationCommands {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn get_account_id(account: Option<String>) -> Result<String> {
-    match account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
-        Some(id) if !id.is_empty() => Ok(id),
-        _ => {
-            anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+/// Resolve the account ID from explicit arg, env var, or hub auto-discovery.
+///
+/// Priority:
+/// 1. `--account <id>` argument
+/// 2. `APS_ACCOUNT_ID` environment variable
+/// 3. Auto-discover: call `raps hub list`; use the sole hub or prompt when multiple
+pub(crate) async fn resolve_account_id(
+    account: Option<String>,
+    dm_client: &DataManagementClient,
+) -> Result<String> {
+    // Fast path: explicit arg or env var
+    if let Some(id) = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
+        if !id.is_empty() {
+            return Ok(id);
+        }
+    }
+
+    // Auto-discover via hub list (requires 3-legged auth)
+    let hubs = dm_client
+        .list_hubs()
+        .await
+        .context("Failed to list hubs for account auto-discovery. Use --account or set APS_ACCOUNT_ID.")?;
+
+    match hubs.len() {
+        0 => anyhow::bail!(
+            "No accessible hubs found. Use --account <id> or set APS_ACCOUNT_ID."
+        ),
+        1 => {
+            let id = hubs[0].id.clone();
+            eprintln!(
+                "Using account: {} ({})",
+                hubs[0].attributes.name, id
             );
+            Ok(id)
+        }
+        _ => {
+            // Multiple hubs: prompt interactively or bail in non-interactive mode
+            let items: Vec<String> = hubs
+                .iter()
+                .map(|h| format!("{} — {}", h.id, h.attributes.name))
+                .collect();
+            let idx = raps_kernel::prompts::spawn_prompt(move || {
+                raps_kernel::prompts::select("Select account", &items)
+            })
+            .await?;
+            Ok(hubs[idx].id.clone())
         }
     }
 }
@@ -540,22 +580,25 @@ impl AdminCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
         concurrency: usize,
     ) -> Result<()> {
         match self {
             AdminCommands::User(cmd) => {
-                cmd.execute(config, auth_client, output_format, concurrency)
+                cmd.execute(config, auth_client, dm_client, output_format, concurrency)
                     .await
             }
             AdminCommands::Folder(cmd) => {
-                cmd.execute(config, auth_client, output_format, concurrency)
+                cmd.execute(config, auth_client, dm_client, output_format, concurrency)
                     .await
             }
-            AdminCommands::Project(cmd) => cmd.execute(config, auth_client, output_format).await,
+            AdminCommands::Project(cmd) => {
+                cmd.execute(config, auth_client, dm_client, output_format).await
+            }
             AdminCommands::Operation(cmd) => cmd.execute(output_format).await,
             AdminCommands::CompanyList { account } => {
-                project::execute_company_list(config, auth_client, account, output_format).await
+                project::execute_company_list(config, auth_client, dm_client, account, output_format).await
             }
         }
     }

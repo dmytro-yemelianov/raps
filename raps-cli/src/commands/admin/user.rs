@@ -20,9 +20,11 @@ use crate::output::OutputFormat;
 
 use super::csv_ops::{execute_csv_import, execute_csv_update};
 use super::operations::display_bulk_result;
+use raps_dm::DataManagementClient;
+
 use super::{
-    UserCommands, create_bulk_progress_bar, get_account_id, make_progress_callback,
-    parse_filter_with_ids,
+    UserCommands, create_bulk_progress_bar, make_progress_callback, parse_filter_with_ids,
+    resolve_account_id,
 };
 
 #[derive(Serialize, schemars::JsonSchema)]
@@ -119,6 +121,7 @@ impl UserCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
         global_concurrency: usize,
     ) -> Result<()> {
@@ -130,7 +133,7 @@ impl UserCommands {
                 status,
                 search,
             } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let http_config = HttpClientConfig::default();
 
                 if let Some(project_id) = project {
@@ -293,7 +296,7 @@ impl UserCommands {
                 yes: _,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 let bulk_config = BulkConfig {
@@ -379,7 +382,7 @@ impl UserCommands {
                 yes: _,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 let bulk_config = BulkConfig {
@@ -470,6 +473,7 @@ impl UserCommands {
                     return execute_csv_update(
                         config,
                         auth_client,
+                        dm_client,
                         account.clone(),
                         filter.clone(),
                         project_ids.clone(),
@@ -486,7 +490,7 @@ impl UserCommands {
                     anyhow::bail!("At least one of --role or --company must be provided.");
                 }
 
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 let http_config = HttpClientConfig::default();
                 let admin_client = AccountAdminClient::new_with_http_config(
@@ -779,7 +783,7 @@ impl UserCommands {
                 dry_run,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency).min(50);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let http_config = HttpClientConfig::default();
 
                 let admin_client = AccountAdminClient::new_with_http_config(

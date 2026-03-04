@@ -1127,7 +1127,7 @@ async fn execute_command(
 
         Commands::Admin(cmd) => {
             let auth_client = get_auth_client();
-            cmd.execute(config, &auth_client, output_format, concurrency)
+            cmd.execute(config, &auth_client, &get_dm_client(), output_format, concurrency)
                 .await?;
         }
 

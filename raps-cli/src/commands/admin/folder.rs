@@ -16,10 +16,12 @@ use raps_kernel::http::HttpClientConfig;
 
 use crate::output::OutputFormat;
 
+use raps_dm::DataManagementClient;
+
 use super::operations::display_bulk_result;
 use super::{
-    FolderCommands, create_bulk_progress_bar, get_account_id, make_progress_callback,
-    parse_filter_with_ids,
+    FolderCommands, create_bulk_progress_bar, make_progress_callback, parse_filter_with_ids,
+    resolve_account_id,
 };
 
 impl FolderCommands {
@@ -27,6 +29,7 @@ impl FolderCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
         global_concurrency: usize,
     ) -> Result<()> {
@@ -43,7 +46,7 @@ impl FolderCommands {
                 yes: _,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 // Parse folder type

@@ -14,9 +14,11 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
+use raps_dm::DataManagementClient;
+
 use crate::output::OutputFormat;
 
-use super::{AdminProjectCommands, get_account_id};
+use super::{AdminProjectCommands, resolve_account_id};
 
 #[derive(Serialize, schemars::JsonSchema)]
 struct ProjectListOutput {
@@ -50,10 +52,11 @@ struct CompanyListOutput {
 pub(crate) async fn execute_company_list(
     config: &Config,
     auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
     account: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = get_account_id(account)?;
+    let account_id = resolve_account_id(account, dm_client).await?;
 
     if output_format.supports_colors() {
         println!(
@@ -147,6 +150,7 @@ impl AdminProjectCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
     ) -> Result<()> {
         match self {
@@ -157,7 +161,7 @@ impl AdminProjectCommands {
                 platform,
                 limit,
             } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 // Build filter expression from individual flags
                 let mut filter_parts = Vec::new();
@@ -289,7 +293,7 @@ impl AdminProjectCommands {
                 end_date,
                 timezone,
             } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -365,7 +369,7 @@ impl AdminProjectCommands {
                 start_date,
                 end_date,
             } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -419,7 +423,7 @@ impl AdminProjectCommands {
                 Ok(())
             }
             AdminProjectCommands::Archive { account, project } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 if output_format.supports_colors() {
                     println!(
