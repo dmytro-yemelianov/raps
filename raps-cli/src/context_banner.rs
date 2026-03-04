@@ -189,23 +189,24 @@ pub(crate) fn box_bottom() -> String {
     format!("└{}┘", "─".repeat(BOX_WIDTH - 2))
 }
 
-/// Strip SGR ANSI escape codes (`ESC[...m`) as produced by the `colored` crate.
-/// Does NOT handle cursor-movement or OSC sequences. Used only for test width assertions.
+/// Strip ANSI CSI escape sequences (`ESC[...X` where X is any ASCII letter).
+/// Handles SGR (colors/bold), cursor movement, and other CSI sequences.
+/// Used only for test width assertions.
 pub(crate) fn strip_ansi(s: &str) -> String {
     let mut out = String::new();
-    let mut in_escape = false;
-    for c in s.chars() {
-        if c == '\x1b' {
-            in_escape = true;
-            continue;
-        }
-        if in_escape {
-            if c == 'm' {
-                in_escape = false;
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next(); // consume '['
+            // consume all bytes up to and including the final ASCII letter
+            for inner in chars.by_ref() {
+                if inner.is_ascii_alphabetic() {
+                    break;
+                }
             }
-            continue;
+        } else {
+            out.push(c);
         }
-        out.push(c);
     }
     out
 }

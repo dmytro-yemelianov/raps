@@ -16,16 +16,16 @@ use crate::output::OutputFormat;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-/// Print a full-width `═` rule with an optional centred label.
+/// Print a full-width `═` rule (BOX_WIDTH chars).
 fn eq_rule() {
     println!("{}", "═".repeat(BOX_WIDTH));
 }
 
-/// Print a section header using `─` dashes.
-/// Layout: `  {title} ` + `─` × (BOX_WIDTH - title.len() - 3)
+/// Print a section header using `─` dashes flush to BOX_WIDTH.
+/// Layout: `  {title} ─────…` (total BOX_WIDTH chars)
 fn section_rule(title: &str) {
     let title_chars = title.chars().count();
-    // "  " (2) + title + " " (1) = title_chars + 3 chars consumed
+    // "  " (2) + title + " " (1) = title_chars + 3 prefix chars
     let dash_count = BOX_WIDTH.saturating_sub(title_chars + 3);
     let line = format!("  {} {}", title, "─".repeat(dash_count));
     println!("{}", line.bold());
