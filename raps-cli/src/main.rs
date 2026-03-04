@@ -359,12 +359,96 @@ enum Commands {
     External(Vec<String>),
 }
 
+/// Transform bare `help` positional args into `--help` so that
+/// `raps help auth`, `raps auth help`, and `raps auth login help` all work.
+fn transform_help_args(args: impl Iterator<Item = String>) -> Vec<String> {
+    let mut args: Vec<String> = args.collect();
+
+    // Find the first "help" that is positional (not a value fed to a preceding flag)
+    let help_idx = args.iter().enumerate().skip(1).find_map(|(i, arg)| {
+        if arg.eq_ignore_ascii_case("help") && !args[i - 1].starts_with('-') {
+            Some(i)
+        } else {
+            None
+        }
+    });
+
+    if let Some(idx) = help_idx {
+        args.remove(idx);
+        args.push("--help".to_string());
+    }
+
+    args
+}
+
+#[cfg(test)]
+mod help_transform_tests {
+    use super::*;
+
+    fn t(args: &[&str]) -> Vec<String> {
+        transform_help_args(args.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn raps_help_auth() {
+        assert_eq!(t(&["raps", "help", "auth"]), vec!["raps", "auth", "--help"]);
+    }
+
+    #[test]
+    fn raps_auth_help() {
+        assert_eq!(t(&["raps", "auth", "help"]), vec!["raps", "auth", "--help"]);
+    }
+
+    #[test]
+    fn raps_auth_login_help() {
+        assert_eq!(
+            t(&["raps", "auth", "login", "help"]),
+            vec!["raps", "auth", "login", "--help"]
+        );
+    }
+
+    #[test]
+    fn raps_help_auth_login() {
+        assert_eq!(
+            t(&["raps", "help", "auth", "login"]),
+            vec!["raps", "auth", "login", "--help"]
+        );
+    }
+
+    #[test]
+    fn raps_help_alone() {
+        assert_eq!(t(&["raps", "help"]), vec!["raps", "--help"]);
+    }
+
+    #[test]
+    fn no_help_passthrough() {
+        assert_eq!(t(&["raps", "auth", "status"]), vec!["raps", "auth", "status"]);
+    }
+
+    #[test]
+    fn flag_value_not_transformed() {
+        // --output happens to be followed by "help" — don't transform
+        assert_eq!(
+            t(&["raps", "--output", "help"]),
+            vec!["raps", "--output", "help"]
+        );
+    }
+
+    #[test]
+    fn already_dashdash_help_passthrough() {
+        assert_eq!(
+            t(&["raps", "auth", "--help"]),
+            vec!["raps", "auth", "--help"]
+        );
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     raps_kernel::profiler::init();
 
     // Handle clap errors (invalid arguments) - clap already exits with code 2
-    let cli = match Cli::try_parse() {
+    let cli = match Cli::try_parse_from(transform_help_args(std::env::args())) {
         Ok(cli) => cli,
         Err(e) => {
             let exit_code = match e.kind() {
