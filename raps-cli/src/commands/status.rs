@@ -38,8 +38,7 @@ fn mask_id(s: &str) -> String {
         return s.to_string();
     }
     let prefix: String = chars.iter().take(4).collect();
-    let suffix: String = chars.iter().rev().take(4).collect::<String>()
-        .chars().rev().collect();
+    let suffix: String = chars[chars.len() - 4..].iter().collect();
     format!("{}…{}", prefix, suffix)
 }
 
@@ -235,13 +234,12 @@ pub async fn run_status(
                     let name_col = format!("{:<24}", truncate(&hub.attributes.name, 24));
                     let id_short = {
                         let id = &hub.id;
-                        let count = id.chars().count();
-                        if count <= 12 {
+                        let chars: Vec<char> = id.chars().collect();
+                        if chars.len() <= 12 {
                             id.clone()
                         } else {
-                            let prefix: String = id.chars().take(6).collect();
-                            let suffix: String = id.chars().rev().take(4).collect::<String>()
-                                .chars().rev().collect();
+                            let prefix: String = chars.iter().take(6).collect();
+                            let suffix: String = chars[chars.len() - 4..].iter().collect();
                             format!("{}…{}", prefix, suffix)
                         }
                     };
