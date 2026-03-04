@@ -90,6 +90,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   inspect       Inspect archive contents via HTTP Range (no full download)
 
 \x1b[1;36m3-Legged Auth (User Login)\x1b[0m
+  status        Show context: auth state, hub tiers (Personal/Enterprise), active account
   hub           List and manage hubs
   project       List and manage projects
   folder        List and manage folders
@@ -227,6 +228,9 @@ enum Commands {
     /// Translate files using Model Derivative API
     #[command(subcommand)]
     Translate(TranslateCommands),
+
+    /// Show full context: auth state, hubs (Personal vs Enterprise), active account
+    Status,
 
     /// List and manage hubs
     #[command(subcommand)]
@@ -971,6 +975,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Bucket(_) => "bucket",
         Commands::Object(_) => "object",
         Commands::Translate(_) => "translate",
+        Commands::Status => "status",
         Commands::Hub(_) => "hub",
         Commands::Project(_) => "project",
         Commands::Folder(_) => "folder",
@@ -1089,6 +1094,15 @@ async fn execute_command(
 
         Commands::Translate(cmd) => {
             cmd.execute(&get_derivative_client(), output_format).await?;
+        }
+
+        Commands::Status => {
+            commands::status::run_status(
+                &get_auth_client(),
+                &get_dm_client(),
+                output_format,
+            )
+            .await?;
         }
 
         Commands::Hub(cmd) => {
