@@ -100,20 +100,37 @@ impl AuthClient {
             .await?;
 
         // --- Display instructions ---
-        let verify_url = format!(
+        let verify_url_with_code = format!(
             "{}/device?code={}",
             proxy_base,
             urlencoding::encode(&session.user_code)
         );
-        println!("\n{}", "Device Authorization".bold().cyan());
-        println!("{}", "-".repeat(50));
-        println!("  Open: {}", verify_url.cyan().bold());
+        let verify_url_plain = format!("{}/device", proxy_base);
+        println!("\n{}", "Device Authorization Required".bold().cyan());
+        println!("{}", "─".repeat(56));
         println!(
-            "  Code: {}",
+            "  {}",
+            "To complete login, open the following URL in your browser:".dimmed()
+        );
+        println!();
+        println!(
+            "  {} {}",
+            "→".cyan(),
+            verify_url_with_code.cyan().bold()
+        );
+        println!();
+        println!(
+            "  {}",
+            "The code will be pre-filled. If it is not, go to:".dimmed()
+        );
+        println!("    {}", verify_url_plain.dimmed());
+        println!(
+            "  {} and enter code: {}",
+            "manually".dimmed(),
             session.user_code.yellow().bold()
         );
-        println!("{}", "-".repeat(50));
-        println!("{}", "Waiting for authorization...".dimmed());
+        println!("{}", "─".repeat(56));
+        println!("{}", "  Waiting for you to authorize in the browser...".dimmed());
 
         // --- Poll for authorization ---
         let auth_code = self
