@@ -106,6 +106,33 @@ impl ContextBanner {
         }
     }
 
+    /// Print a cyan bordered admin context box to stderr.
+    /// Shows the first Enterprise hub entry (the resolved account).
+    ///
+    /// Example (80 cols):
+    /// ┌─ Account Context ────────────────────────────────────────────────────────────┐
+    /// │  ◆ ENTERPRISE  Acme Corp                                                     │
+    /// │  Account ID:   01fb1602-2ec0-4b05-bf6e-39dc70b3ae05                         │
+    /// │  Region:       US                                                            │
+    /// └──────────────────────────────────────────────────────────────────────────────┘
+    pub fn print_box(&self) {
+        let Some(entry) = self.hubs.iter().find(|h| h.tier == HubTier::Enterprise) else {
+            return;
+        };
+        let region = entry.region.as_deref().unwrap_or("--");
+        let top    = box_top("Account Context");
+        let line1  = box_line(&format!("◆ ENTERPRISE  {}", entry.name));
+        let line2  = box_line(&format!("Account ID:   {}", entry.id));
+        let line3  = box_line(&format!("Region:       {}", region));
+        let bottom = box_bottom();
+
+        eprintln!("{}", top.cyan());
+        eprintln!("{}", line1.cyan().bold());
+        eprintln!("{}", line2.cyan());
+        eprintln!("{}", line3.cyan());
+        eprintln!("{}", bottom.cyan());
+    }
+
     /// Print one inline line per hub to stderr (table/interactive mode only).
     ///
     /// Format (80-col safe):
@@ -140,6 +167,46 @@ pub(crate) fn truncate(s: &str, max_len: usize) -> String {
         let truncated: String = s.chars().take(max_len.saturating_sub(1)).collect();
         format!("{}…", truncated)
     }
+}
+
+/// Render one content line inside the box.
+/// Format: │  {content padded to BOX_WIDTH-2}  │  (total BOX_WIDTH visible chars)
+pub(crate) fn box_line(content: &str) -> String {
+    let inner_content = format!("  {}", truncate(content, BOX_WIDTH - 4)); // BOX_WIDTH-4 = 76 for content
+    format!("│{:<width$}│", inner_content, width = BOX_WIDTH - 2) // pad to 78
+}
+
+/// Render the top border: ┌─ {title} ─…─┐  (total BOX_WIDTH visible chars)
+pub(crate) fn box_top(title: &str) -> String {
+    let prefix = format!("┌─ {} ", title);
+    let prefix_chars = prefix.chars().count();
+    let dashes = "─".repeat(BOX_WIDTH.saturating_sub(prefix_chars + 1));
+    format!("{}{}┐", prefix, dashes)
+}
+
+/// Render the bottom border (total BOX_WIDTH visible chars).
+pub(crate) fn box_bottom() -> String {
+    format!("└{}┘", "─".repeat(BOX_WIDTH - 2))
+}
+
+/// Strip ANSI escape codes (used for width assertions in tests).
+pub(crate) fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_escape = false;
+    for c in s.chars() {
+        if c == '\x1b' {
+            in_escape = true;
+            continue;
+        }
+        if in_escape {
+            if c == 'm' {
+                in_escape = false;
+            }
+            continue;
+        }
+        out.push(c);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -254,5 +321,40 @@ mod tests {
         let result = truncate("hello world this is too long", 10);
         assert!(result.chars().count() <= 10);
         assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_box_line_width() {
+        let line = box_line("Account ID:   01fb1602-2ec0-4b05-bf6e-39dc70b3ae05");
+        let visible = strip_ansi(&line);
+        assert_eq!(
+            visible.chars().count(),
+            BOX_WIDTH,
+            "box_line visible width should be {BOX_WIDTH}, got {}",
+            visible.chars().count()
+        );
+    }
+
+    #[test]
+    fn test_box_top_width() {
+        let top = box_top("Account Context");
+        let visible = strip_ansi(&top);
+        assert_eq!(
+            visible.chars().count(),
+            BOX_WIDTH,
+            "box_top visible width should be {BOX_WIDTH}, got {}",
+            visible.chars().count()
+        );
+    }
+
+    #[test]
+    fn test_box_bottom_width() {
+        let bottom = box_bottom();
+        assert_eq!(
+            bottom.chars().count(),
+            BOX_WIDTH,
+            "box_bottom visible width should be {BOX_WIDTH}, got {}",
+            bottom.chars().count()
+        );
     }
 }
