@@ -524,18 +524,23 @@ pub(crate) async fn resolve_account_id(
         .collect();
 
     match hubs.len() {
-        0 => anyhow::bail!(
-            "No enterprise ACC/BIM360 accounts found.\n\
-             Admin commands require an enterprise Autodesk Construction Cloud or BIM360 account.\n\
-             Personal Autodesk accounts do not have Admin API access.\n\
-             Use --account <id> if you know your enterprise account ID."
-        ),
+        0 => {
+            crate::context_banner::print_warning_no_enterprise();
+            anyhow::bail!(
+                "No enterprise ACC/BIM360 accounts found. \
+                 Use --account <id> if you know your enterprise account ID."
+            )
+        }
         1 => {
-            let id = hubs[0].id.clone();
-            eprintln!(
-                "Using account: {} ({})",
-                hubs[0].attributes.name, id
+            let hub = &hubs[0];
+            let id = hub.id.trim_start_matches("b.").to_string();
+            let region = hub.attributes.region.as_deref();
+            let banner = crate::context_banner::ContextBanner::from_account(
+                &id,
+                &hub.attributes.name,
+                region,
             );
+            banner.print_box();
             Ok(id)
         }
         _ => {
