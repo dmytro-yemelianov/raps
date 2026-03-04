@@ -32,6 +32,7 @@
 //! - Reality Capture: Photogrammetry processing
 
 mod commands;
+mod context_banner;
 mod credits;
 mod mcp;
 mod output;
