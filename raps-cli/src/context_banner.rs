@@ -51,11 +51,12 @@ pub struct ContextBanner {
 impl HubEntry {
     /// Shortened ID for inline display (max 16 chars).
     pub fn short_id(&self) -> String {
-        if self.id.len() <= 16 {
+        let chars: Vec<char> = self.id.chars().collect();
+        if chars.len() <= 16 {
             self.id.clone()
         } else {
-            let prefix = &self.id[..8.min(self.id.len())];
-            let suffix = &self.id[self.id.len().saturating_sub(4)..];
+            let prefix: String = chars[..8.min(chars.len())].iter().collect();
+            let suffix: String = chars[chars.len().saturating_sub(4)..].iter().collect();
             format!("{}…{}", prefix, suffix)
         }
     }
@@ -227,7 +228,7 @@ mod tests {
             region: Some("US".into()),
         };
         let short = entry.short_id();
-        assert!(short.len() <= 16, "short_id too long: {}", short);
+        assert!(short.chars().count() <= 16, "short_id too long: {}", short);
         assert!(short.contains('…'), "should contain ellipsis: {}", short);
     }
 
