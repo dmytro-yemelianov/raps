@@ -13,7 +13,6 @@ use serde::Serialize;
 use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
-// use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
 pub enum HubCommands {
