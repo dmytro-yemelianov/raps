@@ -13,18 +13,15 @@ raps auth login          # opens browser for 3-legged OAuth
 raps auth status         # confirm you are logged in as Account Admin
 ```
 
-**Account ID:** Required for all admin commands. Find yours:
+**Account ID:** Required for all admin commands. Your Account Admin will have provided this, or you can find it in the Autodesk Construction Cloud web UI under Account Settings > Account Info.
 
-```bash
-raps admin account list             # lists accounts you administer
-# Note the "id" column — this is your ACCOUNT_ID
-```
-
-Set it as an environment variable to avoid repeating it:
+Set it as an environment variable to avoid repeating it on every command:
 
 ```bash
 export APS_ACCOUNT_ID=<your-account-id>
 ```
+
+Alternatively, pass it directly with `--account <id>` on any admin command.
 
 ---
 
@@ -167,7 +164,7 @@ There is no "clone permissions from User A to User B" command. However, you can 
 ```bash
 raps admin user list \
   --account $APS_ACCOUNT_ID \
-  --search "source.user@company.com" \
+  --search source.user@company.com \
   --output csv > source-user-projects.csv
 ```
 
@@ -178,39 +175,41 @@ If the source user is in all active projects:
 ```bash
 raps admin user add new.user@company.com \
   --account $APS_ACCOUNT_ID \
-  --role "Document Manager" \   # match source user's role
+  --role "Document Manager" \
   --filter "status:active"
 ```
 
 **Step 3: Set folder-level permissions (if required)**
 
-Folder permissions must be set per folder type. Common folder targets: "Project Files", "Photos", "Field":
+Folder permissions must be set per folder type. The default folder is `project-files`; pass `--folder` for others:
 
 ```bash
+# Preview first
 raps admin folder rights new.user@company.com \
   --account $APS_ACCOUNT_ID \
-  --folder "Project Files" \
-  --level ViewDownloadUpload \
+  --level view-download-upload \
+  --folder project-files \
   --filter "status:active" \
-  --dry-run    # preview first
+  --dry-run
 
+# Apply
 raps admin folder rights new.user@company.com \
   --account $APS_ACCOUNT_ID \
-  --folder "Project Files" \
-  --level ViewDownloadUpload \
+  --level view-download-upload \
+  --folder project-files \
   --filter "status:active"
 ```
 
-**Available permission levels:**
+**Available permission levels** (pass to `--level`):
 
 | Level | Description |
 |-------|-------------|
-| `ViewOnly` | Read-only access |
-| `ViewDownload` | View and download |
-| `UploadOnly` | Upload only |
-| `ViewDownloadUpload` | View, download, upload |
-| `ViewDownloadUploadEdit` | Full edit access |
-| `FolderControl` | Admin-level folder control |
+| `view-only` | Read-only access |
+| `view-download` | View and download |
+| `upload-only` | Upload only |
+| `view-download-upload` | View, download, upload |
+| `view-download-upload-edit` | Full edit access |
+| `folder-control` | Admin-level folder control |
 
 ### Cost estimate for native copy-permissions feature
 
@@ -317,15 +316,9 @@ raps admin user list \
   --output csv > project-admins.csv
 ```
 
-### Export folder permission assignments
-
-```bash
-raps admin folder rights user@company.com \
-  --account $APS_ACCOUNT_ID \
-  --output csv > folder-permissions.csv
-```
-
 **CSV fields included:** id, email, name, role, company, status, project
+
+> Note: Folder-level permission data is not directly exportable to CSV via RAPS. The `folder rights` command is a write operation (it applies permissions). Folder assignments must be reviewed in the ACC web UI.
 
 ---
 
@@ -431,6 +424,9 @@ raps report issues-summary --account $APS_ACCOUNT_ID --output csv > issues.csv
 
 # RFI summary across projects
 raps report rfi-summary --account $APS_ACCOUNT_ID --output csv > rfis.csv
+
+# Submittals summary
+raps report submittals-summary --account $APS_ACCOUNT_ID --output csv > submittals.csv
 
 # User roster
 raps admin user list --account $APS_ACCOUNT_ID --output csv > users.csv
