@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 
+use raps_kernel::error::RapsError;
 use raps_kernel::http;
 
 use crate::types::{AccountProject, PaginatedResponse, ProjectClassification};
@@ -48,9 +49,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let projects_response: PaginatedResponse<AccountProject> = response
@@ -79,9 +78,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response
@@ -162,9 +159,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let projects_response: PaginatedResponse<AccountProject> = response
@@ -203,9 +198,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response
@@ -244,9 +237,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response

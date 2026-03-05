@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 
+use raps_kernel::error::RapsError;
 use raps_kernel::http;
 
 use crate::types::{AccountUser, PaginatedResponse};
@@ -48,9 +49,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list users ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let users_response: PaginatedResponse<AccountUser> = response
@@ -97,9 +96,7 @@ impl AccountAdminClient {
         }
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to search for user ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         // The search endpoint returns a single user or array
@@ -164,9 +161,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update account user ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let user: AccountUser = response

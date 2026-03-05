@@ -7,10 +7,27 @@ use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 use raps_kernel::types::StoredToken;
 
+use assert_cmd::Command;
+use raps_mock::TestServer;
+
 pub struct TestClients {
     pub admin: AccountAdminClient,
     pub users: std::sync::Arc<ProjectUsersClient>,
     pub auth: AuthClient,
+}
+
+/// Start a mock server and return a Command configured to use it.
+pub async fn start_cli_test() -> (TestServer, Command) {
+    let _ = tracing_subscriber::fmt::try_init();
+    let server = TestServer::start_default().await.unwrap();
+    let mut cmd = Command::cargo_bin("raps").unwrap();
+    
+    // Configure CLI to use mock server
+    cmd.env("APS_BASE_URL", &server.url);
+    cmd.env("APS_CLIENT_ID", "test-client");
+    cmd.env("APS_CLIENT_SECRET", "test-secret");
+    
+    (server, cmd)
 }
 
 pub fn make_clients(base_url: &str) -> TestClients {

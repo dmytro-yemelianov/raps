@@ -17,6 +17,71 @@ use anyhow::Error;
 use colored::Colorize;
 use serde::Deserialize;
 use std::process;
+use thiserror::Error as ThisError;
+
+/// RAPS-specific error categories for better exit code mapping
+#[derive(Debug, ThisError)]
+pub enum RapsError {
+    /// Invalid arguments or validation failure
+    #[error("Invalid arguments: {0}")]
+    InvalidArguments(String),
+
+    /// Authentication or permission failure
+    #[error("Authentication failure: {0}")]
+    AuthFailure(String),
+
+    /// Resource not found
+    #[error("Resource not found: {0}")]
+    NotFound(String),
+
+    /// API or remote server error with interpreted details
+    #[error("API error (HTTP {0}): {1}")]
+    ApiError(u16, String, Option<InterpretedError>),
+
+    /// Generic remote/network error
+    #[error("Remote error: {0}")]
+    RemoteError(String),
+
+    /// Internal application error
+    #[error("Internal error: {0}")]
+    InternalError(String),
+}
+
+impl RapsError {
+    /// Create a RapsError from an HTTP response
+    pub async fn from_response(response: reqwest::Response) -> Self {
+        let status = response.status().as_u16();
+        let body = response.text().await.unwrap_or_default();
+
+        match status {
+            401 | 403 => {
+                let interpreted = interpret_error(status, &body);
+                RapsError::AuthFailure(interpreted.explanation)
+            }
+            404 => RapsError::NotFound("Resource not found".to_string()),
+            _ => {
+                let interpreted = interpret_error(status, &body);
+                RapsError::ApiError(status, interpreted.explanation.clone(), Some(interpreted))
+            }
+        }
+    }
+
+    /// Get the associated exit code for this error
+    pub fn exit_code(&self) -> ExitCode {
+        match self {
+            RapsError::InvalidArguments(_) => ExitCode::InvalidArguments,
+            RapsError::AuthFailure(_) => ExitCode::AuthFailure,
+            RapsError::NotFound(_) => ExitCode::NotFound,
+            RapsError::ApiError(status, _, _) => match *status {
+                401 | 403 => ExitCode::AuthFailure,
+                404 => ExitCode::NotFound,
+                _ => ExitCode::RemoteError,
+            },
+            RapsError::RemoteError(_) => ExitCode::RemoteError,
+            RapsError::InternalError(_) => ExitCode::InternalError,
+        }
+    }
+}
 
 /// Exit codes following standard conventions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +105,12 @@ impl ExitCode {
     ///
     /// Analyzes the error chain to determine the appropriate exit code
     pub fn from_error(err: &Error) -> Self {
+        // First, check if there is a RapsError in the chain
+        if let Some(raps_err) = err.downcast_ref::<RapsError>() {
+            return raps_err.exit_code();
+        }
+
+        // Fallback to string matching for other errors
         let error_string = err.to_string().to_lowercase();
         let error_chain: Vec<String> = err.chain().map(|e| e.to_string().to_lowercase()).collect();
 
@@ -377,6 +448,21 @@ mod tests {
     fn test_exit_code_mapping(#[case] msg: &str, #[case] expected: ExitCode) {
         let err = anyhow::anyhow!("{}", msg);
         assert_eq!(ExitCode::from_error(&err), expected);
+    }
+
+    #[test]
+    fn test_exit_code_from_raps_error() {
+        let err = anyhow::Error::new(RapsError::NotFound("Object".to_string()));
+        assert_eq!(ExitCode::from_error(&err), ExitCode::NotFound);
+
+        let err = anyhow::Error::new(RapsError::AuthFailure("Expired".to_string()));
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
+
+        let err = anyhow::Error::new(RapsError::ApiError(500, "Internal Server Error".to_string(), None));
+        assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
+
+        let err = anyhow::Error::new(RapsError::ApiError(403, "Forbidden".to_string(), None));
+        assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
     }
 
     #[test]
