@@ -8,7 +8,7 @@
 //! with APS APIs for buckets, objects, translation, projects, and more.
 
 pub mod auth_guidance;
-mod definitions;
+pub mod definitions;
 mod dispatch;
 pub mod server;
 pub mod tools;

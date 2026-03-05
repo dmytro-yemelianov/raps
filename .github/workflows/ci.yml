@@ -117,6 +117,18 @@ jobs:
         with:
           api-key: ${{ secrets.FOSSA_API_KEY }}
 
+  docs-freshness:
+    name: docs-freshness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2
+      - name: Verify AGENTS.md is up to date
+        run: cargo run -p raps-cli -- docs mcp --check
+
   audit:
     name: audit
     runs-on: ubuntu-latest

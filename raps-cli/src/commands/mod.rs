@@ -18,6 +18,7 @@ pub mod da;
 pub mod dashboard;
 pub mod demo;
 pub mod doctor;
+pub mod docs;
 pub mod folder;
 pub mod generate;
 pub mod hub;
