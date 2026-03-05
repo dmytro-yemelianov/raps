@@ -32,18 +32,22 @@ fn generate_mcp_docs(check: bool, write: bool) -> Result<()> {
     let content = build_agents_md();
 
     if write {
-        std::fs::write("AGENTS.md", &content)?;
-        println!("Written AGENTS.md ({} bytes)", content.len());
+        let path = std::path::Path::new("AGENTS.md");
+        std::fs::write(path, &content)?;
+        println!("Written {} ({} bytes)", path.display(), content.len());
         return Ok(());
     }
 
     if check {
-        let existing = std::fs::read_to_string("AGENTS.md").unwrap_or_default();
+        let existing = std::fs::read_to_string("AGENTS.md")
+            .unwrap_or_default();
         if existing == content {
             println!("AGENTS.md is up to date.");
             return Ok(());
         } else {
-            anyhow::bail!("AGENTS.md is stale. Regenerate with: raps docs mcp --write");
+            anyhow::bail!(
+                "AGENTS.md is stale. Run from repo root: raps docs mcp --write"
+            );
         }
     }
 
