@@ -90,6 +90,43 @@ pub fn safe_join(base_dir: &Path, untrusted_name: &str) -> Result<PathBuf> {
     Ok(joined)
 }
 
+/// Validate that a resource ID (project ID, bucket key, hub ID, URN, etc.) is safe
+/// to interpolate into API URLs.
+///
+/// Rejects:
+/// - Empty strings
+/// - Control characters
+/// - Query-parameter injection characters (`?`, `&`, `=`)
+/// - URL-encoded sequences that could decode to path traversal or null (`%2f`, `%00`, `%25`, `%0a`, `%0d`, `%09`)
+///
+/// Allows: alphanumeric, `-`, `_`, `.`, `:`, `+`, `/` (for base64 URNs and APS IDs).
+pub fn validate_resource_id(id: &str) -> Result<&str> {
+    if id.is_empty() {
+        bail!("Resource ID must not be empty");
+    }
+
+    if id.chars().any(|c| c.is_control()) {
+        bail!("Resource ID contains control characters: {:?}", id);
+    }
+
+    if id.contains('?') || id.contains('&') || id.contains('=') {
+        bail!("Resource ID contains query-parameter characters: {:?}", id);
+    }
+
+    let lower = id.to_lowercase();
+    for bad in &["%2f", "%00", "%25", "%0a", "%0d", "%09"] {
+        if lower.contains(bad) {
+            bail!(
+                "Resource ID contains suspicious URL-encoded sequence '{}': {:?}",
+                bad,
+                id
+            );
+        }
+    }
+
+    Ok(id)
+}
+
 /// Create directories with mode 0o700 (owner-only) on Unix.
 ///
 /// Uses `DirBuilder::mode()` on Unix to avoid a TOCTOU window between
@@ -217,5 +254,35 @@ mod tests {
 
         let perms = fs::metadata(&dir).unwrap().permissions();
         assert_eq!(perms.mode() & 0o777, 0o700);
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_query_params() {
+        assert!(validate_resource_id("b.default.proj?admin=true").is_err());
+        assert!(validate_resource_id("bucket&key=injected").is_err());
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_double_encoded() {
+        assert!(validate_resource_id("proj%2F..%2Fetc").is_err());
+        assert!(validate_resource_id("id%00null").is_err());
+    }
+
+    #[test]
+    fn test_validate_resource_id_accepts_valid_ids() {
+        assert!(validate_resource_id("b.default.myproject").is_ok());
+        assert!(validate_resource_id("a.proj:v1.0_final-2").is_ok());
+        assert!(validate_resource_id("urn:adsk.wipprod:dm.lineage:abc123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_control_chars() {
+        assert!(validate_resource_id("proj\x00id").is_err());
+        assert!(validate_resource_id("id\ninjection").is_err());
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_empty() {
+        assert!(validate_resource_id("").is_err());
     }
 }
