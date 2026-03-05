@@ -2,7 +2,7 @@
 
 **Feature Branch**: `005-non-interactive-mode`
 **Created**: 2026-01-15
-**Status**: Draft
+**Status**: Complete
 **Input**: User description: "Non-interactive mode and bypass prompts: commands must accept all params via flags and fail if prompts required."
 
 ## User Scenarios & Testing
