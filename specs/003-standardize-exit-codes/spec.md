@@ -2,7 +2,7 @@
 
 **Feature Branch**: `003-standardize-exit-codes`
 **Created**: 2026-01-15
-**Status**: Draft
+**Status**: Complete
 **Input**: User description: "Standardize exit codes: 0 success, 2 invalid args, 3 auth failure, 4 not found, 5 remote error, 6 internal error. Document in docs/cli/exit-codes.md."
 
 ## User Scenarios & Testing
