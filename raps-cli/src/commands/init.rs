@@ -13,6 +13,10 @@ use crate::context_banner::BOX_WIDTH;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
+fn export_line(account_id: &str) -> String {
+    format!("export APS_ACCOUNT_ID={}", account_id)
+}
+
 /// Return the shell rc filename for a given shell binary path or name.
 fn shell_rc_filename(shell: &str) -> &'static str {
     if shell.contains("zsh") {
@@ -65,7 +69,14 @@ pub async fn run_init() -> Result<()> {
 
     // Step 4 — hub discovery
     let hubs = step_discover_hubs(maybe_auth.as_ref(), &client_id, &client_secret).await;
-    let _ = (logged_in, &profile_name, hubs); // used in future steps
+    // Step 5 — enterprise context
+    if !hubs.is_empty() {
+        step_enterprise_context(&hubs, &profile_name).await?;
+    } else if logged_in {
+        step_header(5, 6, "Enterprise Context");
+        println!();
+        println!("  {} Skipped (no hubs found).", "→".dimmed());
+    }
 
     println!();
     println!("{}", "═".repeat(BOX_WIDTH));
@@ -307,6 +318,138 @@ async fn step_discover_hubs(
     }
 }
 
+// ─── step 5: enterprise context ──────────────────────────────────────────────
+
+async fn step_enterprise_context(
+    hubs: &[raps_dm::types::Hub],
+    profile_name: &str,
+) -> Result<()> {
+    use crate::context_banner::{ContextBanner, HubTier, tier_from_extension};
+
+    step_header(5, 6, "Enterprise Context");
+    println!();
+
+    // Find enterprise hubs
+    let enterprise_hubs: Vec<&raps_dm::types::Hub> = hubs
+        .iter()
+        .filter(|h| {
+            let ext = h.attributes.extension.as_ref()
+                .and_then(|e| e.extension_type.as_deref());
+            tier_from_extension(ext) == HubTier::Enterprise
+        })
+        .collect();
+
+    if enterprise_hubs.is_empty() {
+        crate::context_banner::print_warning_no_enterprise();
+        println!();
+        println!("  To get an enterprise hub, register your app in ACC Custom Integrations:");
+        println!("    {} https://acc.autodesk.com", "→".cyan());
+        println!("    {} (Account Admin → Custom Integrations)", " ".repeat(2));
+        println!("    {} Docs: rapscli.xyz/docs/custom-integrations", "→".cyan());
+        return Ok(());
+    }
+
+    // Use first enterprise hub
+    let hub = enterprise_hubs[0];
+    let raw_id = &hub.id;
+    let account_id = raw_id.strip_prefix("b.").unwrap_or(raw_id);
+    let region = hub.attributes.region.as_deref();
+
+    let banner = ContextBanner::from_account(account_id, &hub.attributes.name, region);
+    banner.print_box();
+
+    println!();
+    println!("  To use admin commands, register this app in ACC Custom Integrations:");
+    println!("    {} {}", "→".cyan(), "https://acc.autodesk.com".underline());
+    println!("    {} (Account Admin → Custom Integrations)", " ".repeat(2));
+    println!("    {} {}", "→".cyan(), "Docs: rapscli.xyz/docs/custom-integrations".underline());
+    println!();
+    println!(
+        "  Save {} = {}",
+        "APS_ACCOUNT_ID".bold(),
+        account_id.cyan()
+    );
+    println!();
+
+    // Prompt save choice (default: option 0 = profile only)
+    let options = save_choice_options(profile_name);
+    let profile_name_owned = profile_name.to_string();
+    let choice = raps_kernel::prompts::spawn_prompt(move || {
+        raps_kernel::prompts::select_with_default(
+            "  How would you like to save it?",
+            &options,
+            0,
+        )
+    })
+    .await
+    .unwrap_or(0);
+
+    // Always save to profile first
+    save_account_to_profile(&profile_name_owned, account_id).await?;
+    println!(
+        "  {} Saved to profile '{}'",
+        "✓".green().bold(),
+        profile_name_owned.cyan()
+    );
+
+    match choice {
+        1 => {
+            // Print export line
+            let line = export_line(account_id);
+            println!();
+            println!("  Add this to your shell config:");
+            println!("    {}", line.cyan().bold());
+        }
+        2 => {
+            // Auto-append to shell rc
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "bash".to_string());
+            let rc_file = shell_rc_filename(&shell);
+            let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
+            let rc_path = std::path::PathBuf::from(&home).join(rc_file);
+            let line = format!("\n{}\n", export_line(account_id));
+            match std::fs::OpenOptions::new().create(true).append(true).open(&rc_path) {
+                Ok(mut f) => {
+                    use std::io::Write;
+                    f.write_all(line.as_bytes())?;
+                    println!(
+                        "  {} Appended to {}",
+                        "✓".green().bold(),
+                        rc_path.display().to_string().cyan()
+                    );
+                    println!(
+                        "  {} Reload with: source {}",
+                        "→".dimmed(),
+                        rc_path.display()
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "  {} Could not write to {}: {}",
+                        "✗".red().bold(),
+                        rc_path.display(),
+                        e
+                    );
+                    println!("  Add manually: {}", export_line(account_id).cyan());
+                }
+            }
+        }
+        _ => {} // choice 0: profile only, already done
+    }
+
+    Ok(())
+}
+
+async fn save_account_to_profile(profile_name: &str, account_id: &str) -> Result<()> {
+    use crate::commands::config::{load_profiles, save_profiles};
+
+    let mut data = load_profiles().await?;
+    if let Some(profile) = data.profiles.get_mut(profile_name) {
+        profile.context_account_id = Some(account_id.to_string());
+        save_profiles(&data).await?;
+    }
+    Ok(())
+}
+
 async fn save_profile(name: &str, client_id: &str, client_secret: &str) -> Result<()> {
     use crate::commands::config::{load_profiles, save_profiles, ProfileConfig};
 
@@ -384,5 +527,14 @@ mod tests {
             "✗".red().bold()
         );
         assert!(fail_msg.contains("2-legged auth failed"));
+    }
+
+    #[test]
+    fn test_export_line_format() {
+        let line = export_line("01fb1602-2ec0-4b05-bf6e-39dc70b3ae05");
+        assert_eq!(
+            line,
+            "export APS_ACCOUNT_ID=01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"
+        );
     }
 }
