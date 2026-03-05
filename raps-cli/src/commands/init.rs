@@ -58,7 +58,14 @@ pub async fn run_init() -> Result<()> {
 
     // Step 2 — test auth (non-fatal)
     let auth_ok = step_test_auth(&client_id, &client_secret).await;
-    let _ = (auth_ok, &profile_name); // auth_ok used in future steps
+    let _ = auth_ok;
+
+    // Step 3 — 3-legged login (optional)
+    let (logged_in, maybe_auth) = step_login(&client_id, &client_secret).await;
+
+    // Step 4 — hub discovery
+    let hubs = step_discover_hubs(maybe_auth.as_ref(), &client_id, &client_secret).await;
+    let _ = (logged_in, &profile_name, hubs); // used in future steps
 
     println!();
     println!("{}", "═".repeat(BOX_WIDTH));
@@ -166,6 +173,140 @@ async fn step_test_auth(client_id: &str, client_secret: &str) -> bool {
     }
 }
 
+fn save_choice_options(profile_name: &str) -> Vec<String> {
+    vec![
+        format!("Save to profile '{}' only  (default)", profile_name),
+        "Save to profile + print export line for ~/.bashrc / ~/.zshrc".to_string(),
+        "Save to profile + auto-append to detected shell rc file".to_string(),
+    ]
+}
+
+// ─── step 3: 3-legged login ──────────────────────────────────────────────────
+
+/// Returns (logged_in, Option<AuthClient>)
+async fn step_login(
+    client_id: &str,
+    client_secret: &str,
+) -> (bool, Option<raps_kernel::auth::AuthClient>) {
+    step_header(3, 6, "3-Legged Login");
+    println!();
+    println!("  Log in to access hubs and user context.");
+
+    let proceed = raps_kernel::prompts::spawn_prompt(|| {
+        raps_kernel::prompts::confirm("  Proceed with browser login?", true)
+    })
+    .await
+    .unwrap_or(false);
+
+    if !proceed {
+        println!("  {} Skipped.", "→".dimmed());
+        return (false, None);
+    }
+
+    // Build auth client directly from credentials
+    let config = raps_kernel::config::Config {
+        client_id: client_id.to_string(),
+        client_secret: client_secret.to_string(),
+        base_url: "https://developer.api.autodesk.com".to_string(),
+        callback_url: "http://localhost:8080/callback".to_string(),
+        da_nickname: None,
+        http_config: raps_kernel::http::HttpClientConfig::default(),
+    };
+    let auth = raps_kernel::auth::AuthClient::new(config);
+
+    let scopes = &[
+        "data:read", "data:write", "data:create", "data:search",
+        "bucket:read", "account:read", "user:read",
+    ];
+
+    let use_device = raps_kernel::interactive::is_headless();
+    if use_device {
+        println!(
+            "  {} Headless environment detected — using device code flow.",
+            "!".yellow()
+        );
+    }
+
+    let result = if use_device {
+        auth.login_device(scopes).await
+    } else {
+        auth.login(scopes).await
+    };
+
+    match result {
+        Ok(_token) => {
+            // Try to get user info for the greeting
+            if let Ok(user) = auth.get_user_info().await {
+                let name = user.name.or(user.preferred_username).unwrap_or_default();
+                let email = user.email.unwrap_or_default();
+                println!(
+                    "  {} Logged in as {} ({})",
+                    "✓".green().bold(),
+                    name.cyan().bold(),
+                    email
+                );
+            } else {
+                println!("  {} Logged in", "✓".green().bold());
+            }
+            (true, Some(auth))
+        }
+        Err(e) => {
+            println!("  {} Login failed: {}", "✗".red().bold(), e);
+            println!(
+                "  {} Continuing without 3-legged auth. Run `raps auth login` later.",
+                "!".yellow()
+            );
+            (false, None)
+        }
+    }
+}
+
+// ─── step 4: hub discovery ───────────────────────────────────────────────────
+
+async fn step_discover_hubs(
+    auth: Option<&raps_kernel::auth::AuthClient>,
+    client_id: &str,
+    client_secret: &str,
+) -> Vec<raps_dm::types::Hub> {
+    step_header(4, 6, "Hub Discovery");
+    println!();
+
+    let auth_ref = match auth {
+        Some(a) => a,
+        None => {
+            println!("  {} Skipped (not logged in).", "→".dimmed());
+            return vec![];
+        }
+    };
+
+    let config = raps_kernel::config::Config {
+        client_id: client_id.to_string(),
+        client_secret: client_secret.to_string(),
+        base_url: "https://developer.api.autodesk.com".to_string(),
+        callback_url: "http://localhost:8080/callback".to_string(),
+        da_nickname: None,
+        http_config: raps_kernel::http::HttpClientConfig::default(),
+    };
+
+    let dm = raps_dm::DataManagementClient::new(config, auth_ref.clone());
+
+    match dm.list_hubs().await {
+        Ok(hubs) if !hubs.is_empty() => {
+            let banner = crate::context_banner::ContextBanner::from_hubs(&hubs);
+            banner.print_inline();
+            hubs
+        }
+        Ok(_) => {
+            println!("  {}", "(no hubs found — check your account access)".dimmed());
+            vec![]
+        }
+        Err(e) => {
+            println!("  {} Could not list hubs: {}", "✗".red().bold(), e);
+            vec![]
+        }
+    }
+}
+
 async fn save_profile(name: &str, client_id: &str, client_secret: &str) -> Result<()> {
     use crate::commands::config::{load_profiles, save_profiles, ProfileConfig};
 
@@ -220,6 +361,16 @@ mod tests {
     fn test_detect_shell_rc_unknown() {
         let rc = shell_rc_filename("unknown_shell");
         assert_eq!(rc, ".profile");
+    }
+
+    #[test]
+    fn test_save_choice_label() {
+        // Option labels used in the select prompt
+        let opts = save_choice_options("myprofile");
+        assert_eq!(opts.len(), 3);
+        assert!(opts[0].contains("myprofile"));   // option 1 mentions profile name
+        assert!(opts[1].contains("export"));      // option 2 mentions export
+        assert!(opts[2].contains("auto"));        // option 3 mentions auto-append
     }
 
     #[test]
