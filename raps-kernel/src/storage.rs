@@ -226,7 +226,7 @@ impl TokenStorage {
             Ok(e) => e,
             Err(e) => {
                 // If keyring is not available, fall back to file storage
-                tracing::warn!(error = %e, "Keychain not available, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_STORAGE_BACKEND=file");
+                tracing::warn!(error = %e, "Keychain not available, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_USE_FILE_STORAGE=true");
                 return self.save_file(token);
             }
         };
@@ -235,7 +235,7 @@ impl TokenStorage {
             Ok(()) => Ok(()),
             Err(e) => {
                 // If keychain save fails, fall back to file storage
-                tracing::warn!(error = %e, "Keychain save failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_STORAGE_BACKEND=file");
+                tracing::warn!(error = %e, "Keychain save failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_USE_FILE_STORAGE=true");
                 self.save_file(token)
             }
         }
@@ -246,7 +246,7 @@ impl TokenStorage {
         let entry = match keyring::Entry::new(&self.service_name, &self.username) {
             Ok(e) => e,
             Err(e) => {
-                tracing::warn!(error = %e, "Keychain not available, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_STORAGE_BACKEND=file");
+                tracing::warn!(error = %e, "Keychain not available, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_USE_FILE_STORAGE=true");
                 return self.load_file();
             }
         };
@@ -262,7 +262,7 @@ impl TokenStorage {
                 self.load_file()
             }
             Err(e) => {
-                tracing::warn!(error = %e, "Keychain load failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_STORAGE_BACKEND=file");
+                tracing::warn!(error = %e, "Keychain load failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_USE_FILE_STORAGE=true");
                 self.load_file()
             }
         }
@@ -290,7 +290,7 @@ impl TokenStorage {
             }
             Err(e) => {
                 // If keychain delete fails, try file storage
-                tracing::warn!(error = %e, "Keychain delete failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_STORAGE_BACKEND=file");
+                tracing::warn!(error = %e, "Keychain delete failed, using file storage instead. This is normal on headless servers and CI/CD. To silence this, set RAPS_USE_FILE_STORAGE=true");
                 self.delete_file()
             }
         }

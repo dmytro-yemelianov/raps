@@ -33,6 +33,10 @@ pub enum PipelineCommands {
         /// Dry run (show commands without executing)
         #[arg(short, long)]
         dry_run: bool,
+
+        /// Pipeline variable override (KEY=VALUE, repeatable)
+        #[arg(long = "var", value_parser = parse_var_assignment)]
+        var: Vec<(String, String)>,
     },
 
     /// Validate a pipeline file
@@ -184,7 +188,8 @@ impl PipelineCommands {
                 file,
                 ignore_failure,
                 dry_run,
-            } => run_pipeline(&file, ignore_failure, dry_run, output_format).await,
+                var,
+            } => run_pipeline(&file, ignore_failure, dry_run, var, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
             PipelineCommands::Create {
@@ -567,9 +572,11 @@ async fn run_pipeline(
     file: &PathBuf,
     global_ignore_failure: bool,
     dry_run: bool,
+    var_overrides: Vec<(String, String)>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let pipeline = load_pipeline(file).await?;
+    let mut pipeline = load_pipeline(file).await?;
+    apply_variable_overrides(&mut pipeline.variables, &var_overrides);
     let context: StepContext = Arc::new(Mutex::new(HashMap::new()));
 
     if output_format.supports_colors() {
@@ -677,6 +684,30 @@ async fn run_pipeline(
     Ok(())
 }
 
+fn parse_var_assignment(s: &str) -> Result<(String, String), String> {
+    let parts: Vec<&str> = s.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return Err(format!(
+            "Invalid variable assignment '{}'. Expected KEY=VALUE",
+            s
+        ));
+    }
+    let key = parts[0].trim();
+    if key.is_empty() {
+        return Err("Variable key cannot be empty".to_string());
+    }
+    Ok((key.to_string(), parts[1].to_string()))
+}
+
+fn apply_variable_overrides(
+    base: &mut HashMap<String, String>,
+    overrides: &[(String, String)],
+) {
+    for (key, value) in overrides {
+        base.insert(key.clone(), value.clone());
+    }
+}
+
 fn execute_raps_command(command: &str) -> Result<i32> {
     // Get the current executable path
     let exe_path = std::env::current_exe().context("Failed to get current executable path")?;
@@ -728,16 +759,17 @@ fn eval_expression(expr: &str, context: &StepContext) -> Result<bool> {
 }
 
 fn eval_comparison(expr: &str, context: &StepContext) -> Result<bool> {
+    // Support: <left> || <right>
+    // Parse OR first so AND has higher precedence.
+    if let Some((left, right)) = expr.split_once("||") {
+        return Ok(
+            eval_comparison(left.trim(), context)? || eval_comparison(right.trim(), context)?
+        );
+    }
     // Support: <left> && <right>
     if let Some((left, right)) = expr.split_once("&&") {
         return Ok(
             eval_comparison(left.trim(), context)? && eval_comparison(right.trim(), context)?
-        );
-    }
-    // Support: <left> || <right>
-    if let Some((left, right)) = expr.split_once("||") {
-        return Ok(
-            eval_comparison(left.trim(), context)? || eval_comparison(right.trim(), context)?
         );
     }
 
@@ -1601,6 +1633,58 @@ steps:
         assert_eq!(parse_duration("1h").unwrap(), std::time::Duration::from_secs(3600));
         assert!(parse_duration("5d").is_err());
         assert!(parse_duration("  ").is_err());
+    }
+
+    #[test]
+    fn test_eval_expr_operator_precedence_and_over_or() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 }); // true
+        ctx.insert("b".to_string(), StepResult { exit_code: 1 }); // false
+        ctx.insert("c".to_string(), StepResult { exit_code: 1 }); // false
+        let ctx = Arc::new(Mutex::new(ctx));
+
+        // Should evaluate as: true || (false && false) == true
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 && steps.c.exit_code == 0 }}",
+            &ctx
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn test_parse_var_assignment_valid() {
+        let parsed = parse_var_assignment("BUCKET=my-bucket").unwrap();
+        assert_eq!(parsed, ("BUCKET".to_string(), "my-bucket".to_string()));
+    }
+
+    #[test]
+    fn test_parse_var_assignment_value_with_equals() {
+        let parsed = parse_var_assignment("TOKEN=abc=def").unwrap();
+        assert_eq!(parsed, ("TOKEN".to_string(), "abc=def".to_string()));
+    }
+
+    #[test]
+    fn test_parse_var_assignment_invalid() {
+        assert!(parse_var_assignment("missing_equals").is_err());
+        assert!(parse_var_assignment("=value").is_err());
+    }
+
+    #[test]
+    fn test_apply_variable_overrides_cli_wins() {
+        let mut vars = HashMap::from([
+            ("BUCKET".to_string(), "from-file".to_string()),
+            ("REGION".to_string(), "US".to_string()),
+        ]);
+        let overrides = vec![
+            ("BUCKET".to_string(), "from-cli".to_string()),
+            ("MODEL".to_string(), "test.rvt".to_string()),
+        ];
+
+        apply_variable_overrides(&mut vars, &overrides);
+
+        assert_eq!(vars.get("BUCKET"), Some(&"from-cli".to_string()));
+        assert_eq!(vars.get("REGION"), Some(&"US".to_string()));
+        assert_eq!(vars.get("MODEL"), Some(&"test.rvt".to_string()));
     }
 }
 

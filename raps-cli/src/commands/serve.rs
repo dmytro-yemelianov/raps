@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
+    body::Bytes,
     Json, Router,
     extract::{Path, State},
     http::{HeaderMap, Method, StatusCode, Uri},
@@ -654,20 +655,19 @@ struct WebhookEvent {
 async fn webhook_callback(
     State(state): State<ServiceState>,
     headers: HeaderMap,
-    Json(event): Json<WebhookEvent>,
+    body: Bytes,
 ) -> impl IntoResponse {
     // Verify signature if APS_WEBHOOK_SECRET is set
     let secret = std::env::var("APS_WEBHOOK_SECRET").ok();
     if let Some(ref secret) = secret {
         let signature = headers
-            .get("x-adsk-signature")
+            .get("x-aps-signature")
+            .or_else(|| headers.get("x-adsk-signature"))
             .and_then(|v| v.to_str().ok());
         match signature {
             Some(sig) => {
                 // Verify HMAC-SHA256 signature
-                let body_bytes =
-                    serde_json::to_vec(&event.payload).unwrap_or_default();
-                if !verify_webhook_signature(secret, &body_bytes, sig) {
+                if !verify_webhook_signature(secret, body.as_ref(), sig) {
                     tracing::warn!("Webhook signature verification failed");
                     return (
                         StatusCode::UNAUTHORIZED,
@@ -677,7 +677,7 @@ async fn webhook_callback(
                 }
             }
             None => {
-                tracing::warn!("Webhook request missing x-adsk-signature header");
+                tracing::warn!("Webhook request missing signature header");
                 return (
                     StatusCode::UNAUTHORIZED,
                     Json(serde_json::json!({"error": "missing signature"})),
@@ -686,6 +686,17 @@ async fn webhook_callback(
             }
         }
     }
+
+    let event: WebhookEvent = match serde_json::from_slice(body.as_ref()) {
+        Ok(evt) => evt,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "invalid JSON payload"})),
+            )
+                .into_response();
+        }
+    };
 
     // Publish event to Redis Stream
     let event_type = event
@@ -741,8 +752,8 @@ async fn webhook_callback(
 }
 
 fn verify_webhook_signature(secret: &str, body: &[u8], expected_signature: &str) -> bool {
-    use sha2::Sha256;
     use hmac::{Hmac, Mac};
+    use sha2::Sha256;
 
     type HmacSha256 = Hmac<Sha256>;
 
@@ -751,8 +762,11 @@ fn verify_webhook_signature(secret: &str, body: &[u8], expected_signature: &str)
     };
     mac.update(body);
 
-    // The signature may be hex-encoded
-    let Ok(expected_bytes) = hex::decode(expected_signature) else {
+    let normalized = expected_signature.trim();
+    let normalized = normalized.strip_prefix("sha256=").unwrap_or(normalized);
+
+    // APS webhook signatures are hex-encoded HMAC-SHA256 digests.
+    let Ok(expected_bytes) = hex::decode(normalized) else {
         return false;
     };
 

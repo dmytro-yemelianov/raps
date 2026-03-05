@@ -93,7 +93,7 @@ pub enum WebhookCommands {
     VerifySignature {
         /// The webhook payload (JSON string or @file)
         payload: String,
-        /// The signature from X-Adsk-Signature header
+        /// The signature from x-aps-signature (or legacy x-adsk-signature)
         #[arg(short, long)]
         signature: String,
         /// The webhook secret
@@ -710,7 +710,7 @@ struct VerifySignatureOutput {
 fn verify_signature(
     payload: &str,
     signature: &str,
-    _secret: &str,
+    secret: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
     use std::io::Read;
@@ -726,23 +726,17 @@ fn verify_signature(
         payload.to_string()
     };
 
-    // Calculate HMAC-SHA256 signature
-    // Note: In a real implementation, you'd use a crypto library like hmac + sha2
-    // For now, we'll provide a placeholder that shows the expected format
+    let valid = verify_hmac_sha256_signature(secret, payload_data.as_bytes(), signature);
 
-    // The APS webhook signature format is typically base64(HMAC-SHA256(secret, payload))
-    // This is a simplified verification that checks format
-    let is_valid_format = signature.len() > 20 && !signature.contains(' ');
-
-    let output = if is_valid_format {
+    let output = if valid {
         VerifySignatureOutput {
             valid: true,
-            message: "Signature format is valid. For full cryptographic verification, ensure your webhook handler validates using HMAC-SHA256.".to_string(),
+            message: "Signature is valid (HMAC-SHA256)".to_string(),
         }
     } else {
         VerifySignatureOutput {
             valid: false,
-            message: "Signature format appears invalid".to_string(),
+            message: "Signature is invalid".to_string(),
         }
     };
 
@@ -768,6 +762,27 @@ fn verify_signature(
     }
 
     Ok(())
+}
+
+fn verify_hmac_sha256_signature(secret: &str, body: &[u8], signature: &str) -> bool {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else {
+        return false;
+    };
+    mac.update(body);
+
+    let normalized = signature.trim();
+    let normalized = normalized.strip_prefix("sha256=").unwrap_or(normalized);
+
+    let Ok(expected_bytes) = hex::decode(normalized) else {
+        return false;
+    };
+
+    mac.verify_slice(&expected_bytes).is_ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -971,5 +986,42 @@ mod tests {
         let json = serde_json::to_value(&output).unwrap();
         assert_eq!(json["valid"], true);
         assert_eq!(json["message"], "Signature verified");
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_valid() {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let secret = "test-secret";
+        let body = br#"{"event":"dm.version.added"}"#;
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = hex::encode(mac.finalize().into_bytes());
+
+        assert!(verify_hmac_sha256_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_sha256_prefix() {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let secret = "test-secret";
+        let body = b"payload";
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
+
+        assert!(verify_hmac_sha256_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_invalid() {
+        assert!(!verify_hmac_sha256_signature(
+            "secret",
+            b"payload",
+            "not-a-valid-signature"
+        ));
     }
 }
