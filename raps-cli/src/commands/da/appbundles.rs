@@ -5,10 +5,18 @@
 
 use anyhow::Result;
 use colored::Colorize;
+use serde::Serialize;
 
 use crate::output::OutputFormat;
 use raps_da::DesignAutomationClient;
 use raps_kernel::prompts;
+
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct AppbundleUploadOutput {
+    pub id: String,
+    pub version: i32,
+    pub file: String,
+}
 
 pub(super) async fn list_appbundles(
     client: &DesignAutomationClient,
@@ -169,13 +177,7 @@ pub(super) async fn upload_appbundle(
             bundle_details.version
         );
     } else {
-        #[derive(serde::Serialize, schemars::JsonSchema)]
-        struct UploadResult {
-            id: String,
-            version: i32,
-            file: String,
-        }
-        output_format.write(&UploadResult {
+        output_format.write(&AppbundleUploadOutput {
             id: id.to_string(),
             version: bundle_details.version,
             file: file.display().to_string(),
