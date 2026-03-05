@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
@@ -15,6 +15,20 @@ use crate::OssClient;
 use crate::types::*;
 
 impl OssClient {
+    fn normalize_lexical_path(path: &Path) -> PathBuf {
+        let mut normalized = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+        }
+        normalized
+    }
+
     /// Upload a file to a bucket using S3 signed URLs
     /// Automatically uses multipart upload for files larger than 5MB
     pub async fn upload_object(
@@ -166,16 +180,25 @@ impl OssClient {
         // Create progress bar (hidden in non-interactive mode)
         let pb = progress::file_progress(total_size, &format!("Downloading {}", object_key));
 
-        // Validate output path stays within current directory
+        // Validate output path stays within current directory, even if the file does not exist yet.
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        if let (Ok(canon_cwd), Ok(canon_target)) = (cwd.canonicalize(), output_path.canonicalize())
-            && !canon_target.starts_with(&canon_cwd)
-        {
-            anyhow::bail!(
-                "Path '{}' escapes working directory '{}'",
-                output_path.display(),
-                cwd.display()
-            );
+        let canon_cwd = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        let abs_output = if output_path.is_absolute() {
+            output_path.to_path_buf()
+        } else {
+            cwd.join(output_path)
+        };
+        if let Some(parent) = abs_output.parent() {
+            let checked_parent = parent
+                .canonicalize()
+                .unwrap_or_else(|_| Self::normalize_lexical_path(parent));
+            if !checked_parent.starts_with(&canon_cwd) {
+                anyhow::bail!(
+                    "Path '{}' escapes working directory '{}'",
+                    output_path.display(),
+                    cwd.display()
+                );
+            }
         }
 
         // Stream download
