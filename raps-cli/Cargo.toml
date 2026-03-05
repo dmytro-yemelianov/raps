@@ -131,3 +131,16 @@ predicates.workspace = true
 dotenvy.workspace = true
 insta.workspace = true
 raps-mock.workspace = true
+raps-kernel = { workspace = true, features = ["test-utils"] }
+
+[[test]]
+name = "operations"
+path = "tests/operations_runner.rs"
+
+[[test]]
+name = "scenarios"
+path = "tests/scenarios_runner.rs"
+
+[[test]]
+name = "cli_tests"
+path = "tests/cli_tests_runner.rs"
