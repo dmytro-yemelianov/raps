@@ -1,47 +1,58 @@
-# Exit Codes
+# RAPS CLI Exit Codes
 
-RAPS CLI uses standardized exit codes to help you write robust automation scripts.
+The RAPS CLI uses standard exit codes to indicate the result of a command. This allows for robust error handling in automation scripts and CI/CD pipelines. 
 
-| Code | Name | Description |
-|------|------|-------------|
-| `0` | **Success** | The command completed successfully. |
-| `2` | **Invalid Arguments** | Command line usage error (e.g., missing flag, invalid value) or validation failure. |
-| `3` | **Authentication Failure** | The command requires authentication, but the session is invalid, expired, or missing permissions. Run `raps auth login`. |
-| `4` | **Not Found** | The requested resource (bucket, object, hub, etc.) could not be found. |
-| `5` | **Remote/API Error** | A network error or 5xx server error occurred. These may be transient; retry strategies are recommended. |
-| `6` | **Internal Error** | An unexpected internal error occurred within the CLI. |
+By checking the exit code of a `raps` command, scripts can determine whether to retry an operation (e.g., on a transient remote error) or fail fast (e.g., on invalid arguments or missing resources).
 
-## Examples
+## Exit Code Reference
 
-### Check for Auth Failure
+| Exit Code | Name | Description | Suggested Action |
+| :--- | :--- | :--- | :--- |
+| **0** | **Success** | The command completed successfully. | Continue execution. |
+| **2** | **Invalid Arguments** | The command was invoked with invalid flags, missing required arguments, or failed local validation. | Do not retry. Fix the script or command invocation. |
+| **3** | **Auth Failure** | Authentication or authorization failed. This includes missing credentials, expired tokens, or insufficient permissions (HTTP 401/403). | Do not retry automatically. Prompt for login or check permissions. |
+| **4** | **Not Found** | The targeted resource (bucket, project, user, etc.) could not be found (HTTP 404). | Do not retry. Verify the resource ID. |
+| **5** | **Remote Error** | A remote or API error occurred, such as a server error (HTTP 5xx), a network timeout, or connection reset. | Retry the operation with exponential backoff. |
+| **6** | **Internal Error** | An internal application error occurred within the CLI itself, such as an IO error or an unexpected panic. | Report the issue to the maintainers. |
 
-```bash
-raps bucket list
-if [ $? -eq 3 ]; then
-    echo "Session expired. Logging in..."
-    raps auth login
-fi
-```
+## Scripting Example (Bash)
 
-### Retry on Remote Error
+Here is an example of how to handle RAPS exit codes in a Bash script:
 
 ```bash
-MAX_RETRIES=3
-COUNT=0
+#!/bin/bash
 
-while [ $COUNT -lt $MAX_RETRIES ]; do
-    raps translate status $URN --wait
-    EXIT_CODE=$?
-    
-    if [ $EXIT_CODE -eq 0 ]; then
-        break
-    elif [ $EXIT_CODE -eq 5 ]; then
-        echo "Remote error, retrying..."
-        COUNT=$((COUNT+1))
-        sleep 5
-    else
-        echo "Permanent error: $EXIT_CODE"
-        exit $EXIT_CODE
-    fi
-done
+raps admin user add-to-all-projects test@example.com --role "Project Admin"
+EXIT_CODE=$?
+
+case $EXIT_CODE in
+  0)
+    echo "Successfully added user to projects."
+    ;;
+  2)
+    echo "Error: Invalid arguments provided to the CLI."
+    exit 2
+    ;;
+  3)
+    echo "Error: Authentication failed. Please run 'raps auth login' and try again."
+    exit 3
+    ;;
+  4)
+    echo "Error: The specified account or project was not found."
+    exit 4
+    ;;
+  5)
+    echo "Error: Remote API error. You might want to retry this operation."
+    # Add retry logic here
+    exit 5
+    ;;
+  6)
+    echo "Error: Internal CLI error."
+    exit 6
+    ;;
+  *)
+    echo "Unknown error occurred (Exit code: $EXIT_CODE)."
+    exit $EXIT_CODE
+    ;;
+esac
 ```
