@@ -5,7 +5,7 @@
 //!
 //! Commands for listing and viewing hubs (requires 3-legged auth).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
@@ -13,6 +13,7 @@ use serde::Serialize;
 use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
+use raps_kernel::security::validate_resource_id;
 
 #[derive(Debug, Subcommand)]
 pub enum HubCommands {
@@ -140,6 +141,9 @@ async fn hub_info(
     hub_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
+    validate_resource_id(hub_id)
+        .with_context(|| format!("Invalid hub ID: {:?}", hub_id))?;
+
     let hub = tracked_op("Fetching hub details", output_format, || {
         client.get_hub(hub_id)
     })

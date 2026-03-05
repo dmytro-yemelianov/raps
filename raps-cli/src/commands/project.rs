@@ -14,6 +14,7 @@ use crate::commands::interactive;
 use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
+use raps_kernel::security::validate_resource_id;
 // use raps_kernel::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -63,7 +64,11 @@ async fn list_projects(
 ) -> Result<()> {
     // Get hub ID interactively if not provided
     let hub = match hub_id {
-        Some(h) => h,
+        Some(h) => {
+            validate_resource_id(&h)
+                .with_context(|| format!("Invalid hub ID: {:?}", h))?;
+            h
+        }
         None => interactive::prompt_for_hub(client).await?,
     };
 
@@ -144,12 +149,20 @@ async fn project_info(
     output_format: OutputFormat,
 ) -> Result<()> {
     let hub_id = match opt_hub_id {
-        Some(h) => h.clone(),
+        Some(h) => {
+            validate_resource_id(h)
+                .with_context(|| format!("Invalid hub ID: {:?}", h))?;
+            h.clone()
+        }
         None => interactive::prompt_for_hub(client).await?,
     };
 
     let project_id = match opt_project_id {
-        Some(p) => p.clone(),
+        Some(p) => {
+            validate_resource_id(p)
+                .with_context(|| format!("Invalid project ID: {:?}", p))?;
+            p.clone()
+        }
         None => interactive::prompt_for_project(client, &hub_id).await?,
     };
     let (project, folders) = tracked_op("Fetching project details", output_format, || async {
