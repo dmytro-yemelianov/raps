@@ -4,6 +4,7 @@
 //! Item (file) operations for the Data Management API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use crate::types::*;
 use crate::{DataManagementClient, MAX_PAGINATION_PAGES};
@@ -24,10 +25,10 @@ impl DataManagementClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get item ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Item> = response
@@ -60,10 +61,10 @@ impl DataManagementClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to get item versions ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let api_response: JsonApiResponse<Vec<Version>> = response
@@ -155,14 +156,10 @@ impl DataManagementClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to create item from storage ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Item> = response
@@ -198,9 +195,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete item ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -253,9 +248,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to rename item ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Item> = response

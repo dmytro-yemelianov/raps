@@ -4,6 +4,7 @@
 //! AppBundle operations for the Design Automation API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 use serde::Serialize;
 
 use raps_kernel::http;
@@ -22,10 +23,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list appbundles ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let paginated: PaginatedResponse<String> = response
@@ -61,10 +62,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create appbundle ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let appbundle: AppBundleDetails = response
@@ -105,10 +106,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create appbundle alias ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -124,10 +125,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete appbundle ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -199,15 +200,16 @@ impl DesignAutomationClient {
             .post(endpoint_url)
             .multipart(form)
             .send()
-            .await
-            .context("Failed to upload app bundle archive")?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload app bundle ({status}): {error_text}");
-        }
-
-        Ok(())
+                    .await
+                    .context("Failed to upload app bundle archive")?;
+            
+                tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(endpoint_url), "HTTP response");
+            
+                if !response.status().is_success() {
+                    return Err(RapsError::from_response(response).await.into());
+                }
+            
+                Ok(())
+            
     }
 }

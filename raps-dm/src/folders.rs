@@ -4,6 +4,7 @@
 //! Folder operations for the Data Management API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use crate::types::*;
 use crate::{DataManagementClient, MAX_PAGINATION_PAGES};
@@ -37,14 +38,10 @@ impl DataManagementClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!(
-                    "Failed to list folder contents ({}): {}",
-                    status,
-                    error_text
-                );
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let api_response: JsonApiResponse<Vec<serde_json::Value>> = response
@@ -111,10 +108,10 @@ impl DataManagementClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create folder ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Folder> = response
@@ -172,9 +169,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to rename folder ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Folder> = response
@@ -209,9 +204,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete folder ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())

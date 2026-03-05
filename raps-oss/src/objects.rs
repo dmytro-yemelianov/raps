@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
+use raps_kernel::error::RapsError;
 use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -122,19 +123,18 @@ impl OssClient {
             .header("Content-Length", file_size.to_string())
             .body(body)
             .send()
-            .await
-            .context("Failed to upload to S3")?;
-        raps_kernel::profiler::record_http_request(_upload_start.elapsed());
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload to S3 ({status}): {error_text}");
-        }
-
-        pb.set_position(file_size);
-
-        // Step 3: Complete the upload
+                    .await
+                    .context("Failed to upload to S3")?;
+                raps_kernel::profiler::record_http_request(_upload_start.elapsed());
+            
+                tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(s3_url), "HTTP response");
+            
+                if !response.status().is_success() {
+                    return Err(RapsError::from_response(response).await.into());
+                }
+            
+                pb.set_position(file_size);
+                    // Step 3: Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
         let object_info = self
             .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
@@ -167,10 +167,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = signed
@@ -242,10 +242,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = signed
@@ -309,10 +309,10 @@ impl OssClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list objects ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let response_text = response
@@ -357,10 +357,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete object ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -388,10 +388,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get object details ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let details: ObjectDetails = response
@@ -428,14 +428,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to get signed download URL ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let signed: SignedS3DownloadResponse = response
@@ -481,14 +477,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to get signed upload URL ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let signed: SignedS3UploadResponse = response
@@ -527,14 +519,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to complete signed upload ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         // Get response text for debugging

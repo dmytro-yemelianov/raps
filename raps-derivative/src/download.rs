@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
+use raps_kernel::error::RapsError;
 use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -54,9 +55,7 @@ impl DerivativeClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download derivative ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = response.content_length().unwrap_or(0);

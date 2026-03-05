@@ -4,6 +4,7 @@
 //! Metadata operations for the Model Derivative API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use crate::DerivativeClient;
 use crate::types::*;
@@ -31,10 +32,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get metadata ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         response
@@ -67,10 +68,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get object tree ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         response
@@ -108,10 +109,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get properties ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         response
@@ -153,10 +154,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to query properties ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         response

@@ -4,6 +4,7 @@
 //! Engine operations for the Design Automation API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use raps_kernel::http;
 
@@ -30,6 +31,9 @@ impl DesignAutomationClient {
             self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
+
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if response.status().is_success() {
             let text = response.text().await.unwrap_or_default();
             // Response is a plain string (the nickname) wrapped in quotes
@@ -37,6 +41,8 @@ impl DesignAutomationClient {
             if !trimmed.is_empty() {
                 return Ok(trimmed.to_string());
             }
+        } else {
+            return Err(RapsError::from_response(response).await.into());
         }
         Ok("default".to_string())
     }
@@ -54,10 +60,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list engines ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let paginated: PaginatedResponse<String> = response
@@ -90,10 +96,10 @@ impl DesignAutomationClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list engines ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let paginated: PaginatedResponse<String> = response

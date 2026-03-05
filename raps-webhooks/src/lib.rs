@@ -10,6 +10,7 @@
 #![allow(dead_code)]
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 use serde::{Deserialize, Serialize};
 
 use raps_kernel::auth::AuthClient;
@@ -165,10 +166,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list webhooks ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let webhooks_response: WebhooksResponse = response
@@ -189,10 +190,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list webhooks ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let webhooks_response: WebhooksResponse = response
@@ -241,10 +242,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create webhook ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let webhook: Webhook = response
@@ -271,10 +272,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get webhook ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let webhook: Webhook = response
@@ -311,10 +312,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update webhook ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let webhook: Webhook = response
@@ -341,10 +342,10 @@ impl WebhooksClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete webhook ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())

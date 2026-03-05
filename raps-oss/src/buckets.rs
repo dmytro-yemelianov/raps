@@ -4,6 +4,7 @@
 //! Bucket operations for the OSS API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use crate::OssClient;
 use crate::types::*;
@@ -34,10 +35,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create bucket ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let bucket: Bucket = response
@@ -204,10 +205,10 @@ impl OssClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list buckets ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let buckets_response: BucketsResponse = response
@@ -236,10 +237,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get bucket details ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let bucket: Bucket = response
@@ -260,10 +261,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete bucket ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
