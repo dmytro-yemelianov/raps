@@ -192,6 +192,7 @@ pub(crate) fn box_bottom() -> String {
 /// Strip ANSI CSI escape sequences (`ESC[...X` where X is any ASCII letter).
 /// Handles SGR (colors/bold), cursor movement, and other CSI sequences.
 /// Used only for test width assertions.
+#[cfg(test)]
 pub(crate) fn strip_ansi(s: &str) -> String {
     let mut out = String::new();
     let mut chars = s.chars().peekable();

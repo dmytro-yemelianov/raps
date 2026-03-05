@@ -16,11 +16,6 @@ use crate::output::OutputFormat;
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-/// Print a full-width `═` rule (BOX_WIDTH chars).
-fn eq_rule() {
-    println!("{}", "═".repeat(BOX_WIDTH));
-}
-
 /// Print a section header using `─` dashes flush to BOX_WIDTH.
 /// Layout: `  {title} ─────…` (total BOX_WIDTH chars)
 fn section_rule(title: &str) {
@@ -260,11 +255,9 @@ pub async fn run_status(
                     // For enterprise hubs, print sub-info
                     if tier == HubTier::Enterprise {
                         let account_id = bare_account_id(&hub.id);
-                        println!("{}",
-                            format!("                └─ Admin API: {}  Account ID: {}",
-                                "✓ ready".green(),
-                                account_id
-                            )
+                        println!("                └─ Admin API: {}  Account ID: {}",
+                            "✓ ready".green(),
+                            account_id
                         );
                     }
                 }

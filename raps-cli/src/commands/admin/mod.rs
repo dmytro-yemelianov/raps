@@ -496,10 +496,10 @@ pub(crate) async fn resolve_account_id(
     dm_client: &DataManagementClient,
 ) -> Result<String> {
     // Fast path: explicit arg or env var
-    if let Some(id) = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
-        if !id.is_empty() {
-            return Ok(id);
-        }
+    if let Some(id) = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok())
+        && !id.is_empty()
+    {
+        return Ok(id);
     }
 
     // Auto-discover via hub list (requires 3-legged auth)
