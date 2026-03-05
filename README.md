@@ -536,7 +536,7 @@ raps reality result <photoscene-id>
 Start the MCP server for AI assistant integration:
 
 ```bash
-raps serve
+raps mcp
 ```
 
 **Configure in Claude Desktop** (`claude_desktop_config.json`):
@@ -546,7 +546,7 @@ raps serve
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"],
+      "args": ["mcp"],
       "env": {
         "APS_CLIENT_ID": "your_client_id",
         "APS_CLIENT_SECRET": "your_client_secret"
@@ -563,7 +563,7 @@ raps serve
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"]
+      "args": ["mcp"]
     }
   }
 }
@@ -599,7 +599,7 @@ Once configured, AI assistants can directly manage APS resources using natural l
 | `demo` | Run demo scenarios |
 | `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
-| `serve` | Start MCP server for AI assistant integration (v3.0.0+) |
+| `mcp` | Start MCP server for AI assistant integration (v3.0.0+) |
 
 ## API Coverage
 
