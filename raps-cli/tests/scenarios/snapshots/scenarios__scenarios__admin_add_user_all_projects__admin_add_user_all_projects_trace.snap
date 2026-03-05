@@ -1,0 +1,15 @@
+---
+source: raps-cli/tests/scenarios/admin_add_user_all_projects.rs
+assertion_line: 40
+expression: trace
+---
+[
+  {
+    "method": "POST",
+    "path": "/construction/admin/v1/projects/proj-001/users"
+  },
+  {
+    "method": "POST",
+    "path": "/construction/admin/v1/projects/proj-002/users"
+  }
+]
