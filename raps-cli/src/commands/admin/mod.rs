@@ -252,7 +252,7 @@ pub enum UserCommands {
         from_csv: PathBuf,
     },
 
-    /// Add a user as Project Admin to all active projects in an account
+    /// Add a user to all active projects in an account with an optional role
     #[command(name = "add-to-all-projects")]
     AddToAllProjects {
         /// Email address of the user to add
@@ -261,6 +261,10 @@ pub enum UserCommands {
         /// Account ID (defaults to APS_ACCOUNT_ID env var)
         #[arg(short, long)]
         account: Option<String>,
+
+        /// Role ID to assign in each project (e.g. the project administrator role ID)
+        #[arg(long)]
+        role: Option<String>,
 
         /// Parallel requests (defaults to global --concurrency, max: 50)
         #[arg(long)]

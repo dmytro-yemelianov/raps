@@ -2358,6 +2358,7 @@ dependencies = [
  "raps-derivative",
  "raps-dm",
  "raps-kernel",
+ "raps-mock",
  "raps-oss",
  "raps-reality",
  "raps-webhooks",

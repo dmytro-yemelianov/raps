@@ -779,6 +779,7 @@ impl UserCommands {
             UserCommands::AddToAllProjects {
                 email,
                 account,
+                role,
                 concurrency,
                 dry_run,
             } => {
@@ -799,11 +800,14 @@ impl UserCommands {
 
                 if output_format.supports_colors() {
                     println!(
-                        "\n{} Add user {} as Project Admin to all active projects in account {}",
+                        "\n{} Add user {} to all active projects in account {}",
                         "→".cyan(),
                         email.green(),
                         account_id.cyan()
                     );
+                    if let Some(ref r) = role {
+                        println!("  Role: {}", r.yellow());
+                    }
                     println!("  Concurrency: {}", concurrency);
                     if dry_run {
                         println!("  {} Dry-run mode enabled", "⚠".yellow());
@@ -842,6 +846,8 @@ impl UserCommands {
                     #[derive(Serialize, schemars::JsonSchema)]
                     struct DryRunOutput {
                         email: String,
+                        #[serde(skip_serializing_if = "Option::is_none")]
+                        role: Option<String>,
                         projects: Vec<DryRunProject>,
                     }
                     #[derive(Serialize, schemars::JsonSchema)]
@@ -878,6 +884,7 @@ impl UserCommands {
                         _ => {
                             output_format.write(&DryRunOutput {
                                 email: email.clone(),
+                                role: role.clone(),
                                 projects,
                             })?;
                         }
@@ -906,13 +913,14 @@ impl UserCommands {
                     .map(|project| {
                         let users_client = &users_client;
                         let email = &email;
+                        let role = &role;
                         let succeeded = &succeeded;
                         let failed = &failed;
                         let skipped = &skipped;
                         async move {
                             let request = raps_acc::users::AddProjectUserRequest {
                                 email: email.clone(),
-                                role_id: None,
+                                role_id: role.clone(),
                                 products: vec![],
                             };
                             match users_client.add_user(&project.id, request).await {

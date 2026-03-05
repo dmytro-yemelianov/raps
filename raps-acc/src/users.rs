@@ -437,6 +437,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_add_request_role_id_absent_when_none() {
+        let request = AddProjectUserRequest {
+            email: "user@example.com".to_string(),
+            role_id: None,
+            products: vec![],
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"email\":\"user@example.com\""));
+        assert!(
+            !json.contains("roleId"),
+            "roleId must be absent when None (skip_serializing_if)"
+        );
+    }
+
+    #[test]
     fn test_add_request_serialization() {
         let request = AddProjectUserRequest {
             email: "user@example.com".to_string(),
