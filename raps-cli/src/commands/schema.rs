@@ -55,16 +55,19 @@ macro_rules! schema_entry {
 }
 
 fn schema_registry() -> Vec<SchemaEntry> {
+    use super::acc::{AssetOutput, ChecklistOutput, SubmittalOutput};
     use super::auth::{InspectOutput, TestAuthOutput, WhoamiOutput};
     use super::bucket::{BucketInfoOutput, BucketOutput};
     use super::folder::FolderItemOutput;
     use super::hub::HubListOutput;
+    use super::issue::IssueOutput;
     use super::item::ItemInfoOutput;
     use super::object::download::{
         DeleteObjectOutput, DownloadOutput, ObjectInfoOutput, ObjectListOutput, SignedUrlOutput,
     };
     use super::object::upload::{BatchUploadResult, UploadOutput};
     use super::project::ProjectListOutput;
+    use super::rfi::RfiOutput;
 
     vec![
         // Auth
@@ -137,6 +140,43 @@ fn schema_registry() -> Vec<SchemaEntry> {
             Vec<FolderItemOutput>
         ),
         schema_entry!("item.info", "dm", "Item details", ItemInfoOutput),
+        // ACC — Issues
+        schema_entry!(
+            "issue.list",
+            "acc",
+            "Issue list item",
+            Vec<IssueOutput>
+        ),
+        schema_entry!("issue.get", "acc", "Issue details", IssueOutput),
+        // ACC — RFIs
+        schema_entry!(
+            "rfi.list",
+            "acc",
+            "RFI list item",
+            Vec<RfiOutput>
+        ),
+        schema_entry!("rfi.get", "acc", "RFI details", RfiOutput),
+        // ACC — Assets
+        schema_entry!(
+            "asset.list",
+            "acc",
+            "Asset list item",
+            Vec<AssetOutput>
+        ),
+        // ACC — Submittals
+        schema_entry!(
+            "submittal.list",
+            "acc",
+            "Submittal list item",
+            Vec<SubmittalOutput>
+        ),
+        // ACC — Checklists
+        schema_entry!(
+            "checklist.list",
+            "acc",
+            "Checklist list item",
+            Vec<ChecklistOutput>
+        ),
     ]
 }
 
@@ -250,5 +290,14 @@ mod tests {
         assert!(names.contains(&"project.list"), "missing project.list");
         assert!(names.contains(&"folder.list"), "missing folder.list");
         assert!(names.contains(&"item.info"), "missing item.info");
+    }
+
+    #[test]
+    fn test_schema_registry_covers_acc_types() {
+        let registry = schema_registry();
+        let names: Vec<_> = registry.iter().map(|e| e.name).collect();
+        assert!(names.contains(&"issue.list"), "missing issue.list");
+        assert!(names.contains(&"rfi.list"), "missing rfi.list");
+        assert!(names.contains(&"asset.list"), "missing asset.list");
     }
 }

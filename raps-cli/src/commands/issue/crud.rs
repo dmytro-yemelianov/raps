@@ -16,6 +16,19 @@ use raps_kernel::interactive;
 
 use super::truncate_str;
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub struct IssueOutput {
+    pub id: String,
+    pub display_id: Option<i32>,
+    pub title: String,
+    pub status: String,
+    pub description: Option<String>,
+    pub assigned_to: Option<String>,
+    pub due_date: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
+}
+
 pub(super) async fn list_issues(
     client: &IssuesClient,
     project_id: &str,

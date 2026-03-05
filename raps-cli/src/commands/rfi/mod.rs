@@ -298,17 +298,17 @@ async fn resolve_rfi_args(
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-pub(super) struct RfiOutput {
-    pub(super) id: String,
-    pub(super) number: Option<String>,
-    pub(super) title: String,
-    pub(super) status: String,
-    pub(super) priority: Option<String>,
-    pub(super) question: Option<String>,
-    pub(super) answer: Option<String>,
-    pub(super) due_date: Option<String>,
-    pub(super) assigned_to_name: Option<String>,
-    pub(super) created_at: Option<String>,
+pub struct RfiOutput {
+    pub id: String,
+    pub number: Option<String>,
+    pub title: String,
+    pub status: String,
+    pub priority: Option<String>,
+    pub question: Option<String>,
+    pub answer: Option<String>,
+    pub due_date: Option<String>,
+    pub assigned_to_name: Option<String>,
+    pub created_at: Option<String>,
 }
 
 pub(super) fn truncate_str(s: &str, max_len: usize) -> String {
