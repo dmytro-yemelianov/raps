@@ -130,3 +130,4 @@ assert_cmd.workspace = true
 predicates.workspace = true
 dotenvy.workspace = true
 insta.workspace = true
+raps-mock.workspace = true
