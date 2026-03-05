@@ -57,10 +57,14 @@ macro_rules! schema_entry {
 fn schema_registry() -> Vec<SchemaEntry> {
     use super::auth::{InspectOutput, TestAuthOutput, WhoamiOutput};
     use super::bucket::{BucketInfoOutput, BucketOutput};
+    use super::folder::FolderItemOutput;
+    use super::hub::HubListOutput;
+    use super::item::ItemInfoOutput;
     use super::object::download::{
         DeleteObjectOutput, DownloadOutput, ObjectInfoOutput, ObjectListOutput, SignedUrlOutput,
     };
     use super::object::upload::{BatchUploadResult, UploadOutput};
+    use super::project::ProjectListOutput;
 
     vec![
         // Auth
@@ -113,6 +117,26 @@ fn schema_registry() -> Vec<SchemaEntry> {
             SignedUrlOutput
         ),
         schema_entry!("object.info", "object", "Object details", ObjectInfoOutput),
+        // Data Management
+        schema_entry!(
+            "hub.list",
+            "dm",
+            "Hub list item",
+            Vec<HubListOutput>
+        ),
+        schema_entry!(
+            "project.list",
+            "dm",
+            "Project list item",
+            Vec<ProjectListOutput>
+        ),
+        schema_entry!(
+            "folder.list",
+            "dm",
+            "Folder list item",
+            Vec<FolderItemOutput>
+        ),
+        schema_entry!("item.info", "dm", "Item details", ItemInfoOutput),
     ]
 }
 
@@ -216,5 +240,15 @@ mod tests {
                 json.err()
             );
         }
+    }
+
+    #[test]
+    fn test_schema_registry_covers_dm_types() {
+        let registry = schema_registry();
+        let names: Vec<_> = registry.iter().map(|e| e.name).collect();
+        assert!(names.contains(&"hub.list"), "missing hub.list");
+        assert!(names.contains(&"project.list"), "missing project.list");
+        assert!(names.contains(&"folder.list"), "missing folder.list");
+        assert!(names.contains(&"item.info"), "missing item.info");
     }
 }

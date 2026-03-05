@@ -50,7 +50,7 @@ impl ProjectCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct ProjectListOutput {
+pub struct ProjectListOutput {
     id: String,
     name: String,
     project_type: String,

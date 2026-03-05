@@ -41,7 +41,7 @@ impl HubCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct HubListOutput {
+pub struct HubListOutput {
     id: String,
     name: String,
     hub_type: String,
