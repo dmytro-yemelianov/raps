@@ -422,8 +422,10 @@ mod tests {
         let has_admin = names.iter().any(|n| n.starts_with("admin."));
         let has_da = names.iter().any(|n| n.starts_with("da."));
         let has_webhook = names.iter().any(|n| n.starts_with("webhook."));
+        let has_reality = names.iter().any(|n| n.starts_with("reality."));
         assert!(has_admin, "no admin entries in schema registry");
         assert!(has_da, "no DA entries in schema registry");
         assert!(has_webhook, "no webhook entries in schema registry");
+        assert!(has_reality, "no reality entries in schema registry");
     }
 }
