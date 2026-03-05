@@ -4,6 +4,7 @@
 //! Tool dispatch implementation for the MCP server.
 
 use rmcp::model::*;
+use raps_kernel::security::strip_prompt_injection;
 use serde_json::{Map, Value};
 
 use super::server::RapsServer;
@@ -1360,7 +1361,13 @@ impl RapsServer {
         // Enrich auth-related errors with actionable guidance
         let result = Self::enrich_error(&result);
 
-        CallToolResult::success(vec![Content::text(result)])
+        // Sanitize the response body against prompt injection before returning to the AI
+        let sanitized = match strip_prompt_injection(Value::String(result)) {
+            Value::String(s) => s,
+            other => other.to_string(),
+        };
+
+        CallToolResult::success(vec![Content::text(sanitized)])
     }
 
     /// If the result string looks like an auth error, append user-friendly guidance.
