@@ -96,8 +96,8 @@ pub fn safe_join(base_dir: &Path, untrusted_name: &str) -> Result<PathBuf> {
 /// Rejects:
 /// - Empty strings
 /// - Control characters
-/// - Query-parameter injection characters (`?`, `&`, `=`)
-/// - URL-encoded sequences that could decode to path traversal or null (`%2f`, `%00`, `%25`, `%0a`, `%0d`, `%09`)
+/// - Query-parameter injection characters (`?`, `&`, `=`, `#`, `@`)
+/// - URL-encoded sequences that could decode to path traversal or null (`%2e`, `%2f`, `%00`, `%25`, `%0a`, `%0d`, `%09`)
 ///
 /// Allows: alphanumeric, `-`, `_`, `.`, `:`, `+`, `/` (for base64 URNs and APS IDs).
 pub fn validate_resource_id(id: &str) -> Result<&str> {
@@ -109,12 +109,12 @@ pub fn validate_resource_id(id: &str) -> Result<&str> {
         bail!("Resource ID contains control characters: {:?}", id);
     }
 
-    if id.contains('?') || id.contains('&') || id.contains('=') {
+    if id.contains('?') || id.contains('&') || id.contains('=') || id.contains('#') || id.contains('@') {
         bail!("Resource ID contains query-parameter characters: {:?}", id);
     }
 
     let lower = id.to_lowercase();
-    for bad in &["%2f", "%00", "%25", "%0a", "%0d", "%09"] {
+    for bad in &["%2e", "%2f", "%00", "%25", "%0a", "%0d", "%09"] {
         if lower.contains(bad) {
             bail!(
                 "Resource ID contains suspicious URL-encoded sequence '{}': {:?}",
@@ -284,5 +284,17 @@ mod tests {
     #[test]
     fn test_validate_resource_id_rejects_empty() {
         assert!(validate_resource_id("").is_err());
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_fragment_and_userinfo() {
+        assert!(validate_resource_id("project#fragment").is_err());
+        assert!(validate_resource_id("user@host").is_err());
+    }
+
+    #[test]
+    fn test_validate_resource_id_rejects_encoded_dot() {
+        assert!(validate_resource_id("%2e%2e%2fpasswd").is_err());
+        assert!(validate_resource_id("id%2ename").is_err());
     }
 }
