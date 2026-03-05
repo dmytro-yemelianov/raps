@@ -125,7 +125,7 @@ pub async fn run_status(
 
     // ── 5. Render ───────────────────────────────────────────────────────────
     match output_format {
-        OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Csv | OutputFormat::Plain => {
+        OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Csv | OutputFormat::Plain | OutputFormat::Ndjson => {
             // Structured output — build a JSON-serialisable struct.
             let hub_outputs: Vec<HubStatusOutput> = hubs
                 .iter()

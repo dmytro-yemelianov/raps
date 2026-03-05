@@ -34,6 +34,19 @@ impl OutputFormatter {
                 let json_value = serde_json::to_value(data)?;
                 write_table(json_value, writer)?;
             }
+            OutputFormat::Ndjson => {
+                let value = serde_json::to_value(data)?;
+                match value {
+                    serde_json::Value::Array(items) => {
+                        for item in items {
+                            writeln!(writer, "{}", serde_json::to_string(&item)?)?;
+                        }
+                    }
+                    other => {
+                        writeln!(writer, "{}", serde_json::to_string(&other)?)?;
+                    }
+                }
+            }
         }
         Ok(())
     }

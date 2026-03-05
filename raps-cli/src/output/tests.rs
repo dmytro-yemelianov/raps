@@ -241,3 +241,49 @@ fn test_snapshot_csv_with_special_chars() {
     let result = String::from_utf8(output).unwrap();
     insta::assert_snapshot!(result);
 }
+
+#[test]
+fn test_ndjson_writes_one_line_per_item() {
+    use serde::Serialize;
+    use crate::output::{OutputFormat, formatter::OutputFormatter};
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct Row { id: u32, name: String }
+
+    let data = vec![
+        Row { id: 1, name: "alpha".into() },
+        Row { id: 2, name: "beta".into() },
+    ];
+    let mut buf = Vec::new();
+    OutputFormatter::print_output(&data, OutputFormat::Ndjson, &mut buf).unwrap();
+    let out = String::from_utf8(buf).unwrap();
+    let lines: Vec<_> = out.lines().collect();
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("\"alpha\""));
+    assert!(lines[1].contains("\"beta\""));
+    for line in &lines {
+        serde_json::from_str::<serde_json::Value>(line).unwrap();
+    }
+}
+
+#[test]
+fn test_ndjson_single_object_one_line() {
+    use serde::Serialize;
+    use crate::output::{OutputFormat, formatter::OutputFormatter};
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct Single { value: i32 }
+
+    let mut buf = Vec::new();
+    OutputFormatter::print_output(&Single { value: 42 }, OutputFormat::Ndjson, &mut buf).unwrap();
+    let out = String::from_utf8(buf).unwrap();
+    assert_eq!(out.lines().count(), 1);
+    serde_json::from_str::<serde_json::Value>(out.trim()).unwrap();
+}
+
+#[test]
+fn test_ndjson_from_str_roundtrip() {
+    use crate::output::OutputFormat;
+    assert_eq!(<OutputFormat as std::str::FromStr>::from_str("ndjson").unwrap(), OutputFormat::Ndjson);
+    assert_eq!(OutputFormat::Ndjson.to_string(), "ndjson");
+}

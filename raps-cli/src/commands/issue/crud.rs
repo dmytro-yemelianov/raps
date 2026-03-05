@@ -72,7 +72,7 @@ pub(super) async fn list_issues(
             OutputFormat::Csv => {
                 println!("id,display_id,title,status,assigned_to,created_at,updated_at")
             }
-            OutputFormat::Plain => println!("No issues found"),
+            OutputFormat::Plain | OutputFormat::Ndjson => println!("No issues found"),
         }
         return Ok(());
     }
@@ -162,6 +162,9 @@ pub(super) async fn list_issues(
                     display_id, issue.status, issue.title, assigned
                 );
             }
+        }
+        OutputFormat::Ndjson => {
+            output_format.write(&issues)?;
         }
     }
 
