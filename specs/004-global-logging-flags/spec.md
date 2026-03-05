@@ -2,7 +2,7 @@
 
 **Feature Branch**: `004-global-logging-flags`
 **Created**: 2026-01-15
-**Status**: Draft
+**Status**: Complete
 **Input**: User description: "Global logging flags: --no-color, --quiet, --verbose, --debug. Redact secrets in debug logs."
 
 ## User Scenarios & Testing
