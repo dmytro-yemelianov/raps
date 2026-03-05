@@ -20,6 +20,7 @@ pub mod doctor;
 pub mod folder;
 pub mod generate;
 pub mod hub;
+pub mod init;
 pub mod inspect;
 pub mod interactive;
 pub mod issue;

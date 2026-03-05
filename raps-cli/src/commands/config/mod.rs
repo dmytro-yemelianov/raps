@@ -227,7 +227,7 @@ pub(crate) async fn load_profiles() -> Result<ProfilesData> {
     Ok(data)
 }
 
-async fn save_profiles(data: &ProfilesData) -> Result<()> {
+pub(crate) async fn save_profiles(data: &ProfilesData) -> Result<()> {
     let path = profiles_path().await?;
     let content = serde_json::to_string_pretty(data)?;
     tokio::fs::write(&path, content).await?;

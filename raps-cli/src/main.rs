@@ -103,6 +103,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   template      Project templates management (create, list, update, archive)
 
 \x1b[1;32mUtility (No Auth Required)\x1b[0m
+  init          First-time setup wizard (credentials, login, hub context)
   config        Configuration management (profiles, settings)
   completions   Generate shell completions for bash, zsh, fish, PowerShell
   shell         Start an interactive shell session
@@ -228,6 +229,9 @@ enum Commands {
     /// Translate files using Model Derivative API
     #[command(subcommand)]
     Translate(TranslateCommands),
+
+    /// First-time setup wizard — configure credentials, login, and hub context
+    Init,
 
     /// Show full context: auth state, hubs (Personal vs Enterprise), active account
     Status,
@@ -975,6 +979,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Bucket(_) => "bucket",
         Commands::Object(_) => "object",
         Commands::Translate(_) => "translate",
+        Commands::Init => "init",
         Commands::Status => "status",
         Commands::Hub(_) => "hub",
         Commands::Project(_) => "project",
@@ -1094,6 +1099,10 @@ async fn execute_command(
 
         Commands::Translate(cmd) => {
             cmd.execute(&get_derivative_client(), output_format).await?;
+        }
+
+        Commands::Init => {
+            commands::init::run_init().await?;
         }
 
         Commands::Status => {
