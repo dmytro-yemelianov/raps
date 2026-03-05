@@ -9,7 +9,9 @@
 use anyhow::Result;
 use colored::Colorize;
 
+use crate::commands::status::run_status;
 use crate::context_banner::BOX_WIDTH;
+use crate::output::OutputFormat;
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,11 +80,15 @@ pub async fn run_init() -> Result<()> {
         println!("  {} Skipped (no hubs found).", "→".dimmed());
     }
 
+    // Step 6 — summary
+    step_summary(&client_id, &client_secret).await;
+
     println!();
     println!("{}", "═".repeat(BOX_WIDTH));
     println!(
         "  {}",
-        "Setup complete. Run `raps status` anytime to check your configuration.".bold()
+        "Setup complete. Run `raps status` anytime to check your configuration."
+            .bold()
     );
     println!("{}", "═".repeat(BOX_WIDTH));
 
@@ -437,6 +443,31 @@ async fn step_enterprise_context(
     }
 
     Ok(())
+}
+
+// ─── step 6: summary ─────────────────────────────────────────────────────────
+
+async fn step_summary(client_id: &str, client_secret: &str) {
+    step_header(6, 6, "Summary");
+    println!();
+
+    // Build fresh clients from the credentials we have
+    // (env vars for the new profile may not be loaded yet in this process)
+    let config = raps_kernel::config::Config {
+        client_id: client_id.to_string(),
+        client_secret: client_secret.to_string(),
+        base_url: "https://developer.api.autodesk.com".to_string(),
+        callback_url: "http://localhost:8080/callback".to_string(),
+        da_nickname: None,
+        http_config: raps_kernel::http::HttpClientConfig::default(),
+    };
+
+    let auth = raps_kernel::auth::AuthClient::new(config.clone());
+    let dm = raps_dm::DataManagementClient::new(config, auth.clone());
+
+    if let Err(e) = run_status(&auth, &dm, OutputFormat::Table).await {
+        println!("  {} Could not load status: {}", "!".yellow(), e);
+    }
 }
 
 async fn save_account_to_profile(profile_name: &str, account_id: &str) -> Result<()> {
