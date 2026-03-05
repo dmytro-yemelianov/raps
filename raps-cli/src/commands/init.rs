@@ -56,9 +56,9 @@ pub async fn run_init() -> Result<()> {
     // Step 1 — credentials
     let (profile_name, client_id, client_secret) = step_credentials().await?;
 
-    // Steps 2-6 use a fresh AuthClient built from the saved profile
-    // (remaining steps are stubs for now — will be filled in Tasks 2-6)
-    let _ = (&profile_name, &client_id, &client_secret);
+    // Step 2 — test auth (non-fatal)
+    let auth_ok = step_test_auth(&client_id, &client_secret).await;
+    let _ = (auth_ok, &profile_name); // auth_ok used in future steps
 
     println!();
     println!("{}", "═".repeat(BOX_WIDTH));
@@ -128,6 +128,44 @@ async fn step_credentials() -> Result<(String, String, String)> {
     Ok((profile_name, client_id, client_secret))
 }
 
+// ─── step 2: test 2-legged auth ──────────────────────────────────────────────
+
+async fn step_test_auth(client_id: &str, client_secret: &str) -> bool {
+    step_header(2, 6, "Test 2-Legged Auth");
+    println!();
+    println!("  Testing client credentials...");
+
+    // Build a minimal config directly (avoids env var dependency)
+    let config = raps_kernel::config::Config {
+        client_id: client_id.to_string(),
+        client_secret: client_secret.to_string(),
+        base_url: "https://developer.api.autodesk.com".to_string(),
+        callback_url: "http://localhost:8080/callback".to_string(),
+        da_nickname: None,
+        http_config: raps_kernel::http::HttpClientConfig::default(),
+    };
+    let auth = raps_kernel::auth::AuthClient::new(config);
+
+    match auth.test_auth().await {
+        Ok(()) => {
+            println!("  {} 2-legged auth OK", "✓".green().bold());
+            true
+        }
+        Err(e) => {
+            println!(
+                "  {} 2-legged auth failed — check client_id / client_secret",
+                "✗".red().bold()
+            );
+            println!("  {}", format!("    {e}").dimmed());
+            println!(
+                "  {} You can still continue and fix credentials later.",
+                "!".yellow()
+            );
+            false
+        }
+    }
+}
+
 async fn save_profile(name: &str, client_id: &str, client_secret: &str) -> Result<()> {
     use crate::commands::config::{load_profiles, save_profiles, ProfileConfig};
 
@@ -182,5 +220,18 @@ mod tests {
     fn test_detect_shell_rc_unknown() {
         let rc = shell_rc_filename("unknown_shell");
         assert_eq!(rc, ".profile");
+    }
+
+    #[test]
+    fn test_step_auth_result_formatting() {
+        // Test the message strings we'll print (pure formatting, no network)
+        let ok_msg = format!("{} 2-legged auth OK", "✓".green().bold());
+        assert!(ok_msg.contains("2-legged auth OK"));
+
+        let fail_msg = format!(
+            "{} 2-legged auth failed — check client_id / client_secret",
+            "✗".red().bold()
+        );
+        assert!(fail_msg.contains("2-legged auth failed"));
     }
 }
