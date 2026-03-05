@@ -10,7 +10,7 @@ use assert_cmd::Command;
 use predicates::prelude::PredicateBooleanExt;
 
 #[test]
-fn test_bucket_get_rejects_injected_key() {
+fn test_input_validation_bucket_rejects_query_injection() {
     let mut cmd = Command::cargo_bin("raps").unwrap();
     cmd.args(["bucket", "info", "key?injected=true"]);
     cmd.assert()
@@ -19,10 +19,28 @@ fn test_bucket_get_rejects_injected_key() {
 }
 
 #[test]
-fn test_bucket_get_rejects_fragment() {
+fn test_input_validation_bucket_rejects_fragment() {
     let mut cmd = Command::cargo_bin("raps").unwrap();
     cmd.args(["bucket", "info", "key#fragment"]);
     cmd.assert()
         .failure()
         .stderr(predicates::str::contains("Invalid bucket key").or(predicates::str::contains("query-parameter").or(predicates::str::contains("Invalid"))));
+}
+
+#[test]
+fn test_input_validation_hub_info_rejects_injection() {
+    let mut cmd = Command::cargo_bin("raps").unwrap();
+    cmd.args(["hub", "info", "hub?injected=true"]);
+    cmd.assert()
+        .failure()
+        .stderr(predicates::str::contains("Invalid").or(predicates::str::contains("query-parameter")));
+}
+
+#[test]
+fn test_input_validation_project_list_rejects_injection() {
+    let mut cmd = Command::cargo_bin("raps").unwrap();
+    cmd.args(["project", "list", "hub&injected=true"]);
+    cmd.assert()
+        .failure()
+        .stderr(predicates::str::contains("Invalid").or(predicates::str::contains("query-parameter")));
 }
