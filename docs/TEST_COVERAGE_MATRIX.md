@@ -28,7 +28,7 @@ Columns: **Lines** = line coverage %, **Fns** = function coverage %
 | `commands/admin/user.rs` | 14.1% | 36.8% | mock scenarios; bulk logic in raps-admin crate |
 | `commands/admin/project.rs` | 2.0% | 9.1% | help-snapshot only |
 | `commands/admin/folder.rs` | 0% | 0% | help-snapshot only |
-| `commands/admin/operations.rs` | 0% | 0% | help-snapshot only |
+| `commands/admin/operations.rs` | **53.3%** | 81.8% | unit tests (format_status, display_bulk_result table/JSON), scenario tests (list empty table/JSON/filter/yaml, status/resume/cancel no-ops, unknown UUID) |
 
 ---
 
