@@ -351,4 +351,49 @@ mod tests {
     fn test_bare_account_id_no_prefix() {
         assert_eq!(bare_account_id("a.personalid"), "a.personalid");
     }
+
+    #[test]
+    fn mask_id_short_string_unchanged() {
+        assert_eq!(mask_id("abc"), "abc");
+        assert_eq!(mask_id("12345678"), "12345678"); // exactly 8 chars, no mask
+    }
+
+    #[test]
+    fn mask_id_long_string_shows_prefix_and_suffix() {
+        let result = mask_id("ABCDEFGHIJKLMN"); // 14 chars
+        assert_eq!(result, "ABCD\u{2026}KLMN"); // "ABCD…KLMN"
+    }
+
+    #[test]
+    fn format_remaining_expired() {
+        assert_eq!(format_remaining(0), "expired");
+        assert_eq!(format_remaining(-10), "expired");
+    }
+
+    #[test]
+    fn format_remaining_seconds_only() {
+        assert_eq!(format_remaining(45), "45s");
+    }
+
+    #[test]
+    fn format_remaining_minutes() {
+        assert_eq!(format_remaining(90), "1m");
+        assert_eq!(format_remaining(3599), "59m");
+    }
+
+    #[test]
+    fn format_remaining_hours() {
+        assert_eq!(format_remaining(3600), "1h0m");
+        assert_eq!(format_remaining(5400), "1h30m");
+    }
+
+    #[test]
+    fn bare_account_id_strips_b_prefix() {
+        assert_eq!(bare_account_id("b.abc-123"), "abc-123");
+    }
+
+    #[test]
+    fn bare_account_id_no_prefix_unchanged() {
+        assert_eq!(bare_account_id("abc-123"), "abc-123");
+    }
 }
