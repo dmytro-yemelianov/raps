@@ -3,6 +3,7 @@ pub mod admin_remove_user;
 pub mod admin_archive_project;
 pub mod admin_dry_run;
 pub mod admin_cli_scenarios;
+pub mod admin_folder_scenarios;
 pub mod status_scenario;
 pub mod hub_scenarios;
 pub mod webhook_scenarios;
