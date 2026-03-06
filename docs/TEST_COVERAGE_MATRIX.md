@@ -81,9 +81,9 @@ Columns: **Lines** = line coverage %, **Fns** = function coverage %
 |---|---|---|---|
 | `commands/da/engines.rs` | 21.6% | 100% | help-snapshot, dispatch smoke |
 | `commands/da/mod.rs` | 7.3% | 66.7% | help-snapshot |
-| `commands/da/activities.rs` | 0% | 0% | help-snapshot only |
-| `commands/da/appbundles.rs` | 0% | 0% | help-snapshot only |
-| `commands/da/workitems.rs` | 0% | 0% | help-snapshot only |
+| `commands/da/activities.rs` | **65.1%** | 82.4% | scenario tests (list/create/delete, JSON file, missing fields); wait/alias-error paths require live API |
+| `commands/da/appbundles.rs` | **49.7%** | 82.4% | scenario tests (list/create/delete round-trips) |
+| `commands/da/workitems.rs` | **43.6%** | 100% | scenario tests (list, run qualified/unqualified, status, input/output args); wait polling requires live API |
 
 ---
 
