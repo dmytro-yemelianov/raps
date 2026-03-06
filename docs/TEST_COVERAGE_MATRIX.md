@@ -186,7 +186,7 @@ Columns: **Lines** = line coverage %, **Fns** = function coverage %
 | `commands/object/mod.rs` | 37.3% | 93.3% | help-snapshot, arg-validation |
 | `commands/object/download.rs` | 3.1% | 13.3% | help-snapshot only |
 | `commands/object/upload.rs` | 0% | 0% | help-snapshot only |
-| `commands/object/copy.rs` | 0% | 0% | help-snapshot only |
+| `commands/object/copy.rs` | **40.3%** | 64.7% | scenario tests (batch-copy empty bucket, batch-rename no matches, copy/rename nonexistent source error paths, arg-validation); full copy round-trip requires upload (panics in debug mode due to clap positional arg ordering) |
 
 ---
 

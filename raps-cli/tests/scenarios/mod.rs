@@ -13,3 +13,4 @@ pub mod da_appbundles_scenarios;
 pub mod context_scenarios;
 pub mod da_activities_scenarios;
 pub mod da_workitems_scenarios;
+pub mod object_copy_scenarios;
