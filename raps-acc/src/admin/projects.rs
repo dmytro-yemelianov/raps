@@ -146,7 +146,7 @@ impl AccountAdminClient {
                     }
                 }
             }
-            Err(e) if e.to_string().contains("400") => {
+            Err(e) if e.to_string().contains("400") || e.to_string().contains("404") => {
                 // BIM 360 Business hub — ACC v1 endpoint not supported
                 all_projects = self.list_all_projects_bim360(account_id).await?;
             }

@@ -20,7 +20,7 @@ impl AccountAdminClient {
 
         match self.list_roles_acc(&account_id).await {
             Ok(roles) => Ok(roles),
-            Err(e) if e.to_string().contains("400") => {
+            Err(e) if e.to_string().contains("400") || e.to_string().contains("404") => {
                 self.list_roles_bim360(&account_id).await
             }
             Err(e) => Err(e),
