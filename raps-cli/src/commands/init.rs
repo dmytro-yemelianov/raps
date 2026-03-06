@@ -568,4 +568,38 @@ mod tests {
             "export APS_ACCOUNT_ID=01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"
         );
     }
+
+    #[test]
+    fn export_line_formats_correctly() {
+        assert_eq!(export_line("abc-123"), "export APS_ACCOUNT_ID=abc-123");
+    }
+
+    #[test]
+    fn export_line_empty_account_id() {
+        assert_eq!(export_line(""), "export APS_ACCOUNT_ID=");
+    }
+
+    #[test]
+    fn shell_rc_filename_zsh() {
+        assert_eq!(shell_rc_filename("/bin/zsh"), ".zshrc");
+        assert_eq!(shell_rc_filename("zsh"), ".zshrc");
+    }
+
+    #[test]
+    fn shell_rc_filename_bash() {
+        assert_eq!(shell_rc_filename("/bin/bash"), ".bashrc");
+        assert_eq!(shell_rc_filename("bash"), ".bashrc");
+    }
+
+    #[test]
+    fn shell_rc_filename_unknown_falls_back_to_profile() {
+        assert_eq!(shell_rc_filename("fish"), ".profile");
+        assert_eq!(shell_rc_filename("/usr/bin/sh"), ".profile");
+    }
+
+    #[test]
+    fn shell_rc_filename_zsh_wins_over_bash_when_both_in_path() {
+        // "zsh" check comes before "bash" check in implementation
+        assert_eq!(shell_rc_filename("zsh-bash"), ".zshrc");
+    }
 }
