@@ -22,7 +22,7 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
             "proj-001",
             AddProjectUserRequest {
                 email: "dup@example.com".into(),
-                role_id: None,
+                role_ids: vec![],
                 products: vec![],
             },
         )
@@ -36,6 +36,7 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
         "mock-account-001",
         "dup@example.com",
         None,
+        vec![],
         &ProjectFilter::new(),
         BulkConfig::default(),
         |_| {},
@@ -65,6 +66,7 @@ async fn test_filter_excludes_all_projects_returns_zero_total() {
         "mock-account-001",
         "empty@example.com",
         None,
+        vec![],
         &filter,
         BulkConfig::default(),
         |_| {},

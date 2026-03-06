@@ -18,6 +18,7 @@ async fn test_dry_run_add_makes_zero_write_calls() {
         "mock-account-001",
         "dryrun@example.com",
         Some("role-admin"),
+        vec![],
         &ProjectFilter::new(),
         BulkConfig { dry_run: true, ..Default::default() },
         |_| {},

@@ -17,7 +17,7 @@ async fn test_add_user_sends_post_to_correct_endpoint() {
             "proj-001",
             AddProjectUserRequest {
                 email: "new@example.com".into(),
-                role_id: None,
+                role_ids: vec![],
                 products: vec![],
             },
         )
@@ -42,14 +42,14 @@ async fn test_add_user_with_role_id_sends_role_in_body() {
             "proj-001",
             AddProjectUserRequest {
                 email: "roletest@example.com".into(),
-                role_id: Some("role-project-admin".into()),
+                role_ids: vec!["role-project-admin".into()],
                 products: vec![],
             },
         )
         .await
         .unwrap();
 
-    assert_eq!(result.role_id, Some("role-project-admin".into()));
+    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-project-admin"));
 }
 
 #[tokio::test]
@@ -64,13 +64,13 @@ async fn test_add_user_without_role_omits_role_id_key() {
             "proj-001",
             AddProjectUserRequest {
                 email: "norole@example.com".into(),
-                role_id: None,
+                role_ids: vec![],
                 products: vec![],
             },
         )
         .await
         .unwrap();
 
-    // Mock assigns "role-default" when no roleId in body
-    assert_eq!(result.role_id, Some("role-default".into()));
+    // Mock assigns "role-default" when no roleIds in body
+    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-default"));
 }

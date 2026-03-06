@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
-//! Integration tests: ProjectUsersClient correctly forwards role_id to the ACC API.
+//! Integration tests: ProjectUsersClient correctly forwards roleIds to the ACC API.
 //!
 //! These tests verify the full HTTP round-trip using raps-mock so no real ACC
 //! tenant is needed. The mock server seeds two active projects (proj-001,
-//! proj-002) and echoes back whatever roleId it receives.
+//! proj-002) and echoes back whatever roleIds array it receives.
 
 use raps_acc::users::{AddProjectUserRequest, ProjectUsersClient};
 use raps_kernel::auth::AuthClient;
@@ -54,8 +54,8 @@ async fn inject_token(auth: &AuthClient, base_url: &str) {
     auth.set_3leg_token_for_testing(token).await;
 }
 
-/// When role_id=Some("role-project-admin") is passed, the HTTP POST body must
-/// contain "roleId" and the server must echo it back in the response.
+/// When role_ids=["role-project-admin"] is passed, the HTTP POST body must
+/// contain "roleIds" array and the server must echo it back in the response.
 #[tokio::test]
 async fn test_add_user_with_role_id_propagates_to_api() {
     let server = TestServer::start_default().await.unwrap();
@@ -64,16 +64,16 @@ async fn test_add_user_with_role_id_propagates_to_api() {
 
     let request = AddProjectUserRequest {
         email: "newuser@example.com".to_string(),
-        role_id: Some("role-project-admin".to_string()),
+        role_ids: vec!["role-project-admin".to_string()],
         products: vec![],
     };
 
     let result = client.add_user("proj-001", request).await.unwrap();
-    assert_eq!(result.role_id, Some("role-project-admin".to_string()));
+    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-project-admin"));
 }
 
-/// When role_id=None, the POST body must NOT contain "roleId" and the server
-/// assigns its default role.
+/// When role_ids=[] is passed, the POST body must NOT contain "roleIds" and the
+/// server assigns its default role.
 #[tokio::test]
 async fn test_add_user_without_role_id_omits_role_from_body() {
     let server = TestServer::start_default().await.unwrap();
@@ -82,13 +82,13 @@ async fn test_add_user_without_role_id_omits_role_from_body() {
 
     let request = AddProjectUserRequest {
         email: "newuser2@example.com".to_string(),
-        role_id: None,
+        role_ids: vec![],
         products: vec![],
     };
 
-    // Server default when roleId absent from body is "role-default"
+    // Server default when roleIds absent from body is "role-default"
     let result = client.add_user("proj-001", request).await.unwrap();
-    assert_eq!(result.role_id, Some("role-default".to_string()));
+    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-default"));
 }
 
 /// User already present (same email+project) should return a recognisable error
@@ -102,7 +102,7 @@ async fn test_add_duplicate_user_returns_error() {
     // alice@example.com is seeded in proj-001 by the mock (user-001)
     let request = AddProjectUserRequest {
         email: "alice@example.com".to_string(),
-        role_id: Some("role-project-admin".to_string()),
+        role_ids: vec!["role-project-admin".to_string()],
         products: vec![],
     };
 
