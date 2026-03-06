@@ -7,7 +7,8 @@ use anyhow::{Context, Result};
 
 use raps_kernel::http;
 
-use super::types::{AccountRole, Bim360Role};
+use crate::types::ProductAccess;
+use super::types::{AccountRole, Bim360Role, ResolvedRole};
 use super::{AccountAdminClient, normalize_account_id};
 
 impl AccountAdminClient {
@@ -24,6 +25,53 @@ impl AccountAdminClient {
                 self.list_roles_bim360(&account_id).await
             }
             Err(e) => Err(e),
+        }
+    }
+
+    /// Resolve a role name to its representation for this hub type.
+    ///
+    /// - UUID input → `ResolvedRole::Uuid` (passed through, works for both hub types)
+    /// - BIM 360 hub (roles endpoint returns data) → `ResolvedRole::Uuid` from name lookup
+    /// - ACC hub (roles endpoint returns 404/empty) → `ResolvedRole::Products` from known mapping
+    pub async fn resolve_role(&self, account_id: &str, role: &str) -> Result<ResolvedRole> {
+        if is_uuid(role) {
+            return Ok(ResolvedRole::Uuid(role.to_string()));
+        }
+
+        match self.list_roles(account_id).await {
+            Ok(roles) if !roles.is_empty() => {
+                // BIM 360 hub — resolve by name to UUID
+                let matched = roles.iter().find(|r| r.name == role)
+                    .or_else(|| roles.iter().find(|r| r.name.to_lowercase() == role.to_lowercase()))
+                    .or_else(|| roles.iter().find(|r| r.name.to_lowercase().contains(&role.to_lowercase())));
+
+                if let Some(r) = matched {
+                    return Ok(ResolvedRole::Uuid(r.id.clone()));
+                }
+
+                // Name not found in BIM 360 roles — try ACC products as fallback
+                if let Some(products) = role_name_to_acc_products(role) {
+                    return Ok(ResolvedRole::Products(products));
+                }
+
+                let available: Vec<String> = roles.iter().map(|r| format!("\"{}\"", r.name)).collect();
+                anyhow::bail!(
+                    "Role {:?} not found. Available roles: {}",
+                    role,
+                    available.join(", ")
+                )
+            }
+            _ => {
+                // ACC hub (or roles endpoint unavailable) — use product-based mapping
+                if let Some(products) = role_name_to_acc_products(role) {
+                    return Ok(ResolvedRole::Products(products));
+                }
+                anyhow::bail!(
+                    "Role {:?} not recognized. Known ACC roles: \
+                    \"Project Admin\", \"Project Member\", \"Project Editor\", \"Project Viewer\"",
+                    role
+                )
+            }
         }
     }
 
@@ -131,6 +179,33 @@ fn parse_roles_response(body: &str) -> Result<Vec<AccountRole>> {
     let wrapped: Wrapped = serde_json::from_str(body)
         .context("Failed to parse roles response (expected array or {results:[]})")?;
     Ok(wrapped.results)
+}
+
+/// Map a well-known role display name to ACC product access configurations.
+///
+/// ACC does not have a `role_id` concept — access is controlled via product keys.
+/// Returns `None` for unrecognized role names.
+fn role_name_to_acc_products(role: &str) -> Option<Vec<ProductAccess>> {
+    let key = |k: &str, a: &str| ProductAccess { key: k.to_string(), access: a.to_string() };
+    match role.to_lowercase().trim() {
+        "project admin" | "admin" | "administrator" => Some(vec![
+            key("projectAdministration", "administrator"),
+            key("docs", "administrator"),
+        ]),
+        "project member" | "member" => Some(vec![
+            key("projectAdministration", "member"),
+            key("docs", "member"),
+        ]),
+        "project editor" | "editor" => Some(vec![
+            key("projectAdministration", "member"),
+            key("docs", "editor"),
+        ]),
+        "project viewer" | "viewer" => Some(vec![
+            key("projectAdministration", "member"),
+            key("docs", "viewer"),
+        ]),
+        _ => None,
+    }
 }
 
 /// Returns true if the string looks like a UUID (with or without dashes)

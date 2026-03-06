@@ -10,6 +10,7 @@ use colored::Colorize;
 use serde::Serialize;
 
 use raps_acc::admin::AccountAdminClient;
+use raps_acc::admin::ResolvedRole;
 use raps_acc::users::ProjectUsersClient;
 use raps_admin::{BulkConfig, bulk_add_user};
 use raps_kernel::auth::AuthClient;
@@ -340,15 +341,14 @@ impl UserCommands {
                 users_client.account_id = Some(account_id.clone());
                 let users_client = Arc::new(users_client);
 
-                // Resolve role name to UUID if provided
-                let resolved_role = if let Some(ref role_name) = role {
-                    Some(
-                        admin_client
-                            .resolve_role_id(&account_id, role_name)
-                            .await?,
-                    )
+                // Resolve role name to either a BIM 360 UUID or ACC product access list
+                let (resolved_role_id, resolved_products): (Option<String>, Vec<raps_acc::types::ProductAccess>) = if let Some(ref role_name) = role {
+                    match admin_client.resolve_role(&account_id, role_name).await? {
+                        ResolvedRole::Uuid(id) => (Some(id), vec![]),
+                        ResolvedRole::Products(products) => (None, products),
+                    }
                 } else {
-                    None
+                    (None, vec![])
                 };
 
                 let progress_bar = create_bulk_progress_bar(output_format);
@@ -359,7 +359,8 @@ impl UserCommands {
                     users_client,
                     &account_id,
                     &email,
-                    resolved_role.as_deref(),
+                    resolved_role_id.as_deref(),
+                    resolved_products,
                     &project_filter,
                     bulk_config,
                     on_progress,

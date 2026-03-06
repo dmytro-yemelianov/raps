@@ -87,6 +87,17 @@ impl RapsServer {
             ..Default::default()
         };
 
+        // Resolve role name to UUID (BIM 360) or product access list (ACC)
+        let (resolved_role_id, resolved_products) = if let Some(ref role_name) = role {
+            match admin_client.resolve_role(&account_id, role_name).await {
+                Ok(raps_acc::admin::ResolvedRole::Uuid(id)) => (Some(id), vec![]),
+                Ok(raps_acc::admin::ResolvedRole::Products(products)) => (None, products),
+                Err(e) => return format!("Failed to resolve role: {}", e),
+            }
+        } else {
+            (None, vec![])
+        };
+
         // Progress callback (no-op for MCP)
         let on_progress = |_| {};
 
@@ -95,7 +106,8 @@ impl RapsServer {
             users_client,
             &account_id,
             &email,
-            role.as_deref(),
+            resolved_role_id.as_deref(),
+            resolved_products,
             &project_filter,
             bulk_config,
             on_progress,

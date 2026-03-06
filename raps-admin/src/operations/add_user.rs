@@ -39,7 +39,8 @@ pub struct BulkAddUserParams {
 /// * `users_client` - Client for project users API (add user)
 /// * `account_id` - The account ID
 /// * `user_email` - Email of the user to add
-/// * `role_id` - Optional role ID to assign
+/// * `role_id` - Optional BIM 360 role UUID to assign
+/// * `products` - ACC product access list (used instead of role_id for ACC hubs)
 /// * `project_filter` - Filter for selecting target projects
 /// * `config` - Bulk execution configuration
 /// * `on_progress` - Progress callback
@@ -53,6 +54,7 @@ pub async fn bulk_add_user<P>(
     account_id: &str,
     user_email: &str,
     role_id: Option<&str>,
+    products: Vec<ProductAccess>,
     project_filter: &ProjectFilter,
     config: BulkConfig,
     on_progress: P,
@@ -84,6 +86,7 @@ where
         "account_id": account_id,
         "user_email": user_email,
         "role_id": role_id,
+        "products": products,
     });
 
     let operation_id = state_manager
@@ -112,15 +115,17 @@ where
     // Step 4: Create the processor closure
     let email_clone = user_email.to_string();
     let role_id_clone = role_id.map(|s| s.to_string());
+    let products_clone = products.clone();
     let users_client_clone = Arc::clone(&users_client);
 
     let processor = move |project_id: String| {
         let email = email_clone.clone();
         let role_id = role_id_clone.clone();
+        let products = products_clone.clone();
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref()).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products).await
         }
     };
 
@@ -150,6 +155,7 @@ async fn add_user_to_project(
     project_id: &str,
     email: &str,
     role_id: Option<&str>,
+    products: Vec<ProductAccess>,
 ) -> ItemResult {
     // Check if user already exists in the project
     match users_client.user_exists(project_id, email).await {
@@ -175,7 +181,7 @@ async fn add_user_to_project(
     let request = AddProjectUserRequest {
         email: email.to_string(),
         role_id: role_id.map(|s| s.to_string()),
-        products: vec![],
+        products,
     };
 
     match users_client.add_user(project_id, request).await {
@@ -226,6 +232,10 @@ where
         .to_string();
 
     let role_id = state.parameters["role_id"].as_str().map(|s| s.to_string());
+    let products: Vec<ProductAccess> = state.parameters["products"]
+        .as_array()
+        .and_then(|arr| serde_json::from_value(serde_json::Value::Array(arr.clone())).ok())
+        .unwrap_or_default();
 
     // Get pending projects (not yet processed)
     let pending_project_ids = state_manager.get_pending_projects(&state);
@@ -280,10 +290,11 @@ where
     let processor = move |project_id: String| {
         let email = user_email.clone();
         let role_id = role_id.clone();
+        let products = products.clone();
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref()).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products).await
         }
     };
 
