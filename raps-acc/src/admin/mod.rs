@@ -5,6 +5,7 @@
 
 mod companies;
 mod projects;
+mod roles;
 mod types;
 mod users;
 

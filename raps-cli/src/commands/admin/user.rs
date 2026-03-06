@@ -340,6 +340,17 @@ impl UserCommands {
                 users_client.account_id = Some(account_id.clone());
                 let users_client = Arc::new(users_client);
 
+                // Resolve role name to UUID if provided
+                let resolved_role = if let Some(ref role_name) = role {
+                    Some(
+                        admin_client
+                            .resolve_role_id(&account_id, role_name)
+                            .await?,
+                    )
+                } else {
+                    None
+                };
+
                 let progress_bar = create_bulk_progress_bar(output_format);
                 let on_progress = make_progress_callback(progress_bar.clone());
 
@@ -348,7 +359,7 @@ impl UserCommands {
                     users_client,
                     &account_id,
                     &email,
-                    role.as_deref(),
+                    resolved_role.as_deref(),
                     &project_filter,
                     bulk_config,
                     on_progress,
