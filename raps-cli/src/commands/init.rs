@@ -73,7 +73,7 @@ pub async fn run_init() -> Result<()> {
     let hubs = step_discover_hubs(maybe_auth.as_ref(), &client_id, &client_secret).await;
     // Step 5 — enterprise context
     if !hubs.is_empty() {
-        step_enterprise_context(&hubs, &profile_name).await?;
+        step_enterprise_context(&hubs, &profile_name, &client_id).await?;
     } else if logged_in {
         step_header(5, 6, "Enterprise Context");
         println!();
@@ -329,6 +329,7 @@ async fn step_discover_hubs(
 async fn step_enterprise_context(
     hubs: &[raps_dm::types::Hub],
     profile_name: &str,
+    client_id: &str,
 ) -> Result<()> {
     use crate::context_banner::{ContextBanner, HubTier, tier_from_extension};
 
@@ -348,10 +349,23 @@ async fn step_enterprise_context(
     if enterprise_hubs.is_empty() {
         crate::context_banner::print_warning_no_enterprise();
         println!();
-        println!("  To get an enterprise hub, register your app in ACC Custom Integrations:");
-        println!("    {} https://acc.autodesk.com", "→".cyan());
-        println!("    {} (Account Admin → Custom Integrations)", " ".repeat(2));
-        println!("    {} Docs: rapscli.xyz/docs/custom-integrations", "→".cyan());
+        println!("  For RAPS to work with ACC account administration (managing project");
+        println!("  members, roles, and bulk operations), your APS app must be registered");
+        println!("  as a Custom Integration in your ACC account. This grants the app");
+        println!("  permission to call account-level APIs on behalf of your organization.");
+        println!();
+        println!("  {} Action required — do this in ACC (Account Administrator role needed):", "→".cyan());
+        println!();
+        println!("  1. Open Custom Integrations in your ACC account:");
+        println!("       {} {}", "→".cyan(), "https://acc.autodesk.com/account-admin/custom-integrations/".underline());
+        println!("  2. Click {}.", "\"Add custom integration\"".bold());
+        println!("  3. Paste your Client ID when prompted:");
+        println!("       {}", client_id.cyan().bold());
+        println!("  4. Set access level to {}.", "\"Full Account Access\"".bold());
+        println!("  5. Save. Your app now has permission to manage this account via API.");
+        println!();
+        println!("  Once done, re-run {} — the enterprise hub should appear.", "`raps init`".bold());
+        println!("  Docs: {}", "rapscli.xyz/docs/custom-integrations".underline());
         return Ok(());
     }
 
@@ -365,10 +379,22 @@ async fn step_enterprise_context(
     banner.print_box();
 
     println!();
-    println!("  To use admin commands, register this app in ACC Custom Integrations:");
-    println!("    {} {}", "→".cyan(), "https://acc.autodesk.com".underline());
-    println!("    {} (Account Admin → Custom Integrations)", " ".repeat(2));
-    println!("    {} {}", "→".cyan(), "Docs: rapscli.xyz/docs/custom-integrations".underline());
+    println!("  For RAPS to work with {} admin commands — adding and removing", hub.attributes.name.cyan().bold());
+    println!("  project members, updating roles, managing folder permissions, and");
+    println!("  running bulk operations across projects — your APS app must be");
+    println!("  registered as a Custom Integration in this ACC account.");
+    println!();
+    println!("  {} Action required — do this in ACC (Account Administrator role needed):", "→".cyan());
+    println!();
+    println!("  1. Open Custom Integrations for this account:");
+    println!("       {} {}", "→".cyan(), "https://acc.autodesk.com/account-admin/custom-integrations/".underline());
+    println!("  2. Click {}.", "\"Add custom integration\"".bold());
+    println!("  3. Paste your Client ID when prompted:");
+    println!("       {}", client_id.cyan().bold());
+    println!("  4. Set access level to {}.", "\"Full Account Access\"".bold());
+    println!("  5. Save. Your app now has permission to manage this account via API.");
+    println!();
+    println!("  Docs: {}", "rapscli.xyz/docs/custom-integrations".underline());
     println!();
     println!(
         "  Save {} = {}",

@@ -195,7 +195,7 @@ async fn update_user_role(
 
     // Check from-role filter if specified
     if let Some(from_role) = from_role_id {
-        let current_role = current_user.role_id.as_deref().unwrap_or("");
+        let current_role = current_user.role_ids.first().map(String::as_str).unwrap_or("");
         if current_role != from_role {
             return ItemResult::Skipped {
                 reason: format!("role_mismatch: current={}", current_role),
@@ -204,7 +204,7 @@ async fn update_user_role(
     }
 
     // Check if already has the target role
-    if current_user.role_id.as_deref() == Some(new_role_id) {
+    if current_user.role_ids.contains(&new_role_id.to_string()) {
         return ItemResult::Skipped {
             reason: "already_has_role".to_string(),
         };
@@ -212,7 +212,7 @@ async fn update_user_role(
 
     // Update the user's role
     let request = UpdateProjectUserRequest {
-        role_id: Some(new_role_id.to_string()),
+        role_ids: vec![new_role_id.to_string()],
         products: None,
     };
 

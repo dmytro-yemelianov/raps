@@ -103,6 +103,61 @@ async fn test_admin_project_archive_cli() {
 }
 ```
 
+## Idempotency & Conflict Resolution
+
+All bulk operations are designed to be safe to re-run. Running the same command twice on the same set of projects should never produce failures where a success or skip is the correct outcome.
+
+### Result semantics
+
+| Result | Meaning |
+|--------|---------|
+| `Success` | The API call completed and the desired state was applied |
+| `Skipped` | The desired state was already in place; no change needed |
+| `Failed` | An unexpected error occurred that was not handled as a known conflict |
+
+Only `Failed` items count against the operation outcome. `Skipped` items are not counted as errors.
+
+### Per-operation idempotency behavior
+
+#### `bulk_add_user` — upsert semantics
+
+Adding a user to a project is the most nuanced operation because the API distinguishes between "add" (POST) and "update" (PATCH):
+
+1. **User not yet in project** → POST succeeds → `Success`
+2. **User already in project (HTTP 409)**:
+   - No role or products requested → `Skipped { reason: "already_exists" }`
+   - Requested role/products match current → `Skipped { reason: "already_exists_same_role" }`
+   - Requested role/products differ → PATCH to update → `Success` (upsert)
+3. **Any other error** → `Failed { retryable: bool }`
+
+This upsert behaviour means the command can be used both for initial provisioning and for role corrections without needing to check current state manually.
+
+**Hub type differences:**
+- **BIM 360 hubs** — role is expressed as a `role_id` UUID; resolved from role name via `GET /hq/v2/accounts/{id}/roles`
+- **ACC hubs** — no account-level roles endpoint; role is expressed as a `products` array (`projectAdministration` + `docs` access keys); resolved from known display names ("Project Admin", "Project Member", "Project Editor", "Project Viewer")
+- When a UUID is provided directly it is passed through unchanged (works for both hub types)
+
+#### `bulk_remove_user` — presence-guarded delete
+
+1. `user_exists()` check before delete → `Skipped { reason: "user_not_in_project" }` if absent
+2. HTTP 404 on the actual delete (TOCTOU race) → also `Skipped`
+3. Any other error → `Failed`
+
+#### `bulk_update_role` — compare-before-patch
+
+1. Fetches current project-user state first (`GET /projects/{id}/users/{userId}`)
+2. HTTP 404 (user not in project) → `Skipped { reason: "user_not_in_project" }`
+3. `from_role_id` filter specified and doesn't match → `Skipped { reason: "role_mismatch: current=..." }`
+4. User already has the target role → `Skipped { reason: "already_has_role" }`
+5. Role differs → PATCH → `Success`
+
+#### `bulk_update_folder_rights` — idempotent by API design
+
+The folder permissions endpoint is a batch SET (not add/remove), so calling it with the same actions is a no-op at the API level:
+
+1. Target folder not found in project → `Skipped { reason: "..._folder_not_found" }`
+2. Otherwise → PUT permissions → `Success` (repeated calls are safe)
+
 ## Running the Tests
 
 To ensure your code meets the quality standards and has high confidence, always run the full test suite targeting the admin components:

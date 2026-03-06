@@ -263,9 +263,9 @@ pub struct ProjectUser {
     /// User's display name
     #[serde(default)]
     pub name: Option<String>,
-    /// Role ID assigned in this project
+    /// Role IDs assigned in this project (ACC returns an array)
     #[serde(default)]
-    pub role_id: Option<String>,
+    pub role_ids: Vec<String>,
     /// Role name
     #[serde(default)]
     pub role_name: Option<String>,

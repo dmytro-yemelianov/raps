@@ -464,7 +464,7 @@ pub(crate) async fn execute_csv_import(
         .iter()
         .map(|row| ImportUserRequest {
             email: row.email.clone(),
-            role_id: row.role_id.clone(),
+            role_ids: row.role_id.clone().map(|s| vec![s]).unwrap_or_default(),
             products: None,
         })
         .collect();

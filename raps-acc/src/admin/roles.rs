@@ -192,16 +192,18 @@ fn role_name_to_acc_products(role: &str) -> Option<Vec<ProductAccess>> {
             key("projectAdministration", "administrator"),
             key("docs", "administrator"),
         ]),
+        // ACC API rule: projectAdministration cannot be "member" — only "administrator" or "none".
+        // When set to "none", all other products must use "member" access.
         "project member" | "member" => Some(vec![
-            key("projectAdministration", "member"),
+            key("projectAdministration", "none"),
             key("docs", "member"),
         ]),
         "project editor" | "editor" => Some(vec![
-            key("projectAdministration", "member"),
+            key("projectAdministration", "none"),
             key("docs", "editor"),
         ]),
         "project viewer" | "viewer" => Some(vec![
-            key("projectAdministration", "member"),
+            key("projectAdministration", "none"),
             key("docs", "viewer"),
         ]),
         _ => None,

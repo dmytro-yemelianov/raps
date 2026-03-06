@@ -34,9 +34,9 @@ pub struct ProjectUsersClient {
 pub struct AddProjectUserRequest {
     /// User email address
     pub email: String,
-    /// Role ID to assign (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// Role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Product access configurations
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub products: Vec<ProductAccess>,
@@ -46,9 +46,9 @@ pub struct AddProjectUserRequest {
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProjectUserRequest {
-    /// New role ID to assign
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// New role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Updated product access configurations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<ProductAccess>>,
@@ -60,9 +60,9 @@ pub struct UpdateProjectUserRequest {
 pub struct ImportUserRequest {
     /// User email address
     pub email: String,
-    /// Optional role ID to assign
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// Role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Optional product access configurations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<ProductAccess>>,
@@ -466,7 +466,7 @@ impl ProjectUsersClient {
                 let _permit = sem.acquire().await.expect("semaphore closed unexpectedly");
                 let request = AddProjectUserRequest {
                     email: user.email.clone(),
-                    role_id: user.role_id,
+                    role_ids: user.role_ids,
                     products: user.products.unwrap_or_default(),
                 };
                 let result = client.add_user(&pid, request).await;
@@ -520,17 +520,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_add_request_role_id_absent_when_none() {
+    fn test_add_request_role_ids_absent_when_empty() {
         let request = AddProjectUserRequest {
             email: "user@example.com".to_string(),
-            role_id: None,
+            role_ids: vec![],
             products: vec![],
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
         assert!(
-            !json.contains("roleId"),
-            "roleId must be absent when None (skip_serializing_if)"
+            !json.contains("roleIds"),
+            "roleIds must be absent when empty (skip_serializing_if)"
         );
     }
 
@@ -538,7 +538,7 @@ mod tests {
     fn test_add_request_serialization() {
         let request = AddProjectUserRequest {
             email: "user@example.com".to_string(),
-            role_id: Some("role-456".to_string()),
+            role_ids: vec!["role-456".to_string()],
             products: vec![ProductAccess {
                 key: "docs".to_string(),
                 access: "member".to_string(),
@@ -547,19 +547,19 @@ mod tests {
 
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
-        assert!(json.contains("role-456"));
+        assert!(json.contains("\"roleIds\":[\"role-456\"]"), "must send roleIds array: {json}");
         assert!(json.contains("docs"));
     }
 
     #[test]
     fn test_update_request_serialization() {
         let request = UpdateProjectUserRequest {
-            role_id: Some("new-role".to_string()),
+            role_ids: vec!["new-role".to_string()],
             products: None,
         };
 
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains("new-role"));
+        assert!(json.contains("\"roleIds\":[\"new-role\"]"), "must send roleIds array: {json}");
         // products should be skipped when None
         assert!(!json.contains("products"));
     }

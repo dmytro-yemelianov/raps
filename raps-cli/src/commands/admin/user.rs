@@ -656,7 +656,7 @@ impl UserCommands {
 
                 let request = raps_acc::users::AddProjectUserRequest {
                     email: email.clone(),
-                    role_id: role_id.clone(),
+                    role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
                     products: vec![],
                 };
 
@@ -754,7 +754,7 @@ impl UserCommands {
                 }
 
                 let request = raps_acc::users::UpdateProjectUserRequest {
-                    role_id: role_id.clone(),
+                    role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
                     products: None,
                 };
 
@@ -934,7 +934,7 @@ impl UserCommands {
                         async move {
                             let request = raps_acc::users::AddProjectUserRequest {
                                 email: email.clone(),
-                                role_id: role.clone(),
+                                role_ids: role.clone().map(|s| vec![s]).unwrap_or_default(),
                                 products: vec![],
                             };
                             match users_client.add_user(&project.id, request).await {

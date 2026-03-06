@@ -164,7 +164,7 @@ async fn add_user_to_project(
     let products_for_upsert = products.clone();
     let request = AddProjectUserRequest {
         email: email.to_string(),
-        role_id: role_id.map(|s| s.to_string()),
+        role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
         products,
     };
 
@@ -228,7 +228,7 @@ async fn upsert_existing_member(
 
     // Check if role already matches
     let role_matches = if let Some(rid) = role_id {
-        existing.role_id.as_deref() == Some(rid)
+        existing.role_ids.contains(&rid.to_string())
     } else if !products.is_empty() {
         // Compare product access keys — if current products cover the requested ones, skip
         let current_keys: std::collections::HashSet<&str> = existing
@@ -258,7 +258,7 @@ async fn upsert_existing_member(
 
     // Role differs — update
     let update = UpdateProjectUserRequest {
-        role_id: role_id.map(|s| s.to_string()),
+        role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
         products: if products.is_empty() { None } else { Some(products) },
     };
 
