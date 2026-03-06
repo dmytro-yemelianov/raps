@@ -4,8 +4,6 @@
 //!   1. DELETE /projects/proj-001/users/user-001
 //!   (proj-002 skipped: alice is not a member there)
 
-use std::sync::Arc;
-
 use raps_admin::{BulkConfig, bulk_remove_user};
 use raps_admin::filter::ProjectFilter;
 use raps_mock::TestServer;

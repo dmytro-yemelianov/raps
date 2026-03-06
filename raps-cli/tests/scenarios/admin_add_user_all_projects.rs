@@ -4,8 +4,6 @@
 //!   1. POST /projects/proj-001/users
 //!   2. POST /projects/proj-002/users
 
-use std::sync::Arc;
-
 use raps_admin::{BulkConfig, bulk_add_user};
 use raps_admin::filter::ProjectFilter;
 use raps_mock::TestServer;

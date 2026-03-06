@@ -206,7 +206,7 @@ mod tests {
     #[test]
     fn test_format_table_number() {
         assert_eq!(format_value_for_table(&json!(42)), "42");
-        assert_eq!(format_value_for_table(&json!(3.14)), "3.14");
+        assert_eq!(format_value_for_table(&json!(1.5)), "1.5");
     }
 
     #[test]
