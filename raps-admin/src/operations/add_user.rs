@@ -157,27 +157,10 @@ async fn add_user_to_project(
     role_id: Option<&str>,
     products: Vec<ProductAccess>,
 ) -> ItemResult {
-    // Check if user already exists in the project
-    match users_client.user_exists(project_id, email).await {
-        Ok(true) => {
-            return ItemResult::Skipped {
-                reason: "already_exists".to_string(),
-            };
-        }
-        Ok(false) => {
-            // User doesn't exist, proceed to add
-        }
-        Err(e) => {
-            // Error checking existence - treat as retryable
-            return ItemResult::Failed {
-                error: format!("Failed to check user existence: {}", e),
-                retryable: true,
-            };
-        }
-    }
-
     // Add the user to the project by email; ACC sends an invitation if the
     // user is not yet an account member.
+    // Note: no pre-check by email — user_exists requires a UUID, not an email.
+    // Duplicate detection is handled by treating HTTP 409 as Skipped below.
     let request = AddProjectUserRequest {
         email: email.to_string(),
         role_id: role_id.map(|s| s.to_string()),
