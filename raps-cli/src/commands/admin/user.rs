@@ -332,11 +332,13 @@ impl UserCommands {
                     auth_client.clone(),
                     http_config.clone(),
                 );
-                let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
+                let mut users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                ));
+                );
+                users_client.account_id = Some(account_id.clone());
+                let users_client = Arc::new(users_client);
 
                 let progress_bar = create_bulk_progress_bar(output_format);
                 let on_progress = make_progress_callback(progress_bar.clone());

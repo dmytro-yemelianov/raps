@@ -146,7 +146,7 @@ impl AccountUser {
 // ============================================================================
 
 /// Project within an account
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountProject {
     /// Project ID (e.g., "b.project-uuid")

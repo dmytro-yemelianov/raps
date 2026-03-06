@@ -62,6 +62,11 @@ impl AccountAdminClient {
     fn hq_url(&self, account_id: &str) -> String {
         format!("{}/hq/v1/accounts/{}", self.config.base_url, account_id)
     }
+
+    /// Get the base URL for BIM 360 HQ v2 API
+    pub(crate) fn hq_v2_url(&self, account_id: &str) -> String {
+        format!("{}/hq/v2/accounts/{}", self.config.base_url, account_id)
+    }
 }
 
 /// Normalize account ID to the format expected by ACC Admin API
