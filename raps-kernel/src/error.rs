@@ -363,11 +363,13 @@ fn get_error_help(status_code: u16, error_code: &str, message: &str) -> (String,
         );
     }
 
-    // Default
-    (
-        format!("Request failed (HTTP {})", status_code),
-        vec!["Check the error details".to_string()],
-    )
+    // Default — include the response body so users can see what the API actually returned
+    let explanation = if message.is_empty() || message == status_to_code(status_code) {
+        format!("Request failed (HTTP {})", status_code)
+    } else {
+        format!("Request failed (HTTP {}): {}", status_code, message)
+    };
+    (explanation, vec!["Check the error details".to_string()])
 }
 
 /// Format an interpreted error for display
