@@ -305,57 +305,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_mask_id_long() {
-        let masked = mask_id("RCM7ABCDEFGHYJYS");
-        assert!(masked.contains('…'), "should contain ellipsis");
-        assert!(masked.starts_with("RCM7"), "should start with first 4 chars");
-        assert!(masked.ends_with("YJYS"), "should end with last 4 chars");
-    }
-
-    #[test]
-    fn test_mask_id_short_passthrough() {
-        let short = "ABCD";
-        assert_eq!(mask_id(short), short);
-    }
-
-    #[test]
-    fn test_format_remaining_hours() {
-        assert_eq!(format_remaining(3700), "1h1m");
-    }
-
-    #[test]
-    fn test_format_remaining_minutes() {
-        assert_eq!(format_remaining(1620), "27m");
-    }
-
-    #[test]
-    fn test_format_remaining_seconds() {
-        assert_eq!(format_remaining(45), "45s");
-    }
-
-    #[test]
-    fn test_format_remaining_expired() {
-        assert_eq!(format_remaining(0), "expired");
-        assert_eq!(format_remaining(-100), "expired");
-    }
-
-    #[test]
-    fn test_bare_account_id_strips_prefix() {
-        assert_eq!(
-            bare_account_id("b.01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"),
-            "01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"
-        );
-    }
-
-    #[test]
-    fn test_bare_account_id_no_prefix() {
-        assert_eq!(bare_account_id("a.personalid"), "a.personalid");
-    }
-
-    #[test]
     fn mask_id_short_string_unchanged() {
         assert_eq!(mask_id("abc"), "abc");
         assert_eq!(mask_id("12345678"), "12345678"); // exactly 8 chars, no mask
+    }
+
+    #[test]
+    fn mask_id_nine_char_string_is_masked() {
+        let result = mask_id("ABCDE1234"); // 9 chars — first length that gets masked
+        assert_eq!(result, "ABCD\u{2026}1234");
     }
 
     #[test]
@@ -368,6 +326,11 @@ mod tests {
     fn format_remaining_expired() {
         assert_eq!(format_remaining(0), "expired");
         assert_eq!(format_remaining(-10), "expired");
+    }
+
+    #[test]
+    fn format_remaining_one_second() {
+        assert_eq!(format_remaining(1), "1s");
     }
 
     #[test]
