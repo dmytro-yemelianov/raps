@@ -188,7 +188,12 @@ async fn add_user_to_project(
         Ok(_) => ItemResult::Success,
         Err(e) => {
             let error_str = e.to_string();
-            // Check if it's a rate limit or temporary error
+            // 409 = user already belongs to the project — treat as skipped, not failed
+            if is_already_member_error(&error_str) {
+                return ItemResult::Skipped {
+                    reason: "already_exists".to_string(),
+                };
+            }
             let retryable = is_retryable_error(&error_str);
             ItemResult::Failed {
                 error: error_str,
@@ -196,6 +201,15 @@ async fn add_user_to_project(
             }
         }
     }
+}
+
+/// Check if the error indicates the user is already a member (HTTP 409)
+fn is_already_member_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("409")
+        || lower.contains("already belongs")
+        || lower.contains("already exists")
+        || lower.contains("conflict")
 }
 
 /// Check if an error is retryable
