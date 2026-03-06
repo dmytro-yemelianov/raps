@@ -9,7 +9,7 @@ async fn test_webhook_list_returns_json_from_mock() {
 
     cmd.args(["webhook", "list", "--output", "json"])
         .assert()
-        .code(predicate::ne(101))
+        .success()
         .stdout(predicate::str::is_empty().not());
 }
 
