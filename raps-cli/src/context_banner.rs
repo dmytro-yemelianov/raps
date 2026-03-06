@@ -344,11 +344,15 @@ mod tests {
         assert!(result.ends_with('…'));
     }
 
-    // --- tier_from_extension: None maps to Unknown (no extension = unrecognised) ---
+    // --- tier_from_extension: Some path with an unrecognised extension string → Unknown ---
 
     #[test]
-    fn tier_unknown_when_no_extension() {
-        assert_eq!(tier_from_extension(None), HubTier::Unknown);
+    fn tier_unknown_when_some_unrecognised_extension() {
+        // Covers the Some(_) arm that falls through to Unknown (not None, not a known vendor string).
+        assert_eq!(
+            tier_from_extension(Some("autodesk.something:Unknown")),
+            HubTier::Unknown
+        );
     }
 
     // --- truncate: exact-limit string must not be truncated ---
@@ -360,8 +364,10 @@ mod tests {
     }
 
     #[test]
-    fn truncate_short_string_unchanged() {
-        assert_eq!(truncate("hi", 10), "hi");
+    fn truncate_one_under_limit_unchanged() {
+        // A string of exactly max_len-1 chars must not be truncated (boundary below the cut).
+        let s = "a".repeat(9);
+        assert_eq!(truncate(&s, 10), s);
     }
 
     #[test]
