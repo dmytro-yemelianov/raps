@@ -98,6 +98,12 @@
 - **List templates** (`acc checklist templates`) - view available templates
 - **CRUD operations** - get, create, update checklists
 
+### Account Administration (v5.1.0+)
+- **Bulk user management** (`admin user add-to-all-projects`, `admin user update`) - securely provision, update, and manage access across thousands of projects
+- **Project lifecycle** (`admin project create`, `admin project update`, `admin project archive`)
+- **Parallel operation support** with rate limiting, retries, and comprehensive reporting
+- Supports detailed dry runs (`--dry-run`) to validate massive configuration changes safely
+
 ### Reality Capture
 - Create photoscenes for photogrammetry
 - Upload photos and start processing
