@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! CLI help and smoke tests for `raps status`.
 
 use assert_cmd::Command;
@@ -13,7 +14,7 @@ fn test_status_help() {
         .args(["status", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("status").or(predicate::str::contains("context")));
+        .stdout(predicate::str::contains("auth state"));
 }
 
 #[test]
@@ -23,7 +24,7 @@ fn test_status_no_credentials_does_not_panic() {
         .env_remove("APS_CLIENT_ID")
         .env_remove("APS_CLIENT_SECRET")
         .assert()
-        .code(predicate::ne(101_i32));
+        .code(predicate::ne(101));
 }
 
 #[test]
@@ -33,5 +34,5 @@ fn test_status_output_json_flag_accepted() {
         .env_remove("APS_CLIENT_ID")
         .env_remove("APS_CLIENT_SECRET")
         .assert()
-        .code(predicate::ne(101_i32));
+        .code(predicate::ne(101));
 }

@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 //! CLI help and smoke tests for `raps init`.
 
 use assert_cmd::Command;
@@ -13,7 +14,7 @@ fn test_init_help() {
         .args(["init", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("init").or(predicate::str::contains("setup")));
+        .stdout(predicate::str::contains("wizard"));
 }
 
 #[test]
@@ -23,5 +24,5 @@ fn test_init_non_interactive_exits_gracefully() {
         .env_remove("APS_CLIENT_ID")
         .env_remove("APS_CLIENT_SECRET")
         .assert()
-        .code(predicate::ne(101_i32));
+        .code(predicate::ne(101));
 }
