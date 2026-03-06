@@ -220,12 +220,25 @@ async fn update_user_role(
         Ok(_) => ItemResult::Success,
         Err(e) => {
             let error_str = e.to_string();
+            if is_insight_restriction_error(&error_str) {
+                return ItemResult::Skipped {
+                    reason: "insight_role_locked".to_string(),
+                };
+            }
             ItemResult::Failed {
                 error: error_str.clone(),
                 retryable: is_retryable_error(&error_str),
             }
         }
     }
+}
+
+/// Check if the error is an Insight product restriction (role cannot be changed via this API)
+fn is_insight_restriction_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("cannot remove user access from insight")
+        || lower.contains("insight")
+            && (lower.contains("cannot") || lower.contains("not allowed") || lower.contains("restricted"))
 }
 
 /// Check if an error is retryable
@@ -368,5 +381,13 @@ mod tests {
         assert!(is_retryable_error("503 Service Unavailable"));
         assert!(!is_retryable_error("404 Not Found"));
         assert!(!is_retryable_error("403 Forbidden"));
+    }
+
+    #[test]
+    fn test_is_insight_restriction_error() {
+        assert!(is_insight_restriction_error("Cannot remove user access from Insight"));
+        assert!(is_insight_restriction_error("400 Bad Request: Cannot remove user access from Insight"));
+        assert!(!is_insight_restriction_error("404 Not Found"));
+        assert!(!is_insight_restriction_error("400 Bad Request"));
     }
 }

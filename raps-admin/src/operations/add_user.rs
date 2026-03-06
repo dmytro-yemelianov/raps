@@ -264,10 +264,18 @@ async fn upsert_existing_member(
 
     match users_client.update_user(project_id, &existing.id, update).await {
         Ok(_) => ItemResult::Success,
-        Err(e) => ItemResult::Failed {
-            error: format!("Failed to update user role: {e}"),
-            retryable: is_retryable_error(&e.to_string()),
-        },
+        Err(e) => {
+            let error_str = e.to_string();
+            if is_insight_restriction_error(&error_str) {
+                return ItemResult::Skipped {
+                    reason: "insight_role_locked".to_string(),
+                };
+            }
+            ItemResult::Failed {
+                error: format!("Failed to update user role: {e}"),
+                retryable: is_retryable_error(&error_str),
+            }
+        }
     }
 }
 
@@ -278,6 +286,14 @@ fn is_already_member_error(error: &str) -> bool {
         || lower.contains("already belongs")
         || lower.contains("already exists")
         || lower.contains("conflict")
+}
+
+/// Check if the error is an Insight product restriction (role cannot be changed via this API)
+fn is_insight_restriction_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("cannot remove user access from insight")
+        || lower.contains("insight")
+            && (lower.contains("cannot") || lower.contains("not allowed") || lower.contains("restricted"))
 }
 
 /// Check if an error is retryable
@@ -412,5 +428,15 @@ mod tests {
         assert!(is_retryable_error("Connection timeout"));
         assert!(!is_retryable_error("404 Not Found"));
         assert!(!is_retryable_error("400 Bad Request"));
+    }
+
+    #[test]
+    fn test_is_insight_restriction_error() {
+        assert!(is_insight_restriction_error("Cannot remove user access from Insight"));
+        assert!(is_insight_restriction_error(
+            r#"Failed to update project user (400 Bad Request): {"detail":"Cannot remove user access from Insight"}"#
+        ));
+        assert!(!is_insight_restriction_error("400 Bad Request"));
+        assert!(!is_insight_restriction_error("403 Forbidden"));
     }
 }
