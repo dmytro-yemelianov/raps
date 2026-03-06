@@ -6,3 +6,4 @@ pub mod admin_cli_scenarios;
 pub mod status_scenario;
 pub mod hub_scenarios;
 pub mod webhook_scenarios;
+pub mod translate_scenarios;
