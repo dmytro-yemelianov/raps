@@ -344,6 +344,36 @@ mod tests {
         assert!(result.ends_with('…'));
     }
 
+    // --- tier_from_extension: None maps to Unknown (no extension = unrecognised) ---
+
+    #[test]
+    fn tier_unknown_when_no_extension() {
+        assert_eq!(tier_from_extension(None), HubTier::Unknown);
+    }
+
+    // --- truncate: exact-limit string must not be truncated ---
+
+    #[test]
+    fn truncate_at_exact_limit_unchanged() {
+        let s = "a".repeat(10);
+        assert_eq!(truncate(&s, 10), s);
+    }
+
+    #[test]
+    fn truncate_short_string_unchanged() {
+        assert_eq!(truncate("hi", 10), "hi");
+    }
+
+    #[test]
+    fn truncate_long_string_ends_with_ellipsis() {
+        let result = truncate("abcdefghijklmnopqrstuvwxyz", 10);
+        assert!(
+            result.ends_with('\u{2026}') || result.ends_with("..."),
+            "expected ellipsis at end, got: {result}"
+        );
+        assert!(result.chars().count() <= 11, "result too long: {result}");
+    }
+
     #[test]
     fn test_box_line_width() {
         let line = box_line("Account ID:   01fb1602-2ec0-4b05-bf6e-39dc70b3ae05");
