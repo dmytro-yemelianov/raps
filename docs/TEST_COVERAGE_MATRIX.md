@@ -70,8 +70,8 @@ Columns: **Lines** = line coverage %, **Fns** = function coverage %
 |---|---|---|---|
 | `commands/config/mod.rs` | 36.4% | 66.7% | help-snapshot, dispatch smoke |
 | `commands/config/profiles.rs` | 8.2% | 20.0% | help-snapshot only |
-| `commands/config/config_ops.rs` | 0% | 0% | help-snapshot only |
-| `commands/config/context.rs` | 0% | 0% | help-snapshot only |
+| `commands/config/config_ops.rs` | **79.7%** | 100% | smoke tests (CLI binary, profile create/use/set/get round-trips) |
+| `commands/config/context.rs` | **75.4%** | 87.5% | scenario tests (show/set/clear round-trips, env var source, unknown key) |
 
 ---
 
