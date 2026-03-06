@@ -9,3 +9,4 @@ pub mod status_scenario;
 pub mod hub_scenarios;
 pub mod webhook_scenarios;
 pub mod translate_scenarios;
+pub mod da_appbundles_scenarios;
