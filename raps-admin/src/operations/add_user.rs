@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use raps_acc::admin::AccountAdminClient;
 use raps_acc::types::ProductAccess;
-use raps_acc::users::{AddProjectUserRequest, ProjectUsersClient};
+use raps_acc::users::{AddProjectUserRequest, ProjectUsersClient, UpdateProjectUserRequest};
 
 use crate::bulk::executor::{
     BulkConfig, BulkExecutor, BulkOperationResult, ItemResult, ProcessItem, ProgressUpdate,
@@ -161,6 +161,7 @@ async fn add_user_to_project(
     // user is not yet an account member.
     // Note: no pre-check by email — user_exists requires a UUID, not an email.
     // Duplicate detection is handled by treating HTTP 409 as Skipped below.
+    let products_for_upsert = products.clone();
     let request = AddProjectUserRequest {
         email: email.to_string(),
         role_id: role_id.map(|s| s.to_string()),
@@ -171,11 +172,16 @@ async fn add_user_to_project(
         Ok(_) => ItemResult::Success,
         Err(e) => {
             let error_str = e.to_string();
-            // 409 = user already belongs to the project — treat as skipped, not failed
+            // 409 = user already in project — upsert: update role if it differs
             if is_already_member_error(&error_str) {
-                return ItemResult::Skipped {
-                    reason: "already_exists".to_string(),
-                };
+                return upsert_existing_member(
+                    users_client,
+                    project_id,
+                    email,
+                    role_id,
+                    products_for_upsert,
+                )
+                .await;
             }
             let retryable = is_retryable_error(&error_str);
             ItemResult::Failed {
@@ -183,6 +189,85 @@ async fn add_user_to_project(
                 retryable,
             }
         }
+    }
+}
+
+/// Upsert: user is already in the project — update their role if it differs.
+///
+/// Finds the user by email, compares their current role/products with the
+/// requested ones, and PATCHes if a change is needed. Returns Skipped if
+/// the user already has the correct role, or Success if updated.
+async fn upsert_existing_member(
+    users_client: &ProjectUsersClient,
+    project_id: &str,
+    email: &str,
+    role_id: Option<&str>,
+    products: Vec<ProductAccess>,
+) -> ItemResult {
+    // No role/products requested — nothing to update
+    if role_id.is_none() && products.is_empty() {
+        return ItemResult::Skipped {
+            reason: "already_exists".to_string(),
+        };
+    }
+
+    // Find the user in the project by email
+    let existing = match users_client.find_project_user_by_email(project_id, email).await {
+        Ok(Some(u)) => u,
+        Ok(None) => {
+            // Shouldn't happen after a 409, but treat as already handled
+            return ItemResult::Skipped { reason: "already_exists".to_string() };
+        }
+        Err(e) => {
+            return ItemResult::Failed {
+                error: format!("Failed to look up existing user for role update: {e}"),
+                retryable: true,
+            };
+        }
+    };
+
+    // Check if role already matches
+    let role_matches = if let Some(rid) = role_id {
+        existing.role_id.as_deref() == Some(rid)
+    } else if !products.is_empty() {
+        // Compare product access keys — if current products cover the requested ones, skip
+        let current_keys: std::collections::HashSet<&str> = existing
+            .products
+            .as_deref()
+            .unwrap_or(&[])
+            .iter()
+            .map(|p| p.key.as_str())
+            .collect();
+        products.iter().all(|p| {
+            existing
+                .products
+                .as_deref()
+                .unwrap_or(&[])
+                .iter()
+                .any(|cp| cp.key == p.key && cp.access == p.access)
+        }) && products.iter().all(|p| current_keys.contains(p.key.as_str()))
+    } else {
+        true
+    };
+
+    if role_matches {
+        return ItemResult::Skipped {
+            reason: "already_exists_same_role".to_string(),
+        };
+    }
+
+    // Role differs — update
+    let update = UpdateProjectUserRequest {
+        role_id: role_id.map(|s| s.to_string()),
+        products: if products.is_empty() { None } else { Some(products) },
+    };
+
+    match users_client.update_user(project_id, &existing.id, update).await {
+        Ok(_) => ItemResult::Success,
+        Err(e) => ItemResult::Failed {
+            error: format!("Failed to update user role: {e}"),
+            retryable: is_retryable_error(&e.to_string()),
+        },
     }
 }
 

@@ -378,6 +378,41 @@ impl ProjectUsersClient {
         Ok(response.status().is_success())
     }
 
+    /// Find a user in a project by email address.
+    ///
+    /// Uses `filter[email]` query parameter to avoid fetching all users.
+    /// Returns `None` if the user is not a member of the project.
+    pub async fn find_project_user_by_email(
+        &self,
+        project_id: &str,
+        email: &str,
+    ) -> Result<Option<ProjectUser>> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users?filter[email]={}&limit=1",
+            self.project_url(project_id),
+            urlencoding::encode(email),
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to find project user by email ({status}): {body}");
+        }
+
+        let page: PaginatedResponse<ProjectUser> = response
+            .json()
+            .await
+            .context("Failed to parse project users response")?;
+
+        Ok(page.results.into_iter().next())
+    }
+
     /// Fetch all users in a project (handles pagination automatically)
     pub async fn list_all_project_users(&self, project_id: &str) -> Result<Vec<ProjectUser>> {
         let mut all_users = Vec::new();
