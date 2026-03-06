@@ -238,7 +238,7 @@ Columns: **Lines** = line coverage %, **Fns** = function coverage %
 | Source file | Lines | Fns | Notes |
 |---|---|---|---|
 | `commands/rfi/mod.rs` | 4.9% | 20.0% | help-snapshot, unit tests (CSV parsing, serialization) |
-| `commands/rfi/crud.rs` | 0% | 0% | help-snapshot only |
+| `commands/rfi/crud.rs` | **81.1%** | 100% | scenario tests (list JSON/table/status-filter/since-filter, get JSON/table/nonexistent, create title/table/missing-title/from-csv/empty-csv/missing-csv, update title/table, delete existing/nonexistent) |
 
 ---
 
