@@ -9,6 +9,7 @@ mod copy;
 mod diff;
 pub(crate) mod download;
 mod download_bulk;
+mod inspect;
 pub(crate) mod secret_scan;
 pub(crate) mod upload;
 
@@ -24,6 +25,7 @@ use copy::{batch_copy_objects, batch_rename_objects, copy_object, rename_object}
 use diff::diff_objects;
 use download::{delete_object, download_object, get_signed_url, list_objects, object_info};
 use download_bulk::download_bulk;
+use inspect::inspect_object;
 use upload::{upload_batch, upload_object};
 
 #[derive(Debug, Subcommand)]
@@ -266,6 +268,23 @@ pub enum ObjectCommands {
         #[arg(long)]
         all: bool,
     },
+
+    /// Inspect a .tar.gz or .zip archive in OSS without downloading it
+    ///
+    /// Uses HTTP Range requests to read only the archive metadata (central
+    /// directory for .zip, streaming headers for .tar.gz).  Supports listing
+    /// files and extracting a single file via --extract.
+    Inspect {
+        /// Bucket key
+        bucket: String,
+
+        /// Object key of the archive (.zip, .tar.gz, or .tgz)
+        object: String,
+
+        /// Extract a specific file from the archive by its internal path
+        #[arg(long, short = 'e')]
+        extract: Option<String>,
+    },
 }
 
 impl ObjectCommands {
@@ -396,6 +415,11 @@ impl ObjectCommands {
                 upload::upload_abort(&bucket, &object, output_format)
             }
             ObjectCommands::UploadCleanup { all } => upload::upload_cleanup(all, output_format),
+            ObjectCommands::Inspect {
+                bucket,
+                object,
+                extract,
+            } => inspect_object(client, bucket, object, extract, output_format).await,
         }
     }
 }
