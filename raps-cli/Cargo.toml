@@ -121,6 +121,12 @@ sha2.workspace = true
 hmac.workspace = true
 hex.workspace = true
 
+# SHA-1 for sync checksum comparison
+sha1.workspace = true
+
+# Glob patterns for sync --exclude
+glob.workspace = true
+
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
 

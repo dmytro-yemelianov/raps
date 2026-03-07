@@ -40,6 +40,7 @@ pub mod serve;
 pub mod stats;
 pub mod status;
 pub mod swarm;
+pub mod sync;
 pub mod template;
 pub mod tracked;
 pub mod translate;
