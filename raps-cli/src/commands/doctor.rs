@@ -505,8 +505,43 @@ fn check_disk_space() -> CheckResult {
     }
 }
 
+fn classify_keyring_error(err: &keyring::Error) -> CheckResult {
+    match err {
+        keyring::Error::NoEntry => check(
+            "Keyring",
+            Status::Warn,
+            "Not logged in — run: raps auth login",
+        ),
+        keyring::Error::NoStorageAccess(_) => check(
+            "Keyring",
+            Status::Fail,
+            "Keyring access denied — on some systems may prompt for unlock or require elevated permissions",
+        ),
+        other => check(
+            "Keyring",
+            Status::Fail,
+            &format!("Keyring error (may prompt for system unlock): {other}"),
+        ),
+    }
+}
+
 fn check_keyring() -> CheckResult {
-    check("Keyring", Status::Warn, "not implemented yet")
+    match keyring::Entry::new("raps", "aps_token") {
+        Ok(entry) => match entry.get_password() {
+            Ok(_) => check("Keyring", Status::Pass, "Keyring accessible and token present"),
+            Err(keyring::Error::NoEntry) => check(
+                "Keyring",
+                Status::Warn,
+                "Not logged in — run: raps auth login",
+            ),
+            Err(e) => classify_keyring_error(&e),
+        },
+        Err(e) => check(
+            "Keyring",
+            Status::Fail,
+            &format!("Cannot create keyring entry (may need system keyring unlock): {e}"),
+        ),
+    }
 }
 
 fn check_env_conflicts() -> CheckResult {
@@ -648,5 +683,23 @@ mod tests {
     fn test_disk_space_classify_pass() {
         // 1 GB > DISK_WARN_THRESHOLD_BYTES (500 MB)
         assert!(1024 * 1024 * 1024_u64 > DISK_WARN_THRESHOLD_BYTES);
+    }
+
+    #[test]
+    fn test_classify_keyring_no_entry_means_not_logged_in() {
+        let result = classify_keyring_error(&keyring::Error::NoEntry);
+        assert_eq!(result.status, "warn");
+        assert!(result.message.contains("Not logged in") || result.message.contains("raps auth login"));
+    }
+
+    #[test]
+    fn test_classify_keyring_access_denied_is_fail() {
+        let err = keyring::Error::NoStorageAccess(Box::new(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "access denied",
+        )));
+        let result = classify_keyring_error(&err);
+        assert_eq!(result.status, "fail");
+        assert!(result.message.contains("may prompt") || result.message.contains("unlock") || result.message.contains("access"));
     }
 }
