@@ -13,7 +13,7 @@ use raps_acc::{AccClient, CreateChecklistRequest, UpdateChecklistRequest};
 use super::truncate_str;
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct ChecklistOutput {
+pub struct ChecklistOutput {
     id: String,
     title: String,
     status: String,

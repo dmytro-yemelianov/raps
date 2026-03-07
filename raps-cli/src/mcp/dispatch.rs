@@ -4,6 +4,7 @@
 //! Tool dispatch implementation for the MCP server.
 
 use rmcp::model::*;
+use raps_kernel::security::strip_prompt_injection;
 use serde_json::{Map, Value};
 
 use super::server::RapsServer;
@@ -1360,7 +1361,16 @@ impl RapsServer {
         // Enrich auth-related errors with actionable guidance
         let result = Self::enrich_error(&result);
 
-        CallToolResult::success(vec![Content::text(result)])
+        // Sanitize response body: parse as JSON → walk tree redacting injection patterns → re-serialize.
+        // Falls back to the raw string if it isn't valid JSON (e.g., plain-text error messages).
+        let sanitized_text = if let Ok(value) = serde_json::from_str::<serde_json::Value>(&result) {
+            let sanitized = strip_prompt_injection(value);
+            serde_json::to_string_pretty(&sanitized).unwrap_or(result)
+        } else {
+            result
+        };
+
+        CallToolResult::success(vec![Content::text(sanitized_text)])
     }
 
     /// If the result string looks like an auth error, append user-friendly guidance.

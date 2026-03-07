@@ -19,6 +19,22 @@ use raps_kernel::interactive;
 // use raps_kernel::output::OutputFormat;
 use raps_reality::{OutputFormat as RealityOutputFormat, RealityCaptureClient, SceneType};
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct PhotosceneOutput {
+    pub id: String,
+    pub name: String,
+    pub scene_type: String,
+    pub status: String,
+    pub progress: String,
+}
+
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct CreatePhotosceneOutput {
+    pub success: bool,
+    pub photoscene_id: String,
+    pub name: String,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum RealityCommands {
     /// List photoscenes
@@ -130,15 +146,6 @@ async fn list_photoscenes(
     }
 
     let photoscenes = client.list_photoscenes().await?;
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct PhotosceneOutput {
-        id: String,
-        name: String,
-        scene_type: String,
-        status: String,
-        progress: String,
-    }
 
     let photoscene_outputs: Vec<PhotosceneOutput> = photoscenes
         .iter()
@@ -286,13 +293,6 @@ async fn create_photoscene(
     let photoscene = client
         .create_photoscene(&scene_name, selected_scene_type, selected_format)
         .await?;
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct CreatePhotosceneOutput {
-        success: bool,
-        photoscene_id: String,
-        name: String,
-    }
 
     let output = CreatePhotosceneOutput {
         success: true,

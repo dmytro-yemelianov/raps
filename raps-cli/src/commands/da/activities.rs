@@ -15,6 +15,14 @@ use raps_da::{ActivityParameter, CreateActivityRequest, DesignAutomationClient};
 
 use super::ActivityDefinition;
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct CreateActivityOutput {
+    pub success: bool,
+    pub id: String,
+    pub engine: String,
+    pub version: Option<i32>,
+}
+
 pub(super) async fn list_activities(
     client: &DesignAutomationClient,
     output_format: OutputFormat,
@@ -153,14 +161,6 @@ pub(super) async fn create_activity(
                 }
             }
         }
-    }
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct CreateActivityOutput {
-        success: bool,
-        id: String,
-        engine: String,
-        version: Option<i32>,
     }
 
     let output = CreateActivityOutput {

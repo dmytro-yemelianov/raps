@@ -15,6 +15,11 @@ mod operations;
 mod project;
 mod user;
 
+pub(crate) use csv_ops::CsvUpdateResultOutput;
+pub(crate) use operations::{BulkResultOutput, OperationListOutput, OperationStatusOutput};
+pub(crate) use project::{CompanyListOutput, ProjectListOutput as AdminProjectListOutput};
+pub(crate) use user::UserListOutput;
+
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};

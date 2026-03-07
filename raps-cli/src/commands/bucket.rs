@@ -15,6 +15,7 @@ use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 // use raps_kernel::output::OutputFormat;
 use raps_kernel::prompts;
+use raps_kernel::security::validate_resource_id;
 use raps_oss::{OssClient, Region, RetentionPolicy};
 
 #[derive(Debug, Subcommand)]
@@ -402,6 +403,9 @@ async fn bucket_info(
     bucket_key: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
+    validate_resource_id(bucket_key)
+        .with_context(|| format!("Invalid bucket key: {:?}", bucket_key))?;
+
     let bucket = tracked_op("Fetching bucket details", output_format, || async {
         client.get_bucket_details(bucket_key).await.context(format!(
             "Failed to get bucket details for '{}'. Verify the bucket key is correct",
@@ -470,7 +474,11 @@ async fn delete_bucket(
 ) -> Result<()> {
     // Get bucket key interactively if not provided
     let key = match bucket_key {
-        Some(k) => k,
+        Some(k) => {
+            validate_resource_id(&k)
+                .with_context(|| format!("Invalid bucket key: {:?}", k))?;
+            k
+        }
         None => {
             // List buckets and let user select
             let buckets = client

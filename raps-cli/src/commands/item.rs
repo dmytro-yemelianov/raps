@@ -113,7 +113,7 @@ impl ItemCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct ItemInfoOutput {
+pub struct ItemInfoOutput {
     id: String,
     name: String,
     item_type: String,

@@ -363,6 +363,10 @@ enum Commands {
     /// Sync a local directory to an OSS bucket
     Sync(commands::sync::SyncArgs),
 
+    /// Generate agent-facing documentation from live code
+    #[command(subcommand)]
+    Docs(commands::docs::DocsCommands),
+
     /// Generate man pages for raps and its subcommands
     Man {
         /// Output directory for all man pages (default: print main page to stdout)
@@ -1271,6 +1275,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Swarm(_) => "swarm",
         Commands::Schema(_) => "schema",
         Commands::Sync(_) => "sync",
+        Commands::Docs(_) => "docs",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
         Commands::History { .. } => "history",
@@ -1507,6 +1512,10 @@ async fn execute_command(
 
         Commands::Sync(args) => {
             commands::sync::execute(&get_oss_client(), args).await?;
+        }
+
+        Commands::Docs(cmd) => {
+            cmd.execute()?;
         }
 
         Commands::Man { .. } => {

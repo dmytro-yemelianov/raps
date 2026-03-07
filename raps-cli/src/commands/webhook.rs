@@ -220,7 +220,7 @@ impl WebhookCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct WebhookListOutput {
+pub(crate) struct WebhookListOutput {
     hook_id: String,
     event: String,
     callback_url: String,
@@ -297,7 +297,7 @@ async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> 
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct CreateWebhookOutput {
+pub(crate) struct CreateWebhookOutput {
     success: bool,
     hook_id: String,
     event: String,
@@ -393,7 +393,7 @@ async fn create_webhook(
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct GetWebhookOutput {
+pub(crate) struct GetWebhookOutput {
     hook_id: String,
     system: String,
     event: String,

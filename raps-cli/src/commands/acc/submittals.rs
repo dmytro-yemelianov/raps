@@ -15,7 +15,7 @@ use raps_acc::{AccClient, CreateSubmittalRequest, UpdateSubmittalRequest};
 use super::truncate_str;
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct SubmittalOutput {
+pub struct SubmittalOutput {
     id: String,
     title: String,
     number: Option<String>,
