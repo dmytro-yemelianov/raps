@@ -414,12 +414,10 @@ mod tests {
 
     #[test]
     fn test_network_check_name_contains_network_tag() {
-        let c = CheckResult {
-            name: "Network [network]".to_string(),
-            status: "pass".to_string(),
-            message: "reachable".to_string(),
-        };
-        assert!(c.name.contains("[network]"));
+        // Verify the check() helper produces a result whose name contains the [network] tag
+        // when given the network check's name constant
+        let c = check("Network [network]", Status::Pass, "reachable");
+        assert!(c.name.contains("[network]"), "Network check name must contain [network] tag to signal network requirement");
     }
 
     #[test]
