@@ -161,6 +161,8 @@ pub struct Step {
     pub on_failure: Option<Vec<Step>>,
     #[serde(default)]
     pub max_concurrency: Option<usize>,
+    #[serde(default)]
+    pub depends_on: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
@@ -568,6 +570,69 @@ fn execute_step(
     .boxed()
 }
 
+fn topological_sort(steps: &[Step]) -> Result<Vec<usize>> {
+    use std::collections::{HashMap, VecDeque};
+
+    let name_to_idx: HashMap<&str, usize> = steps
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.name.as_str(), i))
+        .collect();
+
+    // Validate all depends_on references
+    for step in steps {
+        for dep in &step.depends_on {
+            if !name_to_idx.contains_key(dep.as_str()) {
+                anyhow::bail!(
+                    "Step '{}' depends on unknown step '{}'",
+                    step.name,
+                    dep
+                );
+            }
+        }
+    }
+
+    // Kahn's algorithm
+    let n = steps.len();
+    let mut in_degree = vec![0usize; n];
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
+
+    for (i, step) in steps.iter().enumerate() {
+        for dep in &step.depends_on {
+            let dep_idx = name_to_idx[dep.as_str()];
+            adj[dep_idx].push(i);
+            in_degree[i] += 1;
+        }
+    }
+
+    let mut queue: VecDeque<usize> = (0..n).filter(|&i| in_degree[i] == 0).collect();
+    let mut result = Vec::with_capacity(n);
+
+    while let Some(node) = queue.pop_front() {
+        result.push(node);
+        for &next in &adj[node] {
+            in_degree[next] -= 1;
+            if in_degree[next] == 0 {
+                queue.push_back(next);
+            }
+        }
+    }
+
+    if result.len() != n {
+        // Find cycle — collect remaining nodes with in_degree > 0
+        let cycle_steps: Vec<&str> = (0..n)
+            .filter(|&i| in_degree[i] > 0)
+            .map(|i| steps[i].name.as_str())
+            .collect();
+        anyhow::bail!(
+            "Circular dependency detected among steps: {}",
+            cycle_steps.join(" → ")
+        );
+    }
+
+    Ok(result)
+}
+
 async fn run_pipeline(
     file: &PathBuf,
     global_ignore_failure: bool,
@@ -591,12 +656,24 @@ async fn run_pipeline(
     let mut failed = 0u32;
     let mut skipped = 0u32;
 
-    for (i, step) in pipeline.steps.iter().enumerate() {
+    let execution_order = topological_sort(&pipeline.steps)?;
+    let total = execution_order.len();
+
+    if dry_run && output_format.supports_colors() {
+        let order_names: Vec<&str> = execution_order
+            .iter()
+            .map(|&i| pipeline.steps[i].name.as_str())
+            .collect();
+        println!("Execution order: {}", order_names.join(" → "));
+    }
+
+    for (pos, &step_idx) in execution_order.iter().enumerate() {
+        let step = &pipeline.steps[step_idx];
         if output_format.supports_colors() {
             println!(
                 "\n[{}/{}] {}",
-                i + 1,
-                pipeline.steps.len(),
+                pos + 1,
+                total,
                 step.name.bold()
             );
             if let Some(ref cmd) = step.command {
@@ -919,6 +996,15 @@ async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Resul
 
     validate_steps(&pipeline.steps, &mut errors, &mut warnings, "");
 
+    // Resolve dependency order; capture any dep errors as validation errors
+    let execution_order: Option<Vec<usize>> = match topological_sort(&pipeline.steps) {
+        Ok(order) => Some(order),
+        Err(e) => {
+            errors.push(e.to_string());
+            None
+        }
+    };
+
     let result = ValidationResult {
         valid: errors.is_empty(),
         name: pipeline.name.clone(),
@@ -936,6 +1022,13 @@ async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Resul
                     pipeline.name
                 );
                 println!("  {} {} steps", "Steps:".bold(), result.steps_count);
+                if let Some(ref order) = execution_order {
+                    let order_names: Vec<&str> = order
+                        .iter()
+                        .map(|&i| pipeline.steps[i].name.as_str())
+                        .collect();
+                    println!("  {} {}", "Execution order:".bold(), order_names.join(" → "));
+                }
             } else {
                 if !errors.is_empty() {
                     println!("{} Pipeline has errors:", "✗".red().bold());
