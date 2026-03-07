@@ -221,9 +221,36 @@ where
                     "HTTP response"
                 );
 
-                // Record rate limit headers
+                // Record rate limit headers into the global budget tracker
                 crate::rate_budget::registry()
                     .record_from_headers(&endpoint_group, response.headers());
+
+                // Proactive throttle: if remaining quota is below 10% of
+                // limit, sleep until the window resets (capped at 30 s) so
+                // we do not slam the next request straight into a 429.
+                {
+                    let rl =
+                        crate::rate_limit::RateLimitState::from_headers(response.headers());
+                    if let Some(delay) = rl.throttle_delay() {
+                        tracing::debug!(
+                            remaining = ?rl.remaining,
+                            limit = ?rl.limit,
+                            delay_secs = delay.as_secs(),
+                            "rate limit: {}/{} — throttling before next request",
+                            rl.remaining.unwrap_or(0),
+                            rl.limit.unwrap_or(0),
+                        );
+                        sleep(delay).await;
+                    } else if let (Some(remaining), Some(limit)) = (rl.remaining, rl.limit) {
+                        tracing::debug!(
+                            remaining,
+                            limit,
+                            "rate limit: {}/{}",
+                            remaining,
+                            limit,
+                        );
+                    }
+                }
 
                 // Record success/failure for circuit breaker
                 let failure_type = crate::retry_policy::FailureType::from_status(status);

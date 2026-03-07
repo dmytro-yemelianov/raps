@@ -32,6 +32,7 @@ pub mod profiler;
 pub mod progress;
 pub mod prompts;
 pub mod rate_budget;
+pub mod rate_limit;
 #[cfg(feature = "redis")]
 pub mod redis_backend;
 pub mod region;
