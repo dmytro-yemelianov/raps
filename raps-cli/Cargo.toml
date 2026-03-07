@@ -130,6 +130,9 @@ hex.workspace = true
 # SHA-1 for sync checksum comparison
 sha1.workspace = true
 
+# Text diffing (unified diff output for object diff command)
+similar.workspace = true
+
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
 
