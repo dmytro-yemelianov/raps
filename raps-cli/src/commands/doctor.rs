@@ -677,8 +677,57 @@ async fn check_version_staleness() -> CheckResult {
     }
 }
 
+fn mask_proxy_url(raw: &str) -> String {
+    match url::Url::parse(raw) {
+        Ok(mut u) => {
+            if u.password().is_some() {
+                let _ = u.set_password(Some("***"));
+            }
+            if !u.username().is_empty() {
+                let _ = u.set_username("***");
+            }
+            u.to_string()
+        }
+        Err(_) => raw.to_string(),
+    }
+}
+
+/// Accepts a list of (name, value) pairs (testable without touching real env).
+fn find_proxy_from_vars(vars: &[(String, String)]) -> Option<String> {
+    const PROXY_VARS: &[&str] = &[
+        "HTTPS_PROXY", "https_proxy",
+        "HTTP_PROXY",  "http_proxy",
+        "ALL_PROXY",   "all_proxy",
+    ];
+    for name in PROXY_VARS {
+        if let Some((_, val)) = vars.iter().find(|(k, _)| k == name) {
+            return Some(format!("{name}={}", mask_proxy_url(val)));
+        }
+    }
+    None
+}
+
 fn check_proxy_environment() -> CheckResult {
-    check("Proxy/TLS Env", Status::Warn, "not implemented yet")
+    let env_vars: Vec<(String, String)> = std::env::vars()
+        .filter(|(k, _)| {
+            matches!(
+                k.as_str(),
+                "HTTPS_PROXY" | "https_proxy" | "HTTP_PROXY" | "http_proxy" | "ALL_PROXY" | "all_proxy"
+            )
+        })
+        .collect();
+
+    match find_proxy_from_vars(&env_vars) {
+        Some(proxy_info) => check(
+            "Proxy/TLS Env",
+            Status::Warn,
+            &format!(
+                "Proxy detected: {proxy_info} — TLS interception may affect APS API calls; \
+                 if cert errors occur, check corporate CA bundle"
+            ),
+        ),
+        None => check("Proxy/TLS Env", Status::Pass, "No proxy environment variables detected"),
+    }
 }
 
 fn format_size(bytes: u64) -> String {
@@ -872,5 +921,42 @@ mod tests {
     fn test_parse_github_tag_strips_v_prefix() {
         assert_eq!(strip_v_prefix("v5.3.3"), "5.3.3");
         assert_eq!(strip_v_prefix("5.3.3"), "5.3.3");
+    }
+
+    #[test]
+    fn test_mask_proxy_url_strips_credentials() {
+        let masked = mask_proxy_url("http://user:password@proxy.corp.com:8080");
+        assert!(!masked.contains("password"));
+        assert!(masked.contains("proxy.corp.com"));
+    }
+
+    #[test]
+    fn test_mask_proxy_url_no_credentials_unchanged() {
+        let masked = mask_proxy_url("http://proxy.corp.com:8080");
+        // url::Url normalises by appending a trailing slash for the path component
+        assert!(masked.starts_with("http://proxy.corp.com:8080"));
+        assert!(!masked.contains('@'));
+    }
+
+    #[test]
+    fn test_mask_proxy_url_invalid_falls_back_to_host() {
+        let masked = mask_proxy_url("not-a-url");
+        assert_eq!(masked, "not-a-url");
+    }
+
+    #[test]
+    fn test_find_proxy_env_vars_detects_https_proxy() {
+        let vars = vec![
+            ("HTTPS_PROXY".to_string(), "http://proxy:8080".to_string()),
+        ];
+        let found = find_proxy_from_vars(&vars);
+        assert!(found.is_some());
+        assert!(found.unwrap().contains("HTTPS_PROXY"));
+    }
+
+    #[test]
+    fn test_find_proxy_env_vars_empty_when_none_set() {
+        let vars: Vec<(String, String)> = vec![];
+        assert!(find_proxy_from_vars(&vars).is_none());
     }
 }
