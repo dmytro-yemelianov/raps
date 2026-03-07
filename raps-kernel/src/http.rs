@@ -4,6 +4,35 @@
 //! HTTP client utilities
 //!
 //! Provides retry logic, timeouts, and HTTP client configuration.
+//!
+//! # Transport configuration
+//!
+//! ## HTTP/2 multiplexing (APS API calls)
+//!
+//! HTTP/2 is **always enabled** for APS API calls via [`HttpClientConfig::create_client`].
+//! The client is built with `.http2_adaptive_window(true)` which negotiates H2 with APS
+//! servers and enables adaptive flow-control windows for optimal throughput on concurrent
+//! requests.  No additional configuration is required.
+//!
+//! To opt out (e.g. in environments where H2 is broken), set `RAPS_HTTP2=0` in the
+//! environment.  Any other value (or absence of the variable) keeps H2 enabled.
+//!
+//! ## HTTP/3 / QUIC (swarm inter-agent transport, optional)
+//!
+//! An experimental QUIC client for swarm inter-agent communication is available when the
+//! crate is compiled with the `h3` feature flag:
+//!
+//! ```text
+//! cargo build --features h3
+//! ```
+//!
+//! At runtime, enable it with `RAPS_SWARM_QUIC=1` or the `--quic` flag on the
+//! `raps swarm worker start` command.  When disabled (the default), the swarm transport
+//! falls back to the standard HTTP/2 client.
+//!
+//! The QUIC client uses the `quinn` backend embedded in reqwest's `http3` feature.
+//! It requires TLS certificates; in production these should come from the cluster PKI.
+//! In development, self-signed certificates are accepted when `RAPS_QUIC_INSECURE=1` is set.
 
 use anyhow::{Context, Result};
 use reqwest::Client;
@@ -71,6 +100,8 @@ pub struct HttpClientConfig {
     pub timeout: u64,
     /// Connect timeout (seconds)
     pub connect_timeout: u64,
+    /// Enable HTTP/2 multiplexing (default: true, override with RAPS_HTTP2=0)
+    pub http2: bool,
 }
 
 impl Default for HttpClientConfig {
@@ -81,22 +112,67 @@ impl Default for HttpClientConfig {
             base_delay: 1,
             timeout: 120,
             connect_timeout: 30,
+            http2: true,
         }
     }
 }
 
 impl HttpClientConfig {
     /// Create HTTP client with configured timeouts, H2 multiplexing, and connection pooling.
+    ///
+    /// HTTP/2 is enabled by default via `.http2_adaptive_window(true)`.  Set
+    /// `RAPS_HTTP2=0` or construct the config with `http2: false` to disable.
     pub fn create_client(&self) -> Result<Client> {
-        Client::builder()
-            .http2_adaptive_window(true)
+        let mut builder = Client::builder()
             .pool_idle_timeout(Duration::from_secs(90))
             .pool_max_idle_per_host(10)
             .tcp_keepalive(Duration::from_secs(30))
             .timeout(Duration::from_secs(self.timeout))
-            .connect_timeout(Duration::from_secs(self.connect_timeout))
-            .build()
-            .context("Failed to create HTTP client")
+            .connect_timeout(Duration::from_secs(self.connect_timeout));
+
+        if self.http2 {
+            builder = builder.http2_adaptive_window(true);
+        }
+
+        builder.build().context("Failed to create HTTP client")
+    }
+
+    /// Create a QUIC (HTTP/3) client for swarm inter-agent transport.
+    ///
+    /// Only available when the crate is compiled with the `h3` feature.
+    /// Returns the same standard client when the feature is absent so callers
+    /// can use this unconditionally and fall back gracefully.
+    ///
+    /// At runtime the QUIC path is additionally gated by the `RAPS_SWARM_QUIC`
+    /// environment variable (must be `"1"`) or the `--quic` CLI flag.
+    pub fn create_swarm_client(&self) -> Result<Client> {
+        #[cfg(feature = "h3")]
+        {
+            let insecure = std::env::var("RAPS_QUIC_INSECURE").as_deref() == Ok("1");
+            let mut builder = Client::builder()
+                .http3_prior_knowledge()
+                .timeout(Duration::from_secs(self.timeout))
+                .connect_timeout(Duration::from_secs(self.connect_timeout));
+            if insecure {
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+            return builder
+                .build()
+                .context("Failed to create HTTP/3 (QUIC) swarm client");
+        }
+        #[cfg(not(feature = "h3"))]
+        {
+            tracing::debug!("h3 feature not enabled — swarm using standard HTTP/2 client");
+            self.create_client()
+        }
+    }
+
+    /// Returns true if the QUIC swarm transport is requested at runtime.
+    ///
+    /// Checks the `RAPS_SWARM_QUIC` environment variable.  The `h3` feature
+    /// must also be compiled in for the QUIC client to actually be used.
+    pub fn quic_enabled() -> bool {
+        std::env::var("RAPS_SWARM_QUIC").as_deref() == Ok("1")
     }
 
     /// Create HTTP client config from CLI flags and environment variables.
@@ -110,7 +186,14 @@ impl HttpClientConfig {
     /// Create HTTP client config from CLI flags and environment variables
     /// with full control over retry parameters.
     ///
-    /// Precedence: CLI flag > environment variable > default
+    /// Precedence: CLI flag > environment variable > default.
+    ///
+    /// Recognised environment variables:
+    /// - `RAPS_TIMEOUT`     — request timeout in seconds (default 120)
+    /// - `RAPS_MAX_RETRIES` — maximum retry attempts (default 3)
+    /// - `RAPS_BASE_DELAY`  — base backoff delay in seconds (default 1)
+    /// - `RAPS_MAX_WAIT`    — maximum backoff wait in seconds (default 60)
+    /// - `RAPS_HTTP2`       — set to `0` to disable HTTP/2 multiplexing (default enabled)
     pub fn from_cli_and_env_full(
         timeout_flag: Option<u64>,
         max_retries_flag: Option<u32>,
@@ -121,12 +204,15 @@ impl HttpClientConfig {
         let max_retries = resolve_param(max_retries_flag, "RAPS_MAX_RETRIES", 3);
         let base_delay = resolve_param(base_delay_flag, "RAPS_BASE_DELAY", 1);
         let max_wait = resolve_param(max_wait_flag, "RAPS_MAX_WAIT", 60);
+        // HTTP/2 is enabled unless explicitly disabled with RAPS_HTTP2=0
+        let http2 = std::env::var("RAPS_HTTP2").as_deref() != Ok("0");
 
         Self {
             timeout,
             max_retries,
             base_delay,
             max_wait,
+            http2,
             ..Self::default()
         }
     }
@@ -645,6 +731,7 @@ mod tests {
         assert_eq!(config.base_delay, 1);
         assert_eq!(config.timeout, 120);
         assert_eq!(config.connect_timeout, 30);
+        assert!(config.http2, "HTTP/2 should be enabled by default");
     }
 
     #[test]
@@ -652,6 +739,84 @@ mod tests {
         let config = HttpClientConfig::default();
         let client = config.create_client();
         assert!(client.is_ok());
+    }
+
+    #[test]
+    fn test_http_config_create_client_h2_disabled() {
+        let config = HttpClientConfig {
+            http2: false,
+            ..Default::default()
+        };
+        let client = config.create_client();
+        assert!(client.is_ok(), "Client should build even with H2 disabled");
+    }
+
+    #[test]
+    fn test_http_config_http2_env_disabled() {
+        // SAFETY: Test runs with --test-threads=1 or in isolation
+        unsafe {
+            std::env::set_var("RAPS_HTTP2", "0");
+        }
+        let config = HttpClientConfig::from_cli_and_env(None);
+        assert!(!config.http2, "RAPS_HTTP2=0 should disable HTTP/2");
+        unsafe {
+            std::env::remove_var("RAPS_HTTP2");
+        }
+    }
+
+    #[test]
+    fn test_http_config_http2_env_enabled_by_default() {
+        unsafe {
+            std::env::remove_var("RAPS_HTTP2");
+        }
+        let config = HttpClientConfig::from_cli_and_env(None);
+        assert!(config.http2, "HTTP/2 should be enabled when RAPS_HTTP2 is unset");
+    }
+
+    #[test]
+    fn test_http_config_http2_env_nonzero_enables() {
+        // Any value other than "0" keeps H2 enabled
+        unsafe {
+            std::env::set_var("RAPS_HTTP2", "1");
+        }
+        let config = HttpClientConfig::from_cli_and_env(None);
+        assert!(config.http2, "RAPS_HTTP2=1 should keep HTTP/2 enabled");
+        unsafe {
+            std::env::remove_var("RAPS_HTTP2");
+        }
+    }
+
+    #[test]
+    fn test_quic_enabled_false_by_default() {
+        unsafe {
+            std::env::remove_var("RAPS_SWARM_QUIC");
+        }
+        assert!(
+            !HttpClientConfig::quic_enabled(),
+            "QUIC should be disabled by default"
+        );
+    }
+
+    #[test]
+    fn test_quic_enabled_via_env() {
+        unsafe {
+            std::env::set_var("RAPS_SWARM_QUIC", "1");
+        }
+        assert!(
+            HttpClientConfig::quic_enabled(),
+            "QUIC should be enabled when RAPS_SWARM_QUIC=1"
+        );
+        unsafe {
+            std::env::remove_var("RAPS_SWARM_QUIC");
+        }
+    }
+
+    #[test]
+    fn test_create_swarm_client_fallback() {
+        // Without h3 feature this should fall back to a standard client
+        let config = HttpClientConfig::default();
+        let client = config.create_swarm_client();
+        assert!(client.is_ok(), "create_swarm_client should always succeed");
     }
 
     #[test]

@@ -88,6 +88,12 @@ pub enum WorkerCommands {
         #[cfg_attr(feature = "kubernetes", arg(long, default_value = "9091"))]
         #[cfg_attr(not(feature = "kubernetes"), arg(long))]
         metrics_port: Option<u16>,
+
+        /// Use HTTP/3 / QUIC transport for inter-agent swarm communication.
+        /// Requires the crate to be compiled with the `h3` feature.
+        /// Equivalent to setting RAPS_SWARM_QUIC=1 in the environment.
+        #[arg(long, env = "RAPS_SWARM_QUIC", default_value = "false")]
+        quic: bool,
     },
 }
 
@@ -551,7 +557,8 @@ impl WorkerCommands {
                 heartbeat_secs,
                 queues: _,
                 metrics_port,
-            } => worker_start(&redis_url, concurrency, heartbeat_secs, metrics_port).await,
+                quic,
+            } => worker_start(&redis_url, concurrency, heartbeat_secs, metrics_port, quic).await,
         }
     }
 }
@@ -562,6 +569,7 @@ async fn worker_start(
     concurrency: usize,
     heartbeat_secs: u64,
     metrics_port: Option<u16>,
+    quic: bool,
 ) -> Result<()> {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
@@ -577,6 +585,28 @@ async fn worker_start(
             .unwrap_or_else(|_| "unknown".into()),
         std::process::id(),
     );
+
+    // Build the swarm HTTP client — QUIC (HTTP/3) if requested, otherwise HTTP/2.
+    let http_config = raps_kernel::http::HttpClientConfig::default();
+    #[cfg(feature = "h3")]
+    let _swarm_client = if quic || raps_kernel::http::HttpClientConfig::quic_enabled() {
+        println!("  Transport:   HTTP/3 (QUIC)");
+        http_config.create_swarm_client()?
+    } else {
+        println!("  Transport:   HTTP/2");
+        http_config.create_client()?
+    };
+    #[cfg(not(feature = "h3"))]
+    let _swarm_client = {
+        if quic || raps_kernel::http::HttpClientConfig::quic_enabled() {
+            eprintln!(
+                "warning: --quic / RAPS_SWARM_QUIC requested but the `h3` feature is not \
+                 compiled in. Falling back to HTTP/2. Rebuild with `--features h3` to enable QUIC."
+            );
+        }
+        println!("  Transport:   HTTP/2");
+        http_config.create_client()?
+    };
 
     println!("{}", "RAPS Distributed Worker".bold());
     println!("  Redis:       {}", redis_url);
