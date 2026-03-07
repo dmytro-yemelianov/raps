@@ -54,7 +54,7 @@ use commands::{
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, JobCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
     RealityCommands, ReportCommands, RfiCommands, TemplateCommands, TranslateCommands,
-    WebhookCommands,
+    WebhookCommands, WorkflowCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -319,6 +319,10 @@ enum Commands {
     #[command(subcommand)]
     Job(JobCommands),
 
+    /// Run a complete workflow: upload → translate → download
+    #[command(subcommand)]
+    Workflow(WorkflowCommands),
+
     /// Generate shell completions for bash, zsh, fish, PowerShell, or elvish
     Completions {
         /// Shell to generate completions for
@@ -386,9 +390,9 @@ enum Commands {
 
 /// Known top-level subcommand names for fuzzy correction suggestions.
 const KNOWN_SUBCOMMANDS: &[&str] = &[
-    "auth", "bucket", "object", "translate", "init", "status", "hub", "project", "folder",
-    "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi", "report", "template",
-    "reality", "inspect", "plugin", "generate", "demo", "config", "pipeline", "job",
+    "auth", "bucket", "object", "translate", "workflow", "init", "status", "hub", "project",
+    "folder", "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi", "report",
+    "template", "reality", "inspect", "plugin", "generate", "demo", "config", "pipeline", "job",
     "completions", "shell", "mcp", "doctor", "cache", "swarm", "schema", "man",
 ];
 
@@ -1217,6 +1221,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Bucket(_) => "bucket",
         Commands::Object(_) => "object",
         Commands::Translate(_) => "translate",
+        Commands::Workflow(_) => "workflow",
         Commands::Init => "init",
         Commands::Status => "status",
         Commands::Hub(_) => "hub",
@@ -1339,6 +1344,10 @@ async fn execute_command(
 
         Commands::Translate(cmd) => {
             cmd.execute(&get_derivative_client(), output_format).await?;
+        }
+
+        Commands::Workflow(cmd) => {
+            commands::workflow::WorkflowCommands::execute(cmd, config, output_format).await?;
         }
 
         Commands::Init => {

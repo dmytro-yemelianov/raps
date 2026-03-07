@@ -43,6 +43,7 @@ pub mod template;
 pub mod tracked;
 pub mod translate;
 pub mod webhook;
+pub mod workflow;
 
 pub use acc::AccCommands;
 pub use admin::AdminCommands;
@@ -68,3 +69,4 @@ pub use rfi::RfiCommands;
 pub use template::TemplateCommands;
 pub use translate::TranslateCommands;
 pub use webhook::WebhookCommands;
+pub use workflow::WorkflowCommands;
