@@ -8,6 +8,7 @@
 mod config_ops;
 mod context;
 mod profiles;
+pub mod wizard;
 
 use anyhow::{Context, Result};
 use clap::Subcommand;
@@ -43,6 +44,9 @@ pub enum ConfigCommands {
 
     /// Migrate tokens from plaintext file to OS keychain
     MigrateTokens,
+
+    /// Guided first-run setup wizard
+    Wizard,
 }
 
 #[derive(Debug, Subcommand)]
@@ -134,6 +138,7 @@ impl ConfigCommands {
             ConfigCommands::MigrateTokens => {
                 raps_kernel::storage::TokenStorage::migrate_to_keychain()
             }
+            ConfigCommands::Wizard => wizard::run_wizard().await,
         }
     }
 }
