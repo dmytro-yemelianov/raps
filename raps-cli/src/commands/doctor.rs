@@ -80,6 +80,8 @@ pub async fn execute(output_format: OutputFormat) -> Result<()> {
     checks.push(check_env_conflicts());
     checks.push(check_version_staleness().await);
     checks.push(check_proxy_environment());
+    checks.push(check_credential_validity());
+    checks.push(check_token_scope_coverage().await);
 
     let passed = checks.iter().filter(|c| c.status == "pass").count();
     let warnings = checks.iter().filter(|c| c.status == "warn").count();
@@ -731,6 +733,177 @@ fn check_proxy_environment() -> CheckResult {
             ),
         ),
         None => check("Proxy/TLS Env", Status::Pass, "No proxy environment variables detected"),
+    }
+}
+
+/// APS client IDs are non-empty strings (typically base64url-encoded).
+/// We reject obviously invalid values: empty, pure whitespace, or containing whitespace.
+fn looks_like_valid_client_id(id: &str) -> bool {
+    !id.trim().is_empty() && !id.contains(char::is_whitespace)
+}
+
+fn check_credential_validity() -> CheckResult {
+    let config = match raps_kernel::config::Config::from_env_lenient() {
+        Ok(c) => c,
+        Err(e) => return check("Credential Validity", Status::Fail, &format!("Config load error: {e}")),
+    };
+
+    if config.client_id.is_empty() && config.client_secret.is_empty() {
+        return check(
+            "Credential Validity",
+            Status::Warn,
+            "No credentials configured (APS_CLIENT_ID / APS_CLIENT_SECRET not set)",
+        );
+    }
+
+    if config.client_id.is_empty() {
+        return check("Credential Validity", Status::Fail, "client_id is empty");
+    }
+
+    if config.client_secret.is_empty() {
+        return check("Credential Validity", Status::Fail, "client_secret is empty");
+    }
+
+    if !looks_like_valid_client_id(&config.client_id) {
+        return check(
+            "Credential Validity",
+            Status::Warn,
+            &format!(
+                "client_id '{}' contains whitespace — may be malformed",
+                &config.client_id[..config.client_id.len().min(20)]
+            ),
+        );
+    }
+
+    // Warn if both env vars AND a profile are active (credentials in two places)
+    let env_creds_set = std::env::var("APS_CLIENT_ID").is_ok()
+        || std::env::var("APS_CLIENT_SECRET").is_ok();
+    let profile_active = raps_kernel::config::load_profiles()
+        .ok()
+        .and_then(|pd| pd.active_profile)
+        .is_some();
+
+    if env_creds_set && profile_active {
+        return check(
+            "Credential Validity",
+            Status::Warn,
+            "Both APS_CLIENT_ID/APS_CLIENT_SECRET env vars and an active profile are set — \
+             env vars take precedence; double-check you are using the intended credentials",
+        );
+    }
+
+    check(
+        "Credential Validity",
+        Status::Pass,
+        &format!(
+            "client_id set ({}...)",
+            &config.client_id[..config.client_id.len().min(8)]
+        ),
+    )
+}
+
+/// Required scopes for common RAPS operations.
+const REQUIRED_SCOPES: &[(&str, &str)] = &[
+    ("bucket:read",    "raps bucket list"),
+    ("bucket:create",  "raps bucket create"),
+    ("data:read",      "raps object download"),
+    ("data:write",     "raps object upload"),
+    ("data:create",    "raps object upload"),
+    ("viewables:read", "raps translate"),
+];
+
+/// Token response from APS (scopes come back in the `scope` field).
+#[derive(serde::Deserialize)]
+struct ScopeTokenResponse {
+    #[allow(dead_code)]
+    access_token: String,
+    #[serde(default)]
+    scope: Option<String>,
+}
+
+async fn check_token_scope_coverage() -> CheckResult {
+    use std::time::Duration;
+
+    let config = match raps_kernel::config::Config::from_env_lenient() {
+        Ok(c) => c,
+        Err(_) => return check("Token Scopes", Status::Fail, "Config not available"),
+    };
+
+    if config.require_credentials().is_err() {
+        return check("Token Scopes", Status::Warn, "No credentials — cannot check scopes");
+    }
+
+    // Build the scope string we want
+    let requested: String = REQUIRED_SCOPES
+        .iter()
+        .map(|(s, _)| *s)
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return check("Token Scopes", Status::Fail, &format!("HTTP client error: {e}")),
+    };
+
+    let auth_url = config.auth_url();
+    let resp = match client
+        .post(&auth_url)
+        .basic_auth(&config.client_id, Some(&config.client_secret))
+        .form(&[("grant_type", "client_credentials"), ("scope", &requested)])
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => return check("Token Scopes", Status::Fail, &format!("Token request failed: {e}")),
+    };
+
+    if !resp.status().is_success() {
+        let status = resp.status().as_u16();
+        return check(
+            "Token Scopes",
+            Status::Fail,
+            &format!("Token endpoint returned HTTP {status} — check client_id/client_secret"),
+        );
+    }
+
+    let token_resp: ScopeTokenResponse = match resp.json().await {
+        Ok(t) => t,
+        Err(e) => return check("Token Scopes", Status::Fail, &format!("Cannot parse token response: {e}")),
+    };
+
+    let granted_scopes: Vec<&str> = match &token_resp.scope {
+        Some(s) if !s.is_empty() => s.split_whitespace().collect(),
+        _ => {
+            return check(
+                "Token Scopes",
+                Status::Fail,
+                "Token response contains no scopes — app may lack any APS permissions",
+            );
+        }
+    };
+
+    let mut missing: Vec<String> = Vec::new();
+    for (scope, op) in REQUIRED_SCOPES {
+        if !granted_scopes.contains(scope) {
+            missing.push(format!("{scope} (needed for {op})"));
+        }
+    }
+
+    if missing.is_empty() {
+        check(
+            "Token Scopes",
+            Status::Pass,
+            &format!("All required scopes granted ({})", granted_scopes.join(", ")),
+        )
+    } else {
+        check(
+            "Token Scopes",
+            Status::Warn,
+            &format!("Missing scopes: {}", missing.join("; ")),
+        )
     }
 }
 
