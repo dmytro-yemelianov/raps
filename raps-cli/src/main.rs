@@ -383,6 +383,13 @@ enum Commands {
         index: usize,
     },
 
+    /// Show aggregate usage statistics
+    Stats {
+        /// Output format
+        #[arg(long, value_enum, default_value = "table")]
+        format: OutputFormat,
+    },
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -1260,6 +1267,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::External(_) => "external",
         Commands::History { .. } => "history",
         Commands::Replay { .. } => "replay",
+        Commands::Stats { .. } => "stats",
     }
 }
 
@@ -1503,6 +1511,10 @@ async fn execute_command(
 
         Commands::Replay { index } => {
             execute_replay(index)?;
+        }
+
+        Commands::Stats { format } => {
+            commands::stats::execute(format)?;
         }
 
         Commands::External(args) => {
