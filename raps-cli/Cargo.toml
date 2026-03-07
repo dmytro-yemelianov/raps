@@ -115,6 +115,12 @@ csv.workspace = true
 # Temp files (stdin spool for piped uploads)
 tempfile.workspace = true
 
+# Glob pattern matching
+glob.workspace = true
+
+# Filesystem watching
+notify.workspace = true
+
 # Plugin signature verification
 ed25519-dalek.workspace = true
 sha2.workspace = true
