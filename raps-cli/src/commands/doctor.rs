@@ -72,6 +72,14 @@ pub async fn execute(output_format: OutputFormat) -> Result<()> {
     checks.push(check_cache());
     checks.push(check_api_health());
     checks.push(check_plugins());
+    checks.push(check_network_reachability().await);
+    checks.push(check_config_permissions());
+    checks.push(check_context_var_formats());
+    checks.push(check_disk_space());
+    checks.push(check_keyring());
+    checks.push(check_env_conflicts());
+    checks.push(check_version_staleness().await);
+    checks.push(check_proxy_environment());
 
     let passed = checks.iter().filter(|c| c.status == "pass").count();
     let warnings = checks.iter().filter(|c| c.status == "warn").count();
@@ -292,6 +300,38 @@ fn check_plugins() -> CheckResult {
             )
         }
     }
+}
+
+async fn check_network_reachability() -> CheckResult {
+    check("Network [network]", Status::Warn, "not implemented yet")
+}
+
+fn check_config_permissions() -> CheckResult {
+    check("Config Permissions", Status::Warn, "not implemented yet")
+}
+
+fn check_context_var_formats() -> CheckResult {
+    check("Context Vars", Status::Warn, "not implemented yet")
+}
+
+fn check_disk_space() -> CheckResult {
+    check("Disk Space", Status::Warn, "not implemented yet")
+}
+
+fn check_keyring() -> CheckResult {
+    check("Keyring", Status::Warn, "not implemented yet")
+}
+
+fn check_env_conflicts() -> CheckResult {
+    check("Env Conflicts", Status::Warn, "not implemented yet")
+}
+
+async fn check_version_staleness() -> CheckResult {
+    check("Version [network]", Status::Warn, "not implemented yet")
+}
+
+fn check_proxy_environment() -> CheckResult {
+    check("Proxy/TLS Env", Status::Warn, "not implemented yet")
 }
 
 fn format_size(bytes: u64) -> String {

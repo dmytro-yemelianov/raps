@@ -94,6 +94,9 @@ futures-util.workspace = true
 # Directories
 directories.workspace = true
 
+# Disk space queries
+fs2.workspace = true
+
 # Random number generation
 rand.workspace = true
 
