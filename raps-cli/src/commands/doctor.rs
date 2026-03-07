@@ -344,8 +344,51 @@ async fn check_network_reachability() -> CheckResult {
     }
 }
 
+fn check_config_file_permissions(path: &std::path::Path) -> CheckResult {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        match std::fs::metadata(path) {
+            Ok(meta) => {
+                let mode = meta.permissions().mode();
+                // Warn if group-readable (0o040) or world-readable (0o004)
+                if mode & 0o044 != 0 {
+                    check(
+                        "Config Permissions",
+                        Status::Warn,
+                        &format!(
+                            "{} is group/world readable (mode {:04o}) — run: chmod 600 {}",
+                            path.display(),
+                            mode & 0o777,
+                            path.display()
+                        ),
+                    )
+                } else {
+                    check("Config Permissions", Status::Pass, "Config file is owner-only readable")
+                }
+            }
+            Err(e) => check("Config Permissions", Status::Warn, &format!("Cannot stat config: {e}")),
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        check("Config Permissions", Status::Pass, "Permission check not applicable on this OS")
+    }
+}
+
 fn check_config_permissions() -> CheckResult {
-    check("Config Permissions", Status::Warn, "not implemented yet")
+    match directories::ProjectDirs::from("com", "autodesk", "raps") {
+        Some(proj) => {
+            let profiles_path = proj.config_dir().join("profiles.json");
+            if profiles_path.exists() {
+                check_config_file_permissions(&profiles_path)
+            } else {
+                check("Config Permissions", Status::Pass, "No config file found (not yet configured)")
+            }
+        }
+        None => check("Config Permissions", Status::Warn, "Cannot determine config directory"),
+    }
 }
 
 fn check_context_var_formats() -> CheckResult {
@@ -423,5 +466,26 @@ mod tests {
     #[test]
     fn test_network_endpoint_is_aps_domain() {
         assert!(NETWORK_PROBE_URL.starts_with("https://developer.api.autodesk.com"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_config_permissions_detects_world_readable() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o644)).unwrap();
+        let result = check_config_file_permissions(tmp.path());
+        assert_eq!(result.status, "warn", "world-readable config should warn");
+        assert!(result.message.contains("world") || result.message.contains("group") || result.message.contains("readable"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_config_permissions_passes_for_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o600)).unwrap();
+        let result = check_config_file_permissions(tmp.path());
+        assert_eq!(result.status, "pass");
     }
 }
