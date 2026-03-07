@@ -351,13 +351,13 @@ fn check_config_file_permissions(path: &std::path::Path) -> CheckResult {
         match std::fs::metadata(path) {
             Ok(meta) => {
                 let mode = meta.permissions().mode();
-                // Warn if group-readable (0o040) or world-readable (0o004)
-                if mode & 0o044 != 0 {
+                // Warn if any non-owner permission bits (read, write, execute for group or world)
+                if mode & 0o077 != 0 {
                     check(
                         "Config Permissions",
                         Status::Warn,
                         &format!(
-                            "{} is group/world readable (mode {:04o}) — run: chmod 600 {}",
+                            "{} has non-owner permissions (mode {:04o}) — run: chmod 600 {}",
                             path.display(),
                             mode & 0o777,
                             path.display()
@@ -392,9 +392,13 @@ fn check_config_permissions() -> CheckResult {
 }
 
 fn is_valid_uuid(s: &str) -> bool {
-    let re = regex::Regex::new(
-        r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-    ).expect("valid UUID regex");
+    use std::sync::OnceLock;
+    static UUID_RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = UUID_RE.get_or_init(|| {
+        regex::Regex::new(
+            r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        ).expect("valid UUID regex")
+    });
     re.is_match(s)
 }
 
@@ -662,7 +666,7 @@ async fn check_version_staleness() -> CheckResult {
         VersionCompare::UpdateAvailable => check(
             "Version [network]",
             Status::Warn,
-            &format!("Update available: v{current} → v{latest}  (run: npm i -g raps-cli@latest)"),
+            &format!("Update available: v{current} → v{latest} (run: npm i -g @dmytro-yemelianov/raps-cli@latest)"),
         ),
         VersionCompare::Ahead => check(
             "Version [network]",
@@ -791,7 +795,7 @@ mod tests {
         std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o644)).unwrap();
         let result = check_config_file_permissions(tmp.path());
         assert_eq!(result.status, "warn", "world-readable config should warn");
-        assert!(result.message.contains("world") || result.message.contains("group") || result.message.contains("readable"));
+        assert!(result.message.contains("non-owner") || result.message.contains("permissions") || result.message.contains("chmod"));
     }
 
     #[cfg(unix)]
@@ -913,7 +917,7 @@ mod tests {
 
     #[test]
     fn test_compare_versions_ahead_of_release() {
-        let result = compare_versions("5.4.0-dev", "5.3.3");
+        let result = compare_versions("6.0.0", "5.3.3");
         assert_eq!(result, VersionCompare::Ahead);
     }
 
