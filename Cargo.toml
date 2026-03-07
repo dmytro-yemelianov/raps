@@ -113,7 +113,7 @@ glob = "0.3"
 notify = "6"
 
 # MCP Server
-rmcp = { version = "0.12", features = ["server", "transport-io", "schemars"] }
+rmcp = { version = "1.1", features = ["server", "transport-io", "schemars"] }
 schemars = "1.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "json"] }
