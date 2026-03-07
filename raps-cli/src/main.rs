@@ -360,6 +360,9 @@ enum Commands {
     #[command(subcommand)]
     Schema(commands::schema::SchemaCommands),
 
+    /// Sync a local directory to an OSS bucket
+    Sync(commands::sync::SyncArgs),
+
     /// Generate man pages for raps and its subcommands
     Man {
         /// Output directory for all man pages (default: print main page to stdout)
@@ -397,10 +400,10 @@ enum Commands {
 
 /// Known top-level subcommand names for fuzzy correction suggestions.
 const KNOWN_SUBCOMMANDS: &[&str] = &[
-    "auth", "bucket", "object", "translate", "workflow", "init", "status", "hub", "project",
-    "folder", "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi", "report",
-    "template", "reality", "inspect", "plugin", "generate", "demo", "config", "pipeline", "job",
-    "completions", "shell", "mcp", "doctor", "cache", "swarm", "schema", "man",
+    "auth", "bucket", "object", "translate", "workflow", "sync", "init", "status", "hub",
+    "project", "folder", "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi",
+    "report", "template", "reality", "inspect", "plugin", "generate", "demo", "config",
+    "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm", "schema", "man",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -1263,6 +1266,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Cache(_) => "cache",
         Commands::Swarm(_) => "swarm",
         Commands::Schema(_) => "schema",
+        Commands::Sync(_) => "sync",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
         Commands::History { .. } => "history",
@@ -1494,6 +1498,10 @@ async fn execute_command(
 
         Commands::Schema(cmd) => {
             cmd.execute()?;
+        }
+
+        Commands::Sync(args) => {
+            commands::sync::execute(&get_oss_client(), args).await?;
         }
 
         Commands::Man { .. } => {
