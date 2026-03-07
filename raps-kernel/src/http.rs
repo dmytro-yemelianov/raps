@@ -204,6 +204,36 @@ where
         _ => {}
     }
 
+    // --- Cache check (GET requests only) ---
+    let is_get = probe_req
+        .as_ref()
+        .map(|r| r.method() == reqwest::Method::GET)
+        .unwrap_or(false);
+    let cache_url = probe_req
+        .as_ref()
+        .map(|r| r.url().to_string())
+        .unwrap_or_default();
+    if is_get {
+        if let Some(ttl_secs) = crate::response_cache::cache_ttl(&cache_url) {
+            let disk = crate::response_cache::disk_cache();
+            if let Some(body) = disk.get(&cache_url) {
+                tracing::debug!(url = %cache_url, "response cache hit (disk)");
+                // Reconstruct a synthetic reqwest::Response from the cached body.
+                // We return a real HTTP response so callers can call .text()/.json().
+                let response = ::http::Response::builder()
+                    .status(200)
+                    .header("content-type", "application/json")
+                    .header("x-cache", "HIT")
+                    .body(bytes::Bytes::from(body.into_bytes()))
+                    .expect("failed to build cached response");
+                let response = reqwest::Response::from(response);
+                return Ok(response);
+            }
+            // Cache miss — fall through to real request, remember TTL for storage below.
+            let _ = ttl_secs; // used below in the loop
+        }
+    }
+
     // --- Request loop with retry ---
     let mut attempt = 0;
     let mut total_network_time = std::time::Duration::ZERO;
@@ -294,6 +324,38 @@ where
                 }
                 crate::profiler::record_http_request(total_network_time);
                 crate::api_health::record_latency(total_network_time);
+
+                // --- Disk cache store for cacheable GET 200 responses ---
+                if is_get && status == 200 {
+                    if let Some(ttl_secs) = crate::response_cache::cache_ttl(&cache_url) {
+                        let response_url = response.url().to_string();
+                        match response.text().await {
+                            Ok(body_text) => {
+                                tracing::debug!(url = %response_url, ttl_secs, "caching response to disk");
+                                crate::response_cache::disk_cache().set(
+                                    &cache_url,
+                                    body_text.clone(),
+                                    status,
+                                    ttl_secs,
+                                );
+                                // Reconstruct response so caller can use it normally.
+                                let rebuilt = ::http::Response::builder()
+                                    .status(200)
+                                    .header("content-type", "application/json")
+                                    .body(bytes::Bytes::from(body_text.into_bytes()))
+                                    .expect("failed to rebuild cached response");
+                                return Ok(reqwest::Response::from(rebuilt));
+                            }
+                            Err(e) => {
+                                // Body read failed — return error rather than
+                                // silently losing the response.
+                                tracing::warn!(error = %e, "failed to buffer response body for caching");
+                                return Err(anyhow::anyhow!("failed to read response body: {}", e));
+                            }
+                        }
+                    }
+                }
+
                 return Ok(response);
             }
             Err(err) => {
