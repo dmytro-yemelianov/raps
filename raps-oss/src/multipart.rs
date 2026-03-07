@@ -224,6 +224,15 @@ impl OssClient {
             .await?
         };
 
+        tracing::info!(
+            bucket = bucket_key,
+            key = object_key,
+            total_size = file_size,
+            chunk_count = total_parts,
+            chunk_size,
+            "multipart_upload_start"
+        );
+
         // Create progress bar (hidden in non-interactive mode)
         let pb = progress::file_progress(file_size, &format!("Uploading {}", object_key));
 
@@ -372,6 +381,12 @@ impl OssClient {
                                     .map(|s| s.trim_matches('"').to_string())
                                     .unwrap_or_default();
 
+                                tracing::debug!(
+                                    part = part_num,
+                                    size = part_size,
+                                    elapsed_ms = total_part_network_time.as_millis() as u64,
+                                    "chunk_uploaded"
+                                );
                                 // Update state atomically, flush to disk periodically
                                 {
                                     let mut state_guard = state_mutex.lock().await;

@@ -56,6 +56,12 @@ impl OssClient {
             .await
             .context("Failed to get file metadata")?;
         let file_size = metadata.len();
+        tracing::debug!(
+            bucket = bucket_key,
+            key = object_key,
+            size = file_size,
+            "upload_object"
+        );
 
         // Use multipart upload for files larger than threshold
         if file_size > MultipartUploadState::MULTIPART_THRESHOLD {
@@ -153,6 +159,7 @@ impl OssClient {
         object_key: &str,
         output_path: &Path,
     ) -> Result<()> {
+        tracing::debug!(bucket = bucket_key, key = object_key, "download_object");
         // Step 1: Get signed S3 download URL
         let signed = self
             .get_signed_download_url(bucket_key, object_key, None)
@@ -230,6 +237,7 @@ impl OssClient {
         object_key: &str,
         writer: &mut (impl tokio::io::AsyncWrite + Unpin),
     ) -> Result<()> {
+        tracing::debug!(bucket = bucket_key, key = object_key, "download_object_to_writer");
         let signed = self
             .get_signed_download_url(bucket_key, object_key, None)
             .await?;
@@ -432,6 +440,12 @@ impl OssClient {
 
         match remote_sha1 {
             Some(remote) if remote.to_lowercase() == local_sha1.to_lowercase() => {
+                tracing::info!(
+                    bucket = bucket_key,
+                    key = object_key,
+                    sha1 = %local_sha1,
+                    "cache_hit: identical object already exists, skipping upload"
+                );
                 // Duplicate found — return full ObjectInfo converted from ObjectDetails
                 let details = self.get_object_details(bucket_key, object_key).await?;
                 Ok(Some(ObjectInfo {

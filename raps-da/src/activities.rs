@@ -15,6 +15,7 @@ use crate::types::*;
 impl DesignAutomationClient {
     /// List all activities
     pub async fn list_activities(&self) -> Result<Vec<String>> {
+        tracing::info!("list_activities");
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
@@ -39,6 +40,7 @@ impl DesignAutomationClient {
 
     /// Create a new activity
     pub async fn create_activity(&self, request: CreateActivityRequest) -> Result<Activity> {
+        tracing::info!(activity_id = %request.id, "create_activity");
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities", self.config.da_url());
 
@@ -110,6 +112,7 @@ impl DesignAutomationClient {
 
     /// Delete an activity
     pub async fn delete_activity(&self, id: &str) -> Result<()> {
+        tracing::info!(activity_id = id, "delete_activity");
         let token = self.auth.get_token().await?;
         let url = format!("{}/activities/{}", self.config.da_url(), id);
 

@@ -15,6 +15,7 @@ use crate::types::*;
 impl DesignAutomationClient {
     /// List all app bundles
     pub async fn list_appbundles(&self) -> Result<Vec<String>> {
+        tracing::info!("list_appbundles");
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles", self.config.da_url());
 
@@ -44,6 +45,7 @@ impl DesignAutomationClient {
         engine: &str,
         description: Option<&str>,
     ) -> Result<AppBundleDetails> {
+        tracing::info!(bundle_id = id, engine, "create_appbundle");
         let token = self.auth.get_token().await?;
         let url = format!("{}/appbundles", self.config.da_url());
 
@@ -148,6 +150,7 @@ impl DesignAutomationClient {
         upload_params: &UploadParameters,
         file_path: &std::path::Path,
     ) -> Result<()> {
+        tracing::info!(path = %file_path.display(), "upload_appbundle");
         let endpoint_url = upload_params
             .endpoint_url
             .as_deref()

@@ -351,7 +351,7 @@ where
     }
 
     // --- Request loop with retry ---
-    let mut attempt = 0;
+    let mut attempt = 0u32;
     let mut total_network_time = std::time::Duration::ZERO;
     // Load per-endpoint stats once; we update and save after each request.
     let mut ep_stats = crate::endpoint_stats::EndpointStats::load();
@@ -362,6 +362,12 @@ where
         .unwrap_or_default();
     loop {
         let start = std::time::Instant::now();
+        let span = tracing::debug_span!(
+            "http.request",
+            url = %request_url,
+            attempt,
+        );
+        let _enter = span.enter();
         match build_request().send().await {
             Ok(response) => {
                 let elapsed = start.elapsed();
@@ -369,10 +375,9 @@ where
                 let status = response.status().as_u16();
                 let elapsed_ms = elapsed.as_millis() as u64;
                 tracing::debug!(
-                    http.status = status,
-                    url = %response.url(),
+                    status,
                     elapsed_ms,
-                    "HTTP response"
+                    "response"
                 );
 
                 // Record per-endpoint stats
@@ -391,13 +396,12 @@ where
                     let rl =
                         crate::rate_limit::RateLimitState::from_headers(response.headers());
                     if let Some(delay) = rl.throttle_delay() {
-                        tracing::debug!(
+                        let sleep_ms = delay.as_millis() as u64;
+                        tracing::info!(
+                            sleep_ms,
                             remaining = ?rl.remaining,
                             limit = ?rl.limit,
-                            delay_secs = delay.as_secs(),
-                            "rate limit: {}/{} — throttling before next request",
-                            rl.remaining.unwrap_or(0),
-                            rl.limit.unwrap_or(0),
+                            "rate_limit_sleep"
                         );
                         sleep(delay).await;
                     } else if let (Some(remaining), Some(limit)) = (rl.remaining, rl.limit) {
@@ -427,13 +431,14 @@ where
                     let delay = base_delay.saturating_mul(multiplier);
                     attempt += 1;
                     crate::profiler::record_http_retry();
-                    tracing::warn!(
-                        http.status = status,
+                    let delay_ms = delay.as_millis() as u64;
+                    tracing::info!(
                         attempt,
+                        delay_ms,
+                        reason = %format!("http_{}", status),
                         max_retries = config.max_retries,
-                        delay_secs = delay.as_secs_f64(),
                         backoff_multiplier = multiplier,
-                        "Retryable HTTP status, retrying"
+                        "retry"
                     );
                     sleep(delay).await;
                     continue;
@@ -497,13 +502,15 @@ where
                 let base_delay = calculate_delay(attempt, config.base_delay, config.max_wait);
                 let multiplier = ep_stats.backoff_multiplier(&request_url);
                 let delay = base_delay.saturating_mul(multiplier);
-                tracing::warn!(
-                    error = %err,
+                let delay_ms = delay.as_millis() as u64;
+                tracing::info!(
                     attempt,
+                    delay_ms,
+                    reason = "network_error",
+                    error = %err,
                     max_retries = config.max_retries,
-                    delay_secs = delay.as_secs_f64(),
                     backoff_multiplier = multiplier,
-                    "Network error, retrying"
+                    "retry"
                 );
                 sleep(delay).await;
             }
@@ -600,6 +607,12 @@ where
 
     loop {
         let start = std::time::Instant::now();
+        let span = tracing::debug_span!(
+            "http.request",
+            url = %request_url,
+            attempt,
+        );
+        let _enter = span.enter();
         match build_request(&current_token).send().await {
             Ok(response) => {
                 let elapsed = start.elapsed();
@@ -607,10 +620,9 @@ where
                 let status = response.status().as_u16();
                 let elapsed_ms = elapsed.as_millis() as u64;
                 tracing::debug!(
-                    http.status = status,
-                    url = %response.url(),
+                    status,
                     elapsed_ms,
-                    "HTTP response"
+                    "response"
                 );
 
                 ep_stats.record_request(response.url().as_str(), elapsed_ms, status >= 400);
@@ -622,13 +634,12 @@ where
                 {
                     let rl = crate::rate_limit::RateLimitState::from_headers(response.headers());
                     if let Some(delay) = rl.throttle_delay() {
-                        tracing::debug!(
+                        let sleep_ms = delay.as_millis() as u64;
+                        tracing::info!(
+                            sleep_ms,
                             remaining = ?rl.remaining,
                             limit = ?rl.limit,
-                            delay_secs = delay.as_secs(),
-                            "rate limit: {}/{} — throttling before next request",
-                            rl.remaining.unwrap_or(0),
-                            rl.limit.unwrap_or(0),
+                            "rate_limit_sleep"
                         );
                         tokio::time::sleep(delay).await;
                     } else if let (Some(remaining), Some(limit)) = (rl.remaining, rl.limit) {
@@ -676,13 +687,14 @@ where
                     let delay = base_delay.saturating_mul(multiplier);
                     attempt += 1;
                     crate::profiler::record_http_retry();
-                    tracing::warn!(
-                        http.status = status,
+                    let delay_ms = delay.as_millis() as u64;
+                    tracing::info!(
                         attempt,
+                        delay_ms,
+                        reason = %format!("http_{}", status),
                         max_retries = config.max_retries,
-                        delay_secs = delay.as_secs_f64(),
                         backoff_multiplier = multiplier,
-                        "Retryable HTTP status, retrying"
+                        "retry"
                     );
                     tokio::time::sleep(delay).await;
                     continue;
@@ -713,13 +725,15 @@ where
                 let base_delay = calculate_delay(attempt, config.base_delay, config.max_wait);
                 let multiplier = ep_stats.backoff_multiplier(&request_url);
                 let delay = base_delay.saturating_mul(multiplier);
-                tracing::warn!(
-                    error = %err,
+                let delay_ms = delay.as_millis() as u64;
+                tracing::info!(
                     attempt,
+                    delay_ms,
+                    reason = "network_error",
+                    error = %err,
                     max_retries = config.max_retries,
-                    delay_secs = delay.as_secs_f64(),
                     backoff_multiplier = multiplier,
-                    "Network error, retrying"
+                    "retry"
                 );
                 tokio::time::sleep(delay).await;
             }
