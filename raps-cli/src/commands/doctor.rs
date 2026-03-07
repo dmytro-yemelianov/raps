@@ -406,10 +406,10 @@ fn validate_context_vars(
 ) -> Vec<String> {
     let mut issues = Vec::new();
 
-    if let Some(id) = account_id {
-        if !is_valid_uuid(id) {
-            issues.push(format!("APS_ACCOUNT_ID '{}' is not a valid UUID", id));
-        }
+    if let Some(id) = account_id
+        && !is_valid_uuid(id)
+    {
+        issues.push(format!("APS_ACCOUNT_ID '{}' is not a valid UUID", id));
     }
 
     if let Some(id) = hub_id {

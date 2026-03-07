@@ -252,12 +252,10 @@ impl ProjectUsersClient {
         let error_text = response.text().await.unwrap_or_default();
 
         // On 400/404 try BIM 360 HQ v2 if we have an account_id
-        if status == 400 || status == 404 {
-            if let Some(ref account_id) = self.account_id {
-                return self
-                    .add_user_bim360(account_id, project_id, request)
-                    .await;
-            }
+        if (status == 400 || status == 404) && let Some(ref account_id) = self.account_id {
+            return self
+                .add_user_bim360(account_id, project_id, request)
+                .await;
         }
 
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
