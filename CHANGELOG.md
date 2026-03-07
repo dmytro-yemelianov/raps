@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.3.3] - 2026-03-07
+
+### Added
+- **`raps sync`**: Sync a local directory to an OSS bucket — parallel uploads, `--delete`, `--dry-run`, `--checksum` flags.
+- **`raps watch`**: Auto-upload new/changed files from a watched directory to OSS using filesystem events (debounced, `notify` crate).
+- **`raps object diff`**: Compare two OSS objects or an OSS object against a local file — colored unified diff for text, SHA-1/SHA-256 comparison for binary, `--stat` and `--checksum-only` flags.
+- **`raps object download-bulk`**: Parallel bulk downloads with concurrency control (`--concurrency N`), multi-progress bars, skip-existing, and `--flat` mode.
+- **`raps object inspect`**: Inspect `.zip` and `.tar.gz` archives via HTTP Range requests without downloading the full file. `--extract` to pull out a single entry.
+- **`raps stats`**: Aggregate usage dashboard combining endpoint stats, command history, and throughput cache.
+- **`raps workflow run`**: Compose upload → translate → poll → download in a single command.
+- **`raps docs`**: Generate agent-facing documentation (AGENTS.md) from live CLI introspection; MCP subcommand; CI freshness check.
+- **`raps pipeline --resume / --reset / --reset-from`**: Idempotent pipeline re-runs — skip already-completed steps, clear state, or restart from a named step.
+- **Pipeline parallel execution**: `depends_on` field with topological sort (Kahn's algorithm) and cycle detection; steps without dependencies run concurrently.
+- **Translation deduplication cache**: `~/.cache/raps/translation_cache.json` keyed by `urn::format`; `--force` overrides.
+- **Secret scanning before upload**: Six credential patterns detected before any upload; `--allow-secrets` to bypass.
+- **Transparent 401 token refresh**: Automatic token refresh on expiry with pre-check to avoid unnecessary API calls.
+- **TTL response cache**: GET responses cached with per-endpoint TTLs (buckets 60s, hubs 120s, DA engines 3600s).
+- **Rate-limit awareness**: Parses `X-RateLimit-*` headers and auto-throttles when quota drops below 10%.
+- **Adaptive per-endpoint retry**: Tracks failure rates per endpoint and adjusts backoff multiplier (1×/2×/4×).
+- **Fuzzy command suggestions**: Levenshtein distance used to suggest corrections for mistyped subcommands.
+- **Command history and replay**: `raps history` and `raps replay` — all commands logged to `~/.cache/raps/history.json`.
+- **Throughput-based chunk sizing**: Multipart upload chunk size (5/10/25 MB) auto-selected from measured throughput.
+- **Duplicate detection**: `--skip-if-exists` flag on upload uses SHA-1 comparison against existing object.
+- **Upload cost estimation**: `--cost-estimate` shows time/bandwidth estimate before upload.
+- **Format auto-detection**: Translation output format inferred from input file extension.
+- **Translation watch mode**: `--watch` flag on translate polls until success/failure/timeout.
+- **`--proxy` flag**: Global proxy URL flag with eager validation; `RAPS_PROXY` env var support.
+- **HTTP/2 multiplexing**: `http2_adaptive_window` enabled by default; `RAPS_HTTP2=0` to disable.
+- **HTTP/3 QUIC transport**: Optional `h3` feature for swarm inter-agent communication via `--quic` / `RAPS_SWARM_QUIC=1`.
+- **Agent-first CLI**: JSON Schema output for all types, NDJSON streaming, prompt injection defense, ID format validation.
+- **Plugin system completion**: Pre/post hooks now fire around every command; alias expansion wired into interactive shell.
+- **AGENTS.md**: Auto-generated agent documentation committed to repo root.
+
+### Fixed
+- HTTP client configuration errors now surface immediately instead of silently falling back to defaults.
+- Pipeline idempotent state correctly persists across `--resume` runs.
+- Plugin `run_pre_hooks` / `run_post_hooks` were defined but never called — now wired into every command dispatch.
+- Removed dead items from `mcp/auth_guidance.rs`; simplified `AuthState` struct.
+
+### Changed
+- `new_with_http_config` across all API client crates now returns `Result<Self>` instead of silently panicking.
+- Removed five crate-level `#![allow(dead_code)]` suppressions (raps-reality, raps-webhooks, raps-da, raps-acc, raps-dm) — all items were live public API.
+- Shared progress bar helper extracted to `raps_kernel::progress`; duplicated setup removed from reality, admin CSV, and report commands.
+
+### Dependencies
+- `reedline` 0.45 → 0.46
+- `toml` 0.8 → 1.0
+- `crossterm` 0.28 → 0.29
+- `thiserror` 1.0 → 2.0
+- `rmcp` 0.12 → 0.17
+- `deadpool-redis` 0.18 → 0.23
+- `ratatui` 0.29 → 0.30
+- `webbrowser` 0.8 → 1.1
+- `lru` 0.12 → 0.16
+- `redis` 0.27 → 1.0
+
+## [5.3.2] - 2026-03-06
+
+### Added
+- **Admin role upsert**: Update role if user is already a member instead of failing.
+- **BIM 360 Business hub support**: Admin user-add now works across ACC and BIM 360 hub types.
+- **Intelligent role resolution**: `--role` flag resolves role names for both ACC and BIM 360 APIs.
+
+### Fixed
+- `raps admin add`: HTTP 409 already-member treated as skipped, not failed.
+- `raps admin add`: Removed broken user-exists pre-check that caused false negatives.
+- ACC API alignment: `roleId` → `roleIds` array, `projectAdministration` rules, init onboarding flow.
+- HTTP 4xx/5xx errors now include API response body in error messages.
+- `raps admin add`: Insight role-lock HTTP 400 treated as skipped.
+- Storage: plaintext keyring file warnings include `migrate-tokens` hint.
+- ANSI logo spacing and sunflower alignment tweaks.
+
+## [5.3.0] - 2026-03-05
+
+### Added
+- **Comprehensive test coverage**: 100+ new scenario tests across rfi, admin, object copy, DA, config, job, webhook, hub, translate, and status commands using raps-mock. Coverage report published as workflow artifact.
+
+### Changed
+- raps-mock dependency switched from path to git reference (v0.3.0).
+
+## [5.1.0] - 2026-03-02
+
+### Added
+- **`raps doctor` expanded**: 8 new self-checks — network connectivity, filesystem permissions, context variables, disk space (warn <500 MB, fail <100 MB), keyring probe, env var conflict detection, version staleness (GitHub releases API), proxy/TLS environment with credential masking.
+- **Duplicate detection**: SHA-1 comparison for `--skip-if-exists` on object upload.
+- **Adaptive multipart chunk sizing**: 5/10/25 MB chunks based on measured throughput; ETA display with 10s rolling window.
+- **Pipeline `depends_on`**: Topological sort with cycle detection for step ordering.
+- **Translation `--watch`**: Polls until success, failure, or timeout.
+- **Fuzzy command corrections**: Levenshtein edit distance suggests the nearest valid subcommand.
+- **Rate-limit throttling**: Auto-sleep when `X-RateLimit-Remaining` drops below 10% of limit.
+- **Endpoint health tracking**: Per-endpoint failure rate with exponential backoff multiplier.
+- **Format auto-detect**: Translation output format inferred from input file extension.
+- **Command history**: All commands logged; `raps history` and `raps replay`.
+- **Auto-profile from `.raps-project`**: Active profile set from nearest `.raps-project` file.
+- **Upload cost estimation**: Time/bandwidth preview before large uploads.
+- **Webhook status**: `raps webhook status` with optional reachability check.
+
 ## [5.0.0] - 2026-03-01
 
 ### Added
