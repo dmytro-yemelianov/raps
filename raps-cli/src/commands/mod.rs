@@ -44,6 +44,7 @@ pub mod sync;
 pub mod template;
 pub mod tracked;
 pub mod translate;
+pub mod watch_dir;
 pub mod webhook;
 pub mod workflow;
 

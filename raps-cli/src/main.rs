@@ -393,6 +393,9 @@ enum Commands {
         format: OutputFormat,
     },
 
+    /// Watch a directory and auto-upload new/changed files to OSS
+    Watch(commands::watch_dir::WatchArgs),
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -400,10 +403,11 @@ enum Commands {
 
 /// Known top-level subcommand names for fuzzy correction suggestions.
 const KNOWN_SUBCOMMANDS: &[&str] = &[
-    "auth", "bucket", "object", "translate", "workflow", "sync", "init", "status", "hub",
-    "project", "folder", "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi",
-    "report", "template", "reality", "inspect", "plugin", "generate", "demo", "config",
-    "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm", "schema", "man",
+    "auth", "bucket", "object", "translate", "workflow", "sync", "watch", "stats", "init",
+    "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
+    "api", "rfi", "report", "template", "reality", "inspect", "plugin", "generate", "demo",
+    "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm",
+    "schema", "history", "replay", "man",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -1272,6 +1276,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::History { .. } => "history",
         Commands::Replay { .. } => "replay",
         Commands::Stats { .. } => "stats",
+        Commands::Watch(_) => "watch",
     }
 }
 
@@ -1523,6 +1528,10 @@ async fn execute_command(
 
         Commands::Stats { format } => {
             commands::stats::execute(format)?;
+        }
+
+        Commands::Watch(args) => {
+            commands::watch_dir::execute(args, config, output_format).await?;
         }
 
         Commands::External(args) => {
