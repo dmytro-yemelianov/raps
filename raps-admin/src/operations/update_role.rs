@@ -195,7 +195,7 @@ async fn update_user_role(
 
     // Check from-role filter if specified
     if let Some(from_role) = from_role_id {
-        let current_role = current_user.role_id.as_deref().unwrap_or("");
+        let current_role = current_user.role_ids.first().map(String::as_str).unwrap_or("");
         if current_role != from_role {
             return ItemResult::Skipped {
                 reason: format!("role_mismatch: current={}", current_role),
@@ -204,7 +204,7 @@ async fn update_user_role(
     }
 
     // Check if already has the target role
-    if current_user.role_id.as_deref() == Some(new_role_id) {
+    if current_user.role_ids.contains(&new_role_id.to_string()) {
         return ItemResult::Skipped {
             reason: "already_has_role".to_string(),
         };
@@ -212,7 +212,7 @@ async fn update_user_role(
 
     // Update the user's role
     let request = UpdateProjectUserRequest {
-        role_id: Some(new_role_id.to_string()),
+        role_ids: vec![new_role_id.to_string()],
         products: None,
     };
 
@@ -220,12 +220,25 @@ async fn update_user_role(
         Ok(_) => ItemResult::Success,
         Err(e) => {
             let error_str = e.to_string();
+            if is_insight_restriction_error(&error_str) {
+                return ItemResult::Skipped {
+                    reason: "insight_role_locked".to_string(),
+                };
+            }
             ItemResult::Failed {
                 error: error_str.clone(),
                 retryable: is_retryable_error(&error_str),
             }
         }
     }
+}
+
+/// Check if the error is an Insight product restriction (role cannot be changed via this API)
+fn is_insight_restriction_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("cannot remove user access from insight")
+        || lower.contains("insight")
+            && (lower.contains("cannot") || lower.contains("not allowed") || lower.contains("restricted"))
 }
 
 /// Check if an error is retryable
@@ -368,5 +381,13 @@ mod tests {
         assert!(is_retryable_error("503 Service Unavailable"));
         assert!(!is_retryable_error("404 Not Found"));
         assert!(!is_retryable_error("403 Forbidden"));
+    }
+
+    #[test]
+    fn test_is_insight_restriction_error() {
+        assert!(is_insight_restriction_error("Cannot remove user access from Insight"));
+        assert!(is_insight_restriction_error("400 Bad Request: Cannot remove user access from Insight"));
+        assert!(!is_insight_restriction_error("404 Not Found"));
+        assert!(!is_insight_restriction_error("400 Bad Request"));
     }
 }

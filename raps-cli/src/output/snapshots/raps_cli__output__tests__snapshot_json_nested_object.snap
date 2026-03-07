@@ -1,0 +1,12 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 183
+expression: output
+---
+{
+  "name": "test",
+  "inner": {
+    "key": "abc",
+    "count": 5
+  }
+}

@@ -33,6 +33,25 @@ pub enum PipelineCommands {
         /// Dry run (show commands without executing)
         #[arg(short, long)]
         dry_run: bool,
+
+        /// Pipeline variable override (KEY=VALUE, repeatable)
+        #[arg(long = "var", value_parser = parse_var_assignment)]
+        var: Vec<(String, String)>,
+
+        /// Maximum number of steps to run concurrently within a dependency level (0 = unlimited)
+        #[arg(long = "max-parallel", default_value_t = 0)]
+        max_parallel: usize,
+        /// Resume previous run, skipping already-completed steps
+        #[arg(long)]
+        resume: bool,
+
+        /// Clear saved run state and start fresh (overrides --resume)
+        #[arg(long)]
+        reset: bool,
+
+        /// Clear state from this step onwards, re-run from here
+        #[arg(long)]
+        reset_from: Option<String>,
     },
 
     /// Validate a pipeline file
@@ -157,6 +176,8 @@ pub struct Step {
     pub on_failure: Option<Vec<Step>>,
     #[serde(default)]
     pub max_concurrency: Option<usize>,
+    #[serde(default)]
+    pub depends_on: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, schemars::JsonSchema)]
@@ -177,6 +198,100 @@ pub struct StepResult {
 
 type StepContext = Arc<Mutex<HashMap<String, StepResult>>>;
 
+// ── Idempotent run-state ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+enum StepRunStatus {
+    Pending,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StepRunRecord {
+    name: String,
+    status: StepRunStatus,
+    exit_code: Option<i32>,
+    completed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PipelineRunState {
+    pipeline_hash: String,
+    pipeline_file: String,
+    started_at: String,
+    steps: Vec<StepRunRecord>,
+}
+
+impl PipelineRunState {
+    fn state_path(pipeline_file: &std::path::Path) -> Option<std::path::PathBuf> {
+        let dirs = directories::ProjectDirs::from("com", "autodesk", "raps")?;
+        let name = pipeline_file.file_stem()?.to_string_lossy();
+        Some(
+            dirs.cache_dir()
+                .join("pipeline_runs")
+                .join(format!("{}.json", name)),
+        )
+    }
+
+    fn load(pipeline_file: &std::path::Path, current_hash: &str) -> Option<Self> {
+        let path = Self::state_path(pipeline_file)?;
+        let content = std::fs::read_to_string(&path).ok()?;
+        let state: Self = serde_json::from_str(&content).ok()?;
+        if state.pipeline_hash != current_hash {
+            return None;
+        }
+        Some(state)
+    }
+
+    fn save(&self, pipeline_file: &std::path::Path) {
+        if let Some(path) = Self::state_path(pipeline_file) {
+            if let Some(p) = path.parent() {
+                let _ = std::fs::create_dir_all(p);
+            }
+            if let Ok(s) = serde_json::to_string_pretty(self) {
+                let _ = std::fs::write(path, s);
+            }
+        }
+    }
+
+    fn clear(pipeline_file: &std::path::Path) {
+        if let Some(path) = Self::state_path(pipeline_file) {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    fn is_completed(&self, step_name: &str) -> bool {
+        self.steps
+            .iter()
+            .any(|s| s.name == step_name && s.status == StepRunStatus::Completed)
+    }
+
+    fn mark(&mut self, step_name: &str, status: StepRunStatus, exit_code: Option<i32>) {
+        let now = chrono::Utc::now().to_rfc3339();
+        if let Some(rec) = self.steps.iter_mut().find(|s| s.name == step_name) {
+            rec.status = status;
+            rec.exit_code = exit_code;
+            rec.completed_at = Some(now);
+        } else {
+            self.steps.push(StepRunRecord {
+                name: step_name.to_string(),
+                status,
+                exit_code,
+                completed_at: Some(now),
+            });
+        }
+    }
+}
+
+fn pipeline_hash(content: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(content.as_bytes()))
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 impl PipelineCommands {
     pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
         match self {
@@ -184,7 +299,25 @@ impl PipelineCommands {
                 file,
                 ignore_failure,
                 dry_run,
-            } => run_pipeline(&file, ignore_failure, dry_run, output_format).await,
+                var,
+                max_parallel,
+                resume,
+                reset,
+                reset_from,
+            } => {
+                run_pipeline(
+                    &file,
+                    ignore_failure,
+                    dry_run,
+                    var,
+                    max_parallel,
+                    output_format,
+                    resume,
+                    reset,
+                    reset_from,
+                )
+                .await
+            }
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
             PipelineCommands::Create {
@@ -563,13 +696,177 @@ fn execute_step(
     .boxed()
 }
 
+fn topological_sort(steps: &[Step]) -> Result<Vec<usize>> {
+    use std::collections::{HashMap, VecDeque};
+
+    let name_to_idx: HashMap<&str, usize> = steps
+        .iter()
+        .enumerate()
+        .map(|(i, s)| (s.name.as_str(), i))
+        .collect();
+
+    // Validate all depends_on references
+    for step in steps {
+        for dep in &step.depends_on {
+            if !name_to_idx.contains_key(dep.as_str()) {
+                anyhow::bail!(
+                    "Step '{}' depends on unknown step '{}'",
+                    step.name,
+                    dep
+                );
+            }
+        }
+    }
+
+    // Kahn's algorithm
+    let n = steps.len();
+    let mut in_degree = vec![0usize; n];
+    let mut adj: Vec<Vec<usize>> = vec![vec![]; n];
+
+    for (i, step) in steps.iter().enumerate() {
+        for dep in &step.depends_on {
+            let dep_idx = name_to_idx[dep.as_str()];
+            adj[dep_idx].push(i);
+            in_degree[i] += 1;
+        }
+    }
+
+    let mut queue: VecDeque<usize> = (0..n).filter(|&i| in_degree[i] == 0).collect();
+    let mut result = Vec::with_capacity(n);
+
+    while let Some(node) = queue.pop_front() {
+        result.push(node);
+        for &next in &adj[node] {
+            in_degree[next] -= 1;
+            if in_degree[next] == 0 {
+                queue.push_back(next);
+            }
+        }
+    }
+
+    if result.len() != n {
+        // Find cycle — collect remaining nodes with in_degree > 0
+        let cycle_steps: Vec<&str> = (0..n)
+            .filter(|&i| in_degree[i] > 0)
+            .map(|i| steps[i].name.as_str())
+            .collect();
+        anyhow::bail!(
+            "Circular dependency detected among steps: {}",
+            cycle_steps.join(" → ")
+        );
+    }
+
+    Ok(result)
+}
+
+/// Group topologically sorted step indices into parallel execution levels.
+///
+/// Level 0 contains steps with no dependencies.  Level N contains steps whose
+/// all dependencies are in levels 0..N-1.  Steps at the same level have no
+/// dependency between them and can safely run concurrently.
+fn group_by_level(steps: &[Step], sorted_indices: &[usize]) -> Vec<Vec<usize>> {
+    let mut level_of = vec![0usize; steps.len()];
+    for &i in sorted_indices {
+        let max_dep_level = steps[i]
+            .depends_on
+            .iter()
+            .filter_map(|dep| steps.iter().position(|s| s.name == *dep))
+            .map(|dep_idx| level_of[dep_idx])
+            .max()
+            .unwrap_or(0);
+        level_of[i] = if steps[i].depends_on.is_empty() {
+            0
+        } else {
+            max_dep_level + 1
+        };
+    }
+    let max_level = level_of.iter().copied().max().unwrap_or(0);
+    (0..=max_level)
+        .map(|l| {
+            sorted_indices
+                .iter()
+                .copied()
+                .filter(|&i| level_of[i] == l)
+                .collect()
+        })
+        .collect()
+}
+
 async fn run_pipeline(
     file: &PathBuf,
     global_ignore_failure: bool,
     dry_run: bool,
+    var_overrides: Vec<(String, String)>,
+    max_parallel: usize,
     output_format: OutputFormat,
+    resume: bool,
+    reset: bool,
+    reset_from: Option<String>,
 ) -> Result<()> {
-    let pipeline = load_pipeline(file).await?;
+    // Read raw content for hashing (stdin pipelines are not stateful)
+    let raw_content = if file.as_os_str() == "-" {
+        String::new()
+    } else {
+        tokio::fs::read_to_string(file)
+            .await
+            .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?
+    };
+    let hash = pipeline_hash(&raw_content);
+    let canonical_file = file.canonicalize().unwrap_or_else(|_| file.clone());
+
+    // Handle state reset/resume
+    if reset {
+        PipelineRunState::clear(&canonical_file);
+    }
+
+    let mut state: PipelineRunState = if reset {
+        PipelineRunState {
+            pipeline_hash: hash.clone(),
+            pipeline_file: canonical_file.display().to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            steps: Vec::new(),
+        }
+    } else if let Some(ref from_step) = reset_from {
+        // Load existing state, mark `from_step` and everything after it as Pending
+        let mut s = PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
+            PipelineRunState {
+                pipeline_hash: hash.clone(),
+                pipeline_file: canonical_file.display().to_string(),
+                started_at: chrono::Utc::now().to_rfc3339(),
+                steps: Vec::new(),
+            }
+        });
+        // Find the index of the reset-from step and clear from there
+        let reset_idx = s.steps.iter().position(|r| &r.name == from_step);
+        if let Some(idx) = reset_idx {
+            for rec in s.steps[idx..].iter_mut() {
+                rec.status = StepRunStatus::Pending;
+                rec.exit_code = None;
+                rec.completed_at = None;
+            }
+        }
+        s.save(&canonical_file);
+        s
+    } else if resume {
+        PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
+            PipelineRunState {
+                pipeline_hash: hash.clone(),
+                pipeline_file: canonical_file.display().to_string(),
+                started_at: chrono::Utc::now().to_rfc3339(),
+                steps: Vec::new(),
+            }
+        })
+    } else {
+        PipelineRunState {
+            pipeline_hash: hash.clone(),
+            pipeline_file: canonical_file.display().to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            steps: Vec::new(),
+        }
+    };
+
+    let mut pipeline = load_pipeline(file).await?;
+    apply_variable_overrides(&mut pipeline.variables, &var_overrides);
     let context: StepContext = Arc::new(Mutex::new(HashMap::new()));
 
     if output_format.supports_colors() {
@@ -584,58 +881,186 @@ async fn run_pipeline(
     let mut failed = 0u32;
     let mut skipped = 0u32;
 
-    for (i, step) in pipeline.steps.iter().enumerate() {
-        if output_format.supports_colors() {
-            println!(
-                "\n[{}/{}] {}",
-                i + 1,
-                pipeline.steps.len(),
-                step.name.bold()
-            );
-            if let Some(ref cmd) = step.command {
-                println!("  {} {}", "Command:".dimmed(), cmd.cyan());
-            } else if step.parallel.is_some() {
-                println!("  {} parallel steps", "⫸".dimmed());
-            } else if step.for_each.is_some() {
-                println!("  {} for-each loop", "⟳".dimmed());
+    let execution_order = topological_sort(&pipeline.steps)?;
+    let total = execution_order.len();
+    let levels = group_by_level(&pipeline.steps, &execution_order);
+
+    if dry_run && output_format.supports_colors() {
+        for (level_idx, level_indices) in levels.iter().enumerate() {
+            let names: Vec<&str> = level_indices
+                .iter()
+                .map(|&i| pipeline.steps[i].name.as_str())
+                .collect();
+            if level_indices.len() == 1 {
+                println!("Level {} (sequential): {}", level_idx, names.join(", "));
+            } else {
+                println!("Level {} (parallel): {}", level_idx, names.join(", "));
             }
         }
+    }
 
-        let outcome = execute_step(
-            step.clone(),
-            pipeline.variables.clone(),
-            context.clone(),
-            pipeline.defaults.clone(),
-            output_format,
-            dry_run,
-        )
-        .await?;
+    for level_indices in &levels {
+        if level_indices.len() == 1 {
+            // Single step in this level — run sequentially
+            let step_idx = level_indices[0];
+            let step = &pipeline.steps[step_idx];
+            let pos = execution_order
+                .iter()
+                .position(|&i| i == step_idx)
+                .unwrap_or(0);
 
-        match outcome {
-            StepOutcome::Success(_) => {
-                if output_format.supports_colors() {
-                    println!("  {} Success", "✓".green().bold());
+            if output_format.supports_colors() {
+                println!("\n[{}/{}] {}", pos + 1, total, step.name.bold());
+                if let Some(ref cmd) = step.command {
+                    println!("  {} {}", "Command:".dimmed(), cmd.cyan());
+                } else if step.parallel.is_some() {
+                    println!("  {} parallel steps", "⫸".dimmed());
+                } else if step.for_each.is_some() {
+                    println!("  {} for-each loop", "⟳".dimmed());
                 }
-                passed += 1;
             }
-            StepOutcome::Failed(code) => {
+
+            // Skip already-completed steps when resuming
+            if state.is_completed(&step.name) {
                 if output_format.supports_colors() {
-                    println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
-                }
-                failed += 1;
-                if !step.ignore_failure && !global_ignore_failure {
-                    anyhow::bail!(
-                        "Pipeline aborted at step '{}' (exit code: {})",
-                        step.name,
-                        code
+                    println!(
+                        "  {} {} (skipped — already completed)",
+                        "✓".green().dimmed(),
+                        step.name.dimmed()
                     );
                 }
-            }
-            StepOutcome::Skipped => {
-                if output_format.supports_colors() {
-                    println!("  {} Skipped (condition not met)", "○".dimmed());
-                }
                 skipped += 1;
+                continue;
+            }
+
+            let outcome = execute_step(
+                step.clone(),
+                pipeline.variables.clone(),
+                context.clone(),
+                pipeline.defaults.clone(),
+                output_format,
+                dry_run,
+            )
+            .await?;
+
+            match outcome {
+                StepOutcome::Success(code) => {
+                    if output_format.supports_colors() {
+                        println!("  {} Success", "✓".green().bold());
+                    }
+                    state.mark(&step.name, StepRunStatus::Completed, Some(code));
+                    state.save(&canonical_file);
+                    passed += 1;
+                }
+                StepOutcome::Failed(code) => {
+                    if output_format.supports_colors() {
+                        println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
+                    }
+                    state.mark(&step.name, StepRunStatus::Failed, Some(code));
+                    state.save(&canonical_file);
+                    failed += 1;
+                    if !step.ignore_failure && !global_ignore_failure {
+                        anyhow::bail!(
+                            "Pipeline aborted at step '{}' (exit code: {})",
+                            step.name,
+                            code
+                        );
+                    }
+                }
+                StepOutcome::Skipped => {
+                    if output_format.supports_colors() {
+                        println!("  {} Skipped (condition not met)", "○".dimmed());
+                    }
+                    state.mark(&step.name, StepRunStatus::Skipped, None);
+                    state.save(&canonical_file);
+                    skipped += 1;
+                }
+            }
+        } else {
+            // Multiple independent steps — run concurrently using tokio::task::JoinSet
+            use tokio::sync::Semaphore;
+            use tokio::task::JoinSet;
+
+            if output_format.supports_colors() {
+                let names: Vec<&str> = level_indices
+                    .iter()
+                    .map(|&i| pipeline.steps[i].name.as_str())
+                    .collect();
+                println!("\n[parallel] {}", names.join(", "));
+            }
+
+            let semaphore: Option<Arc<Semaphore>> = if max_parallel > 0 {
+                Some(Arc::new(Semaphore::new(max_parallel)))
+            } else {
+                None
+            };
+
+            let mut join_set: JoinSet<Result<(String, bool, StepOutcome)>> = JoinSet::new();
+
+            for &step_idx in level_indices {
+                let step = pipeline.steps[step_idx].clone();
+                let vars = pipeline.variables.clone();
+                let ctx = context.clone();
+                let defs = pipeline.defaults.clone();
+                let fmt = output_format;
+                let dry = dry_run;
+                let sem = semaphore.clone();
+                let step_ignore = step.ignore_failure;
+                let step_name = step.name.clone();
+
+                join_set.spawn(async move {
+                    let _permit = if let Some(ref s) = sem {
+                        Some(s.acquire().await.expect("semaphore closed"))
+                    } else {
+                        None
+                    };
+                    let outcome = execute_step(step, vars, ctx, defs, fmt, dry).await?;
+                    Ok((step_name, step_ignore, outcome))
+                });
+            }
+
+            while let Some(result) = join_set.join_next().await {
+                match result {
+                    Ok(Ok((step_name, step_ignore, outcome))) => match outcome {
+                        StepOutcome::Success(_) => {
+                            if output_format.supports_colors() {
+                                println!("  {} {} Success", "✓".green().bold(), step_name);
+                            }
+                            passed += 1;
+                        }
+                        StepOutcome::Failed(code) => {
+                            if output_format.supports_colors() {
+                                println!(
+                                    "  {} {} Failed (exit code: {})",
+                                    "✗".red().bold(),
+                                    step_name,
+                                    code
+                                );
+                            }
+                            failed += 1;
+                            if !step_ignore && !global_ignore_failure {
+                                join_set.abort_all();
+                                anyhow::bail!(
+                                    "Pipeline aborted at step '{}' (exit code: {})",
+                                    step_name,
+                                    code
+                                );
+                            }
+                        }
+                        StepOutcome::Skipped => {
+                            if output_format.supports_colors() {
+                                println!(
+                                    "  {} {} Skipped (condition not met)",
+                                    "○".dimmed(),
+                                    step_name
+                                );
+                            }
+                            skipped += 1;
+                        }
+                    },
+                    Ok(Err(e)) => return Err(e),
+                    Err(e) => anyhow::bail!("Parallel step task panicked: {}", e),
+                }
             }
         }
     }
@@ -675,6 +1100,30 @@ async fn run_pipeline(
     }
 
     Ok(())
+}
+
+fn parse_var_assignment(s: &str) -> Result<(String, String), String> {
+    let parts: Vec<&str> = s.splitn(2, '=').collect();
+    if parts.len() != 2 {
+        return Err(format!(
+            "Invalid variable assignment '{}'. Expected KEY=VALUE",
+            s
+        ));
+    }
+    let key = parts[0].trim();
+    if key.is_empty() {
+        return Err("Variable key cannot be empty".to_string());
+    }
+    Ok((key.to_string(), parts[1].to_string()))
+}
+
+fn apply_variable_overrides(
+    base: &mut HashMap<String, String>,
+    overrides: &[(String, String)],
+) {
+    for (key, value) in overrides {
+        base.insert(key.clone(), value.clone());
+    }
 }
 
 fn execute_raps_command(command: &str) -> Result<i32> {
@@ -728,16 +1177,17 @@ fn eval_expression(expr: &str, context: &StepContext) -> Result<bool> {
 }
 
 fn eval_comparison(expr: &str, context: &StepContext) -> Result<bool> {
+    // Support: <left> || <right>
+    // Parse OR first so AND has higher precedence.
+    if let Some((left, right)) = expr.split_once("||") {
+        return Ok(
+            eval_comparison(left.trim(), context)? || eval_comparison(right.trim(), context)?
+        );
+    }
     // Support: <left> && <right>
     if let Some((left, right)) = expr.split_once("&&") {
         return Ok(
             eval_comparison(left.trim(), context)? && eval_comparison(right.trim(), context)?
-        );
-    }
-    // Support: <left> || <right>
-    if let Some((left, right)) = expr.split_once("||") {
-        return Ok(
-            eval_comparison(left.trim(), context)? || eval_comparison(right.trim(), context)?
         );
     }
 
@@ -887,6 +1337,15 @@ async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Resul
 
     validate_steps(&pipeline.steps, &mut errors, &mut warnings, "");
 
+    // Resolve dependency order; capture any dep errors as validation errors
+    let execution_order: Option<Vec<usize>> = match topological_sort(&pipeline.steps) {
+        Ok(order) => Some(order),
+        Err(e) => {
+            errors.push(e.to_string());
+            None
+        }
+    };
+
     let result = ValidationResult {
         valid: errors.is_empty(),
         name: pipeline.name.clone(),
@@ -904,6 +1363,13 @@ async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Resul
                     pipeline.name
                 );
                 println!("  {} {} steps", "Steps:".bold(), result.steps_count);
+                if let Some(ref order) = execution_order {
+                    let order_names: Vec<&str> = order
+                        .iter()
+                        .map(|&i| pipeline.steps[i].name.as_str())
+                        .collect();
+                    println!("  {} {}", "Execution order:".bold(), order_names.join(" → "));
+                }
             } else {
                 if !errors.is_empty() {
                     println!("{} Pipeline has errors:", "✗".red().bold());
@@ -1394,6 +1860,265 @@ steps:
         let retry = roundtrip.steps[0].retry.as_ref().unwrap();
         assert_eq!(retry.max_attempts, 2);
         assert_eq!(retry.delay, "3s");
+    }
+
+    // ==================== Variable Substitution Tests ====================
+
+    #[test]
+    fn test_substitute_variables_basic() {
+        let mut vars = HashMap::new();
+        vars.insert("BUCKET".to_string(), "my-bucket".to_string());
+        let result = substitute_variables("bucket info ${BUCKET}", &vars).unwrap();
+        assert_eq!(result, "bucket info my-bucket");
+    }
+
+    #[test]
+    fn test_substitute_variables_multiple() {
+        let mut vars = HashMap::new();
+        vars.insert("BUCKET".to_string(), "my-bucket".to_string());
+        vars.insert("FILE".to_string(), "model.rvt".to_string());
+        let result =
+            substitute_variables("object upload ${BUCKET} ${FILE}", &vars).unwrap();
+        assert_eq!(result, "object upload my-bucket model.rvt");
+    }
+
+    #[test]
+    fn test_substitute_variables_no_vars() {
+        let vars = HashMap::new();
+        let result = substitute_variables("auth test", &vars).unwrap();
+        assert_eq!(result, "auth test");
+    }
+
+    #[test]
+    fn test_substitute_variables_shell_metachar_rejected() {
+        let mut vars = HashMap::new();
+        vars.insert("BAD".to_string(), "value; rm -rf /".to_string());
+        let result = substitute_variables("echo ${BAD}", &vars);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("metacharacters")
+        );
+    }
+
+    #[test]
+    fn test_substitute_variables_pipe_rejected() {
+        let mut vars = HashMap::new();
+        vars.insert("CMD".to_string(), "ls | cat".to_string());
+        assert!(substitute_variables("${CMD}", &vars).is_err());
+    }
+
+    #[test]
+    fn test_substitute_variables_dollar_sign_in_value() {
+        let mut vars = HashMap::new();
+        vars.insert("VAR".to_string(), "has$dollar".to_string());
+        assert!(substitute_variables("${VAR}", &vars).is_err());
+    }
+
+    // ==================== Validate Steps Tests ====================
+
+    #[test]
+    fn test_validate_steps_valid_command() {
+        let steps = vec![Step {
+            name: "Valid".to_string(),
+            command: Some("bucket list".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.is_empty());
+    }
+
+    #[test]
+    fn test_validate_steps_no_action() {
+        let steps = vec![Step {
+            name: "Empty".to_string(),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert_eq!(errors.len(), 1);
+        assert!(errors[0].contains("must have at least one of"));
+    }
+
+    #[test]
+    fn test_validate_steps_for_each_without_command_or_steps() {
+        let steps = vec![Step {
+            name: "Bad ForEach".to_string(),
+            for_each: Some(ForEachConfig {
+                var: "x".to_string(),
+                items: vec!["a".to_string()],
+                parallel: false,
+                max_concurrency: None,
+            }),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("no command or steps")));
+    }
+
+    #[test]
+    fn test_validate_steps_if_and_unless_warning() {
+        let steps = vec![Step {
+            name: "Both Conditions".to_string(),
+            command: Some("auth test".to_string()),
+            if_expr: Some("true".to_string()),
+            unless: Some("false".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.is_empty());
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("both 'if' and 'unless'"));
+    }
+
+    #[test]
+    fn test_validate_steps_invalid_retry() {
+        let steps = vec![Step {
+            name: "Bad Retry".to_string(),
+            command: Some("auth test".to_string()),
+            retry: Some(RetryConfig {
+                max_attempts: 0,
+                backoff: BackoffStrategy::Fixed,
+                delay: "5s".to_string(),
+                on: vec![],
+            }),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("max_attempts must be >= 1")));
+    }
+
+    #[test]
+    fn test_validate_steps_invalid_timeout() {
+        let steps = vec![Step {
+            name: "Bad Timeout".to_string(),
+            command: Some("auth test".to_string()),
+            timeout: Some("not-a-duration".to_string()),
+            ..Step::default()
+        }];
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+        validate_steps(&steps, &mut errors, &mut warnings, "");
+        assert!(errors.iter().any(|e| e.contains("not a valid duration")));
+    }
+
+    // ==================== Expression Evaluation Tests ====================
+
+    #[test]
+    fn test_eval_expr_and() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 0 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_and_false() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 1 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(!eval_expression(
+            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_or() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 1 });
+        ctx.insert("b".to_string(), StepResult { exit_code: 0 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_eval_expr_negation() {
+        let mut ctx = HashMap::new();
+        ctx.insert("step1".to_string(), StepResult { exit_code: 1 });
+        let ctx = Arc::new(Mutex::new(ctx));
+        assert!(eval_expression(
+            "${{ !steps.step1.exit_code == 0 }}",
+            &ctx
+        ).unwrap());
+    }
+
+    #[test]
+    fn test_parse_duration_edge_cases() {
+        assert_eq!(parse_duration("0s").unwrap(), std::time::Duration::from_secs(0));
+        assert_eq!(parse_duration("1s").unwrap(), std::time::Duration::from_secs(1));
+        assert_eq!(parse_duration("1m").unwrap(), std::time::Duration::from_secs(60));
+        assert_eq!(parse_duration("1h").unwrap(), std::time::Duration::from_secs(3600));
+        assert!(parse_duration("5d").is_err());
+        assert!(parse_duration("  ").is_err());
+    }
+
+    #[test]
+    fn test_eval_expr_operator_precedence_and_over_or() {
+        let mut ctx = HashMap::new();
+        ctx.insert("a".to_string(), StepResult { exit_code: 0 }); // true
+        ctx.insert("b".to_string(), StepResult { exit_code: 1 }); // false
+        ctx.insert("c".to_string(), StepResult { exit_code: 1 }); // false
+        let ctx = Arc::new(Mutex::new(ctx));
+
+        // Should evaluate as: true || (false && false) == true
+        assert!(eval_expression(
+            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 && steps.c.exit_code == 0 }}",
+            &ctx
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn test_parse_var_assignment_valid() {
+        let parsed = parse_var_assignment("BUCKET=my-bucket").unwrap();
+        assert_eq!(parsed, ("BUCKET".to_string(), "my-bucket".to_string()));
+    }
+
+    #[test]
+    fn test_parse_var_assignment_value_with_equals() {
+        let parsed = parse_var_assignment("TOKEN=abc=def").unwrap();
+        assert_eq!(parsed, ("TOKEN".to_string(), "abc=def".to_string()));
+    }
+
+    #[test]
+    fn test_parse_var_assignment_invalid() {
+        assert!(parse_var_assignment("missing_equals").is_err());
+        assert!(parse_var_assignment("=value").is_err());
+    }
+
+    #[test]
+    fn test_apply_variable_overrides_cli_wins() {
+        let mut vars = HashMap::from([
+            ("BUCKET".to_string(), "from-file".to_string()),
+            ("REGION".to_string(), "US".to_string()),
+        ]);
+        let overrides = vec![
+            ("BUCKET".to_string(), "from-cli".to_string()),
+            ("MODEL".to_string(), "test.rvt".to_string()),
+        ];
+
+        apply_variable_overrides(&mut vars, &overrides);
+
+        assert_eq!(vars.get("BUCKET"), Some(&"from-cli".to_string()));
+        assert_eq!(vars.get("REGION"), Some(&"US".to_string()));
+        assert_eq!(vars.get("MODEL"), Some(&"test.rvt".to_string()));
     }
 }
 

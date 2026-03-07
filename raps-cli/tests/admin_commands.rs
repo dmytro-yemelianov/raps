@@ -82,6 +82,34 @@ fn test_admin_company_list_help() {
         .stdout(predicate::str::contains("--account"));
 }
 
+// ==================== add-to-all-projects Tests ====================
+
+#[test]
+fn test_admin_user_add_to_all_projects_help_has_role_flag() {
+    raps()
+        .args(["admin", "user", "add-to-all-projects", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--role"));
+}
+
+#[test]
+fn test_admin_user_add_to_all_projects_help_has_dry_run_flag() {
+    raps()
+        .args(["admin", "user", "add-to-all-projects", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--dry-run"));
+}
+
+#[test]
+fn test_admin_user_add_to_all_projects_missing_email() {
+    raps()
+        .args(["admin", "user", "add-to-all-projects"])
+        .assert()
+        .failure();
+}
+
 // ==================== Missing Args Tests ====================
 
 #[test]

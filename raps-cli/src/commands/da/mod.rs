@@ -10,6 +10,11 @@ mod appbundles;
 mod engines;
 mod workitems;
 
+pub(crate) use activities::CreateActivityOutput;
+pub(crate) use appbundles::AppbundleUploadOutput;
+pub(crate) use engines::EngineOutput;
+pub(crate) use workitems::WorkitemOutput;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 

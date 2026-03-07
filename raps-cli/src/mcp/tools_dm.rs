@@ -263,7 +263,7 @@ impl RapsServer {
                     let role = user
                         .role_name
                         .as_deref()
-                        .unwrap_or(user.role_id.as_deref().unwrap_or("-"));
+                        .unwrap_or(user.role_ids.first().map(String::as_str).unwrap_or("-"));
 
                     output.push_str(&format!(
                         "{}. {} ({})\n   * Role: {}\n\n",
@@ -437,7 +437,7 @@ impl RapsServer {
 
         let request = AddProjectUserRequest {
             email: email.clone(),
-            role_id,
+            role_ids: role_id.map(|s| vec![s]).unwrap_or_default(),
             products: vec![],
         };
 
@@ -447,7 +447,7 @@ impl RapsServer {
                 email,
                 user.name.unwrap_or_else(|| "-".to_string()),
                 user.role_name
-                    .unwrap_or_else(|| user.role_id.unwrap_or_else(|| "-".to_string()))
+                    .unwrap_or_else(|| user.role_ids.into_iter().next().unwrap_or_else(|| "-".to_string()))
             ),
             Err(e) => format!("Failed to add user to project: {}", e),
         }
@@ -467,10 +467,9 @@ impl RapsServer {
             .into_iter()
             .filter_map(|v| {
                 let email = v.get("email")?.as_str()?.to_string();
-                let role_id = v.get("role_id").and_then(|r| r.as_str()).map(String::from);
                 Some(ImportUserRequest {
                     email,
-                    role_id,
+                    role_ids: v.get("role_id").and_then(|r| r.as_str()).map(|s| vec![s.to_string()]).unwrap_or_default(),
                     products: None,
                 })
             })
@@ -585,7 +584,7 @@ impl RapsServer {
         }
 
         let request = UpdateProjectUserRequest {
-            role_id,
+            role_ids: role_id.map(|s| vec![s]).unwrap_or_default(),
             products: None,
         };
 
@@ -595,7 +594,7 @@ impl RapsServer {
                 user.id,
                 user.name.unwrap_or_else(|| "-".to_string()),
                 user.role_name
-                    .unwrap_or_else(|| user.role_id.unwrap_or_else(|| "-".to_string()))
+                    .unwrap_or_else(|| user.role_ids.into_iter().next().unwrap_or_else(|| "-".to_string()))
             ),
             Err(e) => format!("Failed to update user in project: {}", e),
         }

@@ -1,0 +1,26 @@
+---
+source: raps-da/src/types.rs
+assertion_line: 514
+expression: value
+---
+{
+  "description": "Deletes all walls from a Revit model",
+  "engine": "Autodesk.Revit+2024",
+  "id": "myapp.DeleteWallsBundle+prod",
+  "package": "https://developer.api.autodesk.com/da/us-east/v3/appbundles/myapp.DeleteWallsBundle+prod",
+  "uploadParameters": {
+    "endpointUrl": "https://dasprod-store.s3.amazonaws.com",
+    "formData": {
+      "content-type": "application/octet-stream",
+      "key": "apps/myapp/DeleteWallsBundle/3/bundle.zip",
+      "policy": "eyJjb25kaXRpb25zIjpbXX0=",
+      "success_action_redirect": "",
+      "success_action_status": "200",
+      "x-amz-algorithm": "AWS4-HMAC-SHA256",
+      "x-amz-credential": "AKIAIOSFODNN7EXAMPLE/20240115/us-east-1/s3/aws4_request",
+      "x-amz-date": "20240115T000000Z",
+      "x-amz-signature": "a1b2c3d4e5f6"
+    }
+  },
+  "version": 3
+}

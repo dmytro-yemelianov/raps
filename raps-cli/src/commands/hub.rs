@@ -5,7 +5,7 @@
 //!
 //! Commands for listing and viewing hubs (requires 3-legged auth).
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Subcommand;
 use colored::Colorize;
 use serde::Serialize;
@@ -13,7 +13,7 @@ use serde::Serialize;
 use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
 use raps_dm::DataManagementClient;
-// use raps_kernel::output::OutputFormat;
+use raps_kernel::security::validate_resource_id;
 
 #[derive(Debug, Subcommand)]
 pub enum HubCommands {
@@ -41,7 +41,7 @@ impl HubCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct HubListOutput {
+pub struct HubListOutput {
     id: String,
     name: String,
     hub_type: String,
@@ -75,6 +75,13 @@ async fn list_hubs(client: &DataManagementClient, output_format: OutputFormat) -
             }
         })
         .collect();
+
+    // Print context banner in table/interactive mode only
+    if matches!(output_format, crate::output::OutputFormat::Table) {
+        let banner = crate::context_banner::ContextBanner::from_hubs(&hubs);
+        banner.print_inline();
+        eprintln!();
+    }
 
     if hub_outputs.is_empty() {
         match output_format {
@@ -134,6 +141,9 @@ async fn hub_info(
     hub_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
+    validate_resource_id(hub_id)
+        .with_context(|| format!("Invalid hub ID: {:?}", hub_id))?;
+
     let hub = tracked_op("Fetching hub details", output_format, || {
         client.get_hub(hub_id)
     })
@@ -199,5 +209,40 @@ fn extract_hub_type(ext_type: &str) -> String {
             .next_back()
             .unwrap_or("Unknown")
             .to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_hub_type_bim360() {
+        assert_eq!(extract_hub_type("hubs:autodesk.bim360:Account"), "BIM 360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_acc() {
+        assert_eq!(extract_hub_type("hubs:autodesk.accproject:Account"), "ACC");
+    }
+
+    #[test]
+    fn test_extract_hub_type_a360() {
+        assert_eq!(extract_hub_type("hubs:autodesk.a360:Personal"), "A360");
+    }
+
+    #[test]
+    fn test_extract_hub_type_fusion() {
+        assert_eq!(extract_hub_type("hubs:autodesk.fusion:Team"), "Fusion");
+    }
+
+    #[test]
+    fn test_extract_hub_type_unknown_uses_last_segment() {
+        assert_eq!(extract_hub_type("hubs:custom:MyType"), "MyType");
+    }
+
+    #[test]
+    fn test_extract_hub_type_no_colon() {
+        assert_eq!(extract_hub_type("something"), "something");
     }
 }

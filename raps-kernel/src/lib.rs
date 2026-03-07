@@ -20,6 +20,7 @@ pub mod cache_backend;
 pub mod checkpoint;
 pub mod circuit_breaker;
 pub mod config;
+pub mod endpoint_stats;
 pub mod error;
 pub mod http;
 pub mod interactive;
@@ -32,6 +33,7 @@ pub mod profiler;
 pub mod progress;
 pub mod prompts;
 pub mod rate_budget;
+pub mod rate_limit;
 #[cfg(feature = "redis")]
 pub mod redis_backend;
 pub mod region;
@@ -55,7 +57,7 @@ pub mod test_utils;
 
 // Re-export commonly used types
 pub use auth::AuthClient;
-pub use config::{Config, ContextConfig};
+pub use config::{Config, ContextConfig, RapsProject, find_project_profile};
 pub use error::ExitCode;
 pub use http::HttpClientConfig;
 pub use output::OutputFormat;

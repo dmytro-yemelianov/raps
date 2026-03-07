@@ -4,13 +4,38 @@
 //! Account Admin project operations
 
 use anyhow::{Context, Result};
+use serde::Deserialize;
 
+use raps_kernel::error::RapsError;
 use raps_kernel::http;
 
 use crate::types::{AccountProject, PaginatedResponse, ProjectClassification};
 
 use super::types::{CreateProjectRequest, UpdateProjectRequest};
 use super::{AccountAdminClient, normalize_account_id};
+
+/// BIM 360 HQ v2 project response (snake_case fields, plain array response)
+#[derive(Debug, Deserialize)]
+struct Bim360Project {
+    id: String,
+    name: String,
+    #[serde(default)]
+    status: Option<String>,
+    #[serde(default)]
+    account_id: Option<String>,
+}
+
+impl From<Bim360Project> for AccountProject {
+    fn from(p: Bim360Project) -> Self {
+        AccountProject {
+            id: p.id,
+            name: p.name,
+            status: p.status,
+            account_id: p.account_id,
+            ..Default::default()
+        }
+    }
+}
 
 impl AccountAdminClient {
     /// List all projects in an account (paginated)
@@ -48,9 +73,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let projects_response: PaginatedResponse<AccountProject> = response
@@ -79,9 +102,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response
@@ -92,26 +113,98 @@ impl AccountAdminClient {
         Ok(project)
     }
 
-    /// Fetch all projects in an account (handles pagination automatically)
+    /// Fetch all projects in an account (handles pagination automatically).
     ///
-    /// This is a convenience method that iterates through all pages.
+    /// Tries the ACC Construction Admin v1 endpoint first. If the account is a
+    /// BIM 360 Business hub (returns HTTP 400 from the ACC endpoint), falls back
+    /// to the BIM 360 HQ v2 endpoint.
     pub async fn list_all_projects(&self, account_id: &str) -> Result<Vec<AccountProject>> {
         let mut all_projects = Vec::new();
         let mut offset = 0;
-        let limit = 200; // Maximum allowed
+        let limit = 200;
+
+        // Try ACC v1 first page; on 400 fall back to BIM 360 HQ v2.
+        let first = self.list_projects(account_id, Some(limit), Some(offset)).await;
+        match first {
+            Ok(response) => {
+                let has_more = response.has_more();
+                let next_offset = response.next_offset();
+                all_projects.extend(response.results);
+                offset = next_offset;
+                if has_more {
+                    loop {
+                        let response = self
+                            .list_projects(account_id, Some(limit), Some(offset))
+                            .await?;
+                        let has_more = response.has_more();
+                        let next_offset = response.next_offset();
+                        all_projects.extend(response.results);
+                        if !has_more {
+                            break;
+                        }
+                        offset = next_offset;
+                    }
+                }
+            }
+            Err(e) if e.to_string().contains("400") || e.to_string().contains("404") => {
+                // BIM 360 Business hub — ACC v1 endpoint not supported
+                all_projects = self.list_all_projects_bim360(account_id).await?;
+            }
+            Err(e) => return Err(e),
+        }
+
+        Ok(all_projects)
+    }
+
+    /// Fetch all projects via BIM 360 HQ v2 API (for Business hubs).
+    ///
+    /// BIM 360 v2 returns a plain JSON array (not a paginated wrapper) with
+    /// `limit`/`offset` query params and an `X-Total-Count` response header.
+    async fn list_all_projects_bim360(&self, account_id: &str) -> Result<Vec<AccountProject>> {
+        let token = self.auth.get_3leg_token().await?;
+        let account_id = normalize_account_id(account_id);
+
+        let limit = 100usize;
+        let mut offset = 0usize;
+        let mut all_projects: Vec<AccountProject> = Vec::new();
 
         loop {
-            let response = self
-                .list_projects(account_id, Some(limit), Some(offset))
-                .await?;
-            let has_more = response.has_more();
-            let next_offset = response.next_offset();
-            all_projects.extend(response.results);
+            let url = format!(
+                "{}/projects?limit={}&offset={}",
+                self.hq_v2_url(&account_id),
+                limit,
+                offset
+            );
 
-            if !has_more {
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
+
+            if !response.status().is_success() {
+                return Err(RapsError::from_response(response).await.into());
+            }
+
+            // Extract total count from header before consuming the response body
+            let total: usize = response
+                .headers()
+                .get("X-Total-Count")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+
+            let page: Vec<Bim360Project> = response
+                .json()
+                .await
+                .context("Failed to parse BIM 360 projects response")?;
+
+            let page_len = page.len();
+            all_projects.extend(page.into_iter().map(AccountProject::from));
+
+            if page_len < limit || (total > 0 && all_projects.len() >= total) {
                 break;
             }
-            offset = next_offset;
+            offset += limit;
         }
 
         Ok(all_projects)
@@ -162,9 +255,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list projects ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let projects_response: PaginatedResponse<AccountProject> = response
@@ -203,9 +294,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response
@@ -244,9 +333,7 @@ impl AccountAdminClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let project: AccountProject = response

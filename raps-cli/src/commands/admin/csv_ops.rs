@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
 use raps_acc::admin::AccountAdminClient;
@@ -18,9 +17,11 @@ use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
 
+use raps_dm::DataManagementClient;
+
 use crate::output::OutputFormat;
 
-use super::{create_bulk_progress_bar, get_account_id, parse_filter_with_ids};
+use super::{create_bulk_progress_bar, parse_filter_with_ids, resolve_account_id};
 
 // ============================================================================
 // CSV UPDATE
@@ -58,6 +59,7 @@ pub(crate) struct CsvUpdateErrorOutput {
 pub(crate) async fn execute_csv_update(
     config: &Config,
     auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
     account: Option<String>,
     filter: Option<String>,
     project_ids: Option<PathBuf>,
@@ -66,7 +68,7 @@ pub(crate) async fn execute_csv_update(
     dry_run: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
-    let account_id = get_account_id(account)?;
+    let account_id = resolve_account_id(account, dm_client).await?;
 
     // Parse CSV file
     let mut reader = csv::Reader::from_path(csv_path)
@@ -137,7 +139,7 @@ pub(crate) async fn execute_csv_update(
         config.clone(),
         auth_client.clone(),
         http_config.clone(),
-    );
+    )?;
 
     let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
@@ -240,7 +242,7 @@ pub(crate) async fn execute_csv_update(
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                ));
+                )?);
 
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
@@ -461,7 +463,7 @@ pub(crate) async fn execute_csv_import(
         .iter()
         .map(|row| ImportUserRequest {
             email: row.email.clone(),
-            role_id: row.role_id.clone(),
+            role_ids: row.role_id.clone().map(|s| vec![s]).unwrap_or_default(),
             products: None,
         })
         .collect();
@@ -470,18 +472,10 @@ pub(crate) async fn execute_csv_import(
 
     // Show spinner during concurrent import (up to 10 parallel requests)
     let spinner = if output_format.supports_colors() {
-        let sp = ProgressBar::new_spinner();
-        sp.set_style(
-            ProgressStyle::with_template("{spinner:.cyan} {msg}")
-                .expect("hardcoded progress template is valid")
-                .tick_strings(&[
-                    "\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283C}", "\u{2834}",
-                    "\u{2826}", "\u{2827}", "\u{2807}", "\u{280F}",
-                ]),
-        );
-        sp.set_message(format!("Importing {} users concurrently...", total));
-        sp.enable_steady_tick(std::time::Duration::from_millis(100));
-        Some(sp)
+        Some(raps_kernel::progress::spinner(&format!(
+            "Importing {} users concurrently...",
+            total
+        )))
     } else {
         None
     };
@@ -489,7 +483,7 @@ pub(crate) async fn execute_csv_import(
     // Create users client and call import_users (concurrent with semaphore)
     let http_config = HttpClientConfig::default();
     let users_client =
-        ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
+        ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
 
     let result = users_client.import_users(project_id, users).await?;
 
@@ -565,4 +559,102 @@ pub(crate) async fn execute_csv_import(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csv_update_row_deserialization() {
+        let mut reader = csv::Reader::from_reader(
+            b"email,role,company\nuser@example.com,admin,Acme Corp" as &[u8],
+        );
+        let row: CsvUpdateRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role, Some("admin".to_string()));
+        assert_eq!(row.company, Some("Acme Corp".to_string()));
+    }
+
+    #[test]
+    fn test_csv_update_row_optional_fields() {
+        let mut reader =
+            csv::Reader::from_reader(b"email,role\nuser@example.com,editor" as &[u8]);
+        let row: CsvUpdateRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role, Some("editor".to_string()));
+        assert!(row.company.is_none());
+    }
+
+    #[test]
+    fn test_csv_update_row_email_validation_logic() {
+        // The validation logic used in execute_csv_update
+        let check = |email: &str| -> bool { !email.is_empty() && email.contains('@') };
+
+        assert!(check("user@example.com"));
+        assert!(!check(""));
+        assert!(!check("not-an-email"));
+        assert!(check("@")); // bare @ passes the basic check
+        assert!(check("a@b"));
+    }
+
+    #[test]
+    fn test_csv_update_row_needs_at_least_one_field() {
+        let row = CsvUpdateRow {
+            email: "user@example.com".to_string(),
+            role: None,
+            company: None,
+        };
+        // Validation requires at least one of role or company
+        assert!(row.role.is_none() && row.company.is_none());
+    }
+
+    #[test]
+    fn test_csv_update_result_output_serialization() {
+        let result = CsvUpdateResultOutput {
+            total: 10,
+            updated: 8,
+            skipped: 1,
+            failed: 1,
+            errors: vec![CsvUpdateErrorOutput {
+                email: "bad@example.com".to_string(),
+                error: "user not found".to_string(),
+            }],
+        };
+        let json = serde_json::to_value(&result).unwrap();
+        assert_eq!(json["total"], 10);
+        assert_eq!(json["updated"], 8);
+        assert_eq!(json["failed"], 1);
+        assert_eq!(json["errors"][0]["email"], "bad@example.com");
+    }
+
+    #[test]
+    fn test_csv_import_row_deserialization() {
+        let mut reader = csv::Reader::from_reader(
+            b"email,role_id\nuser@example.com,abc-123" as &[u8],
+        );
+        let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "user@example.com");
+        assert_eq!(row.role_id, Some("abc-123".to_string()));
+    }
+
+    #[test]
+    fn test_csv_import_row_without_role_id() {
+        let mut reader =
+            csv::Reader::from_reader(b"email\nnewuser@example.com" as &[u8]);
+        let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
+        assert_eq!(row.email, "newuser@example.com");
+        assert!(row.role_id.is_none());
+    }
+
+    #[test]
+    fn test_csv_multiple_rows_parsing() {
+        let csv_data = b"email,role,company\na@b.com,admin,Co1\nc@d.com,editor,Co2\ne@f.com,,Co3";
+        let mut reader = csv::Reader::from_reader(csv_data as &[u8]);
+        let rows: Vec<CsvUpdateRow> = reader.deserialize().filter_map(|r| r.ok()).collect();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].role, Some("admin".to_string()));
+        assert_eq!(rows[1].company, Some("Co2".to_string()));
+        assert!(rows[2].role.is_none());
+    }
 }

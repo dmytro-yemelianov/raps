@@ -1,20 +1,21 @@
 # RAPS Manifest — Single Source of Truth
 
-Last updated: 2026-02-25
+Last updated: 2026-03-05
 
 ## Version
-- **Current version:** 4.14.0
+- **Current version:** 5.1.0
 - **Rust edition:** 2024
 - **Minimum Rust version:** 1.88+
 - **License:** Apache-2.0
 
 ## Counts
-- **Top-level commands:** 55
-- **Total operations (incl. subcommands):** 95+
-- **MCP tools:** 101
+- **Top-level command families:** 27
+- **Total operations (incl. subcommands):** 100+
+- **MCP tools:** 111
 - **Workspace crates:** 10
+- **APS service crates:** 8
 - **APS APIs covered:** 15+
-- **Usage modes:** 7 (CLI, Interactive Shell, TUI Dashboard, Python Bindings, GitHub Actions, Docker, MCP Server)
+- **Usage modes:** 8 (CLI, Interactive Shell, TUI Dashboard, Python Bindings, GitHub Actions, GitLab CI, Docker, MCP Server)
 - **TUI Dashboard:** 7 tabs, 33 views
 - **Shell scripts (use-cases):** 25 across 7 personas
 
@@ -30,11 +31,15 @@ Last updated: 2026-02-25
 9. raps-admin — Account Admin (bulk user ops, folder permissions)
 10. raps-cli — CLI binary, MCP server, TUI dashboard
 
-## Command Groups (21 top-level)
-auth, bucket, object, translate, hub, project, folder, item, issue, acc, admin, rfi, report, template, webhook, da, reality, pipeline, config, api, generate
+## Command Surface
+- Top-level command families are defined in `raps-cli/src/main.rs`.
+- Total operations exceed 100 when subcommands are included.
+- Use `raps --help` and `raps <command> --help` for the live command surface.
 
-## Key Features (v4.12–4.14)
-- 101 MCP tools via `raps serve`
+## Key Features (v5.0–v5.1)
+- 111 MCP tools via `raps mcp`
+- Device code auth flow for headless environments (`raps auth login`)
+- Distributed orchestration: Redis-backed queue/cache, serverless dispatch, webhook gateway
 - TUI Dashboard (7 tabs, 33 views, opt-in `--features dashboard`)
 - Interactive Shell (reedline, TAB completion, syntax highlighting)
 - AEC GraphQL integration (faster hub/project queries, REST fallback)

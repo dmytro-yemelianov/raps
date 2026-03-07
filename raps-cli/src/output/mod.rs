@@ -16,6 +16,7 @@ pub enum OutputFormat {
     Yaml,
     Csv,
     Plain,
+    Ndjson,
 }
 
 impl Display for OutputFormat {
@@ -26,6 +27,7 @@ impl Display for OutputFormat {
             OutputFormat::Yaml => write!(f, "yaml"),
             OutputFormat::Csv => write!(f, "csv"),
             OutputFormat::Plain => write!(f, "plain"),
+            OutputFormat::Ndjson => write!(f, "ndjson"),
         }
     }
 }
@@ -40,6 +42,7 @@ impl FromStr for OutputFormat {
             "yaml" => Ok(OutputFormat::Yaml),
             "csv" => Ok(OutputFormat::Csv),
             "plain" => Ok(OutputFormat::Plain),
+            "ndjson" => Ok(OutputFormat::Ndjson),
             _ => Err(format!("Invalid format: {}", s)),
         }
     }
@@ -77,7 +80,7 @@ impl OutputFormat {
 
     pub fn write_message(&self, message: &str) -> Result<()> {
         match self {
-            OutputFormat::Table | OutputFormat::Plain => {
+            OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson => {
                 println!("{}", message);
                 Ok(())
             }

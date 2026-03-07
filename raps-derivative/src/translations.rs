@@ -4,6 +4,7 @@
 //! Translation operations for the Model Derivative API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 use std::path::Path;
 
 use crate::DerivativeClient;
@@ -65,9 +66,7 @@ impl DerivativeClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&job_url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to start translation ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let translation_response: TranslationResponse = response
@@ -92,10 +91,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&manifest_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get manifest ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let manifest: Manifest = response
@@ -121,10 +120,10 @@ impl DerivativeClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&manifest_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete manifest ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())

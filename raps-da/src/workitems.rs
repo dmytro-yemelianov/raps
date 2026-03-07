@@ -4,6 +4,7 @@
 //! WorkItem operations for the Design Automation API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 
 use raps_kernel::http;
 
@@ -34,10 +35,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create workitem ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let workitem: WorkItem = response
@@ -68,10 +69,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list workitems ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let paginated: PaginatedResponse<WorkItem> = response
@@ -92,10 +93,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get workitem status ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let workitem: WorkItem = response

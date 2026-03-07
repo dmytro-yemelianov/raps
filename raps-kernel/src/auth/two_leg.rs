@@ -91,4 +91,20 @@ impl AuthClient {
         let mut cache = self.cached_2leg_token.write().await;
         *cache = None;
     }
+
+    /// Force-refresh the 2-legged token, bypassing the cache.
+    ///
+    /// Used by `send_with_retry_auth` when a 401 is received to obtain a fresh token
+    /// before retrying the request.
+    pub async fn force_refresh_token(&self) -> Result<String> {
+        // Invalidate cache so get_token fetches a fresh one.
+        self.clear_cache().await;
+        self.get_token().await
+    }
+
+    /// Return the expiry timestamp of the cached 2-legged token, if any.
+    pub async fn get_2leg_token_expiry(&self) -> Option<std::time::Instant> {
+        let cache = self.cached_2leg_token.read().await;
+        cache.as_ref().map(|t| t.expires_at)
+    }
 }

@@ -80,21 +80,21 @@ tests:
           path: data.RAPS_REDIS_URL
           value: "redis://external-host:6380"
 
-  - it: should render default image without registry
+  - it: should render default image with GHCR registry
     template: templates/proxy-deployment.yaml
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "rapscli/raps-proxy:5.2.0"
+          value: "ghcr.io/dmytro-yemelianov/raps-proxy:5.2.0"
 
-  - it: should render image with custom registry
+  - it: should render image with custom registry override
     template: templates/proxy-deployment.yaml
     set:
-      global.image.registry: ghcr.io
+      global.image.registry: custom.registry.io/myorg
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "ghcr.io/rapscli/raps-proxy:5.2.0"
+          value: "custom.registry.io/myorg/raps-proxy:5.2.0"
 
   - it: should use namespace override
     template: templates/configmap.yaml

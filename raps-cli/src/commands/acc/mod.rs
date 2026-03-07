@@ -9,6 +9,10 @@ mod assets;
 mod checklists;
 mod submittals;
 
+pub use assets::AssetOutput;
+pub use checklists::ChecklistOutput;
+pub use submittals::SubmittalOutput;
+
 use anyhow::Result;
 use clap::Subcommand;
 use std::path::PathBuf;

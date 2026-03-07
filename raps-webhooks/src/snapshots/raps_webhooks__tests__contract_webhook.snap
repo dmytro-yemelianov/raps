@@ -1,0 +1,46 @@
+---
+source: raps-webhooks/src/lib.rs
+assertion_line: 527
+expression: response
+---
+Webhook {
+    hook_id: "b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+    tenant: Some(
+        "VGVzdFRlbmFudA",
+    ),
+    callback_url: "https://myapp.example.com/webhooks/aps",
+    created_by: Some(
+        "N2FGNUJ3cHFianRmOHpuM2RiNEt6ZW8wNjVFbjJOQWU",
+    ),
+    event: "dm.version.added",
+    created_date: Some(
+        "2024-06-15T09:30:00.000+0000",
+    ),
+    last_updated_date: Some(
+        "2024-08-20T14:15:30.000+0000",
+    ),
+    system: "data",
+    creator_type: Some(
+        "Application",
+    ),
+    status: "active",
+    scope: Some(
+        WebhookScope {
+            folder: Some(
+                "urn:adsk.wipprod:fs.folder:co.YWJjZGVmZy0xMjM0LTU2Nzg",
+            ),
+            workflow: None,
+        },
+    ),
+    hook_attribute: Some(
+        Object {
+            "projectId": String("b.1234-5678-abcd"),
+        },
+    ),
+    urn: Some(
+        "urn:adsk.webhooks:events.hook:b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+    ),
+    auto_reactivate_hook: Some(
+        true,
+    ),
+}

@@ -10,6 +10,13 @@ use serde::Serialize;
 use crate::output::OutputFormat;
 use raps_da::DesignAutomationClient;
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct EngineOutput {
+    pub id: String,
+    pub description: Option<String>,
+    pub product_version: Option<String>,
+}
+
 pub(super) async fn list_engines(
     client: &DesignAutomationClient,
     output_format: OutputFormat,
@@ -19,13 +26,6 @@ pub(super) async fn list_engines(
     }
 
     let engines = client.list_engines().await?;
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct EngineOutput {
-        id: String,
-        description: Option<String>,
-        product_version: Option<String>,
-    }
 
     let engine_outputs: Vec<EngineOutput> = engines
         .iter()

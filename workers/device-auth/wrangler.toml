@@ -1,0 +1,20 @@
+name = "raps-device-auth"
+main = "src/index.js"
+compatibility_date = "2025-12-01"
+
+routes = [
+  { pattern = "rapscli.xyz/device*", zone_name = "rapscli.xyz" }
+]
+
+# Durable Object binding for device auth sessions
+[durable_objects]
+bindings = [
+  { name = "DEVICE_SESSION", class_name = "DeviceSession" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeviceSession"]
+
+# Secrets (set via `wrangler secret put`):
+#   RAPS_DEVICE_API_SECRET — Bearer token for session creation (optional)

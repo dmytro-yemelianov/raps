@@ -1,21 +1,46 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
-//! Manual PKCE OAuth flow for headless environments
+//! Device code OAuth flow for headless environments
 //!
-//! Instead of the device code grant (which APS doesn't support), this module
-//! implements a manual authorization code flow with PKCE (S256). The user is
-//! shown an authorize URL, opens it on any device, and pastes the resulting
-//! callback URL (or bare authorization code) back into the terminal.
+//! Uses a proxy at `RAPS_DEVICE_PROXY_URL` (default: https://rapscli.xyz) to
+//! provide a GitHub-style "go to URL, enter short code" experience. PKCE
+//! security is preserved end-to-end — the proxy never sees the code_verifier
+//! or client_secret.
 
 use anyhow::{Context, Result};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use colored::Colorize;
+use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use super::AuthClient;
-use super::types::TokenResponse;
 use crate::types::StoredToken;
+
+/// Default proxy URL for device code auth
+const DEFAULT_PROXY_URL: &str = "https://rapscli.xyz";
+
+/// Polling interval in seconds
+const POLL_INTERVAL_SECS: u64 = 5;
+
+/// Maximum polling duration in seconds
+const MAX_POLL_DURATION_SECS: u64 = 300;
+
+/// Response from `POST /device/authorize`
+#[derive(Debug, Deserialize)]
+struct DeviceAuthResponse {
+    session_id: String,
+    user_code: String,
+    #[allow(dead_code)]
+    expires_in: u64,
+}
+
+/// Response from `GET /device/token`
+#[derive(Debug, Deserialize)]
+struct DevicePollResponse {
+    state: String,
+    auth_code: Option<String>,
+}
 
 /// Generate a cryptographically random PKCE code verifier.
 ///
@@ -39,117 +64,102 @@ fn derive_code_challenge(verifier: &str) -> String {
     URL_SAFE_NO_PAD.encode(hash)
 }
 
+/// Get the device proxy base URL from environment or default.
+fn proxy_base_url() -> String {
+    std::env::var("RAPS_DEVICE_PROXY_URL")
+        .unwrap_or_else(|_| DEFAULT_PROXY_URL.to_string())
+        .trim_end_matches('/')
+        .to_string()
+}
+
 impl AuthClient {
-    /// Login with 3-legged OAuth using manual PKCE flow (headless-friendly).
+    /// Login with 3-legged OAuth using device code flow (headless-friendly).
     ///
-    /// 1. Generates a PKCE code verifier / challenge pair.
-    /// 2. Prints an authorization URL for the user to open in any browser.
-    /// 3. Prompts the user to paste back the callback URL (or bare code).
-    /// 4. Exchanges the authorization code + verifier for tokens.
+    /// 1. Generates a PKCE code verifier / challenge pair locally.
+    /// 2. Initiates a device session via the proxy.
+    /// 3. Displays a short user code for the user to enter at the proxy URL.
+    /// 4. Polls the proxy until the user authorizes.
+    /// 5. Exchanges the authorization code via PKCE against APS.
     pub async fn login_device(&self, scopes: &[&str]) -> Result<StoredToken> {
         self.config.require_credentials()?;
 
-        if crate::interactive::is_non_interactive() {
-            anyhow::bail!(
-                "3-legged OAuth (device/PKCE) requires interactive mode.\n\
-                 Use 2-legged auth (raps auth login) for CI/CD, or pass \
-                 credentials via APS_CLIENT_ID and APS_CLIENT_SECRET environment variables."
-            );
-        }
+        // Note: no interactive check here — device code flow is designed for
+        // headless/non-interactive environments. It only prints a code and polls;
+        // no stdin input is required.
+
+        let proxy_base = proxy_base_url();
 
         // --- PKCE ---
         let code_verifier = generate_code_verifier();
         let code_challenge = derive_code_challenge(&code_verifier);
 
-        // --- CSRF state ---
-        let state = uuid::Uuid::new_v4().to_string();
-
-        // --- Build authorize URL ---
+        // --- Initiate device session ---
         let scope_str = scopes.join(" ");
-        let redirect_uri = &self.config.callback_url;
-        let auth_url = format!(
-            "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&code_challenge={}&code_challenge_method=S256",
-            self.config.authorize_url(),
-            urlencoding::encode(&self.config.client_id),
-            urlencoding::encode(redirect_uri),
-            urlencoding::encode(&scope_str),
-            urlencoding::encode(&state),
-            urlencoding::encode(&code_challenge),
-        );
+        let session = self
+            .initiate_device_session(&proxy_base, &scope_str, &code_challenge)
+            .await?;
 
         // --- Display instructions ---
-        println!("\n{}", "Manual PKCE Authentication".bold().cyan());
-        println!("{}", "-".repeat(50));
-        println!(
-            "{}",
-            "Open the following URL in any browser to authorize:".dimmed()
+        let verify_url_with_code = format!(
+            "{}/device?code={}",
+            proxy_base,
+            urlencoding::encode(&session.user_code)
         );
-        println!("\n  {}\n", auth_url.cyan());
+        let verify_url_plain = format!("{}/device", proxy_base);
+        println!("\n{}", "Device Authorization Required".bold().cyan());
+        println!("{}", "─".repeat(56));
         println!(
-            "{}",
-            "After authorizing, you will be redirected to your callback URL.".dimmed()
+            "  {}",
+            "To complete login, open the following URL in your browser:".dimmed()
         );
+        println!();
         println!(
-            "{}",
-            "Paste the full callback URL (or just the authorization code) below.".dimmed()
+            "  {} {}",
+            "→".cyan(),
+            verify_url_with_code.cyan().bold()
         );
-        println!("{}", "-".repeat(50));
+        println!();
+        println!(
+            "  {}",
+            "The code will be pre-filled. If it is not, go to:".dimmed()
+        );
+        println!("    {}", verify_url_plain.dimmed());
+        println!(
+            "  {} and enter code: {}",
+            "manually".dimmed(),
+            session.user_code.yellow().bold()
+        );
+        println!("{}", "─".repeat(56));
+        println!("{}", "  Waiting for you to authorize in the browser...".dimmed());
 
-        // --- Prompt user for the callback URL / code ---
-        let input: String = crate::prompts::spawn_prompt(|| {
-            Ok(dialoguer::Input::new()
-                .with_prompt("Callback URL or authorization code")
-                .interact_text()?)
-        })
-        .await
-        .context("Failed to read user input")?;
-
-        let input = input.trim().to_string();
-        if input.is_empty() {
-            anyhow::bail!("No authorization code provided. Please try again.");
-        }
-
-        // Parse the authorization code and validate state
-        let auth_code = if input.contains("code=") || input.starts_with("http") {
-            // User pasted a full URL — extract query parameters
-            let parsed_url = url::Url::parse(&input)
-                .context("Failed to parse the pasted URL. Please try again with a valid URL.")?;
-            let params: std::collections::HashMap<_, _> = parsed_url.query_pairs().collect();
-
-            // Check for OAuth error in the callback
-            if let Some(error) = params.get("error") {
-                let desc = params
-                    .get("error_description")
-                    .map(|s| s.to_string())
-                    .unwrap_or_default();
-                anyhow::bail!("Authorization error: {error} - {desc}");
-            }
-
-            // Validate CSRF state
-            let returned_state = params
-                .get("state")
-                .ok_or_else(|| anyhow::anyhow!("Missing state parameter in callback URL"))?;
-            if returned_state.as_ref() != state.as_str() {
-                anyhow::bail!("State mismatch — possible CSRF attack. Please try again.");
-            }
-
-            params
-                .get("code")
-                .ok_or_else(|| anyhow::anyhow!("No authorization code found in callback URL"))?
-                .to_string()
-        } else {
-            // User pasted a bare authorization code
-            input
-        };
+        // --- Poll for authorization ---
+        let auth_code = self
+            .poll_device_token(&proxy_base, &session.session_id)
+            .await?;
 
         println!("Authorization code received, exchanging for token...");
 
-        // --- Exchange code for tokens ---
+        // --- Exchange code for tokens via APS ---
+        // The redirect_uri must match what the proxy used for the APS authorize redirect
+        let callback_uri = format!("{}/device/callback", proxy_base);
         let token = self
-            .exchange_code_pkce(&auth_code, redirect_uri, &code_verifier)
+            .exchange_code_pkce(&auth_code, &callback_uri, &code_verifier)
             .await?;
 
         println!("\n{} Authorization successful!", "OK".green().bold());
+
+        // --- Consume session (fire-and-forget) ---
+        let proxy_base_clone = proxy_base.clone();
+        let session_id_clone = session.session_id.clone();
+        let http_clone = self.http_client.clone();
+        tokio::spawn(async move {
+            let _ = consume_device_session_static(
+                &http_clone,
+                &proxy_base_clone,
+                &session_id_clone,
+            )
+            .await;
+        });
 
         // --- Store token ---
         let stored = StoredToken {
@@ -170,6 +180,97 @@ impl AuthClient {
         Ok(stored)
     }
 
+    /// Initiate a device auth session with the proxy.
+    async fn initiate_device_session(
+        &self,
+        proxy_base: &str,
+        scopes: &str,
+        code_challenge: &str,
+    ) -> Result<DeviceAuthResponse> {
+        let url = format!("{}/device/authorize", proxy_base);
+
+        let body = serde_json::json!({
+            "client_id": self.config.client_id,
+            "scopes": scopes,
+            "code_challenge": code_challenge,
+        });
+
+        let response = self
+            .http_client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .context("Failed to connect to device auth proxy")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Device auth proxy error ({status}): {error_text}");
+        }
+
+        response
+            .json::<DeviceAuthResponse>()
+            .await
+            .context("Failed to parse device auth response")
+    }
+
+    /// Poll the proxy for the authorization code.
+    async fn poll_device_token(
+        &self,
+        proxy_base: &str,
+        session_id: &str,
+    ) -> Result<String> {
+        let url = format!(
+            "{}/device/token?session_id={}",
+            proxy_base,
+            urlencoding::encode(session_id)
+        );
+
+        let start = std::time::Instant::now();
+        let max_duration = std::time::Duration::from_secs(MAX_POLL_DURATION_SECS);
+        let interval = std::time::Duration::from_secs(POLL_INTERVAL_SECS);
+
+        loop {
+            if start.elapsed() > max_duration {
+                anyhow::bail!(
+                    "Device authorization timed out after {}s. Please try again.",
+                    MAX_POLL_DURATION_SECS
+                );
+            }
+
+            tokio::time::sleep(interval).await;
+
+            let response = match self.http_client.get(&url).send().await {
+                Ok(resp) => resp,
+                Err(_) => continue, // Transient network error, retry
+            };
+
+            let poll: DevicePollResponse = match response.json().await {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            match poll.state.as_str() {
+                "authorized" => {
+                    let auth_code = poll.auth_code.ok_or_else(|| {
+                        anyhow::anyhow!("Proxy returned authorized state without auth_code")
+                    })?;
+                    return Ok(auth_code);
+                }
+                "expired" => {
+                    anyhow::bail!("Device code expired. Please try again.");
+                }
+                "pending" => {
+                    // Keep polling
+                }
+                other => {
+                    anyhow::bail!("Unexpected device session state: {other}");
+                }
+            }
+        }
+    }
+
     /// Exchange an authorization code for tokens using PKCE (no client_secret required).
     ///
     /// Uses HTTP Basic auth with client_id/client_secret for compatibility with APS,
@@ -179,7 +280,7 @@ impl AuthClient {
         code: &str,
         redirect_uri: &str,
         code_verifier: &str,
-    ) -> Result<TokenResponse> {
+    ) -> Result<super::types::TokenResponse> {
         let url = self.config.auth_url();
 
         let params = [
@@ -207,7 +308,7 @@ impl AuthClient {
             anyhow::bail!("Token exchange failed ({status}): {redacted}");
         }
 
-        let token: TokenResponse = response
+        let token: super::types::TokenResponse = response
             .json()
             .await
             .context("Failed to parse token response")?;
@@ -216,9 +317,32 @@ impl AuthClient {
     }
 }
 
+/// Static helper for fire-and-forget session consumption (used from spawned task).
+async fn consume_device_session_static(
+    http_client: &reqwest::Client,
+    proxy_base: &str,
+    session_id: &str,
+) -> Result<()> {
+    let url = format!("{}/device/consume", proxy_base);
+    let body = serde_json::json!({ "session_id": session_id });
+
+    http_client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .context("Failed to consume device session")?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    // PKCE tests (preserved from original)
+    // ========================================================================
 
     #[test]
     fn test_code_verifier_length_and_charset() {
@@ -267,5 +391,43 @@ mod tests {
         let verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
         let challenge = derive_code_challenge(verifier);
         assert_eq!(challenge, "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+    }
+
+    // ========================================================================
+    // Deserialization tests for new response structs
+    // ========================================================================
+
+    #[test]
+    fn test_deserialize_device_auth_response() {
+        let json = r#"{"session_id":"abc-123","user_code":"ABCD-1234","expires_in":300}"#;
+        let resp: DeviceAuthResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.session_id, "abc-123");
+        assert_eq!(resp.user_code, "ABCD-1234");
+        assert_eq!(resp.expires_in, 300);
+    }
+
+    #[test]
+    fn test_deserialize_device_poll_pending() {
+        let json = r#"{"state":"pending"}"#;
+        let resp: DevicePollResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.state, "pending");
+        assert!(resp.auth_code.is_none());
+    }
+
+    #[test]
+    fn test_deserialize_device_poll_authorized() {
+        let json = r#"{"state":"authorized","auth_code":"some-auth-code-from-aps"}"#;
+        let resp: DevicePollResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.state, "authorized");
+        assert_eq!(resp.auth_code.as_deref(), Some("some-auth-code-from-aps"));
+    }
+
+    #[test]
+    fn test_proxy_base_url_default() {
+        // When env var is not set, should return default
+        // (This test may be affected by env, so we just verify the function doesn't panic)
+        let url = proxy_base_url();
+        assert!(!url.is_empty());
+        assert!(!url.ends_with('/'));
     }
 }

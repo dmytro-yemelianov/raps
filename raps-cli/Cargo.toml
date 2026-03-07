@@ -94,6 +94,18 @@ futures-util.workspace = true
 # Directories
 directories.workspace = true
 
+# Disk space queries
+fs2.workspace = true
+
+# Regular expressions (UUID validation in doctor)
+regex.workspace = true
+
+# Semver comparison (version staleness check in doctor)
+semver.workspace = true
+
+# Keyring access (for doctor keyring probe)
+keyring.workspace = true
+
 # Random number generation
 rand.workspace = true
 
@@ -103,11 +115,27 @@ csv.workspace = true
 # Temp files (stdin spool for piped uploads)
 tempfile.workspace = true
 
+# Glob pattern matching
+glob.workspace = true
+
+# Filesystem watching
+notify.workspace = true
+
 # Plugin signature verification
 ed25519-dalek.workspace = true
 sha2.workspace = true
 hmac.workspace = true
 hex.workspace = true
+
+# SHA-1 for sync checksum comparison
+sha1.workspace = true
+
+# Text diffing (unified diff output for object diff command)
+similar.workspace = true
+
+# Archive inspection (tar.gz / zip via Range requests)
+flate2.workspace = true
+tar.workspace = true
 
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
@@ -124,9 +152,27 @@ default = []
 dashboard = ["ratatui", "crossterm"]
 redis = ["raps-kernel/redis", "dep:hostname", "dep:redis", "dep:deadpool-redis"]
 kubernetes = ["raps-kernel/kubernetes", "redis", "dep:axum"]
+# Enable HTTP/3 (QUIC) transport for swarm inter-agent communication.
+# Activates the h3 feature in raps-kernel (quinn/QUIC backend).
+# Set RAPS_SWARM_QUIC=1 or pass --quic to swarm worker start to use it.
+h3 = ["raps-kernel/h3"]
 
 [dev-dependencies]
 assert_cmd.workspace = true
 predicates.workspace = true
 dotenvy.workspace = true
 insta.workspace = true
+raps-mock.workspace = true
+raps-kernel = { workspace = true, features = ["test-utils"] }
+
+[[test]]
+name = "operations"
+path = "tests/operations_runner.rs"
+
+[[test]]
+name = "scenarios"
+path = "tests/scenarios_runner.rs"
+
+[[test]]
+name = "cli_tests"
+path = "tests/cli_tests_runner.rs"

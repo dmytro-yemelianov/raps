@@ -14,7 +14,7 @@ use crate::output::OutputFormat;
 use super::OperationCommands;
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct OperationStatusOutput {
+pub(crate) struct OperationStatusOutput {
     operation_id: String,
     operation_type: String,
     status: String,
@@ -27,7 +27,7 @@ struct OperationStatusOutput {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct OperationListOutput {
+pub(crate) struct OperationListOutput {
     operation_id: String,
     operation_type: String,
     status: String,
@@ -47,7 +47,7 @@ pub(crate) fn format_status(status: &str) -> String {
 
 /// Output format for bulk operation results
 #[derive(Serialize, schemars::JsonSchema)]
-struct BulkResultOutput {
+pub(crate) struct BulkResultOutput {
     operation_id: String,
     total: usize,
     completed: usize,
@@ -58,7 +58,7 @@ struct BulkResultOutput {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct BulkResultDetailOutput {
+pub(crate) struct BulkResultDetailOutput {
     project_id: String,
     project_name: Option<String>,
     status: String,
@@ -437,5 +437,172 @@ impl OperationCommands {
                 Ok(())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use raps_admin::{BulkOperationResult, ItemDetail, ItemResult};
+    use std::time::Duration;
+    use uuid::Uuid;
+
+    // ── format_status ──────────────────────────────────────────────────────
+
+    #[test]
+    fn format_status_completed_contains_text() {
+        assert!(format_status("completed").contains("completed"));
+    }
+
+    #[test]
+    fn format_status_failed_contains_text() {
+        assert!(format_status("failed").contains("failed"));
+    }
+
+    #[test]
+    fn format_status_inprogress_contains_text() {
+        assert!(format_status("inprogress").contains("inprogress"));
+    }
+
+    #[test]
+    fn format_status_in_progress_variant_contains_text() {
+        assert!(format_status("in_progress").contains("in_progress"));
+    }
+
+    #[test]
+    fn format_status_cancelled_contains_text() {
+        assert!(format_status("cancelled").contains("cancelled"));
+    }
+
+    #[test]
+    fn format_status_unknown_passes_through() {
+        assert!(format_status("pending").contains("pending"));
+    }
+
+    // ── display_bulk_result ────────────────────────────────────────────────
+
+    fn make_result(
+        completed: usize,
+        skipped: usize,
+        failed: usize,
+        details: Vec<ItemDetail>,
+    ) -> BulkOperationResult {
+        BulkOperationResult {
+            operation_id: Uuid::new_v4(),
+            total: completed + skipped + failed,
+            completed,
+            skipped,
+            failed,
+            duration: Duration::from_millis(123),
+            details,
+        }
+    }
+
+    #[test]
+    fn display_bulk_result_json_all_success_returns_ok() {
+        let result = make_result(
+            2,
+            0,
+            0,
+            vec![
+                ItemDetail {
+                    project_id: "proj-1".into(),
+                    project_name: Some("Alpha".into()),
+                    result: ItemResult::Success,
+                    attempts: 1,
+                },
+                ItemDetail {
+                    project_id: "proj-2".into(),
+                    project_name: None,
+                    result: ItemResult::Success,
+                    attempts: 1,
+                },
+            ],
+        );
+        assert!(display_bulk_result(&result, OutputFormat::Json).is_ok());
+    }
+
+    #[test]
+    fn display_bulk_result_json_with_skipped_and_failed_returns_ok() {
+        let result = make_result(
+            1,
+            1,
+            1,
+            vec![
+                ItemDetail {
+                    project_id: "p1".into(),
+                    project_name: None,
+                    result: ItemResult::Success,
+                    attempts: 1,
+                },
+                ItemDetail {
+                    project_id: "p2".into(),
+                    project_name: Some("Beta".into()),
+                    result: ItemResult::Skipped {
+                        reason: "already member".into(),
+                    },
+                    attempts: 1,
+                },
+                ItemDetail {
+                    project_id: "p3".into(),
+                    project_name: Some("Gamma".into()),
+                    result: ItemResult::Failed {
+                        error: "403 Forbidden".into(),
+                        retryable: false,
+                    },
+                    attempts: 3,
+                },
+            ],
+        );
+        assert!(display_bulk_result(&result, OutputFormat::Json).is_ok());
+    }
+
+    #[test]
+    fn display_bulk_result_table_no_failures_returns_ok() {
+        let result = make_result(
+            3,
+            0,
+            0,
+            vec![ItemDetail {
+                project_id: "p1".into(),
+                project_name: Some("One".into()),
+                result: ItemResult::Success,
+                attempts: 1,
+            }],
+        );
+        assert!(display_bulk_result(&result, OutputFormat::Table).is_ok());
+    }
+
+    #[test]
+    fn display_bulk_result_table_with_failures_returns_ok() {
+        let result = make_result(
+            1,
+            0,
+            1,
+            vec![
+                ItemDetail {
+                    project_id: "p1".into(),
+                    project_name: Some("Good".into()),
+                    result: ItemResult::Success,
+                    attempts: 1,
+                },
+                ItemDetail {
+                    project_id: "p2".into(),
+                    project_name: None,
+                    result: ItemResult::Failed {
+                        error: "timeout".into(),
+                        retryable: true,
+                    },
+                    attempts: 3,
+                },
+            ],
+        );
+        assert!(display_bulk_result(&result, OutputFormat::Table).is_ok());
+    }
+
+    #[test]
+    fn display_bulk_result_table_empty_total_no_panic() {
+        let result = make_result(0, 0, 0, vec![]);
+        assert!(display_bulk_result(&result, OutputFormat::Table).is_ok());
     }
 }

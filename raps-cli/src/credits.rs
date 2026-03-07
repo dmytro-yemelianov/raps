@@ -43,14 +43,15 @@ pub fn print_version() {
     let version = env!("CARGO_PKG_VERSION");
     let mcp_tool_count = crate::mcp::tools::TOOLS.len();
 
-    // Flower
+    // Flower (sunflower, top-down view — 4 petals + seed disk)
     println!();
-    println!("      {}", "▄▄▀█▄▄ ▄▄▀█▄".yellow().bold());
-    println!("      {}", "█▄   █▄█   ▀█".yellow().bold());
-    println!("      {}", " ▀█▄▄▀▀▄▄▄▄▄▀".yellow().bold());
-    println!("      {}", "▄▄█▀▀ ▄█▄ ▀▀█".yellow().bold());
-    println!("      {}", "█   ▄█▀ ▀▄▄▄█".yellow().bold());
-    println!("      {}", "▀▀▀▀▀     ▀▀".yellow().bold());
+    println!("          {}", "▄▀▀▀▄".yellow().bold());
+    println!("      {}", "▄▀  ▄▓▓▓▄  ▀▄".yellow().bold());
+    println!("     {}", "▐█  ▐▓▓▓▓▓▌  █▌".yellow().bold());
+    println!("     {}", "▐█  ▐▓███▓▌  █▌".yellow().bold());
+    println!("     {}", "▐█  ▐▓▓▓▓▓▌  █▌".yellow().bold());
+    println!("      {}", "▀▄  ▀▓▓▓▀  ▄▀".yellow().bold());
+    println!("          {}", "▀▄▄▄▀".yellow().bold());
 
     // RAPS text
     println!("   {}", "▄▄▄  ▄▄▄  ▄▄▄▄ ▄▄▄▄".yellow().bold());

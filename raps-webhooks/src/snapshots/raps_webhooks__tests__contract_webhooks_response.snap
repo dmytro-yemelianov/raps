@@ -1,0 +1,69 @@
+---
+source: raps-webhooks/src/lib.rs
+assertion_line: 534
+expression: response
+---
+WebhooksResponse {
+    data: [
+        Webhook {
+            hook_id: "b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+            tenant: Some(
+                "VGVzdFRlbmFudA",
+            ),
+            callback_url: "https://myapp.example.com/webhooks/aps",
+            created_by: Some(
+                "N2FGNUJ3cHFianRmOHpuM2RiNEt6ZW8wNjVFbjJOQWU",
+            ),
+            event: "dm.version.added",
+            created_date: Some(
+                "2024-06-15T09:30:00.000+0000",
+            ),
+            last_updated_date: None,
+            system: "data",
+            creator_type: Some(
+                "Application",
+            ),
+            status: "active",
+            scope: Some(
+                WebhookScope {
+                    folder: Some(
+                        "urn:adsk.wipprod:fs.folder:co.YWJjZGVmZy0xMjM0LTU2Nzg",
+                    ),
+                    workflow: None,
+                },
+            ),
+            hook_attribute: None,
+            urn: Some(
+                "urn:adsk.webhooks:events.hook:b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+            ),
+            auto_reactivate_hook: Some(
+                true,
+            ),
+        },
+        Webhook {
+            hook_id: "c2d5b15f-c785-5ef3-9ef5-g030d9c549e8",
+            tenant: None,
+            callback_url: "https://myapp.example.com/webhooks/extraction",
+            created_by: None,
+            event: "extraction.finished",
+            created_date: Some(
+                "2024-07-01T12:00:00.000+0000",
+            ),
+            last_updated_date: None,
+            system: "derivative",
+            creator_type: None,
+            status: "inactive",
+            scope: None,
+            hook_attribute: None,
+            urn: None,
+            auto_reactivate_hook: None,
+        },
+    ],
+    links: Some(
+        WebhooksLinks {
+            next: Some(
+                "https://developer.api.autodesk.com/webhooks/v1/hooks?pageState=eyJsaW1pdCI6MjB9",
+            ),
+        },
+    ),
+}

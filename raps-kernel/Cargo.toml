@@ -14,6 +14,10 @@ test-utils = []
 redis = ["dep:deadpool-redis", "dep:redis", "dep:hostname"]
 prometheus = ["dep:prometheus"]
 kubernetes = ["dep:axum", "prometheus"]
+# Enable HTTP/3 (QUIC) transport for swarm inter-agent communication.
+# Requires a nightly toolchain or a build environment with QUIC support
+# (quinn backend). Enable with: cargo build --features h3
+h3 = ["reqwest/http3"]
 
 [dependencies]
 # Error handling
@@ -28,6 +32,8 @@ csv.workspace = true
 
 # HTTP client
 reqwest.workspace = true
+http.workspace = true
+bytes.workspace = true
 
 # Async runtime
 tokio.workspace = true
@@ -71,8 +77,9 @@ urlencoding.workspace = true
 # Progress bars
 indicatif.workspace = true
 
-# Cryptographic hashing (PKCE S256 challenge)
+# Cryptographic hashing (PKCE S256 challenge, cache keys)
 sha2.workspace = true
+hex.workspace = true
 
 # Interactive prompts
 dialoguer.workspace = true

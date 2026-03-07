@@ -9,6 +9,7 @@
 mod metadata;
 mod presets;
 mod translations;
+mod watch;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -36,6 +37,18 @@ pub enum TranslateCommands {
         #[arg(short, long)]
         wait: bool,
 
+        /// Watch translation until complete, polling every --poll-interval seconds
+        #[arg(long)]
+        watch: bool,
+
+        /// Polling interval in seconds when using --watch (default: 5)
+        #[arg(long, default_value = "5")]
+        poll_interval: u64,
+
+        /// Timeout in seconds for --watch (0 = no timeout, default: 1800)
+        #[arg(long, default_value = "1800")]
+        watch_timeout: u64,
+
         /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
         #[arg(long, default_value = "US")]
         region: String,
@@ -53,6 +66,10 @@ pub enum TranslateCommands {
         /// Send a Slack notification when the job completes (requires swarm.toml)
         #[arg(long)]
         notify: bool,
+
+        /// Show cost/time estimate before submitting the translation job
+        #[arg(long)]
+        cost_estimate: bool,
     },
 
     /// Check translation status
@@ -236,10 +253,14 @@ impl TranslateCommands {
                 format,
                 root_filename,
                 wait,
+                watch,
+                poll_interval,
+                watch_timeout,
                 region,
                 force,
                 serverless,
                 notify,
+                cost_estimate,
             } => {
                 if serverless {
                     translations::start_serverless(
@@ -260,9 +281,13 @@ impl TranslateCommands {
                         format,
                         root_filename,
                         wait,
+                        watch,
+                        poll_interval,
+                        watch_timeout,
                         output_format,
                         region,
                         force,
+                        cost_estimate,
                     )
                     .await
                 }

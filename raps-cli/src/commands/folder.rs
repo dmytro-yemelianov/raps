@@ -172,7 +172,7 @@ async fn resolve_folder_args(
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct FolderItemOutput {
+pub struct FolderItemOutput {
     id: String,
     name: String,
     item_type: String,

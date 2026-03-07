@@ -25,7 +25,7 @@ This document provides an overview of RAPS deployment and integration options.
 - **Use Case**: GitHub-based CI/CD for APS projects
 
 ### 4. **MCP Server** 🤖
-- **Command**: `raps serve`
+- **Command**: `raps mcp`
 - **Protocol**: Model Context Protocol (stdio)
 - **Clients**: Claude Desktop, Cursor, other MCP-compatible AI tools
 - **Use Case**: AI-assisted APS development and automation
@@ -113,7 +113,7 @@ jobs:
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"],
+      "args": ["mcp"],
       "env": {
         "APS_CLIENT_ID": "your_client_id",
         "APS_CLIENT_SECRET": "your_client_secret"

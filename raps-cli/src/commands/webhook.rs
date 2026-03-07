@@ -93,7 +93,7 @@ pub enum WebhookCommands {
     VerifySignature {
         /// The webhook payload (JSON string or @file)
         payload: String,
-        /// The signature from X-Adsk-Signature header
+        /// The signature from x-aps-signature (or legacy x-adsk-signature)
         #[arg(short, long)]
         signature: String,
         /// The webhook secret
@@ -118,6 +118,13 @@ pub enum WebhookCommands {
         /// Optional relay URL — forward events to this URL after storing
         #[arg(long)]
         relay_url: Option<String>,
+    },
+
+    /// Show health status of all registered webhooks
+    Status {
+        /// Check if callback URLs are reachable (makes HEAD request to each URL)
+        #[arg(long)]
+        check_reachability: bool,
     },
 
     /// Drain stored events from the Cloudflare Worker gateway
@@ -199,6 +206,9 @@ impl WebhookCommands {
                 )
                 .await
             }
+            WebhookCommands::Status { check_reachability } => {
+                webhook_status(client, check_reachability, output_format).await
+            }
             WebhookCommands::Drain {
                 gateway_url,
                 api_key,
@@ -210,7 +220,7 @@ impl WebhookCommands {
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct WebhookListOutput {
+pub(crate) struct WebhookListOutput {
     hook_id: String,
     event: String,
     callback_url: String,
@@ -287,7 +297,7 @@ async fn list_webhooks(client: &WebhooksClient, output_format: OutputFormat) -> 
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct CreateWebhookOutput {
+pub(crate) struct CreateWebhookOutput {
     success: bool,
     hook_id: String,
     event: String,
@@ -383,7 +393,7 @@ async fn create_webhook(
 }
 
 #[derive(Serialize, schemars::JsonSchema)]
-struct GetWebhookOutput {
+pub(crate) struct GetWebhookOutput {
     hook_id: String,
     system: String,
     event: String,
@@ -710,7 +720,7 @@ struct VerifySignatureOutput {
 fn verify_signature(
     payload: &str,
     signature: &str,
-    _secret: &str,
+    secret: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
     use std::io::Read;
@@ -726,23 +736,17 @@ fn verify_signature(
         payload.to_string()
     };
 
-    // Calculate HMAC-SHA256 signature
-    // Note: In a real implementation, you'd use a crypto library like hmac + sha2
-    // For now, we'll provide a placeholder that shows the expected format
+    let valid = verify_hmac_sha256_signature(secret, payload_data.as_bytes(), signature);
 
-    // The APS webhook signature format is typically base64(HMAC-SHA256(secret, payload))
-    // This is a simplified verification that checks format
-    let is_valid_format = signature.len() > 20 && !signature.contains(' ');
-
-    let output = if is_valid_format {
+    let output = if valid {
         VerifySignatureOutput {
             valid: true,
-            message: "Signature format is valid. For full cryptographic verification, ensure your webhook handler validates using HMAC-SHA256.".to_string(),
+            message: "Signature is valid (HMAC-SHA256)".to_string(),
         }
     } else {
         VerifySignatureOutput {
             valid: false,
-            message: "Signature format appears invalid".to_string(),
+            message: "Signature is invalid".to_string(),
         }
     };
 
@@ -768,6 +772,27 @@ fn verify_signature(
     }
 
     Ok(())
+}
+
+fn verify_hmac_sha256_signature(secret: &str, body: &[u8], signature: &str) -> bool {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+
+    type HmacSha256 = Hmac<Sha256>;
+
+    let Ok(mut mac) = HmacSha256::new_from_slice(secret.as_bytes()) else {
+        return false;
+    };
+    mac.update(body);
+
+    let normalized = signature.trim();
+    let normalized = normalized.strip_prefix("sha256=").unwrap_or(normalized);
+
+    let Ok(expected_bytes) = hex::decode(normalized) else {
+        return false;
+    };
+
+    mac.verify_slice(&expected_bytes).is_ok()
 }
 
 // ---------------------------------------------------------------------------
@@ -915,4 +940,240 @@ async fn webhook_drain(
     }
 
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Status (health monitoring)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, schemars::JsonSchema)]
+struct WebhookStatusOutput {
+    hook_id: String,
+    event: String,
+    system: String,
+    callback_url: String,
+    status: String,
+    created_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reachable: Option<bool>,
+}
+
+async fn webhook_status(
+    client: &WebhooksClient,
+    check_reachability: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let webhooks = tracked_op("Fetching webhooks", output_format, || async {
+        client
+            .list_all_webhooks()
+            .await
+            .context("Failed to list webhooks. Check your authentication with 'raps auth test'")
+    })
+    .await?;
+
+    if webhooks.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No webhooks registered.".yellow()),
+            _ => output_format.write(&Vec::<WebhookStatusOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    let http_client = reqwest::Client::new();
+
+    let mut outputs: Vec<WebhookStatusOutput> = Vec::with_capacity(webhooks.len());
+    for w in &webhooks {
+        let reachable = if check_reachability {
+            let result = http_client
+                .head(&w.callback_url)
+                .timeout(std::time::Duration::from_secs(5))
+                .send()
+                .await;
+            Some(result.is_ok())
+        } else {
+            None
+        };
+
+        outputs.push(WebhookStatusOutput {
+            hook_id: w.hook_id.clone(),
+            event: w.event.clone(),
+            system: w.system.clone(),
+            callback_url: w.callback_url.clone(),
+            status: w.status.clone(),
+            created_date: w.created_date.clone(),
+            reachable,
+        });
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            let col_width = if check_reachability { 110 } else { 95 };
+            println!("\n{}", "Webhook Health Status:".bold());
+            println!("{}", "-".repeat(col_width));
+
+            let reach_header = if check_reachability { "  Reachable" } else { "" };
+            println!(
+                "{:<12} {:<25} {:<10} {:<35} {:<20}{}",
+                "APS Status".bold(),
+                "Event".bold(),
+                "System".bold(),
+                "Callback URL".bold(),
+                "Created".bold(),
+                reach_header.bold(),
+            );
+            println!("{}", "-".repeat(col_width));
+
+            for out in &outputs {
+                let status_col = if out.status == "active" {
+                    out.status.to_string().green().to_string()
+                } else {
+                    out.status.to_string().red().to_string()
+                };
+
+                let url = truncate_str(&out.callback_url, 35);
+                let created = out
+                    .created_date
+                    .as_deref()
+                    .unwrap_or("-")
+                    .chars()
+                    .take(20)
+                    .collect::<String>();
+
+                let reach_col = match out.reachable {
+                    Some(true) => "  \u{2713} reachable".green().to_string(),
+                    Some(false) => "  \u{2717} unreachable".red().to_string(),
+                    None => String::new(),
+                };
+
+                println!(
+                    "{:<12} {:<25} {:<10} {:<35} {:<20}{}",
+                    status_col,
+                    out.event.cyan(),
+                    out.system,
+                    url,
+                    created,
+                    reach_col,
+                );
+            }
+
+            println!("{}", "-".repeat(col_width));
+
+            let active_count = outputs.iter().filter(|o| o.status == "active").count();
+            let total = outputs.len();
+            println!(
+                "\n{} {} of {} webhook(s) active.",
+                "Summary:".bold(),
+                active_count,
+                total
+            );
+
+            if check_reachability {
+                let reachable_count =
+                    outputs.iter().filter(|o| o.reachable == Some(true)).count();
+                println!(
+                    "         {} of {} callback URL(s) reachable.",
+                    reachable_count, total
+                );
+            }
+        }
+        _ => {
+            output_format.write(&outputs)?;
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_truncate_str_exact_max() {
+        let result = truncate_str("hello", 5);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_over_max() {
+        let result = truncate_str("this is a long string", 10);
+        assert_eq!(result, "this is...");
+        assert_eq!(result.len(), 10);
+    }
+
+    #[test]
+    fn test_truncate_str_empty() {
+        let result = truncate_str("", 10);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_truncate_str_small_max() {
+        let result = truncate_str("abcdefgh", 4);
+        assert_eq!(result, "a...");
+        assert_eq!(result.len(), 4);
+    }
+
+    #[test]
+    fn test_webhook_list_output_serialization() {
+        let output = WebhookListOutput {
+            hook_id: "hook-123".to_string(),
+            event: "dm.version.added".to_string(),
+            callback_url: "https://example.com/webhook".to_string(),
+            status: "active".to_string(),
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["hook_id"], "hook-123");
+        assert_eq!(json["event"], "dm.version.added");
+        assert_eq!(json["callback_url"], "https://example.com/webhook");
+        assert_eq!(json["status"], "active");
+    }
+
+    #[test]
+    fn test_verify_signature_output_serialization() {
+        let output = VerifySignatureOutput {
+            valid: true,
+            message: "Signature verified".to_string(),
+        };
+        let json = serde_json::to_value(&output).unwrap();
+        assert_eq!(json["valid"], true);
+        assert_eq!(json["message"], "Signature verified");
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_valid() {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let secret = "test-secret";
+        let body = br#"{"event":"dm.version.added"}"#;
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = hex::encode(mac.finalize().into_bytes());
+
+        assert!(verify_hmac_sha256_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_sha256_prefix() {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+
+        let secret = "test-secret";
+        let body = b"payload";
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
+
+        assert!(verify_hmac_sha256_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_hmac_sha256_signature_invalid() {
+        assert!(!verify_hmac_sha256_signature(
+            "secret",
+            b"payload",
+            "not-a-valid-signature"
+        ));
+    }
 }

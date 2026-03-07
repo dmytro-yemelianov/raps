@@ -345,9 +345,12 @@ async fn login(
     let device = if !device && raps_kernel::interactive::is_headless() {
         eprintln!(
             "{}",
-            "Headless environment detected (no browser available). \
-             Switching to device code flow automatically."
+            "Headless environment detected. Using device code flow."
                 .yellow()
+        );
+        eprintln!(
+            "{}",
+            "   You'll be given a short code to enter at https://rapscli.xyz/device".dimmed()
         );
         eprintln!(
             "{}",
@@ -734,4 +737,87 @@ async fn inspect_token(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_mask_string_long() {
+        // 16 chars → "abcd...mnop"
+        let result = mask_string("abcdefghijklmnop");
+        assert_eq!(result, "abcd...mnop");
+    }
+
+    #[test]
+    fn test_mask_string_short() {
+        // 5 chars → "*****"
+        let result = mask_string("hello");
+        assert_eq!(result, "*****");
+    }
+
+    #[test]
+    fn test_mask_string_exactly_8() {
+        // 8 chars → "********"
+        let result = mask_string("12345678");
+        assert_eq!(result, "********");
+    }
+
+    #[test]
+    fn test_mask_string_9_chars() {
+        // 9 chars → first4...last4
+        let result = mask_string("123456789");
+        assert_eq!(result, "1234...6789");
+    }
+
+    #[test]
+    fn test_mask_string_empty() {
+        let result = mask_string("");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_login_preset_all_scopes() {
+        let scopes = LoginPreset::All.scopes();
+        assert_eq!(scopes.len(), AVAILABLE_SCOPES.len());
+        for (scope, _) in AVAILABLE_SCOPES {
+            assert!(scopes.contains(scope), "Missing scope: {}", scope);
+        }
+    }
+
+    #[test]
+    fn test_login_preset_viewer_readonly() {
+        let scopes = LoginPreset::Viewer.scopes();
+        for scope in &scopes {
+            assert!(
+                scope.ends_with(":read") || scope.ends_with(":search"),
+                "Viewer scope '{}' is not read-only",
+                scope
+            );
+        }
+    }
+
+    #[test]
+    fn test_login_preset_no_duplicates() {
+        let presets = [
+            LoginPreset::All,
+            LoginPreset::Viewer,
+            LoginPreset::Editor,
+            LoginPreset::Storage,
+            LoginPreset::Automation,
+            LoginPreset::Admin,
+        ];
+        for preset in &presets {
+            let scopes = preset.scopes();
+            let unique: HashSet<&&str> = scopes.iter().collect();
+            assert_eq!(
+                scopes.len(),
+                unique.len(),
+                "Duplicate scopes found in preset {:?}",
+                preset
+            );
+        }
+    }
 }

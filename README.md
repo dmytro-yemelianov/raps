@@ -98,6 +98,12 @@
 - **List templates** (`acc checklist templates`) - view available templates
 - **CRUD operations** - get, create, update checklists
 
+### Account Administration (v5.1.0+)
+- **Bulk user management** (`admin user add-to-all-projects`, `admin user update`) - securely provision, update, and manage access across thousands of projects
+- **Project lifecycle** (`admin project create`, `admin project update`, `admin project archive`)
+- **Parallel operation support** with rate limiting, retries, and comprehensive reporting
+- Supports detailed dry runs (`--dry-run`) to validate massive configuration changes safely
+
 ### Reality Capture
 - Create photoscenes for photogrammetry
 - Upload photos and start processing
@@ -536,7 +542,7 @@ raps reality result <photoscene-id>
 Start the MCP server for AI assistant integration:
 
 ```bash
-raps serve
+raps mcp
 ```
 
 **Configure in Claude Desktop** (`claude_desktop_config.json`):
@@ -546,7 +552,7 @@ raps serve
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"],
+      "args": ["mcp"],
       "env": {
         "APS_CLIENT_ID": "your_client_id",
         "APS_CLIENT_SECRET": "your_client_secret"
@@ -563,7 +569,7 @@ raps serve
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"]
+      "args": ["mcp"]
     }
   }
 }
@@ -599,7 +605,7 @@ Once configured, AI assistants can directly manage APS resources using natural l
 | `demo` | Run demo scenarios |
 | `config` | Configuration and profile management (import, export) |
 | `completions` | Generate shell completions (bash, zsh, fish, powershell, elvish) |
-| `serve` | Start MCP server for AI assistant integration (v3.0.0+) |
+| `mcp` | Start MCP server for AI assistant integration (v3.0.0+) |
 
 ## API Coverage
 

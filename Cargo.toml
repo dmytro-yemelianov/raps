@@ -15,7 +15,7 @@ exclude = ["python-bindings"]
 resolver = "2"
 
 [workspace.package]
-version = "5.0.0"
+version = "5.3.3"
 edition = "2024"
 authors = ["Dmytro Yemelianov"]
 license = "Apache-2.0"
@@ -26,15 +26,15 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 # Internal crates
-raps-kernel = { path = "raps-kernel", version = "5.0.0" }
-raps-oss = { path = "raps-oss", version = "5.0.0" }
-raps-derivative = { path = "raps-derivative", version = "5.0.0" }
-raps-dm = { path = "raps-dm", version = "5.0.0" }
-raps-da = { path = "raps-da", version = "5.0.0" }
-raps-acc = { path = "raps-acc", version = "5.0.0" }
-raps-webhooks = { path = "raps-webhooks", version = "5.0.0" }
-raps-reality = { path = "raps-reality", version = "5.0.0" }
-raps-admin = { path = "raps-admin", version = "5.0.0" }
+raps-kernel = { path = "raps-kernel", version = "5.3.3" }
+raps-oss = { path = "raps-oss", version = "5.3.3" }
+raps-derivative = { path = "raps-derivative", version = "5.3.3" }
+raps-dm = { path = "raps-dm", version = "5.3.3" }
+raps-da = { path = "raps-da", version = "5.3.3" }
+raps-acc = { path = "raps-acc", version = "5.3.3" }
+raps-webhooks = { path = "raps-webhooks", version = "5.3.3" }
+raps-reality = { path = "raps-reality", version = "5.3.3" }
+raps-admin = { path = "raps-admin", version = "5.3.3" }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive"] }
@@ -47,6 +47,8 @@ console = "0.15"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "stream", "multipart", "rustls-tls", "http2"], default-features = false }
+http = "1.4"
+bytes = "1.11"
 
 # Async runtime
 tokio = { version = "1.49", features = ["full"] }
@@ -71,19 +73,19 @@ base64 = "0.22"
 
 # Error handling
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 
 # File handling
 tokio-util = { version = "0.7", features = ["io", "codec"] }
 futures-util = "0.3"
 
 # OAuth browser flow
-webbrowser = "0.8"
+webbrowser = "1.1"
 tiny_http = "0.12"
 
 # Secure token storage
 directories = "5.0"
-keyring = "3.6"
+keyring = { version = "3.6", features = ["linux-native", "apple-native", "windows-native"] }
 
 # Memory measurement
 memory-stats = "1.2"
@@ -107,8 +109,11 @@ regex = "1.12"
 # Glob pattern matching
 glob = "0.3"
 
+# Filesystem watching
+notify = "6"
+
 # MCP Server
-rmcp = { version = "0.12", features = ["server", "transport-io", "schemars"] }
+rmcp = { version = "1.1", features = ["server", "transport-io", "schemars"] }
 schemars = "1.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "json"] }
@@ -116,24 +121,28 @@ tracing-appender = "0.2"
 
 # TUI dashboard
 ratatui = "0.29"
-crossterm = "0.28"
+crossterm = "0.29"
 
 # Interactive shell
-reedline = "0.45"
+reedline = "0.46"
 nu-ansi-term = "0.50"
 shlex = "1.3"
 
 # Cryptography for plugin signature verification
 ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+sha1 = "0.10"
 sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
+
+# Text diffing (unified diff output)
+similar = "2"
 
 # Semantic versioning
 semver = { version = "1.0", features = ["serde"] }
 
 # TOML parsing for plugin manifests
-toml = "0.8"
+toml = "1.0"
 
 # Compression for plugin packages
 flate2 = "1.0"
@@ -147,7 +156,7 @@ async-trait = "0.1"
 
 # Concurrent data structures
 dashmap = "6"
-lru = "0.12"
+lru = "0.16"
 
 # Redis (feature-gated)
 deadpool-redis = "0.23"
@@ -165,7 +174,7 @@ axum = "0.8"
 # Testing
 assert_cmd = "2.1"
 predicates = "3.1"
-raps-mock = { git = "https://github.com/dmytro-yemelianov/raps-mock.git", tag = "v0.2.0" }
+raps-mock = { git = "https://github.com/dmytro-yemelianov/raps-mock.git", tag = "v0.3.1" }
 tokio-test = "0.4"
 tempfile = "3.26"
 insta = { version = "1.42", features = ["yaml", "json", "redactions"] }

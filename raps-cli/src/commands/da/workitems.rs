@@ -15,6 +15,20 @@ use crate::output::OutputFormat;
 use raps_da::{DesignAutomationClient, WorkItemArgument};
 use raps_kernel::progress;
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct WorkitemOutput {
+    pub id: String,
+    pub status: String,
+    pub progress: String,
+}
+
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct WorkitemRunOutput {
+    pub success: bool,
+    pub workitem_id: String,
+    pub status: String,
+}
+
 pub(super) async fn list_workitems(
     client: &DesignAutomationClient,
     output_format: OutputFormat,
@@ -24,13 +38,6 @@ pub(super) async fn list_workitems(
     }
 
     let workitems = client.list_workitems().await?;
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct WorkitemOutput {
-        id: String,
-        status: String,
-        progress: String,
-    }
 
     let workitem_outputs: Vec<WorkitemOutput> = workitems
         .iter()
@@ -143,14 +150,7 @@ pub(super) async fn run_workitem(
         .create_workitem(&qualified_activity, arguments)
         .await?;
 
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct RunOutput {
-        success: bool,
-        workitem_id: String,
-        status: String,
-    }
-
-    let output = RunOutput {
+    let output = WorkitemRunOutput {
         success: true,
         workitem_id: workitem.id.clone(),
         status: workitem.status.clone(),

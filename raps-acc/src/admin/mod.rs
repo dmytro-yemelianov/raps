@@ -5,6 +5,7 @@
 
 mod companies;
 mod projects;
+mod roles;
 mod types;
 mod users;
 
@@ -13,6 +14,7 @@ mod tests;
 
 pub use types::*;
 
+use anyhow::Context;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 use raps_kernel::http::HttpClientConfig;
@@ -31,23 +33,26 @@ impl AccountAdminClient {
     /// Create a new Account Admin client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create client with custom HTTP configuration
+    /// Create client with custom HTTP configuration.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .context("Failed to initialise HTTP client for Account Admin")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
-        }
+        })
     }
 
     /// Get the base URL for Account Admin API
@@ -61,6 +66,11 @@ impl AccountAdminClient {
     /// Get the base URL for HQ v1 API (used for companies endpoint)
     fn hq_url(&self, account_id: &str) -> String {
         format!("{}/hq/v1/accounts/{}", self.config.base_url, account_id)
+    }
+
+    /// Get the base URL for BIM 360 HQ v2 API
+    pub(crate) fn hq_v2_url(&self, account_id: &str) -> String {
+        format!("{}/hq/v2/accounts/{}", self.config.base_url, account_id)
     }
 }
 

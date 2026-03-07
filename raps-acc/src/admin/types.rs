@@ -3,9 +3,18 @@
 
 //! Request/response types for Account Admin API
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::types::ProjectClassification;
+use crate::types::{ProductAccess, ProjectClassification};
+
+/// Resolved role for user assignment — either a BIM 360 UUID or an ACC product list
+#[derive(Debug, Clone)]
+pub enum ResolvedRole {
+    /// BIM 360 role UUID to pass as `role_id`
+    Uuid(String),
+    /// ACC product access list (no `role_id` concept in ACC)
+    Products(Vec<ProductAccess>),
+}
 
 /// Request to create a new project
 #[derive(Debug, Clone, Serialize, Default)]
@@ -156,4 +165,21 @@ pub struct UpdateAccountUserRequest {
     /// Company name (for display purposes)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub company_name: Option<String>,
+}
+
+/// A role available in an account (ACC or BIM 360)
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountRole {
+    /// Role ID (UUID)
+    pub id: String,
+    /// Human-readable role name (e.g., "Project Admin", "Project Member")
+    pub name: String,
+}
+
+/// BIM 360 HQ v2 role response (snake_case)
+#[derive(Debug, Deserialize)]
+pub struct Bim360Role {
+    pub id: String,
+    pub name: String,
 }

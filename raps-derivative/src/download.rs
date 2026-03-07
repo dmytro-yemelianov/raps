@@ -5,13 +5,28 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use std::path::Path;
+use raps_kernel::error::RapsError;
+use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 
 use crate::DerivativeClient;
 
 impl DerivativeClient {
+    fn normalize_lexical_path(path: &Path) -> PathBuf {
+        let mut normalized = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+        }
+        normalized
+    }
+
     /// Download a derivative to a local file
     pub async fn download_derivative(
         &self,
@@ -40,9 +55,7 @@ impl DerivativeClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download derivative ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = response.content_length().unwrap_or(0);
@@ -56,16 +69,25 @@ impl DerivativeClient {
             .unwrap_or("derivative");
         pb.set_message(format!("Downloading {}", filename));
 
-        // Validate output path stays within current directory
-        let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        if let (Ok(canon_cwd), Ok(canon_target)) = (cwd.canonicalize(), output_path.canonicalize())
-            && !canon_target.starts_with(&canon_cwd)
-        {
-            anyhow::bail!(
-                "Path '{}' escapes working directory '{}'",
-                output_path.display(),
-                cwd.display()
-            );
+        // Validate output path stays within current directory, even if the file does not exist yet.
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let canon_cwd = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        let abs_output = if output_path.is_absolute() {
+            output_path.to_path_buf()
+        } else {
+            cwd.join(output_path)
+        };
+        if let Some(parent) = abs_output.parent() {
+            let checked_parent = parent
+                .canonicalize()
+                .unwrap_or_else(|_| Self::normalize_lexical_path(parent));
+            if !checked_parent.starts_with(&canon_cwd) {
+                anyhow::bail!(
+                    "Path '{}' escapes working directory '{}'",
+                    output_path.display(),
+                    cwd.display()
+                );
+            }
         }
 
         // Create parent directories if needed

@@ -17,6 +17,11 @@ impl AuthClient {
     /// Uses Mutex-based coordination to ensure only one refresh occurs at a time.
     /// Concurrent callers wait and receive the newly refreshed token.
     pub async fn get_3leg_token(&self) -> Result<String> {
+        // Support for test environments where a real 3-legged flow is not possible
+        if let Ok(token) = std::env::var("RAPS_FORCE_TOKEN") {
+            return Ok(token);
+        }
+
         loop {
             let refresh_token_to_use: Option<String>;
             {

@@ -6,10 +6,8 @@
 //!
 //! Handles photogrammetry processing to create 3D models from photos.
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
-
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::File;
@@ -217,25 +215,26 @@ impl RealityCaptureClient {
     /// Create a new Reality Capture client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create a new Reality Capture client with custom HTTP config
+    /// Create a new Reality Capture client with custom HTTP config.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
-        // Create HTTP client with configured timeouts
-        let http_client = http_config.create_client().unwrap_or_else(|e| {
-            tracing::warn!("HTTP client configuration failed, using defaults: {e}");
-            reqwest::Client::new()
-        });
+    ) -> anyhow::Result<Self> {
+        let http_client = http_config
+            .create_client()
+            .context("Failed to initialise HTTP client for Reality Capture")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
-        }
+        })
     }
 
     /// Create a new photoscene
@@ -262,10 +261,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create photoscene ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let create_response: CreatePhotosceneResponse = response
@@ -328,10 +327,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload photos ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let upload_response: UploadResponse = response
@@ -361,10 +360,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to start processing ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -384,10 +383,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get progress ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let progress_response: ProgressResponse = response
@@ -425,10 +424,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get result ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let result_response: ResultResponse = response
@@ -461,10 +460,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete photoscene ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -480,10 +479,10 @@ impl RealityCaptureClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list photoscenes ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let list_response: ListPhotoscenesResponse = response

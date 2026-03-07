@@ -10,7 +10,7 @@
 //! - --debug: Include full trace (redacts secrets)
 
 use regex::Regex;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -34,15 +34,38 @@ pub fn flush() {
 
 /// Initialize logging flags and tracing
 pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
-    NO_COLOR.store(no_color, Ordering::Relaxed);
+    // Resolve whether colors should be used, checking all standard signals:
+    //   1. --no-color flag
+    //   2. NO_COLOR env var (https://no-color.org) — any value disables color
+    //   3. TERM=dumb — terminal that cannot render escape sequences
+    //   4. CLICOLOR=0 — caller explicitly opted out
+    //   5. stdout is not a TTY (piped, redirected, CI without TTY allocation)
+    // CLICOLOR_FORCE=1 / CLICOLOR=1 can re-enable colors even when stdout is
+    // not a TTY (e.g., CI systems that do support ANSI via pseudo-TTY).
+    let clicolor_force = std::env::var("CLICOLOR_FORCE")
+        .ok()
+        .is_some_and(|v| v != "0");
+    let clicolor_off = std::env::var("CLICOLOR")
+        .ok()
+        .is_some_and(|v| v == "0");
+    let no_color_env = std::env::var("NO_COLOR").is_ok();
+    let dumb_term = std::env::var("TERM").as_deref() == Ok("dumb");
+    let is_tty = std::io::stdout().is_terminal();
+
+    let should_color = !no_color
+        && !no_color_env
+        && !dumb_term
+        && !clicolor_off
+        && (clicolor_force || is_tty);
+
+    NO_COLOR.store(!should_color, Ordering::Relaxed);
     QUIET.store(quiet, Ordering::Relaxed);
     VERBOSE.store(verbose, Ordering::Relaxed);
     DEBUG.store(debug, Ordering::Relaxed);
 
-    // Disable colored output globally if --no-color is set
-    if no_color {
-        colored::control::set_override(false);
-    }
+    // Always set an explicit override so the colored crate doesn't rely on
+    // its own lazy-initialized env snapshot, which may race or miss signals.
+    colored::control::set_override(should_color);
 
     // Allow RAPS_LOG or RUST_LOG env vars to override CLI flags
     let console_filter = std::env::var("RAPS_LOG")
@@ -62,7 +85,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
 
     let stderr_layer = tracing_subscriber::fmt::layer()
         .with_writer(RedactingMakeWriter::new(std::io::stderr))
-        .with_ansi(!no_color)
+        .with_ansi(should_color)
         .with_target(debug)
         .without_time()
         .with_filter(console_filter);

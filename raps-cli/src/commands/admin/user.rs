@@ -10,6 +10,7 @@ use colored::Colorize;
 use serde::Serialize;
 
 use raps_acc::admin::AccountAdminClient;
+use raps_acc::admin::ResolvedRole;
 use raps_acc::users::ProjectUsersClient;
 use raps_admin::{BulkConfig, bulk_add_user};
 use raps_kernel::auth::AuthClient;
@@ -20,9 +21,11 @@ use crate::output::OutputFormat;
 
 use super::csv_ops::{execute_csv_import, execute_csv_update};
 use super::operations::display_bulk_result;
+use raps_dm::DataManagementClient;
+
 use super::{
-    UserCommands, create_bulk_progress_bar, get_account_id, make_progress_callback,
-    parse_filter_with_ids,
+    UserCommands, create_bulk_progress_bar, make_progress_callback, parse_filter_with_ids,
+    resolve_account_id,
 };
 
 #[derive(Serialize, schemars::JsonSchema)]
@@ -119,6 +122,7 @@ impl UserCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
         global_concurrency: usize,
     ) -> Result<()> {
@@ -130,7 +134,7 @@ impl UserCommands {
                 status,
                 search,
             } => {
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let http_config = HttpClientConfig::default();
 
                 if let Some(project_id) = project {
@@ -148,7 +152,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    );
+                    )?;
 
                     let all_users = users_client.list_all_project_users(&project_id).await?;
 
@@ -213,7 +217,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    );
+                    )?;
 
                     let all_users = admin_client.list_all_users(&account_id).await?;
 
@@ -293,7 +297,7 @@ impl UserCommands {
                 yes: _,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 let bulk_config = BulkConfig {
@@ -328,12 +332,24 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
-                let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
+                )?;
+                let mut users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                ));
+                )?;
+                users_client.account_id = Some(account_id.clone());
+                let users_client = Arc::new(users_client);
+
+                // Resolve role name to either a BIM 360 UUID or ACC product access list
+                let (resolved_role_id, resolved_products): (Option<String>, Vec<raps_acc::types::ProductAccess>) = if let Some(ref role_name) = role {
+                    match admin_client.resolve_role(&account_id, role_name).await? {
+                        ResolvedRole::Uuid(id) => (Some(id), vec![]),
+                        ResolvedRole::Products(products) => (None, products),
+                    }
+                } else {
+                    (None, vec![])
+                };
 
                 let progress_bar = create_bulk_progress_bar(output_format);
                 let on_progress = make_progress_callback(progress_bar.clone());
@@ -343,7 +359,8 @@ impl UserCommands {
                     users_client,
                     &account_id,
                     &email,
-                    role.as_deref(),
+                    resolved_role_id.as_deref(),
+                    resolved_products,
                     &project_filter,
                     bulk_config,
                     on_progress,
@@ -379,7 +396,7 @@ impl UserCommands {
                 yes: _,
             } => {
                 let concurrency = concurrency.unwrap_or(global_concurrency);
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
                 let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
                 let bulk_config = BulkConfig {
@@ -411,12 +428,12 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
                 let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                ));
+                )?);
 
                 let progress_bar = create_bulk_progress_bar(output_format);
                 let on_progress = make_progress_callback(progress_bar.clone());
@@ -470,6 +487,7 @@ impl UserCommands {
                     return execute_csv_update(
                         config,
                         auth_client,
+                        dm_client,
                         account.clone(),
                         filter.clone(),
                         project_ids.clone(),
@@ -486,14 +504,14 @@ impl UserCommands {
                     anyhow::bail!("At least one of --role or --company must be provided.");
                 }
 
-                let account_id = get_account_id(account)?;
+                let account_id = resolve_account_id(account, dm_client).await?;
 
                 let http_config = HttpClientConfig::default();
                 let admin_client = AccountAdminClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
 
                 // Handle company update at account level
                 if let Some(ref company_name) = company {
@@ -577,7 +595,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    ));
+                    )?);
 
                     let progress_bar = create_bulk_progress_bar(output_format);
                     let on_progress = make_progress_callback(progress_bar.clone());
@@ -625,7 +643,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -638,7 +656,7 @@ impl UserCommands {
 
                 let request = raps_acc::users::AddProjectUserRequest {
                     email: email.clone(),
-                    role_id: role_id.clone(),
+                    role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
                     products: vec![],
                 };
 
@@ -678,7 +696,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if !yes && output_format.supports_colors() {
                     println!(
@@ -724,7 +742,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -736,7 +754,7 @@ impl UserCommands {
                 }
 
                 let request = raps_acc::users::UpdateProjectUserRequest {
-                    role_id: role_id.clone(),
+                    role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
                     products: None,
                 };
 
@@ -770,6 +788,256 @@ impl UserCommands {
 
             UserCommands::Import { project, from_csv } => {
                 execute_csv_import(config, auth_client, &project, &from_csv, output_format).await
+            }
+
+            UserCommands::AddToAllProjects {
+                email,
+                account,
+                role,
+                concurrency,
+                dry_run,
+            } => {
+                let concurrency = concurrency.unwrap_or(global_concurrency).min(50);
+                let account_id = resolve_account_id(account, dm_client).await?;
+                let http_config = HttpClientConfig::default();
+
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config.clone(),
+                )?;
+                let users_client = ProjectUsersClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?;
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Add user {} to all active projects in account {}",
+                        "→".cyan(),
+                        email.green(),
+                        account_id.cyan()
+                    );
+                    if let Some(ref r) = role {
+                        println!("  Role: {}", r.yellow());
+                    }
+                    println!("  Concurrency: {}", concurrency);
+                    if dry_run {
+                        println!("  {} Dry-run mode enabled", "⚠".yellow());
+                    }
+                    println!();
+                }
+
+                // Fetch all projects and filter to active
+                let all_projects = admin_client.list_all_projects(&account_id).await?;
+                let active_projects: Vec<_> = all_projects
+                    .into_iter()
+                    .filter(|p| {
+                        p.status
+                            .as_deref()
+                            .map(|s| s.eq_ignore_ascii_case("active"))
+                            .unwrap_or(false)
+                    })
+                    .collect();
+
+                if active_projects.is_empty() {
+                    if output_format.supports_colors() {
+                        println!("{}", "No active projects found.".yellow());
+                    }
+                    return Ok(());
+                }
+
+                if output_format.supports_colors() {
+                    println!(
+                        "  Found {} active project(s)",
+                        active_projects.len().to_string().cyan()
+                    );
+                    println!();
+                }
+
+                if dry_run {
+                    #[derive(Serialize, schemars::JsonSchema)]
+                    struct DryRunOutput {
+                        email: String,
+                        #[serde(skip_serializing_if = "Option::is_none")]
+                        role: Option<String>,
+                        projects: Vec<DryRunProject>,
+                    }
+                    #[derive(Serialize, schemars::JsonSchema)]
+                    struct DryRunProject {
+                        id: String,
+                        name: String,
+                    }
+
+                    let projects: Vec<DryRunProject> = active_projects
+                        .iter()
+                        .map(|p| DryRunProject {
+                            id: p.id.clone(),
+                            name: p.name.clone(),
+                        })
+                        .collect();
+
+                    match output_format {
+                        OutputFormat::Table => {
+                            for p in &projects {
+                                println!(
+                                    "  {} Would add to: {} ({})",
+                                    "→".dimmed(),
+                                    p.name.cyan(),
+                                    p.id.dimmed()
+                                );
+                            }
+                            println!();
+                            println!(
+                                "{} Dry run: {} project(s) would be affected",
+                                "✓".green().bold(),
+                                projects.len()
+                            );
+                        }
+                        _ => {
+                            output_format.write(&DryRunOutput {
+                                email: email.clone(),
+                                role: role.clone(),
+                                projects,
+                            })?;
+                        }
+                    }
+                    return Ok(());
+                }
+
+                // Execute concurrently
+                use futures_util::stream::{self, StreamExt};
+                use std::sync::atomic::{AtomicUsize, Ordering};
+
+                let succeeded = AtomicUsize::new(0);
+                let failed = AtomicUsize::new(0);
+                let skipped = AtomicUsize::new(0);
+
+                #[derive(Serialize, schemars::JsonSchema)]
+                struct ProjectResult {
+                    project_id: String,
+                    project_name: String,
+                    status: String,
+                    #[serde(skip_serializing_if = "Option::is_none")]
+                    error: Option<String>,
+                }
+
+                let results: Vec<ProjectResult> = stream::iter(active_projects)
+                    .map(|project| {
+                        let users_client = &users_client;
+                        let email = &email;
+                        let role = &role;
+                        let succeeded = &succeeded;
+                        let failed = &failed;
+                        let skipped = &skipped;
+                        async move {
+                            let request = raps_acc::users::AddProjectUserRequest {
+                                email: email.clone(),
+                                role_ids: role.clone().map(|s| vec![s]).unwrap_or_default(),
+                                products: vec![],
+                            };
+                            match users_client.add_user(&project.id, request).await {
+                                Ok(_) => {
+                                    succeeded.fetch_add(1, Ordering::Relaxed);
+                                    ProjectResult {
+                                        project_id: project.id,
+                                        project_name: project.name,
+                                        status: "added".to_string(),
+                                        error: None,
+                                    }
+                                }
+                                Err(e) => {
+                                    let err_str = e.to_string();
+                                    if err_str.contains("409")
+                                        || err_str.to_lowercase().contains("already")
+                                        || err_str.to_lowercase().contains("exists")
+                                    {
+                                        skipped.fetch_add(1, Ordering::Relaxed);
+                                        ProjectResult {
+                                            project_id: project.id,
+                                            project_name: project.name,
+                                            status: "already_exists".to_string(),
+                                            error: None,
+                                        }
+                                    } else {
+                                        failed.fetch_add(1, Ordering::Relaxed);
+                                        ProjectResult {
+                                            project_id: project.id,
+                                            project_name: project.name,
+                                            status: "failed".to_string(),
+                                            error: Some(err_str),
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
+                    .buffer_unordered(concurrency)
+                    .collect()
+                    .await;
+
+                let total = results.len();
+                let ok = succeeded.load(Ordering::Relaxed);
+                let skip = skipped.load(Ordering::Relaxed);
+                let fail = failed.load(Ordering::Relaxed);
+
+                match output_format {
+                    OutputFormat::Table => {
+                        for r in &results {
+                            let icon = match r.status.as_str() {
+                                "added" => "✓".green().to_string(),
+                                "already_exists" => "○".yellow().to_string(),
+                                _ => "✗".red().to_string(),
+                            };
+                            print!(
+                                "  {} {} ({})",
+                                icon,
+                                r.project_name.cyan(),
+                                r.project_id.dimmed()
+                            );
+                            if let Some(ref e) = r.error {
+                                print!(" — {}", e.red());
+                            }
+                            println!();
+                        }
+
+                        println!();
+                        println!("{}", "─".repeat(60));
+                        println!(
+                            "  Total: {}  Added: {}  Already existed: {}  Failed: {}",
+                            total,
+                            ok.to_string().green(),
+                            skip.to_string().yellow(),
+                            fail.to_string().red()
+                        );
+                    }
+                    _ => {
+                        #[derive(Serialize, schemars::JsonSchema)]
+                        struct AddToAllOutput {
+                            email: String,
+                            total: usize,
+                            added: usize,
+                            already_existed: usize,
+                            failed: usize,
+                            results: Vec<ProjectResult>,
+                        }
+                        output_format.write(&AddToAllOutput {
+                            email: email.clone(),
+                            total,
+                            added: ok,
+                            already_existed: skip,
+                            failed: fail,
+                            results,
+                        })?;
+                    }
+                }
+
+                if fail > 0 {
+                    anyhow::bail!("{} project(s) failed", fail);
+                }
+
+                Ok(())
             }
         }
     }

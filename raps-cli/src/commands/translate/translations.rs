@@ -10,13 +10,81 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use serde::Serialize;
 
+use base64::Engine as _;
+use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
-use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
+use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat, TranslationCache};
 use raps_kernel::{progress, prompts};
 
 /// Client-side polling timeout for translations (2 hours).
 /// Translations typically complete within minutes, but complex models can take longer.
 pub(super) const TRANSLATE_POLL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
+
+/// Detect the best output format from a file extension.
+/// Returns the format name (e.g. "svf2") and the matched extension for display.
+fn detect_output_format(file_path: &str) -> (&'static str, &'static str) {
+    let ext = std::path::Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        // Autodesk native formats → SVF2 (best for viewing)
+        "rvt" => ("svf2", "rvt"),
+        "rfa" => ("svf2", "rfa"),
+        "rte" => ("svf2", "rte"),
+        "rft" => ("svf2", "rft"),
+        "dwg" => ("svf2", "dwg"),
+        "dxf" => ("svf2", "dxf"),
+        "dwf" => ("svf2", "dwf"),
+        "dwfx" => ("svf2", "dwfx"),
+        "ipt" => ("svf2", "ipt"),
+        "iam" => ("svf2", "iam"),
+        "ipn" => ("svf2", "ipn"),
+        "ide" => ("svf2", "ide"),
+        "nwd" => ("svf2", "nwd"),
+        "nwc" => ("svf2", "nwc"),
+        "nwf" => ("svf2", "nwf"),
+        "max" => ("svf2", "max"),
+        "3ds" => ("svf2", "3ds"),
+        // Open/exchange formats → SVF2 (most useful for viewing)
+        "ifc" => ("svf2", "ifc"),
+        "ifczip" => ("svf2", "ifczip"),
+        "stp" => ("svf2", "stp"),
+        "step" => ("svf2", "step"),
+        "ste" => ("svf2", "ste"),
+        "sat" => ("svf2", "sat"),
+        "sab" => ("svf2", "sab"),
+        "obj" => ("svf2", "obj"),
+        "stl" => ("svf2", "stl"),
+        "fbx" => ("svf2", "fbx"),
+        "gltf" => ("svf2", "gltf"),
+        "glb" => ("svf2", "glb"),
+        // Fallback
+        _ => ("svf2", ""),
+    }
+}
+
+/// Try to extract the file extension from a base64-encoded URN.
+/// APS URNs are base64url-encoded strings of the form "urn:adsk.objects:os.object:<bucket>/<key>".
+/// Returns the decoded path/filename portion if decoding succeeds.
+fn filename_from_urn(urn: &str) -> Option<String> {
+    use base64::Engine as _;
+
+    // Try base64url (no pad) first, then standard variants
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(urn)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(urn))
+        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(urn))
+        .or_else(|_| base64::engine::general_purpose::STANDARD.decode(urn))
+        .ok()?;
+
+    let s = std::str::from_utf8(&decoded).ok()?;
+    // The URN looks like "urn:adsk.objects:os.object:bucket/path/to/file.rvt"
+    // Extract the last path component as the filename
+    s.split('/').last().map(|f| f.to_string())
+}
 
 #[derive(Serialize, schemars::JsonSchema)]
 struct TranslationStartOutput {
@@ -65,9 +133,13 @@ pub(super) async fn start_translation(
     format: Option<String>,
     root_filename: Option<String>,
     wait: bool,
+    watch: bool,
+    poll_interval: u64,
+    watch_timeout: u64,
     output_format: OutputFormat,
     region_str: String,
     force: bool,
+    cost_estimate: bool,
 ) -> Result<()> {
     let region: raps_derivative::MdRegion = region_str.parse().context("Invalid --region value")?;
     // Get URN interactively if not provided
@@ -100,14 +172,118 @@ pub(super) async fn start_translation(
             ),
         },
         None => {
-            // Interactive mode: prompt for format
-            let formats = DerivativeOutputFormat::all();
-            let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
+            // Try to auto-detect from URN (base64-decode to get filename/extension)
+            let auto_detected = filename_from_urn(&source_urn)
+                .map(|filename| detect_output_format(&filename));
 
-            let selection = prompts::select("Select output format", &format_labels)?;
-            formats[selection]
+            if let Some((fmt, ext)) = auto_detected.filter(|(_, ext)| !ext.is_empty()) {
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Auto-detected output format: {} (from .{} extension)",
+                        "->".dimmed(),
+                        fmt.cyan(),
+                        ext
+                    );
+                } else {
+                    println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                }
+                match fmt {
+                    "svf2" => DerivativeOutputFormat::Svf2,
+                    "svf" => DerivativeOutputFormat::Svf,
+                    "obj" => DerivativeOutputFormat::Obj,
+                    "stl" => DerivativeOutputFormat::Stl,
+                    "step" => DerivativeOutputFormat::Step,
+                    "iges" => DerivativeOutputFormat::Iges,
+                    "ifc" => DerivativeOutputFormat::Ifc,
+                    _ => DerivativeOutputFormat::Svf2,
+                }
+            } else {
+                // Interactive mode: prompt for format
+                let formats = DerivativeOutputFormat::all();
+                let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
+
+                let selection = prompts::select("Select output format", &format_labels)?;
+                formats[selection]
+            }
         }
     };
+
+    // ------------------------------------------------------------------
+    // Translation deduplication cache (issue #205)
+    // ------------------------------------------------------------------
+    let format_key = derivative_format.type_name().to_string();
+    let mut cache = TranslationCache::load();
+
+    if force {
+        // Invalidate any stale cache entry so we re-translate unconditionally.
+        cache.invalidate(&source_urn, &format_key);
+    } else {
+        // 1. Check local disk cache first (fast, no network).
+        if let Some(entry) = cache.get(&source_urn, &format_key) {
+            if entry.status == "success" {
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Translation already complete (cached). Use --force to re-translate.",
+                        "\u{2713}".green().bold()
+                    );
+                } else {
+                    println!(
+                        "Translation already complete (cached). Use --force to re-translate."
+                    );
+                }
+                return Ok(());
+            }
+        } else {
+            // 2. No local cache entry — check the live manifest to avoid
+            //    re-submitting a job that succeeded in a previous session.
+            match client.get_manifest(&source_urn).await {
+                Ok(manifest) if manifest.status == "success" => {
+                    // Cache it for next time and skip submission.
+                    cache.insert(
+                        &source_urn,
+                        &format_key,
+                        manifest.urn.clone(),
+                        "success".to_string(),
+                    );
+                    cache.save();
+                    if output_format.supports_colors() {
+                        println!(
+                            "{} Translation already complete (manifest exists). Use --force to re-translate.",
+                            "\u{2713}".green().bold()
+                        );
+                    } else {
+                        println!(
+                            "Translation already complete (manifest exists). Use --force to re-translate."
+                        );
+                    }
+                    return Ok(());
+                }
+                // 404, inprogress, pending, or any error → fall through and submit.
+                _ => {}
+            }
+        }
+    }
+
+    // Show cost estimate if requested, using file extension from URN
+    if cost_estimate {
+        // Decode the URN to extract the file extension heuristic
+        let ext = {
+            let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(source_urn.trim_end_matches('='))
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+                .unwrap_or_default();
+            // URN typically ends with the object key, e.g. ".../<filename.rvt>"
+            std::path::Path::new(&decoded)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase()
+        };
+        // Use 0 as file size since we don't have it at this point
+        let estimate = CostEstimate::for_translation(0, &ext);
+        estimate.print(&output_format);
+    }
 
     if output_format.supports_colors() {
         println!(
@@ -177,6 +353,22 @@ pub(super) async fn start_translation(
     if wait {
         let urn_for_status = response.urn.clone();
         check_status(client, &urn_for_status, true, output_format).await?;
+    }
+
+    // If --watch flag is set, use the dedicated watch loop with configurable interval/timeout
+    if watch && !wait {
+        super::watch::watch_translation(
+            client,
+            &response.urn,
+            poll_interval,
+            watch_timeout,
+            &output_format,
+        )
+        .await?;
+
+        // Persist success to the deduplication cache.
+        cache.insert(&source_urn, &format_key, response.urn.clone(), "success".to_string());
+        cache.save();
     }
 
     Ok(())
@@ -603,7 +795,19 @@ pub(super) async fn start_serverless(
     };
     let format = match format {
         Some(f) => f,
-        None => prompts::input("Output format", Some("svf2"))?,
+        None => {
+            // Try to auto-detect from URN
+            let auto = filename_from_urn(&urn)
+                .map(|filename| detect_output_format(&filename))
+                .filter(|(_, ext)| !ext.is_empty());
+
+            if let Some((fmt, ext)) = auto {
+                println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                fmt.to_string()
+            } else {
+                prompts::input("Output format", Some("svf2"))?
+            }
+        }
     };
 
     let job = TranslateJobRequest {

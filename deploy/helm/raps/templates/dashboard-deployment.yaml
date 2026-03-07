@@ -21,6 +21,14 @@ spec:
       containers:
         - name: dashboard
           image: {{ include "raps.image" (dict "image" .Values.dashboard.image "global" .Values.global) }}
+          command:
+            - raps
+            - serve
+            - dashboard
+            - --port
+            - {{ .Values.dashboard.service.port | quote }}
+            - --redis-url
+            - {{ include "raps.redisUrl" . }}
           env:
             - name: RUST_LOG
               valueFrom:

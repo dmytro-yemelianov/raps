@@ -1,0 +1,14 @@
+---
+source: raps-cli/tests/scenarios/admin_remove_user.rs
+expression: trace
+---
+[
+  {
+    "method": "POST",
+    "path": "/construction/admin/v1/accounts/mock-account-001/users/search"
+  },
+  {
+    "method": "DELETE",
+    "path": "/construction/admin/v1/projects/proj-001/users/user-001"
+  }
+]

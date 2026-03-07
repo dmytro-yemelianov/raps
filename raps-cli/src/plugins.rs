@@ -127,8 +127,9 @@ impl PluginConfig {
         Ok(proj_dirs.config_dir().join("plugins.json"))
     }
 
-    /// Get an alias command if defined
-    #[allow(dead_code)]
+    /// Get an alias command if defined.
+    ///
+    /// Used by alias expansion in the interactive shell.
     pub fn get_alias(&self, name: &str) -> Option<&str> {
         self.aliases.get(name).map(|s| s.as_str())
     }
@@ -186,6 +187,10 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
+    fn load_latest_config(&self) -> PluginConfig {
+        PluginConfig::load().unwrap_or_else(|_| self.config.clone())
+    }
+
     /// Create a new plugin manager
     pub fn new() -> Result<Self> {
         let config = PluginConfig::load().unwrap_or_default();
@@ -267,8 +272,10 @@ impl PluginManager {
 
     /// Execute a plugin by name
     pub fn execute_plugin(&self, name: &str, args: &[&str]) -> Result<i32> {
+        let config = self.load_latest_config();
+
         // Check configured plugins first
-        if let Some(entry) = self.config.plugins.get(name) {
+        if let Some(entry) = config.plugins.get(name) {
             if !entry.enabled {
                 anyhow::bail!("Plugin '{name}' is disabled");
             }
@@ -305,8 +312,9 @@ impl PluginManager {
     /// - If signature + public_key present: verify ed25519 signature
     fn verify_plugin_integrity(&self, name: &str, path: &Path) -> Result<()> {
         let current_hash = compute_binary_hash(path)?;
+        let config = self.load_latest_config();
 
-        if let Some(entry) = self.config.plugins.get(name) {
+        if let Some(entry) = config.plugins.get(name) {
             // Check ed25519 signature if present
             if let (Some(sig_hex), Some(key_hex)) = (&entry.signature, &entry.public_key) {
                 verify_ed25519_signature(path, sig_hex, key_hex).with_context(|| {
@@ -391,8 +399,9 @@ impl PluginManager {
     pub fn verify_plugin(&self, name: &str) -> Result<PluginVerifyResult> {
         let path = self.resolve_plugin_path(name)?;
         let current_hash = compute_binary_hash(&path)?;
+        let config = self.load_latest_config();
 
-        if let Some(entry) = self.config.plugins.get(name) {
+        if let Some(entry) = config.plugins.get(name) {
             let hash_match = entry.sha256.as_ref() == Some(&current_hash);
 
             // Check signature
@@ -437,7 +446,9 @@ impl PluginManager {
 
     /// Resolve a plugin name to its filesystem path
     fn resolve_plugin_path(&self, name: &str) -> Result<PathBuf> {
-        if let Some(entry) = self.config.plugins.get(name)
+        let config = self.load_latest_config();
+
+        if let Some(entry) = config.plugins.get(name)
             && let Some(ref path) = entry.path
         {
             return Ok(PathBuf::from(path));
@@ -451,14 +462,12 @@ impl PluginManager {
     }
 
     /// Run pre-command hooks
-    #[allow(dead_code)]
     pub fn run_pre_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("pre_{}", command);
         self.run_hooks(&hook_key)
     }
 
     /// Run post-command hooks
-    #[allow(dead_code)]
     pub fn run_post_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("post_{}", command);
         self.run_hooks(&hook_key)

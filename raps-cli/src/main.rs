@@ -32,6 +32,7 @@
 //! - Reality Capture: Photogrammetry processing
 
 mod commands;
+mod context_banner;
 mod credits;
 mod mcp;
 mod output;
@@ -53,7 +54,7 @@ use commands::{
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, JobCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
     RealityCommands, ReportCommands, RfiCommands, TemplateCommands, TranslateCommands,
-    WebhookCommands,
+    WebhookCommands, WorkflowCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -89,6 +90,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   inspect       Inspect archive contents via HTTP Range (no full download)
 
 \x1b[1;36m3-Legged Auth (User Login)\x1b[0m
+  status        Show context: auth state, hub tiers (Personal/Enterprise), active account
   hub           List and manage hubs
   project       List and manage projects
   folder        List and manage folders
@@ -101,6 +103,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   template      Project templates management (create, list, update, archive)
 
 \x1b[1;32mUtility (No Auth Required)\x1b[0m
+  init          First-time setup wizard (credentials, login, hub context)
   config        Configuration management (profiles, settings)
   completions   Generate shell completions for bash, zsh, fish, PowerShell
   shell         Start an interactive shell session
@@ -185,6 +188,10 @@ struct Cli {
     #[arg(long, global = true)]
     no_retry: bool,
 
+    /// HTTP/HTTPS proxy URL (env: RAPS_PROXY), e.g. http://proxy.corp.example.com:8080
+    #[arg(long, value_name = "URL", global = true)]
+    proxy: Option<String>,
+
     /// Maximum concurrent operations for bulk commands (default: 5, env: RAPS_CONCURRENCY)
     #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
@@ -226,6 +233,12 @@ enum Commands {
     /// Translate files using Model Derivative API
     #[command(subcommand)]
     Translate(TranslateCommands),
+
+    /// First-time setup wizard — configure credentials, login, and hub context
+    Init,
+
+    /// Show full context: auth state, hubs (Personal vs Enterprise), active account
+    Status,
 
     /// List and manage hubs
     #[command(subcommand)]
@@ -310,6 +323,10 @@ enum Commands {
     #[command(subcommand)]
     Job(JobCommands),
 
+    /// Run a complete workflow: upload → translate → download
+    #[command(subcommand)]
+    Workflow(WorkflowCommands),
+
     /// Generate shell completions for bash, zsh, fish, PowerShell, or elvish
     Completions {
         /// Shell to generate completions for
@@ -347,6 +364,13 @@ enum Commands {
     #[command(subcommand)]
     Schema(commands::schema::SchemaCommands),
 
+    /// Sync a local directory to an OSS bucket
+    Sync(commands::sync::SyncArgs),
+
+    /// Generate agent-facing documentation from live code
+    #[command(subcommand)]
+    Docs(commands::docs::DocsCommands),
+
     /// Generate man pages for raps and its subcommands
     Man {
         /// Output directory for all man pages (default: print main page to stdout)
@@ -354,17 +378,180 @@ enum Commands {
         output_dir: Option<std::path::PathBuf>,
     },
 
+    /// Show recent command history
+    History {
+        /// Number of recent entries to show
+        #[arg(long, short = 'n', value_name = "N", default_value = "20")]
+        last: usize,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Re-run a command from history by its index
+    Replay {
+        /// 1-based index from `raps history`
+        index: usize,
+    },
+
+    /// Show aggregate usage statistics
+    Stats {
+        /// Output format
+        #[arg(long, value_enum, default_value = "table")]
+        format: OutputFormat,
+    },
+
+    /// Watch a directory and auto-upload new/changed files to OSS
+    Watch(commands::watch_dir::WatchArgs),
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
+}
+
+/// Known top-level subcommand names for fuzzy correction suggestions.
+const KNOWN_SUBCOMMANDS: &[&str] = &[
+    "auth", "bucket", "object", "translate", "workflow", "sync", "watch", "stats", "init",
+    "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
+    "api", "rfi", "report", "template", "reality", "inspect", "plugin", "generate", "demo",
+    "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm",
+    "schema", "history", "replay", "man",
+];
+
+/// Compute the Levenshtein edit distance between two strings.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (m, n) = (a.len(), b.len());
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            dp[i][j] = if a[i - 1] == b[j - 1] {
+                dp[i - 1][j - 1]
+            } else {
+                1 + dp[i - 1][j - 1].min(dp[i - 1][j]).min(dp[i][j - 1])
+            };
+        }
+    }
+    dp[m][n]
+}
+
+/// Find the closest known subcommand to `input` (Levenshtein distance ≤ 3).
+fn suggest_command(input: &str) -> Option<&'static str> {
+    KNOWN_SUBCOMMANDS
+        .iter()
+        .map(|&cmd| (cmd, levenshtein(input, cmd)))
+        .filter(|&(_, d)| d <= 3)
+        .min_by_key(|&(_, d)| d)
+        .map(|(cmd, _)| cmd)
+}
+
+/// Transform bare `help` positional args into `--help` so that
+/// `raps help auth`, `raps auth help`, and `raps auth login help` all work.
+fn transform_help_args(args: impl Iterator<Item = String>) -> Vec<String> {
+    let mut args: Vec<String> = args.collect();
+
+    // Find the first "help" that is positional (not a value fed to a preceding flag)
+    let help_idx = args.iter().enumerate().skip(1).find_map(|(i, arg)| {
+        if arg.eq_ignore_ascii_case("help") && !args[i - 1].starts_with('-') {
+            Some(i)
+        } else {
+            None
+        }
+    });
+
+    if let Some(idx) = help_idx {
+        args.remove(idx);
+        args.push("--help".to_string());
+    }
+
+    args
+}
+
+#[cfg(test)]
+mod help_transform_tests {
+    use super::*;
+
+    fn t(args: &[&str]) -> Vec<String> {
+        transform_help_args(args.iter().map(|s| s.to_string()))
+    }
+
+    #[test]
+    fn raps_help_auth() {
+        assert_eq!(t(&["raps", "help", "auth"]), vec!["raps", "auth", "--help"]);
+    }
+
+    #[test]
+    fn raps_auth_help() {
+        assert_eq!(t(&["raps", "auth", "help"]), vec!["raps", "auth", "--help"]);
+    }
+
+    #[test]
+    fn raps_auth_login_help() {
+        assert_eq!(
+            t(&["raps", "auth", "login", "help"]),
+            vec!["raps", "auth", "login", "--help"]
+        );
+    }
+
+    #[test]
+    fn raps_help_auth_login() {
+        assert_eq!(
+            t(&["raps", "help", "auth", "login"]),
+            vec!["raps", "auth", "login", "--help"]
+        );
+    }
+
+    #[test]
+    fn raps_help_alone() {
+        assert_eq!(t(&["raps", "help"]), vec!["raps", "--help"]);
+    }
+
+    #[test]
+    fn no_help_passthrough() {
+        assert_eq!(t(&["raps", "auth", "status"]), vec!["raps", "auth", "status"]);
+    }
+
+    #[test]
+    fn flag_value_not_transformed() {
+        // --output happens to be followed by "help" — don't transform
+        assert_eq!(
+            t(&["raps", "--output", "help"]),
+            vec!["raps", "--output", "help"]
+        );
+    }
+
+    #[test]
+    fn already_dashdash_help_passthrough() {
+        assert_eq!(
+            t(&["raps", "auth", "--help"]),
+            vec!["raps", "auth", "--help"]
+        );
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     raps_kernel::profiler::init();
 
+    // Record this invocation to history (skip history/replay themselves)
+    let raw_args: Vec<String> = std::env::args().collect();
+    let skip_record = raw_args
+        .get(1)
+        .map(|s| s == "history" || s == "replay")
+        .unwrap_or(false);
+    if !skip_record {
+        record_history(&raw_args);
+    }
+
     // Handle clap errors (invalid arguments) - clap already exits with code 2
-    let cli = match Cli::try_parse() {
+    let cli = match Cli::try_parse_from(transform_help_args(std::env::args())) {
         Ok(cli) => cli,
         Err(e) => {
             let exit_code = match e.kind() {
@@ -376,6 +563,28 @@ async fn main() -> Result<()> {
                     print!("{}", include_str!("../logo.ansi"));
                     let _ = e.print();
                     0
+                }
+                ErrorKind::InvalidSubcommand | ErrorKind::UnknownArgument => {
+                    // Try to extract the mistyped subcommand from the error message and suggest a correction.
+                    // clap formats these as: error: unrecognized subcommand 'bukcets'
+                    let msg = e.to_string();
+                    let mistyped = msg
+                        .lines()
+                        .find(|l| {
+                            l.contains("unrecognized subcommand")
+                                || l.contains("invalid subcommand")
+                        })
+                        .and_then(|l| l.split('\'').nth(1));
+                    if let Some(word) = mistyped {
+                        if let Some(suggestion) = suggest_command(word) {
+                            eprintln!(
+                                "  {}",
+                                format!("Did you mean: raps {}?", suggestion).yellow()
+                            );
+                        }
+                    }
+                    let _ = e.print();
+                    2
                 }
                 _ => {
                     let _ = e.print();
@@ -442,7 +651,7 @@ async fn run(cli: Cli) -> Result<()> {
         None => {
             // If stdin is piped, read commands line-by-line (batch mode)
             if !io::stdin().is_terminal() {
-                return run_piped_stdin(cli.timeout, cli.output, cli.concurrency).await;
+                return run_piped_stdin(cli.timeout, cli.proxy, cli.output, cli.concurrency).await;
             }
             print!("{}", include_str!("../logo.ansi"));
             Cli::command().print_help()?;
@@ -508,7 +717,8 @@ async fn run(cli: Cli) -> Result<()> {
             cli.max_retries,
             cli.base_delay,
             cli.max_wait,
-        );
+            cli.proxy,
+        )?;
         return commands::dashboard::run_dashboard(config, http_config).await;
     }
 
@@ -552,7 +762,8 @@ async fn run(cli: Cli) -> Result<()> {
         max_retries,
         cli.base_delay,
         cli.max_wait,
-    );
+        cli.proxy,
+    )?;
 
     if let Commands::Shell = command {
         credits::shell_welcome();
@@ -711,6 +922,25 @@ async fn run(cli: Cli) -> Result<()> {
                         continue;
                     }
 
+                    // Expand aliases: if the first word matches a configured alias,
+                    // replace the line with the aliased command before parsing.
+                    let line = {
+                        let plugin_cfg = crate::plugins::PluginConfig::load()
+                            .unwrap_or_default();
+                        let first_word = line.split_whitespace().next().unwrap_or("");
+                        if let Some(alias_cmd) = plugin_cfg.get_alias(first_word) {
+                            let rest = line[first_word.len()..].trim_start();
+                            if rest.is_empty() {
+                                alias_cmd.to_string()
+                            } else {
+                                format!("{} {}", alias_cmd, rest)
+                            }
+                        } else {
+                            line.to_string()
+                        }
+                    };
+                    let line = line.as_str();
+
                     let mut args = match shlex::split(line) {
                         Some(args) => args,
                         None => {
@@ -732,12 +962,19 @@ async fn run(cli: Cli) -> Result<()> {
                     };
 
                     let sub_output_format = OutputFormat::determine(sub_cli.output);
-                    let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+                    let sub_http_config = match HttpClientConfig::from_cli_and_env_full(
                         sub_cli.timeout,
                         sub_cli.max_retries,
                         sub_cli.base_delay,
                         sub_cli.max_wait,
-                    );
+                        sub_cli.proxy,
+                    ) {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            eprintln!("Error: {e}");
+                            continue;
+                        }
+                    };
 
                     let sub_command = match sub_cli.command {
                         Some(cmd) => cmd,
@@ -807,6 +1044,7 @@ fn resolve_concurrency(flag: Option<usize>) -> usize {
 /// Supports: `echo "bucket list" | raps` or `Get-Content commands.txt | raps`
 async fn run_piped_stdin(
     timeout: Option<u64>,
+    proxy: Option<String>,
     output: Option<OutputFormat>,
     concurrency: Option<usize>,
 ) -> Result<()> {
@@ -842,12 +1080,20 @@ async fn run_piped_stdin(
         };
 
         let sub_output_format = OutputFormat::determine(sub_cli.output.or(output));
-        let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+        let sub_http_config = match HttpClientConfig::from_cli_and_env_full(
             sub_cli.timeout.or(timeout),
             sub_cli.max_retries,
             sub_cli.base_delay,
             sub_cli.max_wait,
-        );
+            sub_cli.proxy.or_else(|| proxy.clone()),
+        ) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                exit_code = 1;
+                continue;
+            }
+        };
 
         let sub_command = match sub_cli.command {
             Some(cmd) => cmd,
@@ -880,12 +1126,163 @@ async fn run_piped_stdin(
     Ok(())
 }
 
+// ── History helpers ──────────────────────────────────────────────────────────
+
+/// Returns the path to the history file, creating parent dirs if needed.
+fn history_path() -> Option<std::path::PathBuf> {
+    let dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")?;
+    let cache = dirs.cache_dir().to_path_buf();
+    std::fs::create_dir_all(&cache).ok()?;
+    Some(cache.join("history.json"))
+}
+
+/// Loads existing history entries from disk.
+fn load_history() -> Vec<serde_json::Value> {
+    let path = match history_path() {
+        Some(p) => p,
+        None => return vec![],
+    };
+    let data = match std::fs::read_to_string(&path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    serde_json::from_str::<Vec<serde_json::Value>>(&data).unwrap_or_default()
+}
+
+/// Appends the current invocation to the history file (silently ignores errors).
+fn record_history(args: &[String]) {
+    let _ = (|| -> Option<()> {
+        let path = history_path()?;
+
+        let mut entries = {
+            let data = std::fs::read_to_string(&path).unwrap_or_default();
+            serde_json::from_str::<Vec<serde_json::Value>>(&data).unwrap_or_default()
+        };
+
+        let next_index = entries.len() + 1;
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        let args_json: Vec<serde_json::Value> =
+            args.iter().map(|s| serde_json::Value::String(s.clone())).collect();
+
+        entries.push(serde_json::json!({
+            "index": next_index,
+            "timestamp": timestamp,
+            "args": args_json,
+        }));
+
+        // Keep only the last 100 entries
+        if entries.len() > 100 {
+            let drain_count = entries.len() - 100;
+            entries.drain(0..drain_count);
+            // Re-index
+            for (i, entry) in entries.iter_mut().enumerate() {
+                entry["index"] = serde_json::Value::Number((i + 1).into());
+            }
+        }
+
+        let json = serde_json::to_string_pretty(&entries).ok()?;
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &json).ok()?;
+        std::fs::rename(&tmp, &path).ok()?;
+        Some(())
+    })();
+}
+
+/// Handler for `raps history`.
+fn execute_history(last: usize, json_output: bool) -> Result<()> {
+    let entries = load_history();
+    let entries: Vec<_> = entries
+        .iter()
+        .rev()
+        .take(last)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&entries)?);
+        return Ok(());
+    }
+
+    if entries.is_empty() {
+        println!("No history recorded yet.");
+        return Ok(());
+    }
+
+    println!("{:>4}  {:<21}  {}", "N", "TIME", "COMMAND");
+    for entry in &entries {
+        let index = entry.get("index").and_then(|v| v.as_u64()).unwrap_or(0);
+        let timestamp = entry
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        // Format timestamp: truncate to "YYYY-MM-DD HH:MM:SS"
+        let display_time = chrono::DateTime::parse_from_rfc3339(timestamp)
+            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_else(|_| timestamp[..timestamp.len().min(19)].to_string());
+
+        let args: Vec<&str> = entry
+            .get("args")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+        let command_str = args.join(" ");
+
+        println!("{:>4}  {:<21}  {}", index, display_time, command_str);
+    }
+
+    Ok(())
+}
+
+/// Handler for `raps replay <index>`.
+fn execute_replay(index: usize) -> Result<()> {
+    let entries = load_history();
+    let entry = entries
+        .iter()
+        .find(|e| e.get("index").and_then(|v| v.as_u64()) == Some(index as u64))
+        .ok_or_else(|| anyhow::anyhow!("No history entry with index {}", index))?;
+
+    let args: Vec<String> = entry
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if args.is_empty() {
+        anyhow::bail!("History entry {} has no arguments", index);
+    }
+
+    let command_str = args.join(" ");
+    println!("Replaying: {}", command_str);
+
+    let status = std::process::Command::new(&args[0])
+        .args(&args[1..])
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute '{}': {}", args[0], e))?;
+
+    if !status.success() {
+        let code = status.code().unwrap_or(1);
+        std::process::exit(code);
+    }
+
+    Ok(())
+}
+
 fn command_name(cmd: &Commands) -> &'static str {
     match cmd {
         Commands::Auth(_) => "auth",
         Commands::Bucket(_) => "bucket",
         Commands::Object(_) => "object",
         Commands::Translate(_) => "translate",
+        Commands::Workflow(_) => "workflow",
+        Commands::Init => "init",
+        Commands::Status => "status",
         Commands::Hub(_) => "hub",
         Commands::Project(_) => "project",
         Commands::Folder(_) => "folder",
@@ -918,8 +1315,14 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Cache(_) => "cache",
         Commands::Swarm(_) => "swarm",
         Commands::Schema(_) => "schema",
+        Commands::Sync(_) => "sync",
+        Commands::Docs(_) => "docs",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
+        Commands::History { .. } => "history",
+        Commands::Replay { .. } => "replay",
+        Commands::Stats { .. } => "stats",
+        Commands::Watch(_) => "watch",
     }
 }
 
@@ -934,58 +1337,78 @@ async fn execute_command(
     let cmd_name = command_name(&command);
     tracing::info!(command = cmd_name, "Executing command");
 
-    // Helper closure to create clients on demand
-    let get_auth_client =
-        || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };
+    // Run pre-command hooks (ignore errors — hooks should not block the command)
+    let plugin_manager = crate::plugins::PluginManager::default();
+    if let Err(e) = plugin_manager.run_pre_hooks(cmd_name) {
+        tracing::warn!(command = cmd_name, error = %e, "Pre-command hook failed");
+    }
+
+    // Helper closure to create clients on demand.
+    // http_config was already validated by from_cli_and_env_full, so these
+    // expect calls are justified — a panic here would be a programming error.
+    let get_auth_client = || -> AuthClient {
+        AuthClient::new_with_http_config(config.clone(), http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
+    };
 
     let get_oss_client = || -> OssClient {
         let auth = get_auth_client();
         OssClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_derivative_client = || -> DerivativeClient {
         let auth = get_auth_client();
         DerivativeClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_dm_client = || -> DataManagementClient {
         let auth = get_auth_client();
         DataManagementClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_webhooks_client = || -> WebhooksClient {
         let auth = get_auth_client();
         WebhooksClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_da_client = || -> DesignAutomationClient {
         let auth = get_auth_client();
         DesignAutomationClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_issues_client = || -> IssuesClient {
         let auth = get_auth_client();
         IssuesClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_rc_client = || -> RealityCaptureClient {
         let auth = get_auth_client();
         RealityCaptureClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_admin_client = || -> AccountAdminClient {
         let auth = get_auth_client();
         AccountAdminClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let _get_project_users_client = || -> ProjectUsersClient {
         let auth = get_auth_client();
         ProjectUsersClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_permissions_client = || -> FolderPermissionsClient {
         let auth = get_auth_client();
         FolderPermissionsClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     match command {
@@ -1004,6 +1427,23 @@ async fn execute_command(
 
         Commands::Translate(cmd) => {
             cmd.execute(&get_derivative_client(), output_format).await?;
+        }
+
+        Commands::Workflow(cmd) => {
+            commands::workflow::WorkflowCommands::execute(cmd, config, output_format).await?;
+        }
+
+        Commands::Init => {
+            commands::init::run_init().await?;
+        }
+
+        Commands::Status => {
+            commands::status::run_status(
+                &get_auth_client(),
+                &get_dm_client(),
+                output_format,
+            )
+            .await?;
         }
 
         Commands::Hub(cmd) => {
@@ -1043,7 +1483,7 @@ async fn execute_command(
 
         Commands::Admin(cmd) => {
             let auth_client = get_auth_client();
-            cmd.execute(config, &auth_client, output_format, concurrency)
+            cmd.execute(config, &auth_client, &get_dm_client(), output_format, concurrency)
                 .await?;
         }
 
@@ -1056,7 +1496,8 @@ async fn execute_command(
         Commands::Rfi(cmd) => {
             let auth_client = get_auth_client();
             let rfi_client =
-                RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
+                RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone())
+                    .expect("HTTP client configuration was validated at startup");
             cmd.execute(&rfi_client, &get_dm_client(), output_format)
                 .await?;
         }
@@ -1131,6 +1572,14 @@ async fn execute_command(
             cmd.execute()?;
         }
 
+        Commands::Sync(args) => {
+            commands::sync::execute(&get_oss_client(), args).await?;
+        }
+
+        Commands::Docs(cmd) => {
+            cmd.execute()?;
+        }
+
         Commands::Man { .. } => {
             unreachable!()
         }
@@ -1138,6 +1587,22 @@ async fn execute_command(
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => {
             unreachable!()
+        }
+
+        Commands::History { last, json } => {
+            execute_history(last, json)?;
+        }
+
+        Commands::Replay { index } => {
+            execute_replay(index)?;
+        }
+
+        Commands::Stats { format } => {
+            commands::stats::execute(format)?;
+        }
+
+        Commands::Watch(args) => {
+            commands::watch_dir::execute(args, config, output_format).await?;
         }
 
         Commands::External(args) => {
@@ -1161,6 +1626,11 @@ async fn execute_command(
                 anyhow::bail!("Plugin '{}' exited with code {}", plugin_name, code);
             }
         }
+    }
+
+    // Run post-command hooks (ignore errors — hooks should not mask the command result)
+    if let Err(e) = plugin_manager.run_post_hooks(cmd_name) {
+        tracing::warn!(command = cmd_name, error = %e, "Post-command hook failed");
     }
 
     Ok(())

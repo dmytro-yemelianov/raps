@@ -5,7 +5,9 @@
 
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
-use std::path::{Path, PathBuf};
+use raps_kernel::error::RapsError;
+use sha1::{Digest, Sha1};
+use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
@@ -15,6 +17,20 @@ use crate::OssClient;
 use crate::types::*;
 
 impl OssClient {
+    fn normalize_lexical_path(path: &Path) -> PathBuf {
+        let mut normalized = PathBuf::new();
+        for component in path.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    normalized.pop();
+                }
+                other => normalized.push(other.as_os_str()),
+            }
+        }
+        normalized
+    }
+
     /// Upload a file to a bucket using S3 signed URLs
     /// Automatically uses multipart upload for files larger than 5MB
     pub async fn upload_object(
@@ -108,19 +124,18 @@ impl OssClient {
             .header("Content-Length", file_size.to_string())
             .body(body)
             .send()
-            .await
-            .context("Failed to upload to S3")?;
-        raps_kernel::profiler::record_http_request(_upload_start.elapsed());
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to upload to S3 ({status}): {error_text}");
-        }
-
-        pb.set_position(file_size);
-
-        // Step 3: Complete the upload
+                    .await
+                    .context("Failed to upload to S3")?;
+                raps_kernel::profiler::record_http_request(_upload_start.elapsed());
+            
+                tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(s3_url), "HTTP response");
+            
+                if !response.status().is_success() {
+                    return Err(RapsError::from_response(response).await.into());
+                }
+            
+                pb.set_position(file_size);
+                    // Step 3: Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
         let object_info = self
             .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
@@ -153,10 +168,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = signed
@@ -166,16 +181,25 @@ impl OssClient {
         // Create progress bar (hidden in non-interactive mode)
         let pb = progress::file_progress(total_size, &format!("Downloading {}", object_key));
 
-        // Validate output path stays within current directory
+        // Validate output path stays within current directory, even if the file does not exist yet.
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        if let (Ok(canon_cwd), Ok(canon_target)) = (cwd.canonicalize(), output_path.canonicalize())
-            && !canon_target.starts_with(&canon_cwd)
-        {
-            anyhow::bail!(
-                "Path '{}' escapes working directory '{}'",
-                output_path.display(),
-                cwd.display()
-            );
+        let canon_cwd = cwd.canonicalize().unwrap_or_else(|_| cwd.clone());
+        let abs_output = if output_path.is_absolute() {
+            output_path.to_path_buf()
+        } else {
+            cwd.join(output_path)
+        };
+        if let Some(parent) = abs_output.parent() {
+            let checked_parent = parent
+                .canonicalize()
+                .unwrap_or_else(|_| Self::normalize_lexical_path(parent));
+            if !checked_parent.starts_with(&canon_cwd) {
+                anyhow::bail!(
+                    "Path '{}' escapes working directory '{}'",
+                    output_path.display(),
+                    cwd.display()
+                );
+            }
         }
 
         // Stream download
@@ -219,10 +243,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&download_url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to download from S3 ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let total_size = signed
@@ -286,10 +310,10 @@ impl OssClient {
             })
             .await?;
 
+            tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list objects ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let response_text = response
@@ -334,13 +358,94 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete object ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
+    }
+
+    /// Get the SHA-1 hash of an existing remote object.
+    ///
+    /// Returns `Ok(Some(sha1))` if the object exists, or `Ok(None)` if the
+    /// object does not exist (HTTP 404).  Any other HTTP error is propagated.
+    pub async fn get_object_details_sha1(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+    ) -> Result<Option<String>> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/buckets/{}/objects/{}/details",
+            self.config.oss_url(),
+            bucket_key,
+            urlencoding::encode(object_key)
+        );
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        let details: crate::types::ObjectDetails = response
+            .json()
+            .await
+            .context("Failed to parse object details response")?;
+
+        Ok(Some(details.sha1))
+    }
+
+    /// Compute the SHA-1 of a local file and compare it to the remote object.
+    ///
+    /// Returns `Ok(Some(object_info))` when an identical object already exists
+    /// in the bucket, or `Ok(None)` when no duplicate is found.
+    pub async fn check_duplicate(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &std::path::Path,
+    ) -> Result<Option<ObjectInfo>> {
+        // Compute local SHA-1
+        let file_bytes = tokio::fs::read(file_path)
+            .await
+            .context("Failed to read file for SHA-1 computation")?;
+        let mut hasher = Sha1::new();
+        hasher.update(&file_bytes);
+        let local_sha1 = hex::encode(hasher.finalize());
+
+        // Fetch remote SHA-1
+        let remote_sha1 = self
+            .get_object_details_sha1(bucket_key, object_key)
+            .await?;
+
+        match remote_sha1 {
+            Some(remote) if remote.to_lowercase() == local_sha1.to_lowercase() => {
+                // Duplicate found — return full ObjectInfo converted from ObjectDetails
+                let details = self.get_object_details(bucket_key, object_key).await?;
+                Ok(Some(ObjectInfo {
+                    bucket_key: details.bucket_key,
+                    object_key: details.object_key,
+                    object_id: details.object_id,
+                    sha1: Some(details.sha1),
+                    size: details.size,
+                    location: details.location,
+                    content_type: Some(details.content_type),
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// Get detailed metadata for an object without downloading it
@@ -365,10 +470,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get object details ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let details: ObjectDetails = response
@@ -405,14 +510,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to get signed download URL ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let signed: SignedS3DownloadResponse = response
@@ -458,14 +559,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to get signed upload URL ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let signed: SignedS3UploadResponse = response
@@ -504,14 +601,10 @@ impl OssClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!(
-                "Failed to complete signed upload ({}): {}",
-                status,
-                error_text
-            );
+            return Err(RapsError::from_response(response).await.into());
         }
 
         // Get response text for debugging

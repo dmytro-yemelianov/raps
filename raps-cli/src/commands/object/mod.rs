@@ -6,7 +6,11 @@
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.
 
 mod copy;
+mod diff;
 pub(crate) mod download;
+mod download_bulk;
+mod inspect;
+pub(crate) mod secret_scan;
 pub(crate) mod upload;
 
 use anyhow::Result;
@@ -18,7 +22,10 @@ use raps_kernel::prompts;
 use raps_oss::OssClient;
 
 use copy::{batch_copy_objects, batch_rename_objects, copy_object, rename_object};
+use diff::diff_objects;
 use download::{delete_object, download_object, get_signed_url, list_objects, object_info};
+use download_bulk::download_bulk;
+use inspect::inspect_object;
 use upload::{upload_batch, upload_object};
 
 #[derive(Debug, Subcommand)]
@@ -38,6 +45,22 @@ pub enum ObjectCommands {
         /// Resume interrupted upload (for large files)
         #[arg(short, long)]
         resume: bool,
+
+        /// Skip upload if an identical object (same SHA-1) already exists
+        #[arg(long)]
+        skip_if_exists: bool,
+
+        /// Show cost/time estimate before uploading
+        #[arg(long)]
+        cost_estimate: bool,
+
+        /// Skip secret scanning before upload
+        #[arg(long)]
+        skip_secret_scan: bool,
+
+        /// Allow upload even if secrets are detected (overrides the default block)
+        #[arg(long)]
+        allow_secrets: bool,
     },
 
     /// Upload multiple files in parallel
@@ -56,6 +79,10 @@ pub enum ObjectCommands {
         /// Resume a previously interrupted batch upload
         #[arg(long)]
         resume: bool,
+
+        /// Skip upload if an identical object (same SHA-1) already exists
+        #[arg(long)]
+        skip_if_exists: bool,
     },
 
     /// Download an object from a bucket (use `--out-file -` to write to stdout)
@@ -69,6 +96,32 @@ pub enum ObjectCommands {
         /// Output file path (defaults to object key; use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
+    },
+
+    /// Download multiple objects in parallel matching a prefix
+    #[command(name = "download-bulk")]
+    DownloadBulk {
+        /// Bucket key
+        bucket: Option<String>,
+
+        /// Object key prefix to match (e.g. `models/` to download all objects under that path)
+        prefix: String,
+
+        /// Directory to write downloaded files into
+        #[arg(long, default_value = ".")]
+        output_dir: PathBuf,
+
+        /// Maximum number of parallel downloads
+        #[arg(long, default_value = "4")]
+        concurrency: usize,
+
+        /// Skip files that already exist locally with a matching size (on by default)
+        #[arg(long, default_value = "true")]
+        skip_existing: bool,
+
+        /// Download all files directly into --output-dir without preserving the key prefix structure
+        #[arg(long)]
+        flat: bool,
     },
 
     /// List objects in a bucket
@@ -113,6 +166,31 @@ pub enum ObjectCommands {
         bucket: String,
         /// Object key
         object: String,
+    },
+
+    /// Compare two OSS objects or an OSS object against a local file
+    ///
+    /// Both arguments may be OSS keys in `<bucket>/<object-key>` format, or
+    /// the second argument may be a path to a local file.
+    ///
+    /// For text files a unified diff is shown. For binary files size and
+    /// SHA-1/SHA-256 checksums are compared.
+    ///
+    /// Exits with code 0 when files are identical, 1 when they differ.
+    Diff {
+        /// First operand: `<bucket>/<object-key>` OSS path or local file path
+        left: String,
+
+        /// Second operand: `<bucket>/<object-key>` OSS path or local file path
+        right: String,
+
+        /// Show summary only (sizes, hashes, changed/unchanged line counts)
+        #[arg(long)]
+        stat: bool,
+
+        /// Only compare checksums without diffing content
+        #[arg(long)]
+        checksum_only: bool,
     },
 
     /// Copy an object to another bucket or key
@@ -190,6 +268,23 @@ pub enum ObjectCommands {
         #[arg(long)]
         all: bool,
     },
+
+    /// Inspect a .tar.gz or .zip archive in OSS without downloading it
+    ///
+    /// Uses HTTP Range requests to read only the archive metadata (central
+    /// directory for .zip, streaming headers for .tar.gz).  Supports listing
+    /// files and extracting a single file via --extract.
+    Inspect {
+        /// Bucket key
+        bucket: String,
+
+        /// Object key of the archive (.zip, .tar.gz, or .tgz)
+        object: String,
+
+        /// Extract a specific file from the archive by its internal path
+        #[arg(long, short = 'e')]
+        extract: Option<String>,
+    },
 }
 
 impl ObjectCommands {
@@ -205,12 +300,17 @@ impl ObjectCommands {
                 file,
                 key,
                 resume,
-            } => upload_object(client, bucket, file, key, resume, output_format).await,
+                skip_if_exists,
+                cost_estimate,
+                skip_secret_scan,
+                allow_secrets,
+            } => upload_object(client, bucket, file, key, resume, skip_if_exists, cost_estimate, skip_secret_scan, allow_secrets, output_format).await,
             ObjectCommands::UploadBatch {
                 bucket,
                 files,
                 parallel,
                 resume,
+                skip_if_exists,
             } => {
                 upload_batch(
                     client,
@@ -218,6 +318,7 @@ impl ObjectCommands {
                     files,
                     parallel.unwrap_or(concurrency),
                     resume,
+                    skip_if_exists,
                     output_format,
                 )
                 .await
@@ -227,6 +328,26 @@ impl ObjectCommands {
                 object,
                 out_file,
             } => download_object(client, bucket, object, out_file, output_format).await,
+            ObjectCommands::DownloadBulk {
+                bucket,
+                prefix,
+                output_dir,
+                concurrency: cmd_concurrency,
+                skip_existing,
+                flat,
+            } => {
+                download_bulk(
+                    client,
+                    bucket,
+                    prefix,
+                    output_dir,
+                    cmd_concurrency,
+                    skip_existing,
+                    flat,
+                    output_format,
+                )
+                .await
+            }
             ObjectCommands::List { bucket, limit } => {
                 list_objects(client, bucket, limit, output_format).await
             }
@@ -243,6 +364,12 @@ impl ObjectCommands {
             ObjectCommands::Info { bucket, object } => {
                 object_info(client, &bucket, &object, output_format).await
             }
+            ObjectCommands::Diff {
+                left,
+                right,
+                stat,
+                checksum_only,
+            } => diff_objects(client, left, right, stat, checksum_only, output_format).await,
             ObjectCommands::Copy {
                 source_bucket,
                 source_object,
@@ -288,6 +415,11 @@ impl ObjectCommands {
                 upload::upload_abort(&bucket, &object, output_format)
             }
             ObjectCommands::UploadCleanup { all } => upload::upload_cleanup(all, output_format),
+            ObjectCommands::Inspect {
+                bucket,
+                object,
+                extract,
+            } => inspect_object(client, bucket, object, extract, output_format).await,
         }
     }
 }
@@ -332,5 +464,54 @@ pub(super) fn truncate_str(s: &str, max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", &s[..max_len - 3])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_size_bytes() {
+        assert_eq!(format_size(512), "512 B");
+    }
+
+    #[test]
+    fn test_format_size_kilobytes() {
+        assert_eq!(format_size(1024), "1.00 KB");
+    }
+
+    #[test]
+    fn test_format_size_megabytes() {
+        assert_eq!(format_size(1_048_576), "1.00 MB");
+    }
+
+    #[test]
+    fn test_format_size_gigabytes() {
+        assert_eq!(format_size(1_073_741_824), "1.00 GB");
+    }
+
+    #[test]
+    fn test_format_size_zero() {
+        assert_eq!(format_size(0), "0 B");
+    }
+
+    #[test]
+    fn test_format_size_boundary() {
+        assert_eq!(format_size(1023), "1023 B");
+        assert_eq!(format_size(1024), "1.00 KB");
+    }
+
+    #[test]
+    fn test_truncate_str_short() {
+        let result = truncate_str("hello", 10);
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn test_truncate_str_long() {
+        let result = truncate_str("this is a very long string", 10);
+        assert_eq!(result, "this is...");
+        assert_eq!(result.len(), 10);
     }
 }

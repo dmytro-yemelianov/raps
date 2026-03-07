@@ -1,0 +1,23 @@
+{
+  "paginationToken": null,
+  "data": [
+    {
+      "id": "myapp.DeleteWallsActivity+prod",
+      "engine": "Autodesk.Revit+2024",
+      "description": "Deletes all walls from Revit model",
+      "version": 2,
+      "commandLine": [
+        "$(engine.path)\\\\revitcoreconsole.exe /i \"$(args[inputFile].path)\" /al \"$(appbundles[DeleteWallsBundle].path)\""
+      ],
+      "appBundles": [
+        "myapp.DeleteWallsBundle+prod"
+      ]
+    },
+    {
+      "id": "myapp.ExportPDFActivity+dev",
+      "engine": "Autodesk.Revit+2024",
+      "description": null,
+      "version": 1
+    }
+  ]
+}

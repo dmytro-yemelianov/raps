@@ -1300,3 +1300,84 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_schema_creates_object_type() {
+        let s = schema(json!({}), &[]);
+        assert_eq!(s.get("type").unwrap(), "object");
+    }
+
+    #[test]
+    fn test_schema_includes_properties() {
+        let props = json!({"name": {"type": "string"}});
+        let s = schema(props.clone(), &[]);
+        assert_eq!(s.get("properties").unwrap(), &props);
+    }
+
+    #[test]
+    fn test_schema_includes_required() {
+        let s = schema(json!({}), &["bucket_key", "object_key"]);
+        let required = s.get("required").unwrap().as_array().unwrap();
+        assert_eq!(required.len(), 2);
+        assert_eq!(required[0], "bucket_key");
+        assert_eq!(required[1], "object_key");
+    }
+
+    #[test]
+    fn test_schema_empty_props_and_required() {
+        let s = schema(json!({}), &[]);
+        assert_eq!(s.get("properties").unwrap(), &json!({}));
+        assert!(s.get("required").unwrap().as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_get_tools_not_empty() {
+        let tools = get_tools();
+        assert!(!tools.is_empty());
+    }
+
+    #[test]
+    fn test_get_tools_no_duplicate_names() {
+        let tools = get_tools();
+        let mut seen = std::collections::HashSet::new();
+        for tool in &tools {
+            assert!(
+                seen.insert(tool.name.as_ref()),
+                "duplicate tool name: {}",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_tools_all_have_descriptions() {
+        let tools = get_tools();
+        for tool in &tools {
+            assert!(
+                tool.description.is_some(),
+                "tool '{}' has no description",
+                tool.name
+            );
+            assert!(
+                !tool.description.as_ref().unwrap().is_empty(),
+                "tool '{}' has empty description",
+                tool.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_tools_contains_core_tools() {
+        let tools = get_tools();
+        let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
+        assert!(names.contains(&"auth_test"));
+        assert!(names.contains(&"bucket_list"));
+        assert!(names.contains(&"object_upload"));
+        assert!(names.contains(&"hub_list"));
+        assert!(names.contains(&"translate_start"));
+    }
+}

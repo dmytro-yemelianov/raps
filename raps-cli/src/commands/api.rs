@@ -704,3 +704,140 @@ fn extract_error_message(value: &Value, status: StatusCode) -> String {
         .unwrap_or("Request failed")
         .to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_parse_key_value_valid() {
+        let result = parse_key_value("key=value").unwrap();
+        assert_eq!(result, ("key".to_string(), "value".to_string()));
+    }
+
+    #[test]
+    fn test_parse_key_value_value_with_equals() {
+        let result = parse_key_value("key=val=ue").unwrap();
+        assert_eq!(result, ("key".to_string(), "val=ue".to_string()));
+    }
+
+    #[test]
+    fn test_parse_key_value_missing_equals() {
+        let result = parse_key_value("noequals");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid format"));
+    }
+
+    #[test]
+    fn test_parse_key_value_empty_value() {
+        let result = parse_key_value("key=").unwrap();
+        assert_eq!(result, ("key".to_string(), "".to_string()));
+    }
+
+    #[test]
+    fn test_parse_header_valid() {
+        let result = parse_header("Content-Type: application/json").unwrap();
+        assert_eq!(
+            result,
+            ("Content-Type".to_string(), "application/json".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_header_no_colon() {
+        let result = parse_header("invalid");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid header format"));
+    }
+
+    #[test]
+    fn test_parse_header_value_with_colon() {
+        let result = parse_header("Auth: Bearer:token").unwrap();
+        assert_eq!(
+            result,
+            ("Auth".to_string(), "Bearer:token".to_string())
+        );
+    }
+
+    #[test]
+    fn test_build_url_relative_endpoint() {
+        let url = build_url("https://developer.api.autodesk.com", "/oss/v2/buckets", &[]).unwrap();
+        assert_eq!(url, "https://developer.api.autodesk.com/oss/v2/buckets");
+    }
+
+    #[test]
+    fn test_build_url_absolute_endpoint() {
+        let url = build_url(
+            "https://developer.api.autodesk.com",
+            "https://custom.api.example.com/endpoint",
+            &[],
+        )
+        .unwrap();
+        assert_eq!(url, "https://custom.api.example.com/endpoint");
+    }
+
+    #[test]
+    fn test_build_url_with_query_params() {
+        let params = vec![
+            ("key1".to_string(), "val1".to_string()),
+            ("key2".to_string(), "val2".to_string()),
+        ];
+        let url =
+            build_url("https://developer.api.autodesk.com", "/endpoint", &params).unwrap();
+        assert!(url.contains('?'));
+        assert!(url.contains("key1=val1"));
+        assert!(url.contains("key2=val2"));
+        assert!(url.contains('&'));
+    }
+
+    #[test]
+    fn test_build_url_no_query_params() {
+        let url =
+            build_url("https://developer.api.autodesk.com", "/endpoint", &[]).unwrap();
+        assert!(!url.contains('?'));
+    }
+
+    #[test]
+    fn test_categorize_error_codes() {
+        assert_eq!(categorize_error(401), "authentication");
+        assert_eq!(categorize_error(403), "authentication");
+        assert_eq!(categorize_error(400), "validation");
+        assert_eq!(categorize_error(422), "validation");
+        assert_eq!(categorize_error(404), "not_found");
+        assert_eq!(categorize_error(429), "rate_limited");
+        assert_eq!(categorize_error(500), "server_error");
+        assert_eq!(categorize_error(502), "server_error");
+        assert_eq!(categorize_error(503), "server_error");
+        assert_eq!(categorize_error(599), "server_error");
+        assert_eq!(categorize_error(301), "error");
+    }
+
+    #[test]
+    fn test_extract_error_message_fields() {
+        let status_404 = StatusCode::from_u16(404).unwrap();
+
+        // "message" field takes priority
+        let val = json!({"message": "Not found", "error": "err"});
+        assert_eq!(extract_error_message(&val, status_404), "Not found");
+
+        // Falls back to "error"
+        let val = json!({"error": "Something went wrong"});
+        assert_eq!(
+            extract_error_message(&val, status_404),
+            "Something went wrong"
+        );
+
+        // Falls back to "reason"
+        let val = json!({"reason": "Bad input"});
+        assert_eq!(extract_error_message(&val, status_404), "Bad input");
+
+        // Falls back to "developerMessage"
+        let val = json!({"developerMessage": "Dev hint"});
+        assert_eq!(extract_error_message(&val, status_404), "Dev hint");
+
+        // Falls back to canonical reason
+        let val = json!({"other": "field"});
+        assert_eq!(extract_error_message(&val, status_404), "Not Found");
+    }
+}

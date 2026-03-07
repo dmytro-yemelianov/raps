@@ -1,0 +1,9 @@
+---
+source: raps-cli/src/output/tests.rs
+assertion_line: 242
+expression: result
+---
+name,value
+"with,comma",normal
+"with
+newline","also""quoted"

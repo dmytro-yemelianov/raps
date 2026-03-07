@@ -495,4 +495,36 @@ mod tests {
         let params = details.upload_parameters.unwrap();
         assert!(params.endpoint_url.is_some());
     }
+
+    // ==================== Contract Tests ====================
+
+    #[test]
+    fn test_contract_engine_response() {
+        let json = include_str!("../../tests/fixtures/engine_response.json");
+        let response: PaginatedResponse<Engine> = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+
+    #[test]
+    fn test_contract_appbundle_details() {
+        let json = include_str!("../../tests/fixtures/appbundle_details.json");
+        let value: serde_json::Value = serde_json::from_str(json).unwrap();
+        // Verify it deserializes to our type (HashMap ordering makes debug snapshots flaky)
+        let _response: AppBundleDetails = serde_json::from_value(value.clone()).unwrap();
+        insta::assert_json_snapshot!(value);
+    }
+
+    #[test]
+    fn test_contract_activity_response() {
+        let json = include_str!("../../tests/fixtures/activity_response.json");
+        let response: PaginatedResponse<Activity> = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
+
+    #[test]
+    fn test_contract_workitem_response() {
+        let json = include_str!("../../tests/fixtures/workitem_success.json");
+        let response: WorkItem = serde_json::from_str(json).unwrap();
+        insta::assert_debug_snapshot!(response);
+    }
 }

@@ -11,10 +11,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
+use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
 use raps_oss::OssClient;
 
-use super::{format_size, select_bucket};
+use super::{format_size, secret_scan, select_bucket};
 
 #[derive(Serialize, schemars::JsonSchema)]
 pub(crate) struct UploadOutput {
@@ -34,6 +35,10 @@ pub(super) async fn upload_object(
     file: PathBuf,
     key: Option<String>,
     resume: bool,
+    skip_if_exists: bool,
+    cost_estimate: bool,
+    skip_secret_scan: bool,
+    allow_secrets: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     let from_stdin = file.as_os_str() == "-";
@@ -58,6 +63,45 @@ pub(super) async fn upload_object(
         (None, file.clone())
     };
 
+    // Show cost estimate if requested or if file exceeds 100 MB
+    const LARGE_FILE_THRESHOLD: u64 = 100 * 1024 * 1024;
+    if let Ok(metadata) = std::fs::metadata(&actual_file) {
+        let file_size = metadata.len();
+        if cost_estimate || file_size > LARGE_FILE_THRESHOLD {
+            let estimate = CostEstimate::for_upload(file_size);
+            estimate.print(&output_format);
+        }
+    }
+
+    // Secret scanning: detect potential credentials before upload
+    if !skip_secret_scan && !from_stdin {
+        let matches = secret_scan::scan_file(&actual_file)?;
+        if !matches.is_empty() {
+            eprintln!(
+                "{} Secret scan: potential credentials detected in {}",
+                "⚠".yellow().bold(),
+                file.display()
+            );
+            for m in &matches {
+                eprintln!(
+                    "  Line {}: {} — {}",
+                    m.line_number,
+                    m.pattern_name.yellow(),
+                    m.snippet.dimmed()
+                );
+            }
+            if !allow_secrets {
+                anyhow::bail!(
+                    "Upload blocked due to detected secrets. Use --allow-secrets to override or --skip-secret-scan to disable."
+                );
+            }
+            eprintln!(
+                "{} Proceeding despite detected secrets (--allow-secrets)",
+                "⚠".yellow()
+            );
+        }
+    }
+
     // Select bucket
     let bucket_key = select_bucket(client, bucket).await?;
 
@@ -68,6 +112,53 @@ pub(super) async fn upload_object(
             .unwrap_or("unnamed")
             .to_string()
     });
+
+    // Duplicate detection: skip upload if an identical object already exists
+    if skip_if_exists {
+        if let Some(existing) = client
+            .check_duplicate(&bucket_key, &object_key, &actual_file)
+            .await?
+        {
+            if output_format.supports_colors() {
+                println!(
+                    "{} Skipping upload — identical object already exists: {}/{}",
+                    "=".cyan().bold(),
+                    bucket_key,
+                    object_key
+                );
+            }
+            let urn = client.get_urn(&bucket_key, &object_key);
+            let output = UploadOutput {
+                success: true,
+                object_id: existing.object_id.clone(),
+                bucket_key: bucket_key.clone(),
+                object_key: object_key.clone(),
+                size: existing.size,
+                size_human: format_size(existing.size),
+                sha1: existing.sha1.clone(),
+                urn: urn.clone(),
+            };
+            match output_format {
+                OutputFormat::Table => {
+                    println!("{} Object already exists (skipped upload)", "✓".green().bold());
+                    println!("  {} {}", "Object ID:".bold(), output.object_id);
+                    println!("  {} {}", "Size:".bold(), output.size_human);
+                    if let Some(ref sha1) = output.sha1 {
+                        println!("  {} {}", "SHA1:".bold(), sha1.dimmed());
+                    }
+                    println!(
+                        "\n  {} {}",
+                        "URN (for translation):".bold().yellow(),
+                        output.urn
+                    );
+                }
+                _ => {
+                    output_format.write(&output)?;
+                }
+            }
+            return Ok(());
+        }
+    }
 
     if output_format.supports_colors() {
         let source = if from_stdin {
@@ -213,6 +304,7 @@ pub(super) async fn upload_batch(
     files: Vec<PathBuf>,
     parallel: usize,
     resume: bool,
+    skip_if_exists: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // If resume flag, try to load previous state
@@ -244,7 +336,7 @@ pub(super) async fn upload_batch(
                 );
             }
 
-            return resume_batch_upload(client, saved_state, parallel, output_format).await;
+            return resume_batch_upload(client, saved_state, parallel, skip_if_exists, output_format).await;
         } else {
             anyhow::bail!(
                 "No previous batch upload state found. Start a new upload without --resume."
@@ -310,7 +402,15 @@ pub(super) async fn upload_batch(
                 .unwrap_or("unnamed")
                 .to_string();
 
-            let result = client.upload_object(&bucket, &object_key, &file_path).await;
+            let result = if skip_if_exists {
+                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                    Ok(Some(existing)) => Ok(existing),
+                    Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
+                    Err(e) => Err(e),
+                }
+            } else {
+                client.upload_object(&bucket, &object_key, &file_path).await
+            };
 
             drop(permit); // Release permit
 
@@ -451,6 +551,7 @@ async fn resume_batch_upload(
     client: &OssClient,
     mut state: BatchUploadState,
     parallel: usize,
+    skip_if_exists: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Collect indices of files that need uploading (Pending or Failed)
@@ -500,7 +601,15 @@ async fn resume_batch_upload(
                 .unwrap_or("unnamed")
                 .to_string();
 
-            let result = client.upload_object(&bucket, &object_key, &file_path).await;
+            let result = if skip_if_exists {
+                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                    Ok(Some(existing)) => Ok(existing),
+                    Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
+                    Err(e) => Err(e),
+                }
+            } else {
+                client.upload_object(&bucket, &object_key, &file_path).await
+            };
 
             drop(permit); // Release permit
 

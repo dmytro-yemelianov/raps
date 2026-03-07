@@ -15,7 +15,7 @@ mod tests;
 use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use serde::Serialize;
 
 use raps_acc::admin::AccountAdminClient;
@@ -233,18 +233,7 @@ pub(super) fn create_progress_bar(
     if !output_format.supports_colors() {
         return None;
     }
-    let template = format!(
-        "{{spinner:.green}} [{{bar:40.cyan/blue}}] {{pos}}/{{len}} {}",
-        message
-    );
-    let pb = ProgressBar::new(count);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template(&template)
-            .expect("valid progress template")
-            .progress_chars("=>-"),
-    );
-    Some(pb)
+    Some(raps_kernel::progress::bulk_progress(count, message))
 }
 
 pub(super) fn print_report_header(
@@ -355,7 +344,7 @@ pub(super) async fn prepare_report(
         config.clone(),
         auth_client.clone(),
         http_config.clone(),
-    );
+    )?;
 
     let all_projects = admin_client.list_all_projects(&account_id).await?;
     let filtered_projects = project_filter.apply(all_projects);

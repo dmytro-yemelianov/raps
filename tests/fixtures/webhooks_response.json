@@ -1,0 +1,31 @@
+{
+  "data": [
+    {
+      "hookId": "b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+      "tenant": "VGVzdFRlbmFudA",
+      "callbackUrl": "https://myapp.example.com/webhooks/aps",
+      "createdBy": "N2FGNUJ3cHFianRmOHpuM2RiNEt6ZW8wNjVFbjJOQWU",
+      "event": "dm.version.added",
+      "createdDate": "2024-06-15T09:30:00.000+0000",
+      "system": "data",
+      "creatorType": "Application",
+      "status": "active",
+      "scope": {
+        "folder": "urn:adsk.wipprod:fs.folder:co.YWJjZGVmZy0xMjM0LTU2Nzg"
+      },
+      "urn": "urn:adsk.webhooks:events.hook:b1c4a04e-b674-4de2-8de4-f929c8b438d7",
+      "autoReactivateHook": true
+    },
+    {
+      "hookId": "c2d5b15f-c785-5ef3-9ef5-g030d9c549e8",
+      "callbackUrl": "https://myapp.example.com/webhooks/extraction",
+      "event": "extraction.finished",
+      "createdDate": "2024-07-01T12:00:00.000+0000",
+      "system": "derivative",
+      "status": "inactive"
+    }
+  ],
+  "links": {
+    "next": "https://developer.api.autodesk.com/webhooks/v1/hooks?pageState=eyJsaW1pdCI6MjB9"
+  }
+}

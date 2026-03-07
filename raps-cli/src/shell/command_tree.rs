@@ -792,3 +792,95 @@ pub fn build_command_map(commands: &[CommandInfo]) -> HashMap<String, CommandInf
 
     map
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_command_tree_has_expected_top_level_commands() {
+        let tree = build_command_tree();
+        let names: Vec<&str> = tree.iter().map(|c| c.name).collect();
+        assert!(names.contains(&"auth"), "should have auth command");
+        assert!(names.contains(&"bucket"), "should have bucket command");
+        assert!(names.contains(&"object"), "should have object command");
+        assert!(names.contains(&"translate"), "should have translate command");
+        assert!(names.contains(&"help"), "should have help command");
+        assert!(names.contains(&"exit"), "should have exit command");
+    }
+
+    #[test]
+    fn test_build_command_tree_auth_subcommands() {
+        let tree = build_command_tree();
+        let auth = tree.iter().find(|c| c.name == "auth").unwrap();
+        let sub_names: Vec<&str> = auth.subcommands.iter().map(|c| c.name).collect();
+        assert!(sub_names.contains(&"login"));
+        assert!(sub_names.contains(&"logout"));
+        assert!(sub_names.contains(&"status"));
+    }
+
+    #[test]
+    fn test_build_command_tree_bucket_has_params() {
+        let tree = build_command_tree();
+        let bucket = tree.iter().find(|c| c.name == "bucket").unwrap();
+        let create = bucket.subcommands.iter().find(|c| c.name == "create").unwrap();
+        assert!(!create.params.is_empty(), "bucket create should have params");
+    }
+
+    #[test]
+    fn test_build_command_map_top_level_lookup() {
+        let tree = build_command_tree();
+        let map = build_command_map(&tree);
+        assert!(map.contains_key("auth"));
+        assert!(map.contains_key("bucket"));
+        assert!(map.contains_key("help"));
+    }
+
+    #[test]
+    fn test_build_command_map_subcommand_lookup() {
+        let tree = build_command_tree();
+        let map = build_command_map(&tree);
+        assert!(map.contains_key("auth login"));
+        assert!(map.contains_key("auth logout"));
+        assert!(map.contains_key("bucket create"));
+        assert!(map.contains_key("bucket list"));
+    }
+
+    #[test]
+    fn test_build_command_map_no_duplicates() {
+        let tree = build_command_tree();
+        let mut seen = std::collections::HashSet::new();
+        for cmd in &tree {
+            assert!(seen.insert(cmd.name), "duplicate top-level command: {}", cmd.name);
+            let mut sub_seen = std::collections::HashSet::new();
+            for sub in cmd.subcommands {
+                assert!(
+                    sub_seen.insert(sub.name),
+                    "duplicate subcommand '{} {}' ",
+                    cmd.name,
+                    sub.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_command_info_descriptions_non_empty() {
+        let tree = build_command_tree();
+        for cmd in &tree {
+            assert!(
+                !cmd.description.is_empty(),
+                "command '{}' has empty description",
+                cmd.name
+            );
+            for sub in cmd.subcommands {
+                assert!(
+                    !sub.description.is_empty(),
+                    "subcommand '{} {}' has empty description",
+                    cmd.name,
+                    sub.name
+                );
+            }
+        }
+    }
+}

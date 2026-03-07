@@ -14,7 +14,7 @@ MCP is an open protocol that allows AI assistants to access external tools and d
 ## Starting the Server
 
 ```bash
-raps serve
+raps mcp
 ```
 
 The server communicates via stdio (standard input/output), making it compatible with all MCP clients.
@@ -33,7 +33,7 @@ Add to your Claude Desktop configuration file:
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"],
+      "args": ["mcp"],
       "env": {
         "APS_CLIENT_ID": "your_client_id",
         "APS_CLIENT_SECRET": "your_client_secret"
@@ -52,7 +52,7 @@ Add to `.cursor/mcp.json` in your project or global config:
   "mcpServers": {
     "raps": {
       "command": "raps",
-      "args": ["serve"]
+      "args": ["mcp"]
     }
   }
 }
@@ -77,7 +77,7 @@ APS_CLIENT_SECRET=your_client_secret
 
 ## Available Tools
 
-The MCP server exposes 14 tools organized by functionality:
+The MCP server exposes 111 tools in current releases. The list below highlights core tool families:
 
 ### Authentication Tools
 
@@ -161,7 +161,7 @@ The MCP server reuses the existing RAPS codebase:
                   ▼
 ┌─────────────────────────────────────────────────────┐
 │               RAPS MCP Server                        │
-│                 raps serve                           │
+│                  raps mcp                            │
 ├─────────────────────────────────────────────────────┤
 │            Shared API Clients                        │
 │  • AuthClient    • OssClient                        │
@@ -180,7 +180,7 @@ The MCP server reuses the existing RAPS codebase:
 Enable verbose logging by setting the `RUST_LOG` environment variable:
 
 ```bash
-RUST_LOG=debug raps serve
+RUST_LOG=debug raps mcp
 ```
 
 Logs are written to stderr, so they won't interfere with the MCP protocol on stdout.
@@ -203,4 +203,3 @@ Logs are written to stderr, so they won't interfere with the MCP protocol on std
 - [Buckets](buckets.md) - Bucket operations via CLI
 - [Objects](objects.md) - Object operations via CLI
 - [Translation](translation.md) - Model Derivative operations via CLI
-

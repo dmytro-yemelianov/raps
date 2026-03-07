@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAPS CLI — Test Coverage</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #060809;
+      --surface:   #0c1014;
+      --surface2:  #121920;
+      --border:    #1c2a38;
+      --border2:   #243344;
+      --text:      #c4d4e0;
+      --text-dim:  #4a6070;
+      --text-faint:#2a3d4d;
+      --amber:     #f0a020;
+      --blue:      #5ab0f8;
+      --c100: #06d6a0;
+      --c80:  #10b981;
+      --c60:  #84cc16;
+      --c40:  #f0a020;
+      --c20:  #f97316;
+      --c10:  #ef4444;
+      --c0:   #3f1010;
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, #1a2a3a 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.3;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* ── HEADER ── */
+    header {
+      padding: 56px 0 40px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 36px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::after {
+      content: 'COV';
+      position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+      font-family: 'Syne', sans-serif;
+      font-size: 160px; font-weight: 800;
+      color: transparent;
+      -webkit-text-stroke: 1px var(--border2);
+      letter-spacing: -6px;
+      user-select: none; pointer-events: none;
+    }
+
+    .header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+
+    .header-title h1 {
+      font-family: 'Syne', sans-serif;
+      font-size: 48px; font-weight: 800;
+      letter-spacing: -2px; line-height: 1; color: #fff;
+    }
+    .header-title h1 span { color: var(--amber); }
+    .header-title p { margin-top: 8px; color: var(--text-dim); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .header-meta { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 4px;
+      font-size: 10px; color: var(--text-dim); letter-spacing: 0.04em;
+    }
+    .badge .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--amber); }
+
+    /* arcs */
+    .stats-group { display: flex; gap: 20px; align-items: center; }
+    .stat-arc { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .arc-wrap { position: relative; width: 96px; height: 96px; }
+    .arc-wrap svg { transform: rotate(-90deg); display: block; }
+    .arc-track { fill: none; stroke: var(--surface2); stroke-width: 6; }
+    .arc-fill  { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1.6s cubic-bezier(0.16,1,0.3,1); }
+    .arc-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .arc-pct  { font-family: 'Syne', sans-serif; font-size: 19px; font-weight: 700; color: #fff; line-height: 1; }
+    .arc-sub  { font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); margin-top: 2px; }
+    .stat-arc-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-dim); }
+
+    /* ── TIER SUMMARY ── */
+    .tier-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 8px; margin-bottom: 32px; }
+    .tier-card {
+      padding: 14px 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .tier-card:hover { background: var(--surface2); }
+    .tier-card.active { border-color: var(--amber); }
+    .tier-card-header { display: flex; align-items: center; gap: 6px; }
+    .tier-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .tier-card-name { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
+    .tier-card-count { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 700; color: #fff; line-height: 1; }
+    .tier-card-label { font-size: 10px; color: var(--text-faint); }
+
+    /* ── CONTROLS ── */
+    .controls { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; }
+    input[type="search"] {
+      width: 100%; padding: 8px 10px 8px 30px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px;
+      outline: none; transition: border-color 0.15s;
+    }
+    input[type="search"]:focus { border-color: #4a6080; }
+    input[type="search"]::placeholder { color: var(--text-faint); }
+
+    select.sort-sel {
+      padding: 8px 10px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+      color: var(--text-dim); font-family: 'JetBrains Mono', monospace; font-size: 11px;
+      outline: none; cursor: pointer;
+    }
+
+    .results-line { font-size: 11px; color: var(--text-dim); margin-bottom: 12px; }
+    .results-line b { color: var(--amber); }
+
+    /* ── MODULE ── */
+    .module-section {
+      margin-bottom: 5px;
+      border: 1px solid var(--border); border-radius: 6px;
+      overflow: hidden;
+    }
+    .module-section.hidden { display: none; }
+
+    .module-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 16px;
+      background: var(--surface);
+      cursor: pointer; user-select: none;
+      transition: background 0.12s;
+    }
+    .module-header:hover { background: var(--surface2); }
+
+    .mh-toggle { color: var(--text-dim); font-size: 10px; transition: transform 0.2s; flex-shrink: 0; }
+    .module-section.open .mh-toggle { transform: rotate(90deg); }
+
+    .mh-name {
+      font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+      letter-spacing: 0.05em; color: var(--amber); text-transform: uppercase;
+      flex-shrink: 0; min-width: 90px;
+    }
+
+    .mh-bar { flex: 1; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+    .mh-bar-fill { height: 100%; border-radius: 2px; transition: width 1s cubic-bezier(0.16,1,0.3,1); }
+
+    .mh-avg { font-size: 12px; font-weight: 600; min-width: 46px; text-align: right; flex-shrink: 0; }
+    .mh-count { font-size: 10px; color: var(--text-faint); flex-shrink: 0; min-width: 42px; text-align: right; }
+
+    /* ── FILE TABLE ── */
+    .module-body { display: none; }
+    .module-section.open .module-body { display: block; }
+
+    table.file-table { width: 100%; border-collapse: collapse; }
+
+    .col-header-row td {
+      padding: 6px 16px;
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--text-faint); background: var(--surface);
+      border-top: 1px solid var(--border);
+    }
+
+    .file-row { border-top: 1px solid var(--border); transition: background 0.1s; }
+    .file-row:hover { background: rgba(240,160,32,0.04); }
+    .file-row td { padding: 9px 16px; vertical-align: middle; }
+
+    td.td-path { max-width: 300px; }
+    .fp { color: var(--blue); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+    .fp .dir { color: var(--text-dim); }
+
+    td.td-bar { width: 210px; }
+    .bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .bar-track { flex: 1; height: 7px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; width: 0; }
+    .bar-pct { font-size: 11px; font-weight: 600; min-width: 40px; text-align: right; }
+
+    td.td-fn { width: 110px; }
+    .fn-wrap { display: flex; align-items: center; gap: 8px; }
+    .fn-track { width: 46px; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+    .fn-fill { height: 100%; border-radius: 2px; width: 0; }
+    .fn-pct { font-size: 10px; min-width: 36px; text-align: right; color: var(--text-dim); }
+
+    td.td-notes { max-width: 340px; color: var(--text-dim); font-size: 11px; font-style: italic; font-weight: 300; }
+
+    /* colour helpers */
+    .cc100 { color: var(--c100); }  .cc80 { color: var(--c80); }
+    .cc60  { color: var(--c60); }   .cc40 { color: var(--c40); }
+    .cc20  { color: var(--c20); }   .cc10 { color: var(--c10); }
+    .cc0   { color: #5a3030; }
+
+    .bc100 { background: var(--c100); }  .bc80 { background: var(--c80); }
+    .bc60  { background: var(--c60); }
+    .bc40  { background: linear-gradient(90deg, var(--c40), #c88010); }
+    .bc20  { background: var(--c20); }   .bc10 { background: var(--c10); }
+    .bc0   { background: #3f1010; }
+
+    /* no-results */
+    .no-results { display: none; text-align: center; padding: 56px; color: var(--text-faint); font-size: 13px; }
+
+    footer {
+      margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+      display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    footer p { font-size: 11px; color: var(--text-faint); }
+    footer a { color: var(--amber); text-decoration: none; }
+    footer a:hover { color: #fff; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="header-top">
+      <div class="header-title">
+        <h1>RAPS <span>CLI</span></h1>
+        <p>Test Coverage Report &nbsp;·&nbsp; raps-cli package</p>
+        <div class="header-meta">
+          <span class="badge"><span class="dot"></span> cargo llvm-cov</span>
+          <span class="badge">2026-03-06</span>
+          <span class="badge">Rust 1.88 · Edition 2024</span>
+        </div>
+      </div>
+      <div class="stats-group">
+        <div class="stat-arc">
+          <div class="arc-wrap">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle class="arc-track" cx="48" cy="48" r="40"/>
+              <circle class="arc-fill bc20" id="arc-lines" cx="48" cy="48" r="40"
+                stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+            </svg>
+            <div class="arc-center">
+              <div class="arc-pct" id="arc-lines-num">0%</div>
+              <div class="arc-sub">lines</div>
+            </div>
+          </div>
+          <div class="stat-arc-label">Line Cov.</div>
+        </div>
+        <div class="stat-arc">
+          <div class="arc-wrap">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle class="arc-track" cx="48" cy="48" r="40"/>
+              <circle class="arc-fill bc20" id="arc-fns" cx="48" cy="48" r="40"
+                stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+            </svg>
+            <div class="arc-center">
+              <div class="arc-pct" id="arc-fns-num">0%</div>
+              <div class="arc-sub">fns</div>
+            </div>
+          </div>
+          <div class="stat-arc-label">Fn Cov.</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="tier-summary" id="tier-summary"></div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="search" id="search" placeholder="filter by file path…" autocomplete="off">
+    </div>
+    <select class="sort-sel" id="sort-sel">
+      <option value="module">Sort: Module</option>
+      <option value="lines-desc">Lines ↓ highest first</option>
+      <option value="lines-asc">Lines ↑ lowest first</option>
+      <option value="path">Path A–Z</option>
+    </select>
+  </div>
+
+  <div class="results-line" id="results-line"></div>
+  <div id="modules-container"></div>
+  <div class="no-results" id="no-results">No files match the current filter.</div>
+
+  <footer>
+    <p>RAPS CLI · Apache-2.0 · <a href="https://aps.autodesk.com" target="_blank">Autodesk Platform Services</a></p>
+    <p>Most uncovered code requires live APS credentials or interactive TTY</p>
+  </footer>
+</div>
+
+<script>
+/* ─── DATA ──────────────────────────────────────────────────────────── */
+const OVERALL = { lines: 25.4, fns: 35.9 };
+
+const MODULES = [
+  { name:"acc", files:[
+    {path:"commands/acc/mod.rs",        lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/acc/assets.rs",     lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/acc/checklists.rs", lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/acc/submittals.rs", lines:0,    fns:0,    notes:"help-snapshot only"},
+  ]},
+  { name:"admin", files:[
+    {path:"commands/admin/mod.rs",        lines:61.7, fns:58.6, notes:"mock scenarios + operation tests"},
+    {path:"commands/admin/csv_ops.rs",    lines:21.2, fns:52.6, notes:"unit tests (csv parsing)"},
+    {path:"commands/admin/user.rs",       lines:14.1, fns:36.8, notes:"mock scenarios; bulk logic in raps-admin crate"},
+    {path:"commands/admin/project.rs",    lines:2.0,  fns:9.1,  notes:"help-snapshot only"},
+    {path:"commands/admin/folder.rs",     lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/admin/operations.rs", lines:53.3, fns:81.8, notes:"unit tests (format_status, display_bulk_result), scenario tests (list/status/resume/cancel)"},
+  ]},
+  { name:"api",    files:[{path:"commands/api.rs",    lines:41.9, fns:59.0, notes:"arg-validation tests"}]},
+  { name:"auth",   files:[{path:"commands/auth.rs",   lines:27.4, fns:48.5, notes:"help-snapshot, dispatch smoke, MCP auth unit tests"}]},
+  { name:"bucket", files:[{path:"commands/bucket.rs", lines:57.2, fns:69.4, notes:"help-snapshot, arg-validation, output-format tests"}]},
+  { name:"cache",  files:[{path:"commands/cache.rs",  lines:37.0, fns:90.0, notes:"help-snapshot, dir/clear tests"}]},
+  { name:"config", files:[
+    {path:"commands/config/mod.rs",        lines:36.4, fns:66.7, notes:"help-snapshot, dispatch smoke"},
+    {path:"commands/config/profiles.rs",   lines:8.2,  fns:20.0, notes:"help-snapshot only"},
+    {path:"commands/config/config_ops.rs", lines:79.7, fns:100,  notes:"smoke tests (profile create/use/set/get round-trips)"},
+    {path:"commands/config/context.rs",    lines:75.4, fns:87.5, notes:"scenario tests (show/set/clear round-trips, env var source)"},
+  ]},
+  { name:"da", files:[
+    {path:"commands/da/engines.rs",    lines:21.6, fns:100,  notes:"help-snapshot, dispatch smoke"},
+    {path:"commands/da/mod.rs",        lines:7.3,  fns:66.7, notes:"help-snapshot"},
+    {path:"commands/da/activities.rs", lines:65.1, fns:82.4, notes:"scenario tests (list/create/delete, JSON file, missing fields); wait/alias paths require live API"},
+    {path:"commands/da/appbundles.rs", lines:49.7, fns:82.4, notes:"scenario tests (list/create/delete round-trips)"},
+    {path:"commands/da/workitems.rs",  lines:43.6, fns:100,  notes:"scenario tests (list, run qualified/unqualified, status); wait polling requires live API"},
+  ]},
+  { name:"demo",    files:[{path:"commands/demo.rs",     lines:0,    fns:0,    notes:"help-snapshot only (1,126 lines)"}]},
+  { name:"doctor",  files:[{path:"commands/doctor.rs",   lines:52.8, fns:95.2, notes:"help-snapshot, JSON/YAML output tests"}]},
+  { name:"folder",  files:[{path:"commands/folder.rs",   lines:22.7, fns:46.2, notes:"help-snapshot, no-credentials failure"}]},
+  { name:"generate",files:[{path:"commands/generate.rs", lines:95.5, fns:100,  notes:"help-snapshot + actual file generation with tempdir"}]},
+  { name:"hub",     files:[{path:"commands/hub.rs",      lines:43.5, fns:65.0, notes:"help-snapshot, mock scenario (list JSON + table), dispatch smoke"}]},
+  { name:"init",    files:[{path:"commands/init.rs",     lines:25.5, fns:46.7, notes:"help-snapshot, smoke, unit tests; wizard steps require interactive terminal"}]},
+  { name:"inspect", files:[{path:"commands/inspect.rs",  lines:46.7, fns:78.6, notes:"help-snapshot, no-credentials failure"}]},
+  { name:"interactive", files:[{path:"commands/interactive.rs", lines:1.8, fns:12.5, notes:"no tests (requires readline/TTY)"}]},
+  { name:"issue", files:[
+    {path:"commands/issue/mod.rs",         lines:21.8, fns:50.0, notes:"help-snapshot, arg-validation"},
+    {path:"commands/issue/transitions.rs", lines:46.7, fns:70.0, notes:"help-snapshot"},
+    {path:"commands/issue/attachments.rs", lines:20.6, fns:25.0, notes:"help-snapshot"},
+    {path:"commands/issue/comments.rs",    lines:12.5, fns:12.5, notes:"help-snapshot"},
+    {path:"commands/issue/crud.rs",        lines:10.3, fns:10.7, notes:"help-snapshot only"},
+  ]},
+  { name:"item",    files:[{path:"commands/item.rs",     lines:6.6,  fns:21.7, notes:"help-snapshot only"}]},
+  { name:"job",     files:[{path:"commands/job.rs",      lines:44.6, fns:88.9, notes:"colorize_state unit tests + smoke tests; poll/table/stop require live Fly.io API"}]},
+  { name:"object", files:[
+    {path:"commands/object/mod.rs",      lines:37.3, fns:93.3, notes:"help-snapshot, arg-validation"},
+    {path:"commands/object/download.rs", lines:3.1,  fns:13.3, notes:"help-snapshot only"},
+    {path:"commands/object/upload.rs",   lines:0,    fns:0,    notes:"help-snapshot only (865 lines; panics in debug due to clap positional arg order)"},
+    {path:"commands/object/copy.rs",     lines:40.3, fns:64.7, notes:"scenario tests (batch-copy, batch-rename, copy/rename error paths, arg-validation)"},
+  ]},
+  { name:"pipeline", files:[{path:"commands/pipeline.rs", lines:61.0, fns:75.0, notes:"help-snapshot, dry-run with tempfile, validate/sample"}]},
+  { name:"plugin",   files:[{path:"commands/plugin.rs",   lines:8.6,  fns:21.1, notes:"help-snapshot, dispatch smoke"}]},
+  { name:"project",  files:[{path:"commands/project.rs",  lines:22.0, fns:66.7, notes:"help-snapshot, arg-validation"}]},
+  { name:"reality",  files:[{path:"commands/reality.rs",  lines:0,    fns:0,    notes:"help-snapshot only (clap parses but handler never runs)"}]},
+  { name:"report", files:[
+    {path:"commands/report/mod.rs",              lines:13.9, fns:33.3, notes:"help-snapshot, unit tests (serialization, filtering)"},
+    {path:"commands/report/extended_reports.rs", lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/report/issues_report.rs",    lines:0,    fns:0,    notes:"help-snapshot only"},
+    {path:"commands/report/rfi_report.rs",       lines:0,    fns:0,    notes:"help-snapshot only"},
+  ]},
+  { name:"rfi", files:[
+    {path:"commands/rfi/mod.rs",  lines:4.9,  fns:20.0, notes:"help-snapshot, unit tests (CSV parsing, serialization)"},
+    {path:"commands/rfi/crud.rs", lines:81.1, fns:100,  notes:"scenario tests (list/get/create/update/delete full round-trips against raps-mock)"},
+  ]},
+  { name:"schema",   files:[{path:"commands/schema.rs",   lines:96.2, fns:100,  notes:"help-snapshot, list/all/generate with JSON output validation"}]},
+  { name:"status",   files:[{path:"commands/status.rs",   lines:45.3, fns:65.2, notes:"unit tests (helpers), help-snapshot, mock scenario; render path requires live auth"}]},
+  { name:"swarm",    files:[{path:"commands/swarm.rs",    lines:27.3, fns:37.0, notes:"help-snapshot only (redis feature-gated)"}]},
+  { name:"template", files:[{path:"commands/template.rs", lines:7.3,  fns:44.4, notes:"help-snapshot only"}]},
+  { name:"translate", files:[
+    {path:"commands/translate/mod.rs",          lines:27.2, fns:60.0, notes:"help-snapshot, mock scenario (start/status/manifest no-panic)"},
+    {path:"commands/translate/presets.rs",      lines:24.7, fns:30.4, notes:"help-snapshot"},
+    {path:"commands/translate/translations.rs", lines:6.7,  fns:35.0, notes:"help-snapshot only"},
+    {path:"commands/translate/metadata.rs",     lines:0,    fns:0,    notes:"help-snapshot only"},
+  ]},
+  { name:"webhook", files:[{path:"commands/webhook.rs", lines:23.9, fns:51.2, notes:"help-snapshot, mock scenario (list + missing-url error)"}]},
+  { name:"mcp", files:[
+    {path:"mcp/auth_guidance.rs",  lines:88.0, fns:91.7, notes:"comprehensive unit tests (insta snapshots)"},
+    {path:"mcp/definitions.rs",    lines:100,  fns:100,  notes:"schema definitions only"},
+    {path:"mcp/tools.rs",          lines:93.5, fns:100,  notes:"unit tests"},
+    {path:"mcp/server.rs",         lines:38.3, fns:40.0, notes:"partial"},
+    {path:"mcp/dispatch.rs",       lines:0,    fns:0,    notes:"no tests — all tool handlers untested (7,126 lines total in mcp/tools_*)"},
+    {path:"mcp/tools_acc.rs",      lines:0,    fns:0,    notes:"no tests"},
+    {path:"mcp/tools_admin.rs",    lines:0,    fns:0,    notes:"no tests"},
+    {path:"mcp/tools_compound.rs", lines:0,    fns:0,    notes:"no tests"},
+    {path:"mcp/tools_dm.rs",       lines:0,    fns:0,    notes:"no tests"},
+    {path:"mcp/tools_misc.rs",     lines:0,    fns:0,    notes:"no tests"},
+    {path:"mcp/tools_oss.rs",      lines:0,    fns:0,    notes:"no tests"},
+  ]},
+  { name:"support", files:[
+    {path:"context_banner.rs",     lines:67.8, fns:80.0, notes:"unit tests (tier_from_extension, truncate, box rendering)"},
+    {path:"output/formatter.rs",   lines:82.0, fns:95.2, notes:"insta snapshot tests (JSON/YAML/table/CSV)"},
+    {path:"shell/command_tree.rs", lines:100,  fns:100,  notes:"unit tests"},
+    {path:"plugins.rs",            lines:62.9, fns:61.3, notes:"partial"},
+    {path:"credits.rs",            lines:88.6, fns:85.7, notes:"partial"},
+    {path:"shell/completer.rs",    lines:50.6, fns:44.4, notes:"unit tests"},
+    {path:"shell/hinter.rs",       lines:46.3, fns:27.3, notes:"unit tests"},
+    {path:"main.rs",               lines:46.0, fns:74.4, notes:"dispatch smoke tests"},
+    {path:"output/mod.rs",         lines:32.4, fns:50.0, notes:"partial"},
+    {path:"shell/highlighter.rs",  lines:0,    fns:0,    notes:"no tests"},
+    {path:"shell/prompt.rs",       lines:0,    fns:0,    notes:"no tests"},
+  ]},
+];
+
+/* ─── HELPERS ───────────────────────────────────────────────────────── */
+const TIER_META = [
+  { id:"all",     label:"All",    color:"#4a6070",  min:-1,  max:200 },
+  { id:"perfect", label:"100%",   color:"#06d6a0",  min:100, max:200 },
+  { id:"great",   label:"≥ 80%",  color:"#10b981",  min:80,  max:100 },
+  { id:"good",    label:"60–79%", color:"#84cc16",  min:60,  max:80  },
+  { id:"ok",      label:"40–59%", color:"#f0a020",  min:40,  max:60  },
+  { id:"poor",    label:"20–39%", color:"#f97316",  min:20,  max:40  },
+  { id:"bad",     label:"1–19%",  color:"#ef4444",  min:0.1, max:20  },
+  { id:"none",    label:"0%",     color:"#5a3030",  min:-1,  max:0.1 },
+];
+
+function tierOf(pct) {
+  if (pct >= 100) return "perfect";
+  if (pct >= 80)  return "great";
+  if (pct >= 60)  return "good";
+  if (pct >= 40)  return "ok";
+  if (pct >= 20)  return "poor";
+  if (pct > 0)    return "bad";
+  return "none";
+}
+
+function colorOf(pct)    { return TIER_META.find(t => t.id === tierOf(pct)).color; }
+function bgClass(pct)    { return "bc" + { perfect:"100",great:"80",good:"60",ok:"40",poor:"20",bad:"10",none:"0" }[tierOf(pct)]; }
+function textClass(pct)  { return "cc" + { perfect:"100",great:"80",good:"60",ok:"40",poor:"20",bad:"10",none:"0" }[tierOf(pct)]; }
+function fmtPct(v)       { return v === 0 ? "0%" : v === 100 ? "100%" : v.toFixed(1) + "%"; }
+function modAvg(files)   { return files.length ? files.reduce((s,f) => s + f.lines, 0) / files.length : 0; }
+
+function pathSplit(p) {
+  const i = p.lastIndexOf("/");
+  return i < 0 ? ["", p] : [p.slice(0, i+1), p.slice(i+1)];
+}
+
+/* ─── STATE ─────────────────────────────────────────────────────────── */
+let activeTier = "all";
+
+/* ─── TIER SUMMARY ──────────────────────────────────────────────────── */
+function buildTierSummary() {
+  const counts = {};
+  TIER_META.forEach(t => counts[t.id] = 0);
+  MODULES.forEach(m => m.files.forEach(f => counts[tierOf(f.lines)]++));
+
+  const container = document.getElementById("tier-summary");
+  // All card (total)
+  const total = MODULES.reduce((s,m) => s + m.files.length, 0);
+  const allCard = makeTierCard("all", "All", "#4a6070", total, "total files");
+  container.appendChild(allCard);
+
+  TIER_META.slice(1).forEach(t => {
+    container.appendChild(makeTierCard(t.id, t.label, t.color, counts[t.id], "files"));
+  });
+}
+
+function makeTierCard(id, label, color, count, unit) {
+  const div = document.createElement("div");
+  div.className = "tier-card" + (id === activeTier ? " active" : "");
+  div.dataset.tier = id;
+  div.style.borderTopColor = color;
+  div.style.borderTopWidth = "2px";
+  div.innerHTML = `
+    <div class="tier-card-header">
+      <div class="tier-dot" style="background:${color}"></div>
+      <div class="tier-card-name">${label}</div>
+    </div>
+    <div class="tier-card-count" style="color:${color}">${count}</div>
+    <div class="tier-card-label">${unit}</div>`;
+  return div;
+}
+
+// Tier card clicks via delegation
+document.getElementById("tier-summary").addEventListener("click", e => {
+  const card = e.target.closest(".tier-card");
+  if (!card) return;
+  activeTier = card.dataset.tier;
+  document.querySelectorAll(".tier-card").forEach(c => c.classList.toggle("active", c.dataset.tier === activeTier));
+  render();
+});
+
+/* ─── RENDER ────────────────────────────────────────────────────────── */
+function getFiltered() {
+  const query = document.getElementById("search").value.toLowerCase();
+  let files = [];
+  MODULES.forEach(m => m.files.forEach(f => files.push({...f, mod: m.name})));
+
+  return files.filter(f => {
+    const tierOk = activeTier === "all" || tierOf(f.lines) === activeTier;
+    const queryOk = !query || f.path.toLowerCase().includes(query);
+    return tierOk && queryOk;
+  });
+}
+
+function sortFiles(files) {
+  const sort = document.getElementById("sort-sel").value;
+  if (sort === "lines-desc") return [...files].sort((a,b) => b.lines - a.lines);
+  if (sort === "lines-asc")  return [...files].sort((a,b) => a.lines - b.lines);
+  if (sort === "path")       return [...files].sort((a,b) => a.path.localeCompare(b.path));
+  return files; // module order
+}
+
+function render() {
+  const allFiltered = getFiltered();
+  const sorted = sortFiles(allFiltered);
+  const total = MODULES.reduce((s,m) => s + m.files.length, 0);
+
+  document.getElementById("results-line").innerHTML =
+    `Showing <b>${sorted.length}</b> of ${total} files`;
+
+  const noResults = document.getElementById("no-results");
+  const container = document.getElementById("modules-container");
+  container.innerHTML = "";
+
+  if (sorted.length === 0) { noResults.style.display = "block"; return; }
+  noResults.style.display = "none";
+
+  const sort = document.getElementById("sort-sel").value;
+
+  if (sort === "module") {
+    // group by module, same order as MODULES
+    MODULES.forEach(m => {
+      const mFiles = sorted.filter(f => f.mod === m.name);
+      if (!mFiles.length) return;
+      container.appendChild(buildSection(m.name, mFiles));
+    });
+  } else {
+    // single flat section
+    container.appendChild(buildSection("results", sorted));
+  }
+
+  // Animate bars AFTER DOM is painted — requestAnimationFrame fires before paint,
+  // so we need TWO frames to ensure the browser has committed the new DOM.
+  // We also force a reflow inside animateBars() to guarantee transitions fire.
+  requestAnimationFrame(() => requestAnimationFrame(animateBars));
+}
+
+function buildSection(name, files) {
+  const avg = modAvg(files);
+  const section = document.createElement("div");
+  section.className = "module-section open";
+
+  // Header
+  const hdr = document.createElement("div");
+  hdr.className = "module-header";
+  hdr.innerHTML = `
+    <span class="mh-toggle">▶</span>
+    <span class="mh-name">${name}</span>
+    <div class="mh-bar"><div class="mh-bar-fill ${bgClass(avg)}" data-target="${avg}"></div></div>
+    <span class="mh-avg ${textClass(avg)}">${fmtPct(avg)}</span>
+    <span class="mh-count">${files.length} file${files.length > 1 ? "s" : ""}</span>`;
+  hdr.addEventListener("click", () => section.classList.toggle("open"));
+  section.appendChild(hdr);
+
+  // Body
+  const body = document.createElement("div");
+  body.className = "module-body";
+
+  const table = document.createElement("table");
+  table.className = "file-table";
+
+  // Column headers
+  const colHdr = document.createElement("tr");
+  colHdr.className = "col-header-row";
+  colHdr.innerHTML = `<td>File</td><td>Line Coverage</td><td>Fn Cov.</td><td>Notes</td>`;
+  table.appendChild(colHdr);
+
+  files.forEach(f => {
+    const [dir, file] = pathSplit(f.path);
+    const tr = document.createElement("tr");
+    tr.className = "file-row";
+    tr.title = f.notes;
+    tr.innerHTML = `
+      <td class="td-path">
+        <span class="fp"><span class="dir">${dir}</span>${file}</span>
+      </td>
+      <td class="td-bar">
+        <div class="bar-wrap">
+          <div class="bar-track">
+            <div class="bar-fill ${bgClass(f.lines)}" data-target="${f.lines}"></div>
+          </div>
+          <span class="bar-pct ${textClass(f.lines)}">${fmtPct(f.lines)}</span>
+        </div>
+      </td>
+      <td class="td-fn">
+        <div class="fn-wrap">
+          <div class="fn-track">
+            <div class="fn-fill ${bgClass(f.fns)}" data-target="${f.fns}"></div>
+          </div>
+          <span class="fn-pct ${textClass(f.fns)}">${fmtPct(f.fns)}</span>
+        </div>
+      </td>
+      <td class="td-notes">${f.notes}</td>`;
+    table.appendChild(tr);
+  });
+
+  body.appendChild(table);
+  section.appendChild(body);
+  return section;
+}
+
+/* ─── ANIMATIONS ────────────────────────────────────────────────────── */
+function animateBars() {
+  // Collect all animated fills
+  const barFills = [...document.querySelectorAll(".bar-fill, .fn-fill, .mh-bar-fill")];
+
+  // 1. Disable transitions and reset to 0 — ensures we have a clean start state
+  barFills.forEach(el => {
+    el.style.transition = "none";
+    el.style.width = "0%";
+  });
+
+  // 2. Force synchronous reflow — critical: browser must commit the 0% state
+  //    before we start the transition, otherwise it skips straight to final value.
+  //    Reading offsetHeight on any element does this.
+  document.getElementById("modules-container").offsetHeight;
+
+  // 3. Restore transitions and animate to target with staggered delays
+  barFills.forEach((el, i) => {
+    const target = parseFloat(el.dataset.target) || 0;
+    const delay  = i * 12; // ms stagger per element
+    el.style.transition = `width 1.1s cubic-bezier(0.16,1,0.3,1) ${delay}ms`;
+    el.style.width = target + "%";
+  });
+}
+
+function animateArcs() {
+  const C = 251.3; // 2π × 40
+
+  function runArc(id, numId, pct) {
+    const el  = document.getElementById(id);
+    const num = document.getElementById(numId);
+    el.style.strokeDashoffset = C * (1 - pct / 100);
+
+    let start = null;
+    function step(ts) {
+      if (!start) start = ts;
+      const t = Math.min((ts - start) / 1600, 1);
+      const ease = 1 - Math.pow(1 - t, 4); // ease-out-quart
+      num.textContent = (pct * ease).toFixed(1) + "%";
+      if (t < 1) requestAnimationFrame(step);
+      else num.textContent = fmtPct(pct);
+    }
+    requestAnimationFrame(step);
+  }
+
+  setTimeout(() => runArc("arc-lines", "arc-lines-num", OVERALL.lines), 300);
+  setTimeout(() => runArc("arc-fns",   "arc-fns-num",  OVERALL.fns),   500);
+}
+
+/* ─── WIRE UP CONTROLS ──────────────────────────────────────────────── */
+document.getElementById("search").addEventListener("input", render);
+document.getElementById("sort-sel").addEventListener("change", render);
+
+/* ─── BOOT ──────────────────────────────────────────────────────────── */
+buildTierSummary();
+render();
+animateArcs();
+</script>
+</body>
+</html>

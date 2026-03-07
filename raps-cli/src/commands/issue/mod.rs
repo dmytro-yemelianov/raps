@@ -11,6 +11,8 @@ mod comments;
 mod crud;
 mod transitions;
 
+pub use crud::IssueOutput;
+
 use std::path::PathBuf;
 
 use anyhow::Result;

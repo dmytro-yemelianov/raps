@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 
+use raps_kernel::error::RapsError;
 use crate::types::*;
 use crate::{DataManagementClient, MAX_PAGINATION_PAGES};
 
@@ -39,9 +40,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "GraphQL response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("AEC GraphQL request failed ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let gql: GqlResponse<T> = response
@@ -178,9 +177,7 @@ impl DataManagementClient {
         tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list hubs ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Vec<Hub>> = response
@@ -202,9 +199,7 @@ impl DataManagementClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get hub ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Hub> = response
@@ -239,9 +234,7 @@ impl DataManagementClient {
             .await?;
 
             if !response.status().is_success() {
-                let status = response.status();
-                let error_text = response.text().await.unwrap_or_default();
-                anyhow::bail!("Failed to list projects ({status}): {error_text}");
+                return Err(RapsError::from_response(response).await.into());
             }
 
             let api_response: JsonApiResponse<Vec<Project>> = response
@@ -276,9 +269,7 @@ impl DataManagementClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Project> = response
@@ -314,9 +305,7 @@ impl DataManagementClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let body: serde_json::Value = response
@@ -349,9 +338,7 @@ impl DataManagementClient {
         .await?;
 
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get top folders ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let api_response: JsonApiResponse<Vec<Folder>> = response

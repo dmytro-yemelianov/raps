@@ -8,11 +8,7 @@
 //!
 //! Items in this module are pre-built for integration into the MCP auth flow.
 
-use raps_kernel::auth::AuthClient;
-use raps_kernel::config::Config;
-
 /// Authentication requirement for MCP tools
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuthRequirement {
     /// Requires 2-legged OAuth (client credentials)
@@ -24,73 +20,17 @@ pub enum AuthRequirement {
 }
 
 /// Current authentication state
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct AuthState {
-    /// Whether APS_CLIENT_ID is configured
-    pub has_client_id: bool,
-    /// Whether APS_CLIENT_SECRET is configured
-    pub has_client_secret: bool,
     /// Whether 2-legged auth succeeds
     pub two_legged_valid: bool,
     /// Whether 3-legged token exists and is valid
     pub three_legged_valid: bool,
-    /// Whether 3-legged token exists but is expired
-    pub three_legged_expired: bool,
-}
-
-#[allow(dead_code)]
-impl AuthState {
-    /// Check if any credentials are configured
-    pub fn has_any_credentials(&self) -> bool {
-        self.has_client_id || self.has_client_secret
-    }
-
-    /// Check if 2-legged credentials are complete
-    pub fn has_complete_2leg_credentials(&self) -> bool {
-        self.has_client_id && self.has_client_secret
-    }
 }
 
 // ============================================================================
 // Instruction Constants
 // ============================================================================
-
-/// Full onboarding guide for first-time users
-#[allow(dead_code)]
-pub const SETUP_INSTRUCTIONS: &str = r#"
-To set up authentication for RAPS MCP Server:
-
-1. Go to https://aps.autodesk.com/ (Autodesk Platform Services)
-2. Sign in or create an Autodesk account
-3. Create a new application or select an existing one
-4. Copy your Client ID and Client Secret
-5. Set environment variables before starting the MCP server:
-
-   For Unix/macOS:
-     export APS_CLIENT_ID="your_client_id"
-     export APS_CLIENT_SECRET="your_client_secret"
-
-   For Windows (PowerShell):
-     $env:APS_CLIENT_ID="your_client_id"
-     $env:APS_CLIENT_SECRET="your_client_secret"
-
-   Or add to your MCP server configuration (claude_desktop_config.json):
-     {
-       "mcpServers": {
-         "raps": {
-           "command": "raps",
-           "args": ["serve"],
-           "env": {
-             "APS_CLIENT_ID": "your_client_id",
-             "APS_CLIENT_SECRET": "your_client_secret"
-           }
-         }
-       }
-     }
-
-For more information: https://rapscli.xyz/docs/auth
-"#;
 
 /// Missing client ID guidance
 pub const MISSING_CLIENT_ID: &str = r#"
@@ -116,17 +56,6 @@ The Client Secret is required for authentication. To get your Client Secret:
 Note: Keep your Client Secret secure and never share it publicly.
 "#;
 
-/// Prompt to perform 3-legged authentication
-#[allow(dead_code)]
-pub const THREE_LEGGED_PROMPT: &str = r#"
-To access BIM 360/ACC data (hubs, projects, folders, files, issues, RFIs), you need to log in with your Autodesk account.
-
-Use the `auth_login` tool to start the authentication process, or run:
-  raps auth login
-
-This will open a browser window for you to sign in with your Autodesk credentials.
-"#;
-
 /// Tool availability summary header
 pub const TOOL_AVAILABILITY_HEADER: &str = "\nTool Availability:\n";
 
@@ -135,7 +64,6 @@ pub const TOOL_AVAILABILITY_HEADER: &str = "\nTool Availability:\n";
 // ============================================================================
 
 /// Get the authentication requirement for a tool
-#[allow(dead_code)]
 pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
     match tool_name {
         // Auth tools - work with either
@@ -210,45 +138,6 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
 
         // Default to 2-legged for unknown tools
         _ => AuthRequirement::TwoLegged,
-    }
-}
-
-// ============================================================================
-// Auth State Helper
-// ============================================================================
-
-/// Compute current authentication state from config and auth client
-#[allow(dead_code)]
-pub async fn get_auth_state(config: &Config, auth_client: &AuthClient) -> AuthState {
-    let has_client_id = !config.client_id.is_empty();
-    let has_client_secret = !config.client_secret.is_empty();
-
-    // Check 2-legged validity
-    let two_legged_valid = if has_client_id && has_client_secret {
-        auth_client.get_token().await.is_ok()
-    } else {
-        false
-    };
-
-    // Check 3-legged validity
-    let (three_legged_valid, three_legged_expired) = match auth_client.get_3leg_token().await {
-        Ok(_) => (true, false),
-        Err(e) => {
-            let err_msg = e.to_string().to_lowercase();
-            if err_msg.contains("expired") || err_msg.contains("refresh") {
-                (false, true)
-            } else {
-                (false, false)
-            }
-        }
-    };
-
-    AuthState {
-        has_client_id,
-        has_client_secret,
-        two_legged_valid,
-        three_legged_valid,
-        three_legged_expired,
     }
 }
 
@@ -383,4 +272,101 @@ pub fn get_tool_availability_summary(state: &AuthState) -> String {
     }
 
     summary
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_auth_state(two_legged_valid: bool, three_legged_valid: bool) -> AuthState {
+        AuthState {
+            two_legged_valid,
+            three_legged_valid,
+        }
+    }
+
+    // --- get_tool_auth_requirement ---
+
+    #[test]
+    fn test_tool_auth_oss_is_two_legged() {
+        assert_eq!(
+            get_tool_auth_requirement("bucket_list"),
+            AuthRequirement::TwoLegged
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_dm_is_three_legged() {
+        assert_eq!(
+            get_tool_auth_requirement("hub_list"),
+            AuthRequirement::ThreeLegged
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_auth_is_either() {
+        assert_eq!(
+            get_tool_auth_requirement("auth_test"),
+            AuthRequirement::Either
+        );
+    }
+
+    #[test]
+    fn test_tool_auth_unknown_defaults() {
+        assert_eq!(
+            get_tool_auth_requirement("unknown_tool"),
+            AuthRequirement::TwoLegged
+        );
+    }
+
+    // --- format_error_guidance ---
+
+    #[test]
+    fn test_format_error_guidance_client_id() {
+        let result = format_error_guidance("missing client_id");
+        assert!(result.contains("Client ID"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_unauthorized() {
+        let result = format_error_guidance("401 unauthorized");
+        assert!(result.contains("Invalid Credentials"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_network() {
+        let result = format_error_guidance("connection refused");
+        assert!(result.contains("Network Issue"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_expired() {
+        let result = format_error_guidance("token expired");
+        assert!(result.contains("Token Expired"));
+    }
+
+    #[test]
+    fn test_format_error_guidance_generic() {
+        let result = format_error_guidance("something weird");
+        assert!(result.contains("Authentication Error"));
+        assert!(result.contains("something weird"));
+    }
+
+    // --- get_tool_availability_summary ---
+
+    #[test]
+    fn test_availability_summary_all_valid() {
+        let state = make_auth_state(true, true);
+        let summary = get_tool_availability_summary(&state);
+        assert!(!summary.contains("✗"));
+        assert!(summary.contains("✓"));
+    }
+
+    #[test]
+    fn test_availability_summary_no_auth() {
+        let state = make_auth_state(false, false);
+        let summary = get_tool_availability_summary(&state);
+        assert!(!summary.contains("✓"));
+        assert!(summary.contains("✗"));
+    }
 }

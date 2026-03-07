@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
+    body::Bytes,
     Json, Router,
     extract::{Path, State},
     http::{HeaderMap, Method, StatusCode, Uri},
@@ -654,20 +655,19 @@ struct WebhookEvent {
 async fn webhook_callback(
     State(state): State<ServiceState>,
     headers: HeaderMap,
-    Json(event): Json<WebhookEvent>,
+    body: Bytes,
 ) -> impl IntoResponse {
     // Verify signature if APS_WEBHOOK_SECRET is set
     let secret = std::env::var("APS_WEBHOOK_SECRET").ok();
     if let Some(ref secret) = secret {
         let signature = headers
-            .get("x-adsk-signature")
+            .get("x-aps-signature")
+            .or_else(|| headers.get("x-adsk-signature"))
             .and_then(|v| v.to_str().ok());
         match signature {
             Some(sig) => {
                 // Verify HMAC-SHA256 signature
-                let body_bytes =
-                    serde_json::to_vec(&event.payload).unwrap_or_default();
-                if !verify_webhook_signature(secret, &body_bytes, sig) {
+                if !verify_webhook_signature(secret, body.as_ref(), sig) {
                     tracing::warn!("Webhook signature verification failed");
                     return (
                         StatusCode::UNAUTHORIZED,
@@ -677,7 +677,7 @@ async fn webhook_callback(
                 }
             }
             None => {
-                tracing::warn!("Webhook request missing x-adsk-signature header");
+                tracing::warn!("Webhook request missing signature header");
                 return (
                     StatusCode::UNAUTHORIZED,
                     Json(serde_json::json!({"error": "missing signature"})),
@@ -686,6 +686,17 @@ async fn webhook_callback(
             }
         }
     }
+
+    let event: WebhookEvent = match serde_json::from_slice(body.as_ref()) {
+        Ok(evt) => evt,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({"error": "invalid JSON payload"})),
+            )
+                .into_response();
+        }
+    };
 
     // Publish event to Redis Stream
     let event_type = event
@@ -741,8 +752,8 @@ async fn webhook_callback(
 }
 
 fn verify_webhook_signature(secret: &str, body: &[u8], expected_signature: &str) -> bool {
-    use sha2::Sha256;
     use hmac::{Hmac, Mac};
+    use sha2::Sha256;
 
     type HmacSha256 = Hmac<Sha256>;
 
@@ -751,8 +762,11 @@ fn verify_webhook_signature(secret: &str, body: &[u8], expected_signature: &str)
     };
     mac.update(body);
 
-    // The signature may be hex-encoded
-    let Ok(expected_bytes) = hex::decode(expected_signature) else {
+    let normalized = expected_signature.trim();
+    let normalized = normalized.strip_prefix("sha256=").unwrap_or(normalized);
+
+    // APS webhook signatures are hex-encoded HMAC-SHA256 digests.
+    let Ok(expected_bytes) = hex::decode(normalized) else {
         return false;
     };
 
@@ -1095,3 +1109,83 @@ const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
 </body>
 </html>
 "#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use raps_kernel::job_queue::*;
+
+    #[test]
+    fn test_payload_type_name_translate() {
+        let payload = JobPayload::Translate(TranslateJob {
+            urn: String::new(),
+            output_format: String::new(),
+            root_filename: None,
+            region: None,
+            force: false,
+        });
+        assert_eq!(payload_type_name(&payload), "translate");
+    }
+
+    #[test]
+    fn test_payload_type_name_upload() {
+        let payload = JobPayload::Upload(UploadJob {
+            bucket_key: String::new(),
+            object_key: String::new(),
+            file_path: String::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "upload");
+    }
+
+    #[test]
+    fn test_payload_type_name_extract_props() {
+        let payload = JobPayload::ExtractProps(ExtractPropsJob {
+            urn: String::new(),
+            view_guid: None,
+            output_path: String::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "extract_props");
+    }
+
+    #[test]
+    fn test_payload_type_name_pipeline() {
+        let payload = JobPayload::Pipeline(PipelineJob {
+            pipeline_name: String::new(),
+            pipeline_file: String::new(),
+            variables: std::collections::HashMap::new(),
+        });
+        assert_eq!(payload_type_name(&payload), "pipeline");
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_valid() {
+        use sha2::Sha256;
+        use hmac::{Hmac, Mac};
+
+        let secret = "test-secret";
+        let body = b"hello world";
+
+        // Compute expected signature
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).unwrap();
+        mac.update(body);
+        let sig = hex::encode(mac.finalize().into_bytes());
+
+        assert!(verify_webhook_signature(secret, body, &sig));
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_invalid() {
+        assert!(!verify_webhook_signature("secret", b"body", "0000000000000000000000000000000000000000000000000000000000000000"));
+    }
+
+    #[test]
+    fn test_verify_webhook_signature_bad_hex() {
+        assert!(!verify_webhook_signature("secret", b"body", "not-hex!"));
+    }
+
+    #[test]
+    fn test_default_priority() {
+        assert!(matches!(default_priority(), JobPriority::Normal));
+    }
+}

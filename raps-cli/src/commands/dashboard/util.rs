@@ -339,3 +339,89 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
         | ResourceData::SwarmStatus(fields) => fields.first().map(|f| f.value.clone()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_timestamp_valid() {
+        // 2024-01-01 00:00:00 UTC = 1704067200 seconds = 1704067200000 ms
+        let result = format_timestamp(1_704_067_200_000);
+        assert_eq!(result, "2024-01-01 00:00");
+    }
+
+    #[test]
+    fn test_format_timestamp_zero() {
+        let result = format_timestamp(0);
+        assert_eq!(result, "1970-01-01 00:00");
+    }
+
+    #[test]
+    fn test_format_size_bytes() {
+        assert_eq!(format_size(512), "512 B");
+    }
+
+    #[test]
+    fn test_format_size_kb() {
+        assert_eq!(format_size(1024), "1.0 KB");
+    }
+
+    #[test]
+    fn test_format_size_mb() {
+        assert_eq!(format_size(1_048_576), "1.0 MB");
+    }
+
+    #[test]
+    fn test_format_size_gb() {
+        assert_eq!(format_size(1_073_741_824), "1.0 GB");
+    }
+
+    #[test]
+    fn test_status_color_open() {
+        let style = status_color("open");
+        assert_eq!(style.fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn test_status_color_closed() {
+        let style = status_color("closed");
+        assert_eq!(style.fg, Some(Color::DarkGray));
+    }
+
+    #[test]
+    fn test_status_color_draft() {
+        let style = status_color("draft");
+        assert_eq!(style.fg, Some(Color::Yellow));
+    }
+
+    #[test]
+    fn test_status_color_unknown() {
+        let style = status_color("something");
+        assert_eq!(style.fg, Some(Color::White));
+    }
+
+    #[test]
+    fn test_da_status_color_success() {
+        let style = da_status_color("success");
+        assert_eq!(style.fg, Some(Color::Green));
+    }
+
+    #[test]
+    fn test_da_status_color_failed() {
+        let style = da_status_color("failed");
+        assert_eq!(style.fg, Some(Color::Red));
+    }
+
+    #[test]
+    fn test_da_status_color_pending() {
+        let style = da_status_color("pending");
+        assert_eq!(style.fg, Some(Color::Yellow));
+    }
+
+    #[test]
+    fn test_da_status_color_unknown() {
+        let style = da_status_color("something");
+        assert_eq!(style.fg, Some(Color::White));
+    }
+}

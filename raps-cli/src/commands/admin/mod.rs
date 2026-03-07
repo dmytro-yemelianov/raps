@@ -15,13 +15,19 @@ mod operations;
 mod project;
 mod user;
 
+pub(crate) use csv_ops::CsvUpdateResultOutput;
+pub(crate) use operations::{BulkResultOutput, OperationListOutput, OperationStatusOutput};
+pub(crate) use project::{CompanyListOutput, ProjectListOutput as AdminProjectListOutput};
+pub(crate) use user::UserListOutput;
+
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Subcommand, ValueEnum};
 use indicatif::ProgressBar;
 
 use raps_admin::{PermissionLevel, ProgressUpdate, ProjectFilter};
+use raps_dm::DataManagementClient;
 use raps_kernel::auth::AuthClient;
 use raps_kernel::config::Config;
 
@@ -250,6 +256,29 @@ pub enum UserCommands {
         #[arg(long, value_name = "FILE")]
         from_csv: PathBuf,
     },
+
+    /// Add a user to all active projects in an account with an optional role
+    #[command(name = "add-to-all-projects")]
+    AddToAllProjects {
+        /// Email address of the user to add
+        email: String,
+
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Role ID to assign in each project (e.g. the project administrator role ID)
+        #[arg(long)]
+        role: Option<String>,
+
+        /// Parallel requests (defaults to global --concurrency, max: 50)
+        #[arg(long)]
+        concurrency: Option<usize>,
+
+        /// Preview changes without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 /// Folder permission management subcommands
@@ -465,13 +494,75 @@ pub enum OperationCommands {
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn get_account_id(account: Option<String>) -> Result<String> {
-    match account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok()) {
-        Some(id) if !id.is_empty() => Ok(id),
-        _ => {
+/// Resolve the account ID from explicit arg, env var, or hub auto-discovery.
+///
+/// Priority:
+/// 1. `--account <id>` argument
+/// 2. `APS_ACCOUNT_ID` environment variable
+/// 3. Auto-discover: call `raps hub list`; use the sole hub or prompt when multiple
+pub(crate) async fn resolve_account_id(
+    account: Option<String>,
+    dm_client: &DataManagementClient,
+) -> Result<String> {
+    // Fast path: explicit arg or env var
+    if let Some(id) = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok())
+        && !id.is_empty()
+    {
+        return Ok(id);
+    }
+
+    // Auto-discover via hub list (requires 3-legged auth)
+    let all_hubs = dm_client
+        .list_hubs()
+        .await
+        .context("Failed to list hubs for account auto-discovery. Use --account or set APS_ACCOUNT_ID.")?;
+
+    // Filter to enterprise ACC/BIM360 hubs only — personal hubs
+    // (extension_type = "hubs:autodesk.core:Hub") do not have Admin API access.
+    let hubs: Vec<_> = all_hubs
+        .into_iter()
+        .filter(|h| {
+            let ext = h
+                .attributes
+                .extension
+                .as_ref()
+                .and_then(|e| e.extension_type.as_deref())
+                .unwrap_or("");
+            !ext.contains("core:Hub")
+        })
+        .collect();
+
+    match hubs.len() {
+        0 => {
+            crate::context_banner::print_warning_no_enterprise();
             anyhow::bail!(
-                "Account ID is required. Use --account or set APS_ACCOUNT_ID environment variable."
+                "No enterprise ACC/BIM360 accounts found. \
+                 Use --account <id> if you know your enterprise account ID."
+            )
+        }
+        1 => {
+            let hub = &hubs[0];
+            let id = hub.id.trim_start_matches("b.").to_string();
+            let region = hub.attributes.region.as_deref();
+            let banner = crate::context_banner::ContextBanner::from_account(
+                &id,
+                &hub.attributes.name,
+                region,
             );
+            banner.print_box();
+            Ok(id)
+        }
+        _ => {
+            // Multiple enterprise hubs: prompt interactively or bail in non-interactive mode
+            let items: Vec<String> = hubs
+                .iter()
+                .map(|h| format!("{} — {}", h.id, h.attributes.name))
+                .collect();
+            let idx = raps_kernel::prompts::spawn_prompt(move || {
+                raps_kernel::prompts::select("Select account", &items)
+            })
+            .await?;
+            Ok(hubs[idx].id.clone())
         }
     }
 }
@@ -521,22 +612,25 @@ impl AdminCommands {
         self,
         config: &Config,
         auth_client: &AuthClient,
+        dm_client: &DataManagementClient,
         output_format: OutputFormat,
         concurrency: usize,
     ) -> Result<()> {
         match self {
             AdminCommands::User(cmd) => {
-                cmd.execute(config, auth_client, output_format, concurrency)
+                cmd.execute(config, auth_client, dm_client, output_format, concurrency)
                     .await
             }
             AdminCommands::Folder(cmd) => {
-                cmd.execute(config, auth_client, output_format, concurrency)
+                cmd.execute(config, auth_client, dm_client, output_format, concurrency)
                     .await
             }
-            AdminCommands::Project(cmd) => cmd.execute(config, auth_client, output_format).await,
+            AdminCommands::Project(cmd) => {
+                cmd.execute(config, auth_client, dm_client, output_format).await
+            }
             AdminCommands::Operation(cmd) => cmd.execute(output_format).await,
             AdminCommands::CompanyList { account } => {
-                project::execute_company_list(config, auth_client, account, output_format).await
+                project::execute_company_list(config, auth_client, dm_client, account, output_format).await
             }
         }
     }

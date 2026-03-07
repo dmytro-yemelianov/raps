@@ -4,6 +4,7 @@
 //! Activity operations for the Design Automation API.
 
 use anyhow::{Context, Result};
+use raps_kernel::error::RapsError;
 use serde::Serialize;
 
 use raps_kernel::http;
@@ -22,10 +23,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list activities ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let paginated: PaginatedResponse<String> = response
@@ -50,10 +51,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create activity ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         let activity: Activity = response
@@ -98,10 +99,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to create activity alias ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())
@@ -117,10 +118,10 @@ impl DesignAutomationClient {
         })
         .await?;
 
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
         if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to delete activity ({status}): {error_text}");
+            return Err(RapsError::from_response(response).await.into());
         }
 
         Ok(())

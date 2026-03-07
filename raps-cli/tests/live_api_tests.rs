@@ -413,3 +413,98 @@ fn test_live_bucket_workflow() {
 
     println!("Deleted bucket: {}", bucket_key);
 }
+
+/// Full hub workflow: list hubs, then get info for the first one.
+///
+/// Requires: APS_CLIENT_ID, APS_CLIENT_SECRET, and a valid 3-legged login session.
+#[test]
+#[ignore = "requires live APS credentials with 3-legged auth (raps auth login first)"]
+fn test_live_hub_workflow() {
+    // Step 1: list hubs as JSON
+    let list_out = raps()
+        .args(["hub", "list", "--output", "json"])
+        .output()
+        .unwrap();
+    assert!(
+        list_out.status.success(),
+        "hub list failed: {}",
+        String::from_utf8_lossy(&list_out.stderr)
+    );
+
+    let hubs: serde_json::Value =
+        serde_json::from_slice(&list_out.stdout).expect("hub list must return valid JSON");
+    let hub_array = hubs.as_array().expect("hub list must be a JSON array");
+
+    if hub_array.is_empty() {
+        eprintln!("No hubs available — skipping hub info step");
+        return;
+    }
+
+    // Step 2: hub info for the first hub
+    let hub_id = hub_array[0]["id"].as_str().expect("hub id must be a string");
+    let info_out = raps()
+        .args(["hub", "info", hub_id, "--output", "json"])
+        .output()
+        .unwrap();
+    assert!(
+        info_out.status.success(),
+        "hub info failed: {}",
+        String::from_utf8_lossy(&info_out.stderr)
+    );
+    let info: serde_json::Value =
+        serde_json::from_slice(&info_out.stdout).expect("hub info must return valid JSON");
+    assert_eq!(
+        info["id"].as_str(),
+        Some(hub_id),
+        "hub info id must match the requested hub id"
+    );
+}
+
+/// Translate workflow: upload a placeholder file to OSS, start translation, verify graceful response.
+///
+/// Requires: APS_CLIENT_ID, APS_CLIENT_SECRET, and a bucket named `raps-test-translate`.
+/// The translation will fail for non-CAD content — that is expected and verified to be graceful (no panic).
+#[test]
+#[ignore = "requires live APS credentials and a pre-existing raps-test-translate bucket"]
+fn test_live_translate_workflow() {
+    // Step 1: upload a placeholder file to OSS
+    let tmp = tempfile::NamedTempFile::new().expect("should create temp file");
+    std::fs::write(tmp.path(), b"placeholder content for translate test").unwrap();
+
+    let upload_out = raps()
+        .args([
+            "object",
+            "upload",
+            "--bucket",
+            "raps-test-translate",
+            "--key",
+            "translate-test.txt",
+            tmp.path().to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        upload_out.status.success(),
+        "object upload failed: {}",
+        String::from_utf8_lossy(&upload_out.stderr)
+    );
+
+    // Extract the URN from the upload JSON output
+    let upload_json: serde_json::Value =
+        serde_json::from_slice(&upload_out.stdout).expect("object upload must return valid JSON");
+    let urn = upload_json["urn"]
+        .as_str()
+        .expect("upload output must contain a 'urn' field");
+
+    // Step 2: start translation (will likely fail for .txt — verify graceful error, not panic)
+    let translate_out = raps()
+        .args(["translate", "start", urn, "--output", "json"])
+        .output()
+        .unwrap();
+    assert_ne!(
+        translate_out.status.code(),
+        Some(101),
+        "translate start must not panic (exit 101); stderr: {}",
+        String::from_utf8_lossy(&translate_out.stderr)
+    );
+}

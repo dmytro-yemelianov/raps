@@ -18,11 +18,14 @@ use crate::types::{PaginatedResponse, ProductAccess, ProjectUser};
 /// Client for ACC Project Users API
 ///
 /// Provides operations for managing users within individual projects.
+/// Set `account_id` to enable BIM 360 HQ v2 fallback for Business hubs.
 #[derive(Clone)]
 pub struct ProjectUsersClient {
     config: Config,
     auth: AuthClient,
     http_client: reqwest::Client,
+    /// Account ID for BIM 360 HQ v2 user endpoints (required for Business hubs)
+    pub account_id: Option<String>,
 }
 
 /// Request to add a user to a project
@@ -31,9 +34,9 @@ pub struct ProjectUsersClient {
 pub struct AddProjectUserRequest {
     /// User email address
     pub email: String,
-    /// Role ID to assign (optional)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// Role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Product access configurations
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub products: Vec<ProductAccess>,
@@ -43,9 +46,9 @@ pub struct AddProjectUserRequest {
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProjectUserRequest {
-    /// New role ID to assign
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// New role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Updated product access configurations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<ProductAccess>>,
@@ -57,9 +60,9 @@ pub struct UpdateProjectUserRequest {
 pub struct ImportUserRequest {
     /// User email address
     pub email: String,
-    /// Optional role ID to assign
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub role_id: Option<String>,
+    /// Role IDs to assign (ACC API uses an array, even for a single role)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub role_ids: Vec<String>,
     /// Optional product access configurations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<ProductAccess>>,
@@ -102,31 +105,44 @@ impl ProjectUsersClient {
     /// Create a new Project Users client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create client with custom HTTP configuration
+    /// Create client with custom HTTP configuration.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .context("Failed to initialise HTTP client for Project Users")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
-        }
+            account_id: None,
+        })
     }
 
-    /// Get the base URL for Project Admin API
+    /// Get the base URL for ACC Construction Admin v1 project endpoint
     fn project_url(&self, project_id: &str) -> String {
         let project_id = crate::strip_project_prefix(project_id);
         format!(
             "{}/construction/admin/v1/projects/{}",
             self.config.base_url, project_id
+        )
+    }
+
+    /// Get the base URL for BIM 360 HQ v2 project users endpoint
+    fn project_url_bim360(&self, account_id: &str, project_id: &str) -> String {
+        let project_id = crate::strip_project_prefix(project_id);
+        format!(
+            "{}/hq/v2/accounts/{}/projects/{}/users",
+            self.config.base_url, account_id, project_id
         )
     }
 
@@ -206,22 +222,57 @@ impl ProjectUsersClient {
         Ok(user)
     }
 
-    /// Add a user to a project
+    /// Add a user to a project.
     ///
-    /// # Arguments
-    /// * `project_id` - The project ID
-    /// * `request` - Add user request with user ID, role, and products
-    ///
-    /// # Returns
-    /// The newly created project user membership
+    /// Tries the ACC Construction Admin v1 endpoint first. If the project lives
+    /// in a BIM 360 Business hub (returns HTTP 400 or 404) and `self.account_id`
+    /// is set, falls back to the BIM 360 HQ v2 endpoint.
     pub async fn add_user(
         &self,
         project_id: &str,
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
         let token = self.auth.get_3leg_token().await?;
-
         let url = format!("{}/users", self.project_url(project_id));
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
+        if response.status().is_success() {
+            return response
+                .json()
+                .await
+                .context("Failed to parse add user response");
+        }
+
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id
+        if (status == 400 || status == 404) && let Some(ref account_id) = self.account_id {
+            return self
+                .add_user_bim360(account_id, project_id, request)
+                .await;
+        }
+
+        anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
+    }
+
+    /// Add a user to a BIM 360 project via HQ v2 endpoint.
+    async fn add_user_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        request: AddProjectUserRequest,
+    ) -> Result<ProjectUser> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = self.project_url_bim360(account_id, project_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client
@@ -235,15 +286,13 @@ impl ProjectUsersClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to add user to project ({status}): {error_text}");
+            anyhow::bail!("Failed to add user to BIM 360 project ({status}): {error_text}");
         }
 
-        let user: ProjectUser = response
+        response
             .json()
             .await
-            .context("Failed to parse add user response")?;
-
-        Ok(user)
+            .context("Failed to parse BIM 360 add user response")
     }
 
     /// Update a user's role or product access in a project
@@ -330,6 +379,41 @@ impl ProjectUsersClient {
         Ok(response.status().is_success())
     }
 
+    /// Find a user in a project by email address.
+    ///
+    /// Uses `filter[email]` query parameter to avoid fetching all users.
+    /// Returns `None` if the user is not a member of the project.
+    pub async fn find_project_user_by_email(
+        &self,
+        project_id: &str,
+        email: &str,
+    ) -> Result<Option<ProjectUser>> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users?filter[email]={}&limit=1",
+            self.project_url(project_id),
+            urlencoding::encode(email),
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to find project user by email ({status}): {body}");
+        }
+
+        let page: PaginatedResponse<ProjectUser> = response
+            .json()
+            .await
+            .context("Failed to parse project users response")?;
+
+        Ok(page.results.into_iter().next())
+    }
+
     /// Fetch all users in a project (handles pagination automatically)
     pub async fn list_all_project_users(&self, project_id: &str) -> Result<Vec<ProjectUser>> {
         let mut all_users = Vec::new();
@@ -383,7 +467,7 @@ impl ProjectUsersClient {
                 let _permit = sem.acquire().await.expect("semaphore closed unexpectedly");
                 let request = AddProjectUserRequest {
                     email: user.email.clone(),
-                    role_id: user.role_id,
+                    role_ids: user.role_ids,
                     products: user.products.unwrap_or_default(),
                 };
                 let result = client.add_user(&pid, request).await;
@@ -437,10 +521,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_add_request_role_ids_absent_when_empty() {
+        let request = AddProjectUserRequest {
+            email: "user@example.com".to_string(),
+            role_ids: vec![],
+            products: vec![],
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(json.contains("\"email\":\"user@example.com\""));
+        assert!(
+            !json.contains("roleIds"),
+            "roleIds must be absent when empty (skip_serializing_if)"
+        );
+    }
+
+    #[test]
     fn test_add_request_serialization() {
         let request = AddProjectUserRequest {
             email: "user@example.com".to_string(),
-            role_id: Some("role-456".to_string()),
+            role_ids: vec!["role-456".to_string()],
             products: vec![ProductAccess {
                 key: "docs".to_string(),
                 access: "member".to_string(),
@@ -449,19 +548,19 @@ mod tests {
 
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
-        assert!(json.contains("role-456"));
+        assert!(json.contains("\"roleIds\":[\"role-456\"]"), "must send roleIds array: {json}");
         assert!(json.contains("docs"));
     }
 
     #[test]
     fn test_update_request_serialization() {
         let request = UpdateProjectUserRequest {
-            role_id: Some("new-role".to_string()),
+            role_ids: vec!["new-role".to_string()],
             products: None,
         };
 
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains("new-role"));
+        assert!(json.contains("\"roleIds\":[\"new-role\"]"), "must send roleIds array: {json}");
         // products should be skipped when None
         assert!(!json.contains("products"));
     }

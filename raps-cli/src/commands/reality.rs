@@ -9,7 +9,6 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -18,6 +17,22 @@ use crate::output::OutputFormat;
 use raps_kernel::interactive;
 // use raps_kernel::output::OutputFormat;
 use raps_reality::{OutputFormat as RealityOutputFormat, RealityCaptureClient, SceneType};
+
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct PhotosceneOutput {
+    pub id: String,
+    pub name: String,
+    pub scene_type: String,
+    pub status: String,
+    pub progress: String,
+}
+
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct CreatePhotosceneOutput {
+    pub success: bool,
+    pub photoscene_id: String,
+    pub name: String,
+}
 
 #[derive(Debug, Subcommand)]
 pub enum RealityCommands {
@@ -130,15 +145,6 @@ async fn list_photoscenes(
     }
 
     let photoscenes = client.list_photoscenes().await?;
-
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct PhotosceneOutput {
-        id: String,
-        name: String,
-        scene_type: String,
-        status: String,
-        progress: String,
-    }
 
     let photoscene_outputs: Vec<PhotosceneOutput> = photoscenes
         .iter()
@@ -287,13 +293,6 @@ async fn create_photoscene(
         .create_photoscene(&scene_name, selected_scene_type, selected_format)
         .await?;
 
-    #[derive(Serialize, schemars::JsonSchema)]
-    struct CreatePhotosceneOutput {
-        success: bool,
-        photoscene_id: String,
-        name: String,
-    }
-
     let output = CreatePhotosceneOutput {
         success: true,
         photoscene_id: photoscene.photoscene_id.clone(),
@@ -381,13 +380,7 @@ async fn check_status(
     _output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .expect("valid progress template"),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
+        let spinner = raps_kernel::progress::spinner("");
 
         // 4-hour timeout — photogrammetry processing can legitimately take hours
         let timeout = Duration::from_secs(4 * 60 * 60);

@@ -240,3 +240,43 @@ fn colorize_state(state: &str) -> String {
         _ => state.yellow().to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn colorize_state_started_contains_text() {
+        assert!(colorize_state("started").contains("started"));
+    }
+
+    #[test]
+    fn colorize_state_running_contains_text() {
+        assert!(colorize_state("running").contains("running"));
+    }
+
+    #[test]
+    fn colorize_state_stopped_contains_text() {
+        assert!(colorize_state("stopped").contains("stopped"));
+    }
+
+    #[test]
+    fn colorize_state_destroyed_contains_text() {
+        assert!(colorize_state("destroyed").contains("destroyed"));
+    }
+
+    #[test]
+    fn colorize_state_failed_contains_text() {
+        assert!(colorize_state("failed").contains("failed"));
+    }
+
+    #[test]
+    fn colorize_state_created_contains_text() {
+        assert!(colorize_state("created").contains("created"));
+    }
+
+    #[test]
+    fn colorize_state_unknown_falls_through() {
+        assert!(colorize_state("provisioning").contains("provisioning"));
+    }
+}

@@ -310,3 +310,60 @@ pub(super) async fn use_preset(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_presets_not_empty() {
+        let store = PresetStore::default_presets();
+        assert!(!store.presets.is_empty());
+    }
+
+    #[test]
+    fn test_default_presets_no_duplicate_names() {
+        let store = PresetStore::default_presets();
+        let mut seen = std::collections::HashSet::new();
+        for preset in &store.presets {
+            assert!(
+                seen.insert(&preset.name),
+                "duplicate preset name: {}",
+                preset.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_default_presets_all_have_format() {
+        let store = PresetStore::default_presets();
+        for preset in &store.presets {
+            assert!(
+                !preset.format.is_empty(),
+                "preset '{}' has empty format",
+                preset.name
+            );
+        }
+    }
+
+    #[test]
+    fn test_default_presets_includes_viewer() {
+        let store = PresetStore::default_presets();
+        assert!(
+            store.presets.iter().any(|p| p.name == "viewer"),
+            "should include 'viewer' preset"
+        );
+    }
+
+    #[test]
+    fn test_default_presets_serialization_roundtrip() {
+        let store = PresetStore::default_presets();
+        let json = serde_json::to_string(&store).unwrap();
+        let deserialized: PresetStore = serde_json::from_str(&json).unwrap();
+        assert_eq!(store.presets.len(), deserialized.presets.len());
+        for (a, b) in store.presets.iter().zip(deserialized.presets.iter()) {
+            assert_eq!(a.name, b.name);
+            assert_eq!(a.format, b.format);
+        }
+    }
+}

@@ -1,0 +1,22 @@
+name = "rapscli-api"
+main = "src/index.js"
+compatibility_date = "2025-12-01"
+
+# KV namespace for cached release metadata
+kv_namespaces = [
+  { binding = "RELEASE_CACHE", id = "559c8f0f7cbd4eac934b0626d24b39fd" }
+]
+
+routes = [
+  { pattern = "rapscli.xyz/install", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/install.sh", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/install.ps1", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/api/*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/urn*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/s/*", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/health", zone_name = "rapscli.xyz" }
+]
+
+# Cron trigger: refresh release metadata every hour
+[triggers]
+crons = ["0 * * * *"]

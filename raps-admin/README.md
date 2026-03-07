@@ -1,0 +1,177 @@
+# Developing `raps admin` Operations
+
+This guide provides complete, detailed, and tested instructions on how to work on, extend, and test the bulk account administration logic in the `raps-admin` crate.
+
+## Architecture Overview
+
+The `raps-admin` module is specifically designed to handle bulk, long-running operations across potentially thousands of projects. To do this safely, it implements a structured, state-driven workflow instead of making direct inline API calls.
+
+1. **Operations (`src/operations/`)**: Business logic defining how to execute a specific task on a single project (e.g., `AddUser`, `UpdateRole`). Must implement the `AdminOperation` trait.
+2. **Executor (`src/bulk/executor.rs`)**: A parallelizing runner that takes a collection of projects and an `AdminOperation`, distributing the work across a thread pool while handling API rate limiting, automatic backoff, and retries.
+3. **State Management (`src/bulk/state.rs`)**: Operations are stateful. Results (success, failure, skipped) are tracked and can be saved to disk, allowing interrupted operations to be resumed later without duplicating work.
+4. **CLI Layer (`raps-cli/src/commands/admin/`)**: The presentation layer that parses user inputs, initializes the `raps-admin` operation, spins up the executor, and draws the progress bars/summary tables.
+
+## How to Add a New Admin Command
+
+### Step 1: Implement the Operation in `raps-admin`
+1. Create a new file in `raps-admin/src/operations/` (e.g., `archive_project.rs`).
+2. Define a struct holding the required parameters (e.g., `pub struct ArchiveProject`).
+3. Implement the `AdminOperation` trait for your struct:
+
+```rust
+use async_trait::async_trait;
+use raps_acc::admin::AccountAdminClient;
+use crate::bulk::types::{AdminOperation, OperationResult};
+
+pub struct ArchiveProject;
+
+#[async_trait]
+impl AdminOperation for ArchiveProject {
+    fn name(&self) -> &str {
+        "ArchiveProject"
+    }
+
+    async fn execute(
+        &self,
+        client: &AccountAdminClient,
+        account_id: &str,
+        project_id: &str,
+    ) -> Result<OperationResult, anyhow::Error> {
+        // Implement API call logic
+        client.archive_project(account_id, project_id).await?;
+        Ok(OperationResult::Success(format!("Archived {}", project_id)))
+    }
+
+    fn is_retryable_error(&self, err: &anyhow::Error) -> bool {
+        let err_msg = err.to_string().to_lowercase();
+        err_msg.contains("timeout") || err_msg.contains("502") || err_msg.contains("503")
+    }
+}
+```
+4. Register the module in `raps-admin/src/operations/mod.rs`.
+
+### Step 2: Implement the CLI Command in `raps-cli`
+1. Add the subcommand to `raps-cli/src/commands/admin/mod.rs`.
+2. Parse the command in `raps-cli/src/commands/admin/mod.rs` match statement.
+3. Construct your operation struct and pass it to the bulk executor logic. Make sure to support the `--dry-run` and `--concurrency` flags, using `raps_admin::bulk::executor::execute_bulk_operation()`.
+
+### Step 3: Write Integration Tests in `raps-admin`
+Tests in `raps-admin/tests/` verify the logic isolated from CLI flags, ensuring bulk state is tracked correctly.
+
+1. Add tests in `raps-admin/tests/integration_tests.rs`.
+2. Use the `TestServer` from `raps-mock` to spin up a local APS server.
+3. Assert that the operation processes the correct number of items and logs successes.
+
+```rust
+#[tokio::test]
+async fn test_archive_projects_bulk() {
+    let server = raps_mock::TestServer::start_default().await.unwrap();
+    let client = setup_test_client(&server.url).await;
+    
+    // Setup projects...
+    let operation = ArchiveProject;
+    
+    // Run execution
+    let config = BulkConfig { concurrency: 2, dry_run: false, ..Default::default() };
+    let summary = executor::execute_bulk_operation(&client, "acc-id", &projects, operation, config, |_|{}).await.unwrap();
+    
+    assert_eq!(summary.success, 2);
+}
+```
+
+### Step 4: Write Scenario Tests in `raps-cli`
+To verify the full end-to-end command line argument parsing, formatting, and exit codes:
+
+1. Add a test in `raps-cli/tests/scenarios/admin_cli_scenarios.rs`.
+2. Use `crate::test_utils::start_cli_test()` to initialize `assert_cmd` connected to `raps-mock`.
+
+```rust
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_admin_project_archive_cli() {
+    let (_server, mut cmd) = start_cli_test().await;
+    cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token");
+
+    cmd.args([
+        "admin",
+        "project",
+        "archive",
+        "--account", "mock-account-001",
+        "--project", "proj-001"
+    ])
+    .assert()
+    .success();
+}
+```
+
+## Idempotency & Conflict Resolution
+
+All bulk operations are designed to be safe to re-run. Running the same command twice on the same set of projects should never produce failures where a success or skip is the correct outcome.
+
+### Result semantics
+
+| Result | Meaning |
+|--------|---------|
+| `Success` | The API call completed and the desired state was applied |
+| `Skipped` | The desired state was already in place; no change needed |
+| `Failed` | An unexpected error occurred that was not handled as a known conflict |
+
+Only `Failed` items count against the operation outcome. `Skipped` items are not counted as errors.
+
+### Per-operation idempotency behavior
+
+#### `bulk_add_user` — upsert semantics
+
+Adding a user to a project is the most nuanced operation because the API distinguishes between "add" (POST) and "update" (PATCH):
+
+1. **User not yet in project** → POST succeeds → `Success`
+2. **User already in project (HTTP 409)**:
+   - No role or products requested → `Skipped { reason: "already_exists" }`
+   - Requested role/products match current → `Skipped { reason: "already_exists_same_role" }`
+   - Requested role/products differ → PATCH to update → `Success` (upsert)
+3. **Any other error** → `Failed { retryable: bool }`
+
+This upsert behaviour means the command can be used both for initial provisioning and for role corrections without needing to check current state manually.
+
+**Hub type differences:**
+- **BIM 360 hubs** — role is expressed as a `role_id` UUID; resolved from role name via `GET /hq/v2/accounts/{id}/roles`
+- **ACC hubs** — no account-level roles endpoint; role is expressed as a `products` array (`projectAdministration` + `docs` access keys); resolved from known display names ("Project Admin", "Project Member", "Project Editor", "Project Viewer")
+- When a UUID is provided directly it is passed through unchanged (works for both hub types)
+
+#### `bulk_remove_user` — presence-guarded delete
+
+1. `user_exists()` check before delete → `Skipped { reason: "user_not_in_project" }` if absent
+2. HTTP 404 on the actual delete (TOCTOU race) → also `Skipped`
+3. Any other error → `Failed`
+
+#### `bulk_update_role` — compare-before-patch
+
+1. Fetches current project-user state first (`GET /projects/{id}/users/{userId}`)
+2. HTTP 404 (user not in project) → `Skipped { reason: "user_not_in_project" }`
+3. `from_role_id` filter specified and doesn't match → `Skipped { reason: "role_mismatch: current=..." }`
+4. User already has the target role → `Skipped { reason: "already_has_role" }`
+5. Role differs → PATCH → `Success`
+
+#### `bulk_update_folder_rights` — idempotent by API design
+
+The folder permissions endpoint is a batch SET (not add/remove), so calling it with the same actions is a no-op at the API level:
+
+1. Target folder not found in project → `Skipped { reason: "..._folder_not_found" }`
+2. Otherwise → PUT permissions → `Success` (repeated calls are safe)
+
+## Running the Tests
+
+To ensure your code meets the quality standards and has high confidence, always run the full test suite targeting the admin components:
+
+```bash
+# 1. Run unit and isolated integration tests inside raps-admin
+cargo test -p raps-admin
+
+# 2. Run the end-to-end CLI scenarios linked to raps-mock
+cargo test -p raps-cli --test scenarios
+
+# 3. Ensure code coverage is maintained
+cargo clippy -p raps-admin -- -D warnings
+cargo fmt --manifest-path raps-admin/Cargo.toml -- --check
+```
+
+If you modify API payloads, remember to verify the output in `raps-mock` matches what is explicitly stated in the APS OpenAPI Specification.

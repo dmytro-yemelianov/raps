@@ -1,0 +1,11 @@
+---
+source: raps-cli/tests/scenarios/admin_archive_project.rs
+assertion_line: 25
+expression: trace
+---
+[
+  {
+    "method": "PATCH",
+    "path": "/construction/admin/v1/accounts/mock-account-001/projects/proj-002"
+  }
+]
