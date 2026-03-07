@@ -38,6 +38,10 @@ pub enum ObjectCommands {
         /// Resume interrupted upload (for large files)
         #[arg(short, long)]
         resume: bool,
+
+        /// Skip upload if an identical object (same SHA-1) already exists
+        #[arg(long)]
+        skip_if_exists: bool,
     },
 
     /// Upload multiple files in parallel
@@ -56,6 +60,10 @@ pub enum ObjectCommands {
         /// Resume a previously interrupted batch upload
         #[arg(long)]
         resume: bool,
+
+        /// Skip upload if an identical object (same SHA-1) already exists
+        #[arg(long)]
+        skip_if_exists: bool,
     },
 
     /// Download an object from a bucket (use `--out-file -` to write to stdout)
@@ -205,12 +213,14 @@ impl ObjectCommands {
                 file,
                 key,
                 resume,
-            } => upload_object(client, bucket, file, key, resume, output_format).await,
+                skip_if_exists,
+            } => upload_object(client, bucket, file, key, resume, skip_if_exists, output_format).await,
             ObjectCommands::UploadBatch {
                 bucket,
                 files,
                 parallel,
                 resume,
+                skip_if_exists,
             } => {
                 upload_batch(
                     client,
@@ -218,6 +228,7 @@ impl ObjectCommands {
                     files,
                     parallel.unwrap_or(concurrency),
                     resume,
+                    skip_if_exists,
                     output_format,
                 )
                 .await

@@ -34,6 +34,7 @@ pub(super) async fn upload_object(
     file: PathBuf,
     key: Option<String>,
     resume: bool,
+    skip_if_exists: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     let from_stdin = file.as_os_str() == "-";
@@ -68,6 +69,53 @@ pub(super) async fn upload_object(
             .unwrap_or("unnamed")
             .to_string()
     });
+
+    // Duplicate detection: skip upload if an identical object already exists
+    if skip_if_exists {
+        if let Some(existing) = client
+            .check_duplicate(&bucket_key, &object_key, &actual_file)
+            .await?
+        {
+            if output_format.supports_colors() {
+                println!(
+                    "{} Skipping upload — identical object already exists: {}/{}",
+                    "=".cyan().bold(),
+                    bucket_key,
+                    object_key
+                );
+            }
+            let urn = client.get_urn(&bucket_key, &object_key);
+            let output = UploadOutput {
+                success: true,
+                object_id: existing.object_id.clone(),
+                bucket_key: bucket_key.clone(),
+                object_key: object_key.clone(),
+                size: existing.size,
+                size_human: format_size(existing.size),
+                sha1: existing.sha1.clone(),
+                urn: urn.clone(),
+            };
+            match output_format {
+                OutputFormat::Table => {
+                    println!("{} Object already exists (skipped upload)", "✓".green().bold());
+                    println!("  {} {}", "Object ID:".bold(), output.object_id);
+                    println!("  {} {}", "Size:".bold(), output.size_human);
+                    if let Some(ref sha1) = output.sha1 {
+                        println!("  {} {}", "SHA1:".bold(), sha1.dimmed());
+                    }
+                    println!(
+                        "\n  {} {}",
+                        "URN (for translation):".bold().yellow(),
+                        output.urn
+                    );
+                }
+                _ => {
+                    output_format.write(&output)?;
+                }
+            }
+            return Ok(());
+        }
+    }
 
     if output_format.supports_colors() {
         let source = if from_stdin {
@@ -213,6 +261,7 @@ pub(super) async fn upload_batch(
     files: Vec<PathBuf>,
     parallel: usize,
     resume: bool,
+    skip_if_exists: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // If resume flag, try to load previous state
@@ -244,7 +293,7 @@ pub(super) async fn upload_batch(
                 );
             }
 
-            return resume_batch_upload(client, saved_state, parallel, output_format).await;
+            return resume_batch_upload(client, saved_state, parallel, skip_if_exists, output_format).await;
         } else {
             anyhow::bail!(
                 "No previous batch upload state found. Start a new upload without --resume."
@@ -310,7 +359,15 @@ pub(super) async fn upload_batch(
                 .unwrap_or("unnamed")
                 .to_string();
 
-            let result = client.upload_object(&bucket, &object_key, &file_path).await;
+            let result = if skip_if_exists {
+                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                    Ok(Some(existing)) => Ok(existing),
+                    Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
+                    Err(e) => Err(e),
+                }
+            } else {
+                client.upload_object(&bucket, &object_key, &file_path).await
+            };
 
             drop(permit); // Release permit
 
@@ -451,6 +508,7 @@ async fn resume_batch_upload(
     client: &OssClient,
     mut state: BatchUploadState,
     parallel: usize,
+    skip_if_exists: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Collect indices of files that need uploading (Pending or Failed)
@@ -500,7 +558,15 @@ async fn resume_batch_upload(
                 .unwrap_or("unnamed")
                 .to_string();
 
-            let result = client.upload_object(&bucket, &object_key, &file_path).await;
+            let result = if skip_if_exists {
+                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                    Ok(Some(existing)) => Ok(existing),
+                    Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
+                    Err(e) => Err(e),
+                }
+            } else {
+                client.upload_object(&bucket, &object_key, &file_path).await
+            };
 
             drop(permit); // Release permit
 

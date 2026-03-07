@@ -44,6 +44,10 @@ base64.workspace = true
 # Project directories
 directories.workspace = true
 
+# SHA-1 for duplicate detection
+sha1.workspace = true
+hex.workspace = true
+
 [dev-dependencies]
 raps-kernel = { workspace = true, features = ["test-utils"] }
 raps-mock.workspace = true
