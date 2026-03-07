@@ -65,6 +65,9 @@ pub(super) async fn start_translation(
     format: Option<String>,
     root_filename: Option<String>,
     wait: bool,
+    watch: bool,
+    poll_interval: u64,
+    watch_timeout: u64,
     output_format: OutputFormat,
     region_str: String,
     force: bool,
@@ -177,6 +180,18 @@ pub(super) async fn start_translation(
     if wait {
         let urn_for_status = response.urn.clone();
         check_status(client, &urn_for_status, true, output_format).await?;
+    }
+
+    // If --watch flag is set, use the dedicated watch loop with configurable interval/timeout
+    if watch && !wait {
+        super::watch::watch_translation(
+            client,
+            &response.urn,
+            poll_interval,
+            watch_timeout,
+            &output_format,
+        )
+        .await?;
     }
 
     Ok(())

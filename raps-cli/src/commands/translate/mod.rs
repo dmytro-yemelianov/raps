@@ -9,6 +9,7 @@
 mod metadata;
 mod presets;
 mod translations;
+mod watch;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -35,6 +36,18 @@ pub enum TranslateCommands {
         /// Wait for translation to complete (polls until done)
         #[arg(short, long)]
         wait: bool,
+
+        /// Watch translation until complete, polling every --poll-interval seconds
+        #[arg(long)]
+        watch: bool,
+
+        /// Polling interval in seconds when using --watch (default: 5)
+        #[arg(long, default_value = "5")]
+        poll_interval: u64,
+
+        /// Timeout in seconds for --watch (0 = no timeout, default: 1800)
+        #[arg(long, default_value = "1800")]
+        watch_timeout: u64,
 
         /// APS data center region (US, EMEA, AUS, CAN, DEU, IND, JPN, GBR)
         #[arg(long, default_value = "US")]
@@ -236,6 +249,9 @@ impl TranslateCommands {
                 format,
                 root_filename,
                 wait,
+                watch,
+                poll_interval,
+                watch_timeout,
                 region,
                 force,
                 serverless,
@@ -260,6 +276,9 @@ impl TranslateCommands {
                         format,
                         root_filename,
                         wait,
+                        watch,
+                        poll_interval,
+                        watch_timeout,
                         output_format,
                         region,
                         force,
