@@ -1,0 +1,21 @@
+name: Greptile Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Greptile Review
+        uses: greptile-systems/greptile-review@v1
+        with:
+          greptile-api-key: ${{ secrets.GREPTILE_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: dmytro-yemelianov/raps
