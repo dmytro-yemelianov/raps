@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 
+use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
 use raps_oss::OssClient;
 
@@ -35,6 +36,7 @@ pub(super) async fn upload_object(
     key: Option<String>,
     resume: bool,
     skip_if_exists: bool,
+    cost_estimate: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     let from_stdin = file.as_os_str() == "-";
@@ -58,6 +60,16 @@ pub(super) async fn upload_object(
         }
         (None, file.clone())
     };
+
+    // Show cost estimate if requested or if file exceeds 100 MB
+    const LARGE_FILE_THRESHOLD: u64 = 100 * 1024 * 1024;
+    if let Ok(metadata) = std::fs::metadata(&actual_file) {
+        let file_size = metadata.len();
+        if cost_estimate || file_size > LARGE_FILE_THRESHOLD {
+            let estimate = CostEstimate::for_upload(file_size);
+            estimate.print(&output_format);
+        }
+    }
 
     // Select bucket
     let bucket_key = select_bucket(client, bucket).await?;
