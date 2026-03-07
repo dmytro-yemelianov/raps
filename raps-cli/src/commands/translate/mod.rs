@@ -8,6 +8,7 @@
 
 mod metadata;
 mod presets;
+mod timeline;
 mod translations;
 mod watch;
 
@@ -201,6 +202,20 @@ pub enum TranslateCommands {
     /// Manage translation presets
     #[command(subcommand)]
     Preset(PresetCommands),
+
+    /// Show translation history as a timeline for a URN
+    Timeline {
+        /// Base64-encoded URN of the source file
+        urn: String,
+
+        /// Show individual output file details per derivative
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Output format (table or json)
+        #[arg(short, long, default_value = "table")]
+        output: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -349,6 +364,14 @@ impl TranslateCommands {
                     .await
             }
             TranslateCommands::Preset(cmd) => cmd.execute(client, output_format).await,
+            TranslateCommands::Timeline {
+                urn,
+                verbose,
+                output,
+            } => {
+                let fmt = output.parse::<OutputFormat>().unwrap_or(OutputFormat::Table);
+                timeline::show_timeline(client, &urn, verbose, fmt).await
+            }
         }
     }
 }

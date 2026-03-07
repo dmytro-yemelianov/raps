@@ -7,6 +7,7 @@
 
 mod assets;
 mod checklists;
+mod export;
 mod submittals;
 
 pub use assets::AssetOutput;
@@ -18,7 +19,7 @@ use clap::Subcommand;
 use std::path::PathBuf;
 
 use crate::output::OutputFormat;
-use raps_acc::AccClient;
+use raps_acc::{AccClient, IssuesClient, RfiClient};
 
 #[derive(Debug, Subcommand)]
 pub enum AccCommands {
@@ -33,6 +34,16 @@ pub enum AccCommands {
     /// Manage project checklists
     #[command(subcommand)]
     Checklist(ChecklistCommands),
+
+    /// Bulk export ACC project data (issues, RFIs, submittals, checklists)
+    Export {
+        /// Project ID (without "b." prefix)
+        project_id: String,
+
+        /// Output directory (default: ./acc-export-<project-id>-<timestamp>/)
+        #[arg(long = "output-dir")]
+        output_dir: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -244,11 +255,31 @@ pub(super) fn truncate_str(s: &str, max_len: usize) -> String {
 // ---------------------------------------------------------------------------
 
 impl AccCommands {
-    pub async fn execute(self, client: &AccClient, output_format: OutputFormat) -> Result<()> {
+    pub async fn execute(
+        self,
+        client: &AccClient,
+        issues_client: &IssuesClient,
+        rfi_client: &RfiClient,
+        output_format: OutputFormat,
+    ) -> Result<()> {
         match self {
             AccCommands::Asset(cmd) => cmd.execute(client, output_format).await,
             AccCommands::Submittal(cmd) => cmd.execute(client, output_format).await,
             AccCommands::Checklist(cmd) => cmd.execute(client, output_format).await,
+            AccCommands::Export {
+                project_id,
+                output_dir,
+            } => {
+                export::export_project(
+                    client,
+                    issues_client,
+                    rfi_client,
+                    &project_id,
+                    output_dir,
+                    output_format,
+                )
+                .await
+            }
         }
     }
 }
