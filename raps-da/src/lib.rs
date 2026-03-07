@@ -6,9 +6,6 @@
 //!
 //! Handles automation of CAD processing with engines like AutoCAD, Revit, Inventor, 3ds Max.
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
-
 mod activities;
 mod appbundles;
 mod engines;

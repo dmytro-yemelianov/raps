@@ -6,9 +6,6 @@
 //!
 //! Handles photogrammetry processing to create 3D models from photos.
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
-
 use anyhow::{Context, Result};
 use raps_kernel::error::RapsError;
 use serde::{Deserialize, Serialize};
