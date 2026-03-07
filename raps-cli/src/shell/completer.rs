@@ -51,6 +51,7 @@ impl Completer for RapsCompleter {
                 span: Span::new(start, pos),
                 append_whitespace: true,
                 match_indices: None,
+                display_override: None,
             })
             .collect()
     }

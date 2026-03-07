@@ -373,8 +373,8 @@ pub(crate) fn validate_file_path(path: &std::path::Path) -> Result<(), String> {
 
 impl ServerHandler for RapsServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo {
-            instructions: Some(format!(
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
+            .with_instructions(format!(
                 "RAPS MCP Server v{version} - Autodesk Platform Services CLI\n\n\
                     Provides direct access to APS APIs:\n\
                     * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
@@ -395,10 +395,7 @@ impl ServerHandler for RapsServer {
                     Set APS_CLIENT_ID and APS_CLIENT_SECRET env vars.\n\
                     For 3-legged auth, run 'raps auth login' first.",
                 version = env!("CARGO_PKG_VERSION"),
-            )),
-            capabilities: ServerCapabilities::builder().enable_tools().build(),
-            ..Default::default()
-        }
+            ))
     }
 
     async fn list_tools(
