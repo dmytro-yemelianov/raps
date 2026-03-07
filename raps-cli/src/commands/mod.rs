@@ -28,6 +28,7 @@ pub mod interactive;
 pub mod issue;
 pub mod item;
 pub mod job;
+pub mod logs;
 pub mod object;
 pub mod pipeline;
 pub mod plugin;
