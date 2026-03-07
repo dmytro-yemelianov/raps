@@ -579,8 +579,102 @@ fn check_env_conflicts() -> CheckResult {
     }
 }
 
+const GITHUB_RELEASES_URL: &str =
+    "https://api.github.com/repos/dmytro-yemelianov/raps/releases/latest";
+
+#[derive(Debug, PartialEq)]
+enum VersionCompare {
+    UpToDate,
+    UpdateAvailable,
+    Ahead,
+    ParseError,
+}
+
+fn strip_v_prefix(tag: &str) -> &str {
+    tag.strip_prefix('v').unwrap_or(tag)
+}
+
+fn compare_versions(current: &str, latest: &str) -> VersionCompare {
+    let Ok(cur) = semver::Version::parse(strip_v_prefix(current)) else {
+        return VersionCompare::ParseError;
+    };
+    let Ok(lat) = semver::Version::parse(strip_v_prefix(latest)) else {
+        return VersionCompare::ParseError;
+    };
+    match cur.cmp(&lat) {
+        std::cmp::Ordering::Equal => VersionCompare::UpToDate,
+        std::cmp::Ordering::Less => VersionCompare::UpdateAvailable,
+        std::cmp::Ordering::Greater => VersionCompare::Ahead,
+    }
+}
+
 async fn check_version_staleness() -> CheckResult {
-    check("Version [network]", Status::Warn, "not implemented yet")
+    use std::time::Duration;
+
+    let current = env!("CARGO_PKG_VERSION");
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .user_agent(format!("raps/{current}"))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return check("Version [network]", Status::Warn, &format!("Cannot check version: {e}")),
+    };
+
+    let resp = match client.get(GITHUB_RELEASES_URL).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            return check(
+                "Version [network]",
+                Status::Warn,
+                &format!("Cannot reach GitHub releases API (requires network): {e}"),
+            );
+        }
+    };
+
+    if !resp.status().is_success() {
+        return check(
+            "Version [network]",
+            Status::Warn,
+            &format!("GitHub API returned HTTP {} — skipping version check", resp.status().as_u16()),
+        );
+    }
+
+    let json: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(e) => return check("Version [network]", Status::Warn, &format!("Cannot parse GitHub response: {e}")),
+    };
+
+    let tag = match json["tag_name"].as_str() {
+        Some(t) => t,
+        None => return check("Version [network]", Status::Warn, "No tag_name in GitHub release response"),
+    };
+
+    let latest = strip_v_prefix(tag);
+
+    match compare_versions(current, latest) {
+        VersionCompare::UpToDate => check(
+            "Version [network]",
+            Status::Pass,
+            &format!("v{current} is up to date"),
+        ),
+        VersionCompare::UpdateAvailable => check(
+            "Version [network]",
+            Status::Warn,
+            &format!("Update available: v{current} → v{latest}  (run: npm i -g raps-cli@latest)"),
+        ),
+        VersionCompare::Ahead => check(
+            "Version [network]",
+            Status::Pass,
+            &format!("v{current} (ahead of latest release v{latest})"),
+        ),
+        VersionCompare::ParseError => check(
+            "Version [network]",
+            Status::Warn,
+            &format!("Cannot compare versions: current={current}, latest={latest}"),
+        ),
+    }
 }
 
 fn check_proxy_environment() -> CheckResult {
@@ -754,5 +848,29 @@ mod tests {
         let conflicts = detect_credential_conflicts(true, true);
         assert!(!conflicts.is_empty());
         assert!(conflicts[0].contains("APS_CLIENT_ID") || conflicts[0].contains("profile"));
+    }
+
+    #[test]
+    fn test_compare_versions_current_is_latest() {
+        let result = compare_versions("5.3.3", "5.3.3");
+        assert_eq!(result, VersionCompare::UpToDate);
+    }
+
+    #[test]
+    fn test_compare_versions_update_available() {
+        let result = compare_versions("5.3.3", "5.4.0");
+        assert_eq!(result, VersionCompare::UpdateAvailable);
+    }
+
+    #[test]
+    fn test_compare_versions_ahead_of_release() {
+        let result = compare_versions("5.4.0-dev", "5.3.3");
+        assert_eq!(result, VersionCompare::Ahead);
+    }
+
+    #[test]
+    fn test_parse_github_tag_strips_v_prefix() {
+        assert_eq!(strip_v_prefix("v5.3.3"), "5.3.3");
+        assert_eq!(strip_v_prefix("5.3.3"), "5.3.3");
     }
 }
