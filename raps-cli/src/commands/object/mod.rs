@@ -7,6 +7,7 @@
 
 mod copy;
 pub(crate) mod download;
+mod download_bulk;
 pub(crate) mod secret_scan;
 pub(crate) mod upload;
 
@@ -20,6 +21,7 @@ use raps_oss::OssClient;
 
 use copy::{batch_copy_objects, batch_rename_objects, copy_object, rename_object};
 use download::{delete_object, download_object, get_signed_url, list_objects, object_info};
+use download_bulk::download_bulk;
 use upload::{upload_batch, upload_object};
 
 #[derive(Debug, Subcommand)]
@@ -90,6 +92,32 @@ pub enum ObjectCommands {
         /// Output file path (defaults to object key; use `-` for stdout)
         #[arg(long = "out-file")]
         out_file: Option<PathBuf>,
+    },
+
+    /// Download multiple objects in parallel matching a prefix
+    #[command(name = "download-bulk")]
+    DownloadBulk {
+        /// Bucket key
+        bucket: Option<String>,
+
+        /// Object key prefix to match (e.g. `models/` to download all objects under that path)
+        prefix: String,
+
+        /// Directory to write downloaded files into
+        #[arg(long, default_value = ".")]
+        output_dir: PathBuf,
+
+        /// Maximum number of parallel downloads
+        #[arg(long, default_value = "4")]
+        concurrency: usize,
+
+        /// Skip files that already exist locally with a matching size (on by default)
+        #[arg(long, default_value = "true")]
+        skip_existing: bool,
+
+        /// Download all files directly into --output-dir without preserving the key prefix structure
+        #[arg(long)]
+        flat: bool,
     },
 
     /// List objects in a bucket
@@ -254,6 +282,26 @@ impl ObjectCommands {
                 object,
                 out_file,
             } => download_object(client, bucket, object, out_file, output_format).await,
+            ObjectCommands::DownloadBulk {
+                bucket,
+                prefix,
+                output_dir,
+                concurrency: cmd_concurrency,
+                skip_existing,
+                flat,
+            } => {
+                download_bulk(
+                    client,
+                    bucket,
+                    prefix,
+                    output_dir,
+                    cmd_concurrency,
+                    skip_existing,
+                    flat,
+                    output_format,
+                )
+                .await
+            }
             ObjectCommands::List { bucket, limit } => {
                 list_objects(client, bucket, limit, output_format).await
             }
