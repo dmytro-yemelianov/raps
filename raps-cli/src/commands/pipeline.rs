@@ -901,7 +901,7 @@ async fn run_pipeline(
 
     for level_indices in &levels {
         if level_indices.len() == 1 {
-            // Single step in this level — run sequentially (existing code path)
+            // Single step in this level — run sequentially
             let step_idx = level_indices[0];
             let step = &pipeline.steps[step_idx];
             let pos = execution_order

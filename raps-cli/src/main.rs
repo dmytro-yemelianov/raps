@@ -188,6 +188,10 @@ struct Cli {
     #[arg(long, global = true)]
     no_retry: bool,
 
+    /// HTTP/HTTPS proxy URL (env: RAPS_PROXY), e.g. http://proxy.corp.example.com:8080
+    #[arg(long, value_name = "URL", global = true)]
+    proxy: Option<String>,
+
     /// Maximum concurrent operations for bulk commands (default: 5, env: RAPS_CONCURRENCY)
     #[arg(long, value_name = "N", global = true)]
     concurrency: Option<usize>,
@@ -647,7 +651,7 @@ async fn run(cli: Cli) -> Result<()> {
         None => {
             // If stdin is piped, read commands line-by-line (batch mode)
             if !io::stdin().is_terminal() {
-                return run_piped_stdin(cli.timeout, cli.output, cli.concurrency).await;
+                return run_piped_stdin(cli.timeout, cli.proxy, cli.output, cli.concurrency).await;
             }
             print!("{}", include_str!("../logo.ansi"));
             Cli::command().print_help()?;
@@ -713,7 +717,8 @@ async fn run(cli: Cli) -> Result<()> {
             cli.max_retries,
             cli.base_delay,
             cli.max_wait,
-        );
+            cli.proxy,
+        )?;
         return commands::dashboard::run_dashboard(config, http_config).await;
     }
 
@@ -757,7 +762,8 @@ async fn run(cli: Cli) -> Result<()> {
         max_retries,
         cli.base_delay,
         cli.max_wait,
-    );
+        cli.proxy,
+    )?;
 
     if let Commands::Shell = command {
         credits::shell_welcome();
@@ -956,12 +962,19 @@ async fn run(cli: Cli) -> Result<()> {
                     };
 
                     let sub_output_format = OutputFormat::determine(sub_cli.output);
-                    let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+                    let sub_http_config = match HttpClientConfig::from_cli_and_env_full(
                         sub_cli.timeout,
                         sub_cli.max_retries,
                         sub_cli.base_delay,
                         sub_cli.max_wait,
-                    );
+                        sub_cli.proxy,
+                    ) {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            eprintln!("Error: {e}");
+                            continue;
+                        }
+                    };
 
                     let sub_command = match sub_cli.command {
                         Some(cmd) => cmd,
@@ -1031,6 +1044,7 @@ fn resolve_concurrency(flag: Option<usize>) -> usize {
 /// Supports: `echo "bucket list" | raps` or `Get-Content commands.txt | raps`
 async fn run_piped_stdin(
     timeout: Option<u64>,
+    proxy: Option<String>,
     output: Option<OutputFormat>,
     concurrency: Option<usize>,
 ) -> Result<()> {
@@ -1066,12 +1080,20 @@ async fn run_piped_stdin(
         };
 
         let sub_output_format = OutputFormat::determine(sub_cli.output.or(output));
-        let sub_http_config = HttpClientConfig::from_cli_and_env_full(
+        let sub_http_config = match HttpClientConfig::from_cli_and_env_full(
             sub_cli.timeout.or(timeout),
             sub_cli.max_retries,
             sub_cli.base_delay,
             sub_cli.max_wait,
-        );
+            sub_cli.proxy.or_else(|| proxy.clone()),
+        ) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("Error: {e}");
+                exit_code = 1;
+                continue;
+            }
+        };
 
         let sub_command = match sub_cli.command {
             Some(cmd) => cmd,
@@ -1321,58 +1343,72 @@ async fn execute_command(
         tracing::warn!(command = cmd_name, error = %e, "Pre-command hook failed");
     }
 
-    // Helper closure to create clients on demand
-    let get_auth_client =
-        || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };
+    // Helper closure to create clients on demand.
+    // http_config was already validated by from_cli_and_env_full, so these
+    // expect calls are justified — a panic here would be a programming error.
+    let get_auth_client = || -> AuthClient {
+        AuthClient::new_with_http_config(config.clone(), http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
+    };
 
     let get_oss_client = || -> OssClient {
         let auth = get_auth_client();
         OssClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_derivative_client = || -> DerivativeClient {
         let auth = get_auth_client();
         DerivativeClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_dm_client = || -> DataManagementClient {
         let auth = get_auth_client();
         DataManagementClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_webhooks_client = || -> WebhooksClient {
         let auth = get_auth_client();
         WebhooksClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_da_client = || -> DesignAutomationClient {
         let auth = get_auth_client();
         DesignAutomationClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_issues_client = || -> IssuesClient {
         let auth = get_auth_client();
         IssuesClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_rc_client = || -> RealityCaptureClient {
         let auth = get_auth_client();
         RealityCaptureClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_admin_client = || -> AccountAdminClient {
         let auth = get_auth_client();
         AccountAdminClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let _get_project_users_client = || -> ProjectUsersClient {
         let auth = get_auth_client();
         ProjectUsersClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     let get_permissions_client = || -> FolderPermissionsClient {
         let auth = get_auth_client();
         FolderPermissionsClient::new_with_http_config(config.clone(), auth, http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     };
 
     match command {
@@ -1460,7 +1496,8 @@ async fn execute_command(
         Commands::Rfi(cmd) => {
             let auth_client = get_auth_client();
             let rfi_client =
-                RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone());
+                RfiClient::new_with_http_config(config.clone(), auth_client, http_config.clone())
+                    .expect("HTTP client configuration was validated at startup");
             cmd.execute(&rfi_client, &get_dm_client(), output_format)
                 .await?;
         }

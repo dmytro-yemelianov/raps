@@ -6,8 +6,10 @@
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.
 
 mod copy;
+mod diff;
 pub(crate) mod download;
 mod download_bulk;
+mod inspect;
 pub(crate) mod secret_scan;
 pub(crate) mod upload;
 
@@ -20,8 +22,10 @@ use raps_kernel::prompts;
 use raps_oss::OssClient;
 
 use copy::{batch_copy_objects, batch_rename_objects, copy_object, rename_object};
+use diff::diff_objects;
 use download::{delete_object, download_object, get_signed_url, list_objects, object_info};
 use download_bulk::download_bulk;
+use inspect::inspect_object;
 use upload::{upload_batch, upload_object};
 
 #[derive(Debug, Subcommand)]
@@ -164,6 +168,31 @@ pub enum ObjectCommands {
         object: String,
     },
 
+    /// Compare two OSS objects or an OSS object against a local file
+    ///
+    /// Both arguments may be OSS keys in `<bucket>/<object-key>` format, or
+    /// the second argument may be a path to a local file.
+    ///
+    /// For text files a unified diff is shown. For binary files size and
+    /// SHA-1/SHA-256 checksums are compared.
+    ///
+    /// Exits with code 0 when files are identical, 1 when they differ.
+    Diff {
+        /// First operand: `<bucket>/<object-key>` OSS path or local file path
+        left: String,
+
+        /// Second operand: `<bucket>/<object-key>` OSS path or local file path
+        right: String,
+
+        /// Show summary only (sizes, hashes, changed/unchanged line counts)
+        #[arg(long)]
+        stat: bool,
+
+        /// Only compare checksums without diffing content
+        #[arg(long)]
+        checksum_only: bool,
+    },
+
     /// Copy an object to another bucket or key
     Copy {
         /// Source bucket key
@@ -238,6 +267,23 @@ pub enum ObjectCommands {
         /// Remove all state files without checking file existence
         #[arg(long)]
         all: bool,
+    },
+
+    /// Inspect a .tar.gz or .zip archive in OSS without downloading it
+    ///
+    /// Uses HTTP Range requests to read only the archive metadata (central
+    /// directory for .zip, streaming headers for .tar.gz).  Supports listing
+    /// files and extracting a single file via --extract.
+    Inspect {
+        /// Bucket key
+        bucket: String,
+
+        /// Object key of the archive (.zip, .tar.gz, or .tgz)
+        object: String,
+
+        /// Extract a specific file from the archive by its internal path
+        #[arg(long, short = 'e')]
+        extract: Option<String>,
     },
 }
 
@@ -318,6 +364,12 @@ impl ObjectCommands {
             ObjectCommands::Info { bucket, object } => {
                 object_info(client, &bucket, &object, output_format).await
             }
+            ObjectCommands::Diff {
+                left,
+                right,
+                stat,
+                checksum_only,
+            } => diff_objects(client, left, right, stat, checksum_only, output_format).await,
             ObjectCommands::Copy {
                 source_bucket,
                 source_object,
@@ -363,6 +415,11 @@ impl ObjectCommands {
                 upload::upload_abort(&bucket, &object, output_format)
             }
             ObjectCommands::UploadCleanup { all } => upload::upload_cleanup(all, output_format),
+            ObjectCommands::Inspect {
+                bucket,
+                object,
+                extract,
+            } => inspect_object(client, bucket, object, extract, output_format).await,
         }
     }
 }

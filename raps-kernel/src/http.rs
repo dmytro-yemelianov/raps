@@ -102,6 +102,8 @@ pub struct HttpClientConfig {
     pub connect_timeout: u64,
     /// Enable HTTP/2 multiplexing (default: true, override with RAPS_HTTP2=0)
     pub http2: bool,
+    /// Optional HTTP/HTTPS proxy URL (e.g. "http://proxy.corp.example.com:8080")
+    pub proxy_url: Option<String>,
 }
 
 impl Default for HttpClientConfig {
@@ -113,6 +115,7 @@ impl Default for HttpClientConfig {
             timeout: 120,
             connect_timeout: 30,
             http2: true,
+            proxy_url: None,
         }
     }
 }
@@ -122,6 +125,8 @@ impl HttpClientConfig {
     ///
     /// HTTP/2 is enabled by default via `.http2_adaptive_window(true)`.  Set
     /// `RAPS_HTTP2=0` or construct the config with `http2: false` to disable.
+    /// Returns an error if the proxy URL is invalid or if the underlying reqwest
+    /// builder fails (e.g. bad TLS configuration).
     pub fn create_client(&self) -> Result<Client> {
         let mut builder = Client::builder()
             .pool_idle_timeout(Duration::from_secs(90))
@@ -132,6 +137,12 @@ impl HttpClientConfig {
 
         if self.http2 {
             builder = builder.http2_adaptive_window(true);
+        }
+
+        if let Some(proxy_url) = &self.proxy_url {
+            let proxy = reqwest::Proxy::all(proxy_url.as_str())
+                .with_context(|| format!("Invalid proxy URL: {proxy_url}"))?;
+            builder = builder.proxy(proxy);
         }
 
         builder.build().context("Failed to create HTTP client")
@@ -179,8 +190,10 @@ impl HttpClientConfig {
     ///
     /// Precedence: CLI flag > environment variable > default.
     /// Use [`from_cli_and_env_full`] to pass all retry parameters.
-    pub fn from_cli_and_env(timeout_flag: Option<u64>) -> Self {
-        Self::from_cli_and_env_full(timeout_flag, None, None, None)
+    ///
+    /// Returns an error if `RAPS_PROXY` is set but contains an invalid URL.
+    pub fn from_cli_and_env(timeout_flag: Option<u64>) -> Result<Self> {
+        Self::from_cli_and_env_full(timeout_flag, None, None, None, None)
     }
 
     /// Create HTTP client config from CLI flags and environment variables
@@ -194,12 +207,14 @@ impl HttpClientConfig {
     /// - `RAPS_BASE_DELAY`  — base backoff delay in seconds (default 1)
     /// - `RAPS_MAX_WAIT`    — maximum backoff wait in seconds (default 60)
     /// - `RAPS_HTTP2`       — set to `0` to disable HTTP/2 multiplexing (default enabled)
+    /// - `RAPS_PROXY`       — proxy URL; returns an error if invalid
     pub fn from_cli_and_env_full(
         timeout_flag: Option<u64>,
         max_retries_flag: Option<u32>,
         base_delay_flag: Option<u64>,
         max_wait_flag: Option<u64>,
-    ) -> Self {
+        proxy_flag: Option<String>,
+    ) -> Result<Self> {
         let timeout = resolve_param(timeout_flag, "RAPS_TIMEOUT", 120);
         let max_retries = resolve_param(max_retries_flag, "RAPS_MAX_RETRIES", 3);
         let base_delay = resolve_param(base_delay_flag, "RAPS_BASE_DELAY", 1);
@@ -207,14 +222,29 @@ impl HttpClientConfig {
         // HTTP/2 is enabled unless explicitly disabled with RAPS_HTTP2=0
         let http2 = std::env::var("RAPS_HTTP2").as_deref() != Ok("0");
 
-        Self {
+        // Resolve proxy: CLI flag takes precedence over env var.
+        let proxy_url = proxy_flag.or_else(|| std::env::var("RAPS_PROXY").ok());
+
+        // Validate proxy URL eagerly so the user gets a clear error before any
+        // HTTP request is attempted.
+        if let Some(ref url) = proxy_url {
+            Url::parse(url).with_context(|| {
+                format!(
+                    "Invalid proxy URL '{url}'. \
+                     Expected a valid URL such as http://proxy.example.com:8080"
+                )
+            })?;
+        }
+
+        Ok(Self {
             timeout,
             max_retries,
             base_delay,
             max_wait,
             http2,
+            proxy_url,
             ..Self::default()
-        }
+        })
     }
 }
 
@@ -821,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_http_config_from_cli_flag() {
-        let config = HttpClientConfig::from_cli_and_env(Some(60));
+        let config = HttpClientConfig::from_cli_and_env(Some(60)).unwrap();
         assert_eq!(config.timeout, 60);
         // Other values should be default
         assert_eq!(config.max_retries, 3);
@@ -833,7 +863,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_TIMEOUT", "90");
         }
-        let config = HttpClientConfig::from_cli_and_env(None);
+        let config = HttpClientConfig::from_cli_and_env(None).unwrap();
         assert_eq!(config.timeout, 90);
         unsafe {
             std::env::remove_var("RAPS_TIMEOUT");
@@ -846,7 +876,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_TIMEOUT", "90");
         }
-        let config = HttpClientConfig::from_cli_and_env(Some(45));
+        let config = HttpClientConfig::from_cli_and_env(Some(45)).unwrap();
         assert_eq!(config.timeout, 45);
         unsafe {
             std::env::remove_var("RAPS_TIMEOUT");
@@ -859,7 +889,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_TIMEOUT", "not_a_number");
         }
-        let config = HttpClientConfig::from_cli_and_env(None);
+        let config = HttpClientConfig::from_cli_and_env(None).unwrap();
         assert_eq!(config.timeout, 120); // Falls back to default
         unsafe {
             std::env::remove_var("RAPS_TIMEOUT");
@@ -868,7 +898,9 @@ mod tests {
 
     #[test]
     fn test_http_config_full_cli_flags() {
-        let config = HttpClientConfig::from_cli_and_env_full(Some(30), Some(5), Some(2), Some(120));
+        let config =
+            HttpClientConfig::from_cli_and_env_full(Some(30), Some(5), Some(2), Some(120), None)
+                .unwrap();
         assert_eq!(config.timeout, 30);
         assert_eq!(config.max_retries, 5);
         assert_eq!(config.base_delay, 2);
@@ -883,7 +915,8 @@ mod tests {
             std::env::set_var("RAPS_BASE_DELAY", "3");
             std::env::set_var("RAPS_MAX_WAIT", "90");
         }
-        let config = HttpClientConfig::from_cli_and_env_full(None, None, None, None);
+        let config =
+            HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
         assert_eq!(config.max_retries, 7);
         assert_eq!(config.base_delay, 3);
         assert_eq!(config.max_wait, 90);
@@ -899,11 +932,69 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_MAX_RETRIES", "10");
         }
-        let config = HttpClientConfig::from_cli_and_env_full(None, Some(2), None, None);
+        let config =
+            HttpClientConfig::from_cli_and_env_full(None, Some(2), None, None, None).unwrap();
         assert_eq!(config.max_retries, 2); // CLI wins
         unsafe {
             std::env::remove_var("RAPS_MAX_RETRIES");
         }
+    }
+
+    #[test]
+    fn test_http_config_proxy_url_valid() {
+        let config =
+            HttpClientConfig::from_cli_and_env_full(None, None, None, None, Some("http://proxy.example.com:8080".to_string()))
+                .unwrap();
+        assert_eq!(
+            config.proxy_url.as_deref(),
+            Some("http://proxy.example.com:8080")
+        );
+        // Should be able to build the client with this proxy
+        assert!(config.create_client().is_ok());
+    }
+
+    #[test]
+    fn test_http_config_proxy_url_invalid() {
+        let result = HttpClientConfig::from_cli_and_env_full(
+            None,
+            None,
+            None,
+            None,
+            Some("not-a-valid-url".to_string()),
+        );
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not-a-valid-url"));
+    }
+
+    #[test]
+    fn test_http_config_proxy_env_var_valid() {
+        unsafe {
+            std::env::set_var("RAPS_PROXY", "http://proxy.corp.example.com:3128");
+        }
+        let config =
+            HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
+        assert_eq!(
+            config.proxy_url.as_deref(),
+            Some("http://proxy.corp.example.com:3128")
+        );
+        unsafe {
+            std::env::remove_var("RAPS_PROXY");
+        }
+    }
+
+    #[test]
+    fn test_http_config_proxy_env_var_invalid() {
+        unsafe {
+            std::env::set_var("RAPS_PROXY", "not-a-valid-proxy-url");
+        }
+        let result = HttpClientConfig::from_cli_and_env_full(None, None, None, None, None);
+        unsafe {
+            std::env::remove_var("RAPS_PROXY");
+        }
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not-a-valid-proxy-url"));
     }
 
     #[test]

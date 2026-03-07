@@ -69,7 +69,7 @@ pub(crate) async fn execute_company_list(
 
     let http_config = HttpClientConfig::default();
     let admin_client =
-        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
 
     let companies = admin_client.list_companies(&account_id).await?;
 
@@ -208,7 +208,7 @@ impl AdminProjectCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 // List all projects
                 let all_projects = admin_client.list_all_projects(&account_id).await?;
@@ -334,7 +334,7 @@ impl AdminProjectCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 let project = admin_client.create_project(&account_id, request).await?;
 
@@ -393,7 +393,7 @@ impl AdminProjectCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 let updated = admin_client
                     .update_project(&account_id, &project, request)
@@ -439,7 +439,7 @@ impl AdminProjectCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 admin_client.archive_project(&account_id, &project).await?;
 

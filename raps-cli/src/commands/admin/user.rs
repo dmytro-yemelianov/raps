@@ -152,7 +152,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    );
+                    )?;
 
                     let all_users = users_client.list_all_project_users(&project_id).await?;
 
@@ -217,7 +217,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    );
+                    )?;
 
                     let all_users = admin_client.list_all_users(&account_id).await?;
 
@@ -332,12 +332,12 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
                 let mut users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
                 users_client.account_id = Some(account_id.clone());
                 let users_client = Arc::new(users_client);
 
@@ -428,12 +428,12 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
                 let users_client = Arc::new(ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                ));
+                )?);
 
                 let progress_bar = create_bulk_progress_bar(output_format);
                 let on_progress = make_progress_callback(progress_bar.clone());
@@ -511,7 +511,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
 
                 // Handle company update at account level
                 if let Some(ref company_name) = company {
@@ -595,7 +595,7 @@ impl UserCommands {
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    ));
+                    )?);
 
                     let progress_bar = create_bulk_progress_bar(output_format);
                     let on_progress = make_progress_callback(progress_bar.clone());
@@ -643,7 +643,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -696,7 +696,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if !yes && output_format.supports_colors() {
                     println!(
@@ -742,7 +742,7 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if output_format.supports_colors() {
                     println!(
@@ -805,12 +805,12 @@ impl UserCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
                 let users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
-                );
+                )?;
 
                 if output_format.supports_colors() {
                     println!(

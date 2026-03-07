@@ -48,7 +48,7 @@ pub(super) async fn rfi_summary(
     );
 
     let rfi_client =
-        RfiClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config);
+        RfiClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config)?;
 
     let mut summaries = Vec::new();
 
