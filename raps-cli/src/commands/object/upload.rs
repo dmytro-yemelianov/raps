@@ -15,7 +15,7 @@ use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
 use raps_oss::OssClient;
 
-use super::{format_size, select_bucket};
+use super::{format_size, secret_scan, select_bucket};
 
 #[derive(Serialize, schemars::JsonSchema)]
 pub(crate) struct UploadOutput {
@@ -37,6 +37,8 @@ pub(super) async fn upload_object(
     resume: bool,
     skip_if_exists: bool,
     cost_estimate: bool,
+    skip_secret_scan: bool,
+    allow_secrets: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
     let from_stdin = file.as_os_str() == "-";
@@ -68,6 +70,35 @@ pub(super) async fn upload_object(
         if cost_estimate || file_size > LARGE_FILE_THRESHOLD {
             let estimate = CostEstimate::for_upload(file_size);
             estimate.print(&output_format);
+        }
+    }
+
+    // Secret scanning: detect potential credentials before upload
+    if !skip_secret_scan && !from_stdin {
+        let matches = secret_scan::scan_file(&actual_file)?;
+        if !matches.is_empty() {
+            eprintln!(
+                "{} Secret scan: potential credentials detected in {}",
+                "⚠".yellow().bold(),
+                file.display()
+            );
+            for m in &matches {
+                eprintln!(
+                    "  Line {}: {} — {}",
+                    m.line_number,
+                    m.pattern_name.yellow(),
+                    m.snippet.dimmed()
+                );
+            }
+            if !allow_secrets {
+                anyhow::bail!(
+                    "Upload blocked due to detected secrets. Use --allow-secrets to override or --skip-secret-scan to disable."
+                );
+            }
+            eprintln!(
+                "{} Proceeding despite detected secrets (--allow-secrets)",
+                "⚠".yellow()
+            );
         }
     }
 

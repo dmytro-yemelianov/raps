@@ -7,6 +7,7 @@
 
 mod copy;
 pub(crate) mod download;
+pub(crate) mod secret_scan;
 pub(crate) mod upload;
 
 use anyhow::Result;
@@ -46,6 +47,14 @@ pub enum ObjectCommands {
         /// Show cost/time estimate before uploading
         #[arg(long)]
         cost_estimate: bool,
+
+        /// Skip secret scanning before upload
+        #[arg(long)]
+        skip_secret_scan: bool,
+
+        /// Allow upload even if secrets are detected (overrides the default block)
+        #[arg(long)]
+        allow_secrets: bool,
     },
 
     /// Upload multiple files in parallel
@@ -219,7 +228,9 @@ impl ObjectCommands {
                 resume,
                 skip_if_exists,
                 cost_estimate,
-            } => upload_object(client, bucket, file, key, resume, skip_if_exists, cost_estimate, output_format).await,
+                skip_secret_scan,
+                allow_secrets,
+            } => upload_object(client, bucket, file, key, resume, skip_if_exists, cost_estimate, skip_secret_scan, allow_secrets, output_format).await,
             ObjectCommands::UploadBatch {
                 bucket,
                 files,
