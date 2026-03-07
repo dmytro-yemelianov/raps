@@ -127,8 +127,9 @@ impl PluginConfig {
         Ok(proj_dirs.config_dir().join("plugins.json"))
     }
 
-    /// Get an alias command if defined
-    #[allow(dead_code)]
+    /// Get an alias command if defined.
+    ///
+    /// Used by alias expansion in the interactive shell.
     pub fn get_alias(&self, name: &str) -> Option<&str> {
         self.aliases.get(name).map(|s| s.as_str())
     }
@@ -461,14 +462,12 @@ impl PluginManager {
     }
 
     /// Run pre-command hooks
-    #[allow(dead_code)]
     pub fn run_pre_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("pre_{}", command);
         self.run_hooks(&hook_key)
     }
 
     /// Run post-command hooks
-    #[allow(dead_code)]
     pub fn run_post_hooks(&self, command: &str) -> Result<()> {
         let hook_key = format!("post_{}", command);
         self.run_hooks(&hook_key)

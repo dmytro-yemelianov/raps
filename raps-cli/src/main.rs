@@ -916,6 +916,25 @@ async fn run(cli: Cli) -> Result<()> {
                         continue;
                     }
 
+                    // Expand aliases: if the first word matches a configured alias,
+                    // replace the line with the aliased command before parsing.
+                    let line = {
+                        let plugin_cfg = crate::plugins::PluginConfig::load()
+                            .unwrap_or_default();
+                        let first_word = line.split_whitespace().next().unwrap_or("");
+                        if let Some(alias_cmd) = plugin_cfg.get_alias(first_word) {
+                            let rest = line[first_word.len()..].trim_start();
+                            if rest.is_empty() {
+                                alias_cmd.to_string()
+                            } else {
+                                format!("{} {}", alias_cmd, rest)
+                            }
+                        } else {
+                            line.to_string()
+                        }
+                    };
+                    let line = line.as_str();
+
                     let mut args = match shlex::split(line) {
                         Some(args) => args,
                         None => {
@@ -1296,6 +1315,12 @@ async fn execute_command(
     let cmd_name = command_name(&command);
     tracing::info!(command = cmd_name, "Executing command");
 
+    // Run pre-command hooks (ignore errors — hooks should not block the command)
+    let plugin_manager = crate::plugins::PluginManager::default();
+    if let Err(e) = plugin_manager.run_pre_hooks(cmd_name) {
+        tracing::warn!(command = cmd_name, error = %e, "Pre-command hook failed");
+    }
+
     // Helper closure to create clients on demand
     let get_auth_client =
         || -> AuthClient { AuthClient::new_with_http_config(config.clone(), http_config.clone()) };
@@ -1564,6 +1589,11 @@ async fn execute_command(
                 anyhow::bail!("Plugin '{}' exited with code {}", plugin_name, code);
             }
         }
+    }
+
+    // Run post-command hooks (ignore errors — hooks should not mask the command result)
+    if let Err(e) = plugin_manager.run_post_hooks(cmd_name) {
+        tracing::warn!(command = cmd_name, error = %e, "Post-command hook failed");
     }
 
     Ok(())
