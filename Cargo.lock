@@ -943,7 +943,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1015,6 +1015,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb4cb245038516f5f85277875cdaa4f7d2c9a0fa0468de06ed190163b1581fcf"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]
@@ -1379,7 +1389,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "tokio",
  "tower-service",
  "tracing",
@@ -1863,7 +1873,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2164,7 +2174,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -2201,9 +2211,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.10",
+ "socket2 0.6.2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -2282,7 +2292,7 @@ dependencies = [
 
 [[package]]
 name = "raps-acc"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2301,7 +2311,7 @@ dependencies = [
 
 [[package]]
 name = "raps-admin"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2324,7 +2334,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cli"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -2343,12 +2353,14 @@ dependencies = [
  "directories",
  "dotenvy",
  "ed25519-dalek",
+ "fs2",
  "futures-util",
  "hex",
  "hmac",
  "hostname",
  "indicatif",
  "insta",
+ "keyring",
  "nu-ansi-term",
  "predicates",
  "rand 0.8.5",
@@ -2365,9 +2377,11 @@ dependencies = [
  "ratatui",
  "redis",
  "reedline",
+ "regex",
  "reqwest",
  "rmcp",
  "schemars",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2386,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "raps-da"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2406,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "raps-derivative"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2428,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2446,7 +2460,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2523,7 +2537,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -2547,7 +2561,7 @@ dependencies = [
 
 [[package]]
 name = "raps-reality"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -2565,7 +2579,7 @@ dependencies = [
 
 [[package]]
 name = "raps-webhooks"
-version = "5.3.1"
+version = "5.3.3"
 dependencies = [
  "anyhow",
  "insta",
@@ -2907,7 +2921,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3039,6 +3053,10 @@ name = "semver"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+dependencies = [
+ "serde",
+ "serde_core",
+]
 
 [[package]]
 name = "serde"
@@ -3358,10 +3376,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82a72c767771b47409d2345987fda8628641887d5466101319899796367354a0"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.1",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4143,7 +4161,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
