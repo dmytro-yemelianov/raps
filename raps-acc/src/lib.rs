@@ -11,9 +11,6 @@
 //! - Account Admin API - User and project management
 //! - Project Users API - Project member management
 
-// API response structs may contain fields we don't use - this is expected for external API contracts
-#![allow(dead_code)]
-
 pub mod admin;
 pub mod extended;
 pub mod helpers;
