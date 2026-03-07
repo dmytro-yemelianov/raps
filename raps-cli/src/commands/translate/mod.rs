@@ -66,6 +66,10 @@ pub enum TranslateCommands {
         /// Send a Slack notification when the job completes (requires swarm.toml)
         #[arg(long)]
         notify: bool,
+
+        /// Show cost/time estimate before submitting the translation job
+        #[arg(long)]
+        cost_estimate: bool,
     },
 
     /// Check translation status
@@ -256,6 +260,7 @@ impl TranslateCommands {
                 force,
                 serverless,
                 notify,
+                cost_estimate,
             } => {
                 if serverless {
                     translations::start_serverless(
@@ -282,6 +287,7 @@ impl TranslateCommands {
                         output_format,
                         region,
                         force,
+                        cost_estimate,
                     )
                     .await
                 }

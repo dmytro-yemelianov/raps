@@ -10,6 +10,8 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use serde::Serialize;
 
+use base64::Engine as _;
+use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
 use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
 use raps_kernel::{progress, prompts};
@@ -137,6 +139,7 @@ pub(super) async fn start_translation(
     output_format: OutputFormat,
     region_str: String,
     force: bool,
+    cost_estimate: bool,
 ) -> Result<()> {
     let region: raps_derivative::MdRegion = region_str.parse().context("Invalid --region value")?;
     // Get URN interactively if not provided
@@ -204,6 +207,27 @@ pub(super) async fn start_translation(
             }
         }
     };
+
+    // Show cost estimate if requested, using file extension from URN
+    if cost_estimate {
+        // Decode the URN to extract the file extension heuristic
+        let ext = {
+            let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+                .decode(source_urn.trim_end_matches('='))
+                .ok()
+                .and_then(|b| String::from_utf8(b).ok())
+                .unwrap_or_default();
+            // URN typically ends with the object key, e.g. ".../<filename.rvt>"
+            std::path::Path::new(&decoded)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("")
+                .to_lowercase()
+        };
+        // Use 0 as file size since we don't have it at this point
+        let estimate = CostEstimate::for_translation(0, &ext);
+        estimate.print(&output_format);
+    }
 
     if output_format.supports_colors() {
         println!(

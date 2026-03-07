@@ -12,6 +12,7 @@ pub mod auth;
 pub mod bucket;
 pub mod cache;
 pub mod config;
+pub mod cost;
 pub mod da;
 #[cfg(feature = "dashboard")]
 pub mod dashboard;

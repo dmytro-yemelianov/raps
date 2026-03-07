@@ -42,6 +42,10 @@ pub enum ObjectCommands {
         /// Skip upload if an identical object (same SHA-1) already exists
         #[arg(long)]
         skip_if_exists: bool,
+
+        /// Show cost/time estimate before uploading
+        #[arg(long)]
+        cost_estimate: bool,
     },
 
     /// Upload multiple files in parallel
@@ -214,7 +218,8 @@ impl ObjectCommands {
                 key,
                 resume,
                 skip_if_exists,
-            } => upload_object(client, bucket, file, key, resume, skip_if_exists, output_format).await,
+                cost_estimate,
+            } => upload_object(client, bucket, file, key, resume, skip_if_exists, cost_estimate, output_format).await,
             ObjectCommands::UploadBatch {
                 bucket,
                 files,
