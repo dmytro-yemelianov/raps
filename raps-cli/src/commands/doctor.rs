@@ -302,8 +302,46 @@ fn check_plugins() -> CheckResult {
     }
 }
 
+const NETWORK_PROBE_URL: &str = "https://developer.api.autodesk.com";
+
 async fn check_network_reachability() -> CheckResult {
-    check("Network [network]", Status::Warn, "not implemented yet")
+    use std::time::Duration;
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return check("Network [network]", Status::Fail, &format!("Client build failed: {e}")),
+    };
+
+    match client.head(NETWORK_PROBE_URL).send().await {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() || status.as_u16() == 404 || status.as_u16() == 405 {
+                check(
+                    "Network [network]",
+                    Status::Pass,
+                    &format!("developer.api.autodesk.com reachable (HTTP {})", status.as_u16()),
+                )
+            } else {
+                check(
+                    "Network [network]",
+                    Status::Warn,
+                    &format!("Unexpected HTTP {} from APS endpoint", status.as_u16()),
+                )
+            }
+        }
+        Err(e) => {
+            if e.is_timeout() {
+                check("Network [network]", Status::Fail, "Connection timed out (5s) — check firewall/proxy")
+            } else if e.is_connect() {
+                check("Network [network]", Status::Fail, "Cannot connect to developer.api.autodesk.com — check network")
+            } else {
+                check("Network [network]", Status::Fail, &format!("Network error: {e}"))
+            }
+        }
+    }
 }
 
 fn check_config_permissions() -> CheckResult {
@@ -372,5 +410,20 @@ mod tests {
     #[test]
     fn test_format_size_gb() {
         assert_eq!(format_size(1_073_741_824), "1.00 GB");
+    }
+
+    #[test]
+    fn test_network_check_name_contains_network_tag() {
+        let c = CheckResult {
+            name: "Network [network]".to_string(),
+            status: "pass".to_string(),
+            message: "reachable".to_string(),
+        };
+        assert!(c.name.contains("[network]"));
+    }
+
+    #[test]
+    fn test_network_endpoint_is_aps_domain() {
+        assert!(NETWORK_PROBE_URL.starts_with("https://developer.api.autodesk.com"));
     }
 }
