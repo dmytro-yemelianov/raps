@@ -151,6 +151,10 @@ struct Cli {
     #[arg(long, global = true)]
     debug: bool,
 
+    /// Write log output to PATH instead of the default platform log directory
+    #[arg(long, value_name = "PATH", global = true)]
+    log_file: Option<std::path::PathBuf>,
+
     /// Profile performance (execution time, HTTP network time)
     #[arg(long, global = true)]
     profile: bool,
@@ -404,6 +408,10 @@ enum Commands {
     /// Watch a directory and auto-upload new/changed files to OSS
     Watch(commands::watch_dir::WatchArgs),
 
+    /// View and manage log files (show, path, clear, follow)
+    #[command(subcommand)]
+    Logs(commands::logs::LogsCommands),
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -415,7 +423,7 @@ const KNOWN_SUBCOMMANDS: &[&str] = &[
     "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
     "api", "rfi", "report", "template", "reality", "inspect", "plugin", "generate", "demo",
     "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm",
-    "schema", "history", "replay", "man",
+    "schema", "history", "replay", "man", "logs",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -596,7 +604,13 @@ async fn main() -> Result<()> {
     };
 
     // Initialize logging
-    logging::init(cli.no_color, cli.quiet, cli.verbose, cli.debug);
+    logging::init(
+        cli.no_color,
+        cli.quiet,
+        cli.verbose,
+        cli.debug,
+        cli.log_file.as_deref(),
+    );
 
     if cli.profile {
         raps_kernel::profiler::enable();
@@ -1323,6 +1337,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Replay { .. } => "replay",
         Commands::Stats { .. } => "stats",
         Commands::Watch(_) => "watch",
+        Commands::Logs(_) => "logs",
     }
 }
 
@@ -1603,6 +1618,10 @@ async fn execute_command(
 
         Commands::Watch(args) => {
             commands::watch_dir::execute(args, config, output_format).await?;
+        }
+
+        Commands::Logs(cmd) => {
+            cmd.execute(output_format).await?;
         }
 
         Commands::External(args) => {

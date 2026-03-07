@@ -11,6 +11,7 @@
 
 use regex::Regex;
 use std::io::{IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -32,8 +33,22 @@ pub fn flush() {
     }
 }
 
-/// Initialize logging flags and tracing
-pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
+/// Return the log directory used by default (when no `--log-file` override is given).
+pub fn log_dir() -> PathBuf {
+    directories::ProjectDirs::from("com", "autodesk", "raps")
+        .map(|dirs| dirs.data_local_dir().join("logs"))
+        .unwrap_or_else(|| {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(".raps-logs")
+        })
+}
+
+/// Initialize logging flags and tracing.
+///
+/// `log_file` – when `Some`, write the file log to that exact path instead of
+/// the default daily-rolling file in the platform data directory.
+pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool, log_file: Option<&Path>) {
     // Resolve whether colors should be used, checking all standard signals:
     //   1. --no-color flag
     //   2. NO_COLOR env var (https://no-color.org) — any value disables color
@@ -90,19 +105,28 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
         .without_time()
         .with_filter(console_filter);
 
-    let log_dir = directories::ProjectDirs::from("com", "autodesk", "raps")
-        .map(|dirs| dirs.data_local_dir().join("logs"))
-        .unwrap_or_else(|| {
-            std::env::current_dir()
-                .unwrap_or_else(|_| std::path::PathBuf::from("."))
-                .join(".raps-logs")
-        });
+    // Determine the file appender: custom path overrides the default daily-rolling log.
+    let (non_blocking_appender, guard) = if let Some(path) = log_file {
+        // Ensure the parent directory exists.
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                let _ = crate::security::create_dir_restricted(parent);
+            }
+        }
+        let appender = tracing_appender::rolling::never(
+            path.parent().unwrap_or_else(|| std::path::Path::new(".")),
+            path.file_name()
+                .unwrap_or_else(|| std::ffi::OsStr::new("raps.log")),
+        );
+        tracing_appender::non_blocking(appender)
+    } else {
+        let log_dir = log_dir();
+        let _ = crate::security::create_dir_restricted(&log_dir);
+        cleanup_old_logs(&log_dir, 7);
+        let appender = tracing_appender::rolling::daily(&log_dir, "raps.log");
+        tracing_appender::non_blocking(appender)
+    };
 
-    let _ = crate::security::create_dir_restricted(&log_dir);
-    cleanup_old_logs(&log_dir, 7);
-
-    let file_appender = tracing_appender::rolling::daily(&log_dir, "raps.log");
-    let (non_blocking_appender, guard) = tracing_appender::non_blocking(file_appender);
     if let Ok(mut lock) = WORKER_GUARD.lock() {
         *lock = Some(guard);
     }
