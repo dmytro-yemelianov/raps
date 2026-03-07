@@ -47,6 +47,8 @@ console = "0.15"
 
 # HTTP client
 reqwest = { version = "0.12", features = ["json", "stream", "multipart", "rustls-tls", "http2"], default-features = false }
+http = "1.4"
+bytes = "1.11"
 
 # Async runtime
 tokio = { version = "1.49", features = ["full"] }
