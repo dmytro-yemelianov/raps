@@ -37,6 +37,10 @@ pub enum PipelineCommands {
         /// Pipeline variable override (KEY=VALUE, repeatable)
         #[arg(long = "var", value_parser = parse_var_assignment)]
         var: Vec<(String, String)>,
+
+        /// Maximum number of steps to run concurrently within a dependency level (0 = unlimited)
+        #[arg(long = "max-parallel", default_value_t = 0)]
+        max_parallel: usize,
     },
 
     /// Validate a pipeline file
@@ -191,7 +195,8 @@ impl PipelineCommands {
                 ignore_failure,
                 dry_run,
                 var,
-            } => run_pipeline(&file, ignore_failure, dry_run, var, output_format).await,
+                max_parallel,
+            } => run_pipeline(&file, ignore_failure, dry_run, var, max_parallel, output_format).await,
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
             PipelineCommands::Create {
@@ -633,11 +638,45 @@ fn topological_sort(steps: &[Step]) -> Result<Vec<usize>> {
     Ok(result)
 }
 
+/// Group topologically sorted step indices into parallel execution levels.
+///
+/// Level 0 contains steps with no dependencies.  Level N contains steps whose
+/// all dependencies are in levels 0..N-1.  Steps at the same level have no
+/// dependency between them and can safely run concurrently.
+fn group_by_level(steps: &[Step], sorted_indices: &[usize]) -> Vec<Vec<usize>> {
+    let mut level_of = vec![0usize; steps.len()];
+    for &i in sorted_indices {
+        let max_dep_level = steps[i]
+            .depends_on
+            .iter()
+            .filter_map(|dep| steps.iter().position(|s| s.name == *dep))
+            .map(|dep_idx| level_of[dep_idx])
+            .max()
+            .unwrap_or(0);
+        level_of[i] = if steps[i].depends_on.is_empty() {
+            0
+        } else {
+            max_dep_level + 1
+        };
+    }
+    let max_level = level_of.iter().copied().max().unwrap_or(0);
+    (0..=max_level)
+        .map(|l| {
+            sorted_indices
+                .iter()
+                .copied()
+                .filter(|&i| level_of[i] == l)
+                .collect()
+        })
+        .collect()
+}
+
 async fn run_pipeline(
     file: &PathBuf,
     global_ignore_failure: bool,
     dry_run: bool,
     var_overrides: Vec<(String, String)>,
+    max_parallel: usize,
     output_format: OutputFormat,
 ) -> Result<()> {
     let mut pipeline = load_pipeline(file).await?;
@@ -658,68 +697,165 @@ async fn run_pipeline(
 
     let execution_order = topological_sort(&pipeline.steps)?;
     let total = execution_order.len();
+    let levels = group_by_level(&pipeline.steps, &execution_order);
 
     if dry_run && output_format.supports_colors() {
-        let order_names: Vec<&str> = execution_order
-            .iter()
-            .map(|&i| pipeline.steps[i].name.as_str())
-            .collect();
-        println!("Execution order: {}", order_names.join(" → "));
-    }
-
-    for (pos, &step_idx) in execution_order.iter().enumerate() {
-        let step = &pipeline.steps[step_idx];
-        if output_format.supports_colors() {
-            println!(
-                "\n[{}/{}] {}",
-                pos + 1,
-                total,
-                step.name.bold()
-            );
-            if let Some(ref cmd) = step.command {
-                println!("  {} {}", "Command:".dimmed(), cmd.cyan());
-            } else if step.parallel.is_some() {
-                println!("  {} parallel steps", "⫸".dimmed());
-            } else if step.for_each.is_some() {
-                println!("  {} for-each loop", "⟳".dimmed());
+        for (level_idx, level_indices) in levels.iter().enumerate() {
+            let names: Vec<&str> = level_indices
+                .iter()
+                .map(|&i| pipeline.steps[i].name.as_str())
+                .collect();
+            if level_indices.len() == 1 {
+                println!("Level {} (sequential): {}", level_idx, names.join(", "));
+            } else {
+                println!("Level {} (parallel): {}", level_idx, names.join(", "));
             }
         }
+    }
 
-        let outcome = execute_step(
-            step.clone(),
-            pipeline.variables.clone(),
-            context.clone(),
-            pipeline.defaults.clone(),
-            output_format,
-            dry_run,
-        )
-        .await?;
+    for level_indices in &levels {
+        if level_indices.len() == 1 {
+            // Single step in this level — run sequentially (existing code path)
+            let step_idx = level_indices[0];
+            let step = &pipeline.steps[step_idx];
+            let pos = execution_order
+                .iter()
+                .position(|&i| i == step_idx)
+                .unwrap_or(0);
 
-        match outcome {
-            StepOutcome::Success(_) => {
-                if output_format.supports_colors() {
-                    println!("  {} Success", "✓".green().bold());
-                }
-                passed += 1;
-            }
-            StepOutcome::Failed(code) => {
-                if output_format.supports_colors() {
-                    println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
-                }
-                failed += 1;
-                if !step.ignore_failure && !global_ignore_failure {
-                    anyhow::bail!(
-                        "Pipeline aborted at step '{}' (exit code: {})",
-                        step.name,
-                        code
-                    );
+            if output_format.supports_colors() {
+                println!("\n[{}/{}] {}", pos + 1, total, step.name.bold());
+                if let Some(ref cmd) = step.command {
+                    println!("  {} {}", "Command:".dimmed(), cmd.cyan());
+                } else if step.parallel.is_some() {
+                    println!("  {} parallel steps", "⫸".dimmed());
+                } else if step.for_each.is_some() {
+                    println!("  {} for-each loop", "⟳".dimmed());
                 }
             }
-            StepOutcome::Skipped => {
-                if output_format.supports_colors() {
-                    println!("  {} Skipped (condition not met)", "○".dimmed());
+
+            let outcome = execute_step(
+                step.clone(),
+                pipeline.variables.clone(),
+                context.clone(),
+                pipeline.defaults.clone(),
+                output_format,
+                dry_run,
+            )
+            .await?;
+
+            match outcome {
+                StepOutcome::Success(_) => {
+                    if output_format.supports_colors() {
+                        println!("  {} Success", "✓".green().bold());
+                    }
+                    passed += 1;
                 }
-                skipped += 1;
+                StepOutcome::Failed(code) => {
+                    if output_format.supports_colors() {
+                        println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
+                    }
+                    failed += 1;
+                    if !step.ignore_failure && !global_ignore_failure {
+                        anyhow::bail!(
+                            "Pipeline aborted at step '{}' (exit code: {})",
+                            step.name,
+                            code
+                        );
+                    }
+                }
+                StepOutcome::Skipped => {
+                    if output_format.supports_colors() {
+                        println!("  {} Skipped (condition not met)", "○".dimmed());
+                    }
+                    skipped += 1;
+                }
+            }
+        } else {
+            // Multiple independent steps — run concurrently using tokio::task::JoinSet
+            use tokio::sync::Semaphore;
+            use tokio::task::JoinSet;
+
+            if output_format.supports_colors() {
+                let names: Vec<&str> = level_indices
+                    .iter()
+                    .map(|&i| pipeline.steps[i].name.as_str())
+                    .collect();
+                println!("\n[parallel] {}", names.join(", "));
+            }
+
+            let semaphore: Option<Arc<Semaphore>> = if max_parallel > 0 {
+                Some(Arc::new(Semaphore::new(max_parallel)))
+            } else {
+                None
+            };
+
+            let mut join_set: JoinSet<Result<(String, bool, StepOutcome)>> = JoinSet::new();
+
+            for &step_idx in level_indices {
+                let step = pipeline.steps[step_idx].clone();
+                let vars = pipeline.variables.clone();
+                let ctx = context.clone();
+                let defs = pipeline.defaults.clone();
+                let fmt = output_format;
+                let dry = dry_run;
+                let sem = semaphore.clone();
+                let step_ignore = step.ignore_failure;
+                let step_name = step.name.clone();
+
+                join_set.spawn(async move {
+                    let _permit = if let Some(ref s) = sem {
+                        Some(s.acquire().await.expect("semaphore closed"))
+                    } else {
+                        None
+                    };
+                    let outcome = execute_step(step, vars, ctx, defs, fmt, dry).await?;
+                    Ok((step_name, step_ignore, outcome))
+                });
+            }
+
+            while let Some(result) = join_set.join_next().await {
+                match result {
+                    Ok(Ok((step_name, step_ignore, outcome))) => match outcome {
+                        StepOutcome::Success(_) => {
+                            if output_format.supports_colors() {
+                                println!("  {} {} Success", "✓".green().bold(), step_name);
+                            }
+                            passed += 1;
+                        }
+                        StepOutcome::Failed(code) => {
+                            if output_format.supports_colors() {
+                                println!(
+                                    "  {} {} Failed (exit code: {})",
+                                    "✗".red().bold(),
+                                    step_name,
+                                    code
+                                );
+                            }
+                            failed += 1;
+                            if !step_ignore && !global_ignore_failure {
+                                join_set.abort_all();
+                                anyhow::bail!(
+                                    "Pipeline aborted at step '{}' (exit code: {})",
+                                    step_name,
+                                    code
+                                );
+                            }
+                        }
+                        StepOutcome::Skipped => {
+                            if output_format.supports_colors() {
+                                println!(
+                                    "  {} {} Skipped (condition not met)",
+                                    "○".dimmed(),
+                                    step_name
+                                );
+                            }
+                            skipped += 1;
+                        }
+                    },
+                    Ok(Err(e)) => return Err(e),
+                    Err(e) => anyhow::bail!("Parallel step task panicked: {}", e),
+                }
             }
         }
     }
