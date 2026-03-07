@@ -6,6 +6,7 @@
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use raps_kernel::error::RapsError;
+use sha1::{Digest, Sha1};
 use std::path::{Component, Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
@@ -364,6 +365,87 @@ impl OssClient {
         }
 
         Ok(())
+    }
+
+    /// Get the SHA-1 hash of an existing remote object.
+    ///
+    /// Returns `Ok(Some(sha1))` if the object exists, or `Ok(None)` if the
+    /// object does not exist (HTTP 404).  Any other HTTP error is propagated.
+    pub async fn get_object_details_sha1(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+    ) -> Result<Option<String>> {
+        let token = self.auth.get_token().await?;
+        let url = format!(
+            "{}/buckets/{}/objects/{}/details",
+            self.config.oss_url(),
+            bucket_key,
+            urlencoding::encode(object_key)
+        );
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(&url), "HTTP response");
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        let details: crate::types::ObjectDetails = response
+            .json()
+            .await
+            .context("Failed to parse object details response")?;
+
+        Ok(Some(details.sha1))
+    }
+
+    /// Compute the SHA-1 of a local file and compare it to the remote object.
+    ///
+    /// Returns `Ok(Some(object_info))` when an identical object already exists
+    /// in the bucket, or `Ok(None)` when no duplicate is found.
+    pub async fn check_duplicate(
+        &self,
+        bucket_key: &str,
+        object_key: &str,
+        file_path: &std::path::Path,
+    ) -> Result<Option<ObjectInfo>> {
+        // Compute local SHA-1
+        let file_bytes = tokio::fs::read(file_path)
+            .await
+            .context("Failed to read file for SHA-1 computation")?;
+        let mut hasher = Sha1::new();
+        hasher.update(&file_bytes);
+        let local_sha1 = hex::encode(hasher.finalize());
+
+        // Fetch remote SHA-1
+        let remote_sha1 = self
+            .get_object_details_sha1(bucket_key, object_key)
+            .await?;
+
+        match remote_sha1 {
+            Some(remote) if remote.to_lowercase() == local_sha1.to_lowercase() => {
+                // Duplicate found — return full ObjectInfo converted from ObjectDetails
+                let details = self.get_object_details(bucket_key, object_key).await?;
+                Ok(Some(ObjectInfo {
+                    bucket_key: details.bucket_key,
+                    object_key: details.object_key,
+                    object_id: details.object_id,
+                    sha1: Some(details.sha1),
+                    size: details.size,
+                    location: details.location,
+                    content_type: Some(details.content_type),
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 
     /// Get detailed metadata for an object without downloading it
