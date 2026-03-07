@@ -15,6 +15,100 @@ use raps_kernel::progress;
 use crate::OssClient;
 use crate::types::*;
 
+// ─── Throughput tracking ────────────────────────────────────────────────────
+
+struct ThroughputTracker {
+    bytes_done: u64,
+    started: std::time::Instant,
+    recent_bytes: std::collections::VecDeque<(std::time::Instant, u64)>,
+}
+
+impl ThroughputTracker {
+    fn new() -> Self {
+        Self {
+            bytes_done: 0,
+            started: std::time::Instant::now(),
+            recent_bytes: std::collections::VecDeque::new(),
+        }
+    }
+
+    fn record(&mut self, bytes: u64) {
+        let now = std::time::Instant::now();
+        self.bytes_done += bytes;
+        self.recent_bytes.push_back((now, bytes));
+        // Drop entries older than 10 seconds
+        let cutoff = now - std::time::Duration::from_secs(10);
+        while self.recent_bytes.front().is_some_and(|(t, _)| *t < cutoff) {
+            self.recent_bytes.pop_front();
+        }
+    }
+
+    fn bytes_per_second(&self) -> f64 {
+        if self.recent_bytes.is_empty() {
+            return 0.0;
+        }
+        let window_bytes: u64 = self.recent_bytes.iter().map(|(_, b)| b).sum();
+        let oldest = self.recent_bytes.front().map(|(t, _)| *t).unwrap_or(self.started);
+        let window_secs = oldest.elapsed().as_secs_f64().max(0.001);
+        window_bytes as f64 / window_secs
+    }
+
+    fn eta_seconds(&self, remaining_bytes: u64) -> Option<u64> {
+        let bps = self.bytes_per_second();
+        if bps <= 0.0 {
+            return None;
+        }
+        Some((remaining_bytes as f64 / bps).ceil() as u64)
+    }
+}
+
+// ─── Throughput cache (persisted between runs) ───────────────────────────────
+
+#[derive(serde::Serialize, serde::Deserialize, Default)]
+struct ThroughputCache {
+    bytes_per_second: f64,
+    measured_at: i64,
+}
+
+impl ThroughputCache {
+    fn cache_path() -> Option<std::path::PathBuf> {
+        directories::ProjectDirs::from("com", "autodesk", "raps").map(|dirs| {
+            let dir = dirs.cache_dir().to_path_buf();
+            let _ = std::fs::create_dir_all(&dir);
+            dir.join("throughput_cache.json")
+        })
+    }
+
+    fn load() -> Self {
+        let Some(path) = Self::cache_path() else {
+            return Self::default();
+        };
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self) {
+        let Some(path) = Self::cache_path() else {
+            return;
+        };
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+
+    fn suggested_chunk_size(&self) -> u64 {
+        if self.bytes_per_second > 50_000_000.0 {
+            (25 * 1024 * 1024).min(MultipartUploadState::MAX_CHUNK_SIZE)
+        } else if self.bytes_per_second > 10_000_000.0 {
+            (10 * 1024 * 1024).min(MultipartUploadState::MAX_CHUNK_SIZE)
+        } else {
+            MultipartUploadState::DEFAULT_CHUNK_SIZE
+        }
+    }
+}
+
 impl OssClient {
     /// Create a fresh multipart upload state with signed URLs
     #[allow(clippy::too_many_arguments)]
@@ -74,7 +168,11 @@ impl OssClient {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        let chunk_size = MultipartUploadState::DEFAULT_CHUNK_SIZE;
+        let chunk_size = if resume {
+            MultipartUploadState::DEFAULT_CHUNK_SIZE // keep original size when resuming
+        } else {
+            ThroughputCache::load().suggested_chunk_size()
+        };
         let total_parts = file_size.div_ceil(chunk_size) as u32;
 
         let (state, initial_urls) = if resume {
@@ -186,6 +284,7 @@ impl OssClient {
         let parts_since_flush = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let state_mutex = Arc::new(Mutex::new(state));
         let pb_arc = Arc::new(Mutex::new(pb));
+        let tracker_mutex = Arc::new(Mutex::new(ThroughputTracker::new()));
         let file_path_clone = file_path.to_path_buf();
 
         // Buffer pool: pre-allocate buffers to avoid per-chunk allocations.
@@ -213,6 +312,7 @@ impl OssClient {
                 let state_mutex = state_mutex.clone();
                 let parts_since_flush = parts_since_flush.clone();
                 let pb_arc = pb_arc.clone();
+                let tracker_mutex = tracker_mutex.clone();
                 let buf_rx = buf_rx.clone();
                 let buf_tx = buf_tx.clone();
                 let object_key = object_key.to_string();
@@ -289,13 +389,24 @@ impl OssClient {
                                     }
                                 }
 
-                                // Update progress bar
+                                // Update throughput tracker and progress bar
                                 {
+                                    let mut tracker = tracker_mutex.lock().await;
+                                    tracker.record(part_size);
+                                    let bps = tracker.bytes_per_second();
+                                    let mbps = bps / 1_000_000.0;
+                                    let bytes_uploaded = tracker.bytes_done;
+                                    // remaining = total file - bytes uploaded so far
+                                    let remaining = file_size.saturating_sub(bytes_uploaded);
+                                    let eta_str = match tracker.eta_seconds(remaining) {
+                                        Some(eta) => format!("ETA {}s", eta),
+                                        None => "ETA --".to_string(),
+                                    };
                                     let pb_guard = pb_arc.lock().await;
                                     pb_guard.set_position(end);
                                     pb_guard.set_message(format!(
-                                        "Uploading {} ({} parts completed)",
-                                        object_key, part_num
+                                        "Uploading {} — {:.1} MB/s — {}",
+                                        object_key, mbps, eta_str
                                     ));
                                 }
 
@@ -369,6 +480,23 @@ impl OssClient {
             let state_guard = state_mutex.lock().await;
             if let Err(e) = state_guard.save() {
                 tracing::warn!(error = %e, "Failed to save final upload state");
+            }
+        }
+
+        // Persist observed throughput to cache for next upload's chunk size selection
+        {
+            let tracker = tracker_mutex.lock().await;
+            let bps = tracker.bytes_per_second();
+            if bps > 0.0 {
+                let cache = ThroughputCache {
+                    bytes_per_second: bps,
+                    measured_at: chrono::Utc::now().timestamp(),
+                };
+                cache.save();
+                tracing::debug!(
+                    bytes_per_second = bps,
+                    "Saved throughput cache for adaptive chunk sizing"
+                );
             }
         }
 
