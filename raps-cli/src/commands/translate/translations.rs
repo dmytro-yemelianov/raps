@@ -18,6 +18,72 @@ use raps_kernel::{progress, prompts};
 /// Translations typically complete within minutes, but complex models can take longer.
 pub(super) const TRANSLATE_POLL_TIMEOUT: Duration = Duration::from_secs(2 * 60 * 60);
 
+/// Detect the best output format from a file extension.
+/// Returns the format name (e.g. "svf2") and the matched extension for display.
+fn detect_output_format(file_path: &str) -> (&'static str, &'static str) {
+    let ext = std::path::Path::new(file_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    match ext.as_str() {
+        // Autodesk native formats → SVF2 (best for viewing)
+        "rvt" => ("svf2", "rvt"),
+        "rfa" => ("svf2", "rfa"),
+        "rte" => ("svf2", "rte"),
+        "rft" => ("svf2", "rft"),
+        "dwg" => ("svf2", "dwg"),
+        "dxf" => ("svf2", "dxf"),
+        "dwf" => ("svf2", "dwf"),
+        "dwfx" => ("svf2", "dwfx"),
+        "ipt" => ("svf2", "ipt"),
+        "iam" => ("svf2", "iam"),
+        "ipn" => ("svf2", "ipn"),
+        "ide" => ("svf2", "ide"),
+        "nwd" => ("svf2", "nwd"),
+        "nwc" => ("svf2", "nwc"),
+        "nwf" => ("svf2", "nwf"),
+        "max" => ("svf2", "max"),
+        "3ds" => ("svf2", "3ds"),
+        // Open/exchange formats → SVF2 (most useful for viewing)
+        "ifc" => ("svf2", "ifc"),
+        "ifczip" => ("svf2", "ifczip"),
+        "stp" => ("svf2", "stp"),
+        "step" => ("svf2", "step"),
+        "ste" => ("svf2", "ste"),
+        "sat" => ("svf2", "sat"),
+        "sab" => ("svf2", "sab"),
+        "obj" => ("svf2", "obj"),
+        "stl" => ("svf2", "stl"),
+        "fbx" => ("svf2", "fbx"),
+        "gltf" => ("svf2", "gltf"),
+        "glb" => ("svf2", "glb"),
+        // Fallback
+        _ => ("svf2", ""),
+    }
+}
+
+/// Try to extract the file extension from a base64-encoded URN.
+/// APS URNs are base64url-encoded strings of the form "urn:adsk.objects:os.object:<bucket>/<key>".
+/// Returns the decoded path/filename portion if decoding succeeds.
+fn filename_from_urn(urn: &str) -> Option<String> {
+    use base64::Engine as _;
+
+    // Try base64url (no pad) first, then standard variants
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(urn)
+        .or_else(|_| base64::engine::general_purpose::URL_SAFE.decode(urn))
+        .or_else(|_| base64::engine::general_purpose::STANDARD_NO_PAD.decode(urn))
+        .or_else(|_| base64::engine::general_purpose::STANDARD.decode(urn))
+        .ok()?;
+
+    let s = std::str::from_utf8(&decoded).ok()?;
+    // The URN looks like "urn:adsk.objects:os.object:bucket/path/to/file.rvt"
+    // Extract the last path component as the filename
+    s.split('/').last().map(|f| f.to_string())
+}
+
 #[derive(Serialize, schemars::JsonSchema)]
 struct TranslationStartOutput {
     success: bool,
@@ -103,12 +169,39 @@ pub(super) async fn start_translation(
             ),
         },
         None => {
-            // Interactive mode: prompt for format
-            let formats = DerivativeOutputFormat::all();
-            let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
+            // Try to auto-detect from URN (base64-decode to get filename/extension)
+            let auto_detected = filename_from_urn(&source_urn)
+                .map(|filename| detect_output_format(&filename));
 
-            let selection = prompts::select("Select output format", &format_labels)?;
-            formats[selection]
+            if let Some((fmt, ext)) = auto_detected.filter(|(_, ext)| !ext.is_empty()) {
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Auto-detected output format: {} (from .{} extension)",
+                        "->".dimmed(),
+                        fmt.cyan(),
+                        ext
+                    );
+                } else {
+                    println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                }
+                match fmt {
+                    "svf2" => DerivativeOutputFormat::Svf2,
+                    "svf" => DerivativeOutputFormat::Svf,
+                    "obj" => DerivativeOutputFormat::Obj,
+                    "stl" => DerivativeOutputFormat::Stl,
+                    "step" => DerivativeOutputFormat::Step,
+                    "iges" => DerivativeOutputFormat::Iges,
+                    "ifc" => DerivativeOutputFormat::Ifc,
+                    _ => DerivativeOutputFormat::Svf2,
+                }
+            } else {
+                // Interactive mode: prompt for format
+                let formats = DerivativeOutputFormat::all();
+                let format_labels: Vec<String> = formats.iter().map(|f| f.to_string()).collect();
+
+                let selection = prompts::select("Select output format", &format_labels)?;
+                formats[selection]
+            }
         }
     };
 
@@ -618,7 +711,19 @@ pub(super) async fn start_serverless(
     };
     let format = match format {
         Some(f) => f,
-        None => prompts::input("Output format", Some("svf2"))?,
+        None => {
+            // Try to auto-detect from URN
+            let auto = filename_from_urn(&urn)
+                .map(|filename| detect_output_format(&filename))
+                .filter(|(_, ext)| !ext.is_empty());
+
+            if let Some((fmt, ext)) = auto {
+                println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                fmt.to_string()
+            } else {
+                prompts::input("Output format", Some("svf2"))?
+            }
+        }
     };
 
     let job = TranslateJobRequest {
