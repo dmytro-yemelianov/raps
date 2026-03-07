@@ -368,6 +368,48 @@ enum Commands {
     External(Vec<String>),
 }
 
+/// Known top-level subcommand names for fuzzy correction suggestions.
+const KNOWN_SUBCOMMANDS: &[&str] = &[
+    "auth", "bucket", "object", "translate", "init", "status", "hub", "project", "folder",
+    "item", "webhook", "da", "issue", "acc", "admin", "api", "rfi", "report", "template",
+    "reality", "inspect", "plugin", "generate", "demo", "config", "pipeline", "job",
+    "completions", "shell", "mcp", "doctor", "cache", "swarm", "schema", "man",
+];
+
+/// Compute the Levenshtein edit distance between two strings.
+fn levenshtein(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let (m, n) = (a.len(), b.len());
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
+    for i in 1..=m {
+        for j in 1..=n {
+            dp[i][j] = if a[i - 1] == b[j - 1] {
+                dp[i - 1][j - 1]
+            } else {
+                1 + dp[i - 1][j - 1].min(dp[i - 1][j]).min(dp[i][j - 1])
+            };
+        }
+    }
+    dp[m][n]
+}
+
+/// Find the closest known subcommand to `input` (Levenshtein distance ≤ 3).
+fn suggest_command(input: &str) -> Option<&'static str> {
+    KNOWN_SUBCOMMANDS
+        .iter()
+        .map(|&cmd| (cmd, levenshtein(input, cmd)))
+        .filter(|&(_, d)| d <= 3)
+        .min_by_key(|&(_, d)| d)
+        .map(|(cmd, _)| cmd)
+}
+
 /// Transform bare `help` positional args into `--help` so that
 /// `raps help auth`, `raps auth help`, and `raps auth login help` all work.
 fn transform_help_args(args: impl Iterator<Item = String>) -> Vec<String> {
@@ -469,6 +511,28 @@ async fn main() -> Result<()> {
                     print!("{}", include_str!("../logo.ansi"));
                     let _ = e.print();
                     0
+                }
+                ErrorKind::InvalidSubcommand | ErrorKind::UnknownArgument => {
+                    // Try to extract the mistyped subcommand from the error message and suggest a correction.
+                    // clap formats these as: error: unrecognized subcommand 'bukcets'
+                    let msg = e.to_string();
+                    let mistyped = msg
+                        .lines()
+                        .find(|l| {
+                            l.contains("unrecognized subcommand")
+                                || l.contains("invalid subcommand")
+                        })
+                        .and_then(|l| l.split('\'').nth(1));
+                    if let Some(word) = mistyped {
+                        if let Some(suggestion) = suggest_command(word) {
+                            eprintln!(
+                                "  {}",
+                                format!("Did you mean: raps {}?", suggestion).yellow()
+                            );
+                        }
+                    }
+                    let _ = e.print();
+                    2
                 }
                 _ => {
                     let _ = e.print();
