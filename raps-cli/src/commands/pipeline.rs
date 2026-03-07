@@ -96,6 +96,19 @@ pub enum PipelineCommands {
         #[arg(long = "out-file", default_value = ".pipeline.yaml")]
         out_file: PathBuf,
     },
+
+    /// Show semantic diff between two pipeline YAML/JSON files
+    Diff {
+        /// First pipeline file
+        file1: PathBuf,
+
+        /// Second pipeline file
+        file2: PathBuf,
+
+        /// Output format (table or json)
+        #[arg(short, long, default_value = "table")]
+        output: String,
+    },
 }
 
 /// Pipeline definition
@@ -338,6 +351,14 @@ impl PipelineCommands {
                 &out_file,
                 output_format,
             ),
+            PipelineCommands::Diff {
+                file1,
+                file2,
+                output,
+            } => {
+                let fmt = output.parse::<OutputFormat>().unwrap_or(OutputFormat::Table);
+                diff_pipelines(&file1, &file2, fmt).await
+            }
         }
     }
 }
@@ -2239,6 +2260,184 @@ fn create_pipeline(
         }
         _ => {
             output_format.write(&pipeline)?;
+        }
+    }
+
+    Ok(())
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Pipeline diff
+// ───────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+struct StepDiffEntry {
+    name: String,
+    change: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+struct PipelineDiffOutput {
+    file1: String,
+    file2: String,
+    added: Vec<StepDiffEntry>,
+    removed: Vec<StepDiffEntry>,
+    changed: Vec<StepDiffEntry>,
+    reordered: bool,
+    identical: bool,
+}
+
+async fn diff_pipelines(file1: &PathBuf, file2: &PathBuf, output_format: OutputFormat) -> Result<()> {
+    let p1 = load_pipeline(file1).await?;
+    let p2 = load_pipeline(file2).await?;
+
+    let names1: Vec<&str> = p1.steps.iter().map(|s| s.name.as_str()).collect();
+    let names2: Vec<&str> = p2.steps.iter().map(|s| s.name.as_str()).collect();
+
+    let set1: std::collections::HashSet<&str> = names1.iter().copied().collect();
+    let set2: std::collections::HashSet<&str> = names2.iter().copied().collect();
+
+    let mut added: Vec<StepDiffEntry> = set2
+        .difference(&set1)
+        .map(|n| StepDiffEntry {
+            name: n.to_string(),
+            change: "added".to_string(),
+            details: None,
+        })
+        .collect();
+    added.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut removed: Vec<StepDiffEntry> = set1
+        .difference(&set2)
+        .map(|n| StepDiffEntry {
+            name: n.to_string(),
+            change: "removed".to_string(),
+            details: None,
+        })
+        .collect();
+    removed.sort_by(|a, b| a.name.cmp(&b.name));
+
+    let mut changed: Vec<StepDiffEntry> = Vec::new();
+    let map1: HashMap<&str, &Step> = p1.steps.iter().map(|s| (s.name.as_str(), s)).collect();
+    let map2: HashMap<&str, &Step> = p2.steps.iter().map(|s| (s.name.as_str(), s)).collect();
+
+    for name in set1.intersection(&set2) {
+        let s1 = map1[name];
+        let s2 = map2[name];
+        let mut diffs = Vec::new();
+        if s1.command != s2.command {
+            diffs.push(format!(
+                "command: {:?} -> {:?}",
+                s1.command.as_deref().unwrap_or(""),
+                s2.command.as_deref().unwrap_or("")
+            ));
+        }
+        if s1.depends_on != s2.depends_on {
+            diffs.push(format!(
+                "depends_on: {:?} -> {:?}",
+                s1.depends_on,
+                s2.depends_on
+            ));
+        }
+        if s1.if_expr != s2.if_expr {
+            diffs.push(format!(
+                "condition: {:?} -> {:?}",
+                s1.if_expr.as_deref().unwrap_or(""),
+                s2.if_expr.as_deref().unwrap_or("")
+            ));
+        }
+        if !diffs.is_empty() {
+            changed.push(StepDiffEntry {
+                name: name.to_string(),
+                change: "changed".to_string(),
+                details: Some(diffs),
+            });
+        }
+    }
+    changed.sort_by(|a, b| a.name.cmp(&b.name));
+
+    // Check for reordering among common steps
+    let common_order1: Vec<&str> = names1.iter().copied().filter(|n| set2.contains(n)).collect();
+    let common_order2: Vec<&str> = names2.iter().copied().filter(|n| set1.contains(n)).collect();
+    let reordered = common_order1 != common_order2;
+
+    let identical = added.is_empty() && removed.is_empty() && changed.is_empty() && !reordered;
+
+    let diff = PipelineDiffOutput {
+        file1: file1.display().to_string(),
+        file2: file2.display().to_string(),
+        added,
+        removed,
+        changed,
+        reordered,
+        identical,
+    };
+
+    match output_format {
+        OutputFormat::Table => {
+            println!(
+                "\n{} {} vs {}",
+                "Pipeline Diff:".bold(),
+                file1.display().to_string().cyan(),
+                file2.display().to_string().cyan()
+            );
+            println!("{}", "─".repeat(70));
+
+            if diff.identical {
+                println!("{} Pipelines are identical.", "\u{2713}".green().bold());
+                return Ok(());
+            }
+
+            for entry in &diff.added {
+                println!(
+                    "  {} {} {}",
+                    "+".green().bold(),
+                    entry.name.green(),
+                    "(added)".dimmed()
+                );
+            }
+            for entry in &diff.removed {
+                println!(
+                    "  {} {} {}",
+                    "-".red().bold(),
+                    entry.name.red(),
+                    "(removed)".dimmed()
+                );
+            }
+            for entry in &diff.changed {
+                println!(
+                    "  {} {} {}",
+                    "~".yellow().bold(),
+                    entry.name.yellow(),
+                    "(changed)".dimmed()
+                );
+                if let Some(ref details) = entry.details {
+                    for d in details {
+                        println!("      {} {}", "↳".dimmed(), d.dimmed());
+                    }
+                }
+            }
+            if diff.reordered {
+                println!(
+                    "  {} {}",
+                    "⇄".yellow().bold(),
+                    "Steps have been reordered".yellow()
+                );
+            }
+
+            println!("{}", "─".repeat(70));
+            println!(
+                "  {} added, {} removed, {} changed{}",
+                diff.added.len().to_string().green(),
+                diff.removed.len().to_string().red(),
+                diff.changed.len().to_string().yellow(),
+                if diff.reordered { ", reordered" } else { "" }
+            );
+        }
+        _ => {
+            output_format.write(&diff)?;
         }
     }
 

@@ -1495,7 +1495,11 @@ async fn execute_command(
         Commands::Acc(cmd) => {
             let auth_client = get_auth_client();
             let acc_client = AccClient::new(config.clone(), auth_client);
-            cmd.execute(&acc_client, output_format).await?;
+            let issues_client_for_acc = get_issues_client();
+            let rfi_client_for_acc =
+                RfiClient::new_with_http_config(config.clone(), get_auth_client(), http_config.clone())
+                    .expect("HTTP client configuration was validated at startup");
+            cmd.execute(&acc_client, &issues_client_for_acc, &rfi_client_for_acc, output_format).await?;
         }
 
         Commands::Admin(cmd) => {
