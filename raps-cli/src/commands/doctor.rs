@@ -544,8 +544,39 @@ fn check_keyring() -> CheckResult {
     }
 }
 
+fn detect_credential_conflicts(env_creds_set: bool, profile_active: bool) -> Vec<String> {
+    let mut conflicts = Vec::new();
+    if env_creds_set && profile_active {
+        conflicts.push(
+            "APS_CLIENT_ID/APS_CLIENT_SECRET env vars are set AND an active profile is configured — \
+             env vars take precedence; profile credentials are silently ignored".to_string(),
+        );
+    }
+    conflicts
+}
+
 fn check_env_conflicts() -> CheckResult {
-    check("Env Conflicts", Status::Warn, "not implemented yet")
+    let env_creds_set = std::env::var("APS_CLIENT_ID").is_ok()
+        || std::env::var("APS_CLIENT_SECRET").is_ok();
+
+    let profile_active = raps_kernel::config::load_profiles()
+        .ok()
+        .and_then(|pd| pd.active_profile)
+        .is_some();
+
+    let conflicts = detect_credential_conflicts(env_creds_set, profile_active);
+
+    if conflicts.is_empty() {
+        if env_creds_set {
+            check("Env Conflicts", Status::Pass, "Using env var credentials (no profile active)")
+        } else if profile_active {
+            check("Env Conflicts", Status::Pass, "Using active profile credentials (no env override)")
+        } else {
+            check("Env Conflicts", Status::Pass, "No credential sources active")
+        }
+    } else {
+        check("Env Conflicts", Status::Warn, &conflicts.join("; "))
+    }
 }
 
 async fn check_version_staleness() -> CheckResult {
@@ -701,5 +732,27 @@ mod tests {
         let result = classify_keyring_error(&err);
         assert_eq!(result.status, "fail");
         assert!(result.message.contains("may prompt") || result.message.contains("unlock") || result.message.contains("access"));
+    }
+
+    #[test]
+    fn test_detect_no_conflict_when_only_env_set() {
+        let conflicts = detect_credential_conflicts(
+            true,  // env vars set
+            false, // no active profile
+        );
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_no_conflict_when_only_profile_set() {
+        let conflicts = detect_credential_conflicts(false, true);
+        assert!(conflicts.is_empty());
+    }
+
+    #[test]
+    fn test_detect_conflict_when_both_set() {
+        let conflicts = detect_credential_conflicts(true, true);
+        assert!(!conflicts.is_empty());
+        assert!(conflicts[0].contains("APS_CLIENT_ID") || conflicts[0].contains("profile"));
     }
 }
