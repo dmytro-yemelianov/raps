@@ -48,7 +48,7 @@ pub(super) async fn issues_summary(
     );
 
     let issues_client =
-        IssuesClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config);
+        IssuesClient::new_with_http_config(config.clone(), auth_client.clone(), ctx.http_config)?;
 
     let mut summaries = Vec::new();
 

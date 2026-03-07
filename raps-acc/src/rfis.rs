@@ -169,23 +169,26 @@ impl RfiClient {
     /// Create a new RFI client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create a new RFI client with custom HTTP config
+    /// Create a new RFI client with custom HTTP config.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .context("Failed to initialise HTTP client for RFIs")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
-        }
+        })
     }
 
     /// List RFIs in a project

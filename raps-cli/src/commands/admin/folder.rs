@@ -88,13 +88,13 @@ impl FolderCommands {
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                );
+                )?;
                 let permissions_client = Arc::new(
                     raps_acc::permissions::FolderPermissionsClient::new_with_http_config(
                         config.clone(),
                         auth_client.clone(),
                         http_config,
-                    ),
+                    )?,
                 );
 
                 let progress_bar = create_bulk_progress_bar(output_format);

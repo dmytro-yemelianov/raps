@@ -344,7 +344,7 @@ pub(super) async fn prepare_report(
         config.clone(),
         auth_client.clone(),
         http_config.clone(),
-    );
+    )?;
 
     let all_projects = admin_client.list_all_projects(&account_id).await?;
     let filtered_projects = project_filter.apply(all_projects);
