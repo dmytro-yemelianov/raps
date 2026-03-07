@@ -8,7 +8,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use colored::Colorize;
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
 use raps_acc::admin::AccountAdminClient;
@@ -473,18 +472,10 @@ pub(crate) async fn execute_csv_import(
 
     // Show spinner during concurrent import (up to 10 parallel requests)
     let spinner = if output_format.supports_colors() {
-        let sp = ProgressBar::new_spinner();
-        sp.set_style(
-            ProgressStyle::with_template("{spinner:.cyan} {msg}")
-                .expect("hardcoded progress template is valid")
-                .tick_strings(&[
-                    "\u{280B}", "\u{2819}", "\u{2839}", "\u{2838}", "\u{283C}", "\u{2834}",
-                    "\u{2826}", "\u{2827}", "\u{2807}", "\u{280F}",
-                ]),
-        );
-        sp.set_message(format!("Importing {} users concurrently...", total));
-        sp.enable_steady_tick(std::time::Duration::from_millis(100));
-        Some(sp)
+        Some(raps_kernel::progress::spinner(&format!(
+            "Importing {} users concurrently...",
+            total
+        )))
     } else {
         None
     };

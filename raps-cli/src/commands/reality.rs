@@ -9,7 +9,6 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 use dialoguer::{Input, Select};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -381,13 +380,7 @@ async fn check_status(
     _output_format: OutputFormat,
 ) -> Result<()> {
     if wait {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .expect("valid progress template"),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
+        let spinner = raps_kernel::progress::spinner("");
 
         // 4-hour timeout — photogrammetry processing can legitimately take hours
         let timeout = Duration::from_secs(4 * 60 * 60);

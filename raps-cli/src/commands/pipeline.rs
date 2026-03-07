@@ -301,7 +301,6 @@ impl PipelineCommands {
                 dry_run,
                 var,
                 max_parallel,
-            } => run_pipeline(&file, ignore_failure, dry_run, var, max_parallel, output_format).await,
                 resume,
                 reset,
                 reset_from,
@@ -311,6 +310,7 @@ impl PipelineCommands {
                     ignore_failure,
                     dry_run,
                     var,
+                    max_parallel,
                     output_format,
                     resume,
                     reset,
@@ -917,52 +917,20 @@ async fn run_pipeline(
                     println!("  {} parallel steps", "⫸".dimmed());
                 } else if step.for_each.is_some() {
                     println!("  {} for-each loop", "⟳".dimmed());
-        // Skip already-completed steps when resuming
-        if state.is_completed(&step.name) {
-            if output_format.supports_colors() {
-                println!(
-                    "  {} {} (skipped — already completed)",
-                    "✓".green().dimmed(),
-                    step.name.dimmed()
-                );
-            }
-            skipped += 1;
-            continue;
-        }
-
-        let outcome = execute_step(
-            step.clone(),
-            pipeline.variables.clone(),
-            context.clone(),
-            pipeline.defaults.clone(),
-            output_format,
-            dry_run,
-        )
-        .await?;
-
-        match outcome {
-            StepOutcome::Success(code) => {
-                if output_format.supports_colors() {
-                    println!("  {} Success", "✓".green().bold());
                 }
-                state.mark(&step.name, StepRunStatus::Completed, Some(code));
-                state.save(&canonical_file);
-                passed += 1;
             }
-            StepOutcome::Failed(code) => {
+
+            // Skip already-completed steps when resuming
+            if state.is_completed(&step.name) {
                 if output_format.supports_colors() {
-                    println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
-                }
-                state.mark(&step.name, StepRunStatus::Failed, Some(code));
-                state.save(&canonical_file);
-                failed += 1;
-                if !step.ignore_failure && !global_ignore_failure {
-                    anyhow::bail!(
-                        "Pipeline aborted at step '{}' (exit code: {})",
-                        step.name,
-                        code
+                    println!(
+                        "  {} {} (skipped — already completed)",
+                        "✓".green().dimmed(),
+                        step.name.dimmed()
                     );
                 }
+                skipped += 1;
+                continue;
             }
 
             let outcome = execute_step(
@@ -976,16 +944,20 @@ async fn run_pipeline(
             .await?;
 
             match outcome {
-                StepOutcome::Success(_) => {
+                StepOutcome::Success(code) => {
                     if output_format.supports_colors() {
                         println!("  {} Success", "✓".green().bold());
                     }
+                    state.mark(&step.name, StepRunStatus::Completed, Some(code));
+                    state.save(&canonical_file);
                     passed += 1;
                 }
                 StepOutcome::Failed(code) => {
                     if output_format.supports_colors() {
                         println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
                     }
+                    state.mark(&step.name, StepRunStatus::Failed, Some(code));
+                    state.save(&canonical_file);
                     failed += 1;
                     if !step.ignore_failure && !global_ignore_failure {
                         anyhow::bail!(
@@ -999,6 +971,8 @@ async fn run_pipeline(
                     if output_format.supports_colors() {
                         println!("  {} Skipped (condition not met)", "○".dimmed());
                     }
+                    state.mark(&step.name, StepRunStatus::Skipped, None);
+                    state.save(&canonical_file);
                     skipped += 1;
                 }
             }
@@ -1087,9 +1061,6 @@ async fn run_pipeline(
                     Ok(Err(e)) => return Err(e),
                     Err(e) => anyhow::bail!("Parallel step task panicked: {}", e),
                 }
-                state.mark(&step.name, StepRunStatus::Skipped, None);
-                state.save(&canonical_file);
-                skipped += 1;
             }
         }
     }
