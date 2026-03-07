@@ -56,7 +56,7 @@ pub mod test_utils;
 
 // Re-export commonly used types
 pub use auth::AuthClient;
-pub use config::{Config, ContextConfig};
+pub use config::{Config, ContextConfig, RapsProject, find_project_profile};
 pub use error::ExitCode;
 pub use http::HttpClientConfig;
 pub use output::OutputFormat;

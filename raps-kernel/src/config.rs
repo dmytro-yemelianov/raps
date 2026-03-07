@@ -163,10 +163,16 @@ impl Config {
     }
 
     /// Load profile data from disk
+    ///
+    /// Resolution order:
+    /// 1. `.raps-project` file in the current directory (or any parent directory)
+    /// 2. `active_profile` stored in `profiles.json`
     fn load_profile_data() -> Result<(String, ProfileConfig)> {
         let data = load_profiles()?;
-        let profile_name = data
-            .active_profile
+
+        // Project-local profile takes precedence over the globally active profile
+        let profile_name = find_project_profile()
+            .or(data.active_profile)
             .ok_or_else(|| anyhow::anyhow!("No active profile"))?;
 
         let profile = data
@@ -285,6 +291,44 @@ impl Config {
     /// Get the AEC Data Model GraphQL API endpoint
     pub fn aec_graphql_url(&self) -> String {
         format!("{}/aec/graphql", self.base_url)
+    }
+}
+
+/// Represents a `.raps-project` file that pins a profile for the current project directory.
+#[derive(serde::Deserialize, Default)]
+pub struct RapsProject {
+    /// Profile name to use for this project
+    pub profile: Option<String>,
+    /// Optional project description
+    pub description: Option<String>,
+}
+
+/// Walk up from the current directory looking for a `.raps-project` file.
+///
+/// Returns the `profile` field from the first file found, or `None` if no file
+/// is found or the file does not specify a profile.
+pub fn find_project_profile() -> Option<String> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        let candidate = dir.join(".raps-project");
+        if candidate.exists() {
+            let content = std::fs::read_to_string(&candidate).ok()?;
+            // Try TOML first, then JSON
+            let project: RapsProject = toml::from_str(&content)
+                .or_else(|_| serde_json::from_str::<RapsProject>(&content))
+                .ok()?;
+            if project.profile.is_some() {
+                tracing::debug!(
+                    profile = ?project.profile,
+                    path = %candidate.display(),
+                    "auto-selected profile from .raps-project"
+                );
+            }
+            return project.profile;
+        }
+        if !dir.pop() {
+            return None;
+        }
     }
 }
 
