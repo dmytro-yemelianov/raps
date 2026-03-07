@@ -120,7 +120,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "regist
 tracing-appender = "0.2"
 
 # TUI dashboard
-ratatui = "0.29"
+ratatui = "0.30"
 crossterm = "0.28"
 
 # Interactive shell
