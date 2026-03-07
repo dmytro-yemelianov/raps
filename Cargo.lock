@@ -2496,6 +2496,7 @@ dependencies = [
  "sha1",
  "sha2",
  "shlex",
+ "similar",
  "tempfile",
  "tokio",
  "tokio-util",

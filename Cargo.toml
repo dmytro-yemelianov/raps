@@ -135,6 +135,9 @@ sha2 = "0.10"
 hmac = "0.12"
 hex = "0.4"
 
+# Text diffing (unified diff output)
+similar = "2"
+
 # Semantic versioning
 semver = { version = "1.0", features = ["serde"] }
 
