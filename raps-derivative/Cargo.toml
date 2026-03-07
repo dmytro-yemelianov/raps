@@ -40,6 +40,12 @@ tracing.workspace = true
 # Base64 encoding for URNs
 base64.workspace = true
 
+# Platform cache directory resolution (for translation_cache)
+directories.workspace = true
+
+# Timestamps for translation cache entries
+chrono.workspace = true
+
 [dev-dependencies]
 raps-kernel = { workspace = true, features = ["test-utils"] }
 raps-mock.workspace = true
