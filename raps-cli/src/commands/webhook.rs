@@ -120,6 +120,13 @@ pub enum WebhookCommands {
         relay_url: Option<String>,
     },
 
+    /// Show health status of all registered webhooks
+    Status {
+        /// Check if callback URLs are reachable (makes HEAD request to each URL)
+        #[arg(long)]
+        check_reachability: bool,
+    },
+
     /// Drain stored events from the Cloudflare Worker gateway
     Drain {
         /// Gateway URL (or RAPS_GATEWAY_URL env)
@@ -198,6 +205,9 @@ impl WebhookCommands {
                     output_format,
                 )
                 .await
+            }
+            WebhookCommands::Status { check_reachability } => {
+                webhook_status(client, check_reachability, output_format).await
             }
             WebhookCommands::Drain {
                 gateway_url,
@@ -926,6 +936,148 @@ async fn webhook_drain(
             _ => {
                 output_format.write(&body)?;
             }
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Status (health monitoring)
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, schemars::JsonSchema)]
+struct WebhookStatusOutput {
+    hook_id: String,
+    event: String,
+    system: String,
+    callback_url: String,
+    status: String,
+    created_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reachable: Option<bool>,
+}
+
+async fn webhook_status(
+    client: &WebhooksClient,
+    check_reachability: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let webhooks = tracked_op("Fetching webhooks", output_format, || async {
+        client
+            .list_all_webhooks()
+            .await
+            .context("Failed to list webhooks. Check your authentication with 'raps auth test'")
+    })
+    .await?;
+
+    if webhooks.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No webhooks registered.".yellow()),
+            _ => output_format.write(&Vec::<WebhookStatusOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    let http_client = reqwest::Client::new();
+
+    let mut outputs: Vec<WebhookStatusOutput> = Vec::with_capacity(webhooks.len());
+    for w in &webhooks {
+        let reachable = if check_reachability {
+            let result = http_client
+                .head(&w.callback_url)
+                .timeout(std::time::Duration::from_secs(5))
+                .send()
+                .await;
+            Some(result.is_ok())
+        } else {
+            None
+        };
+
+        outputs.push(WebhookStatusOutput {
+            hook_id: w.hook_id.clone(),
+            event: w.event.clone(),
+            system: w.system.clone(),
+            callback_url: w.callback_url.clone(),
+            status: w.status.clone(),
+            created_date: w.created_date.clone(),
+            reachable,
+        });
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            let col_width = if check_reachability { 110 } else { 95 };
+            println!("\n{}", "Webhook Health Status:".bold());
+            println!("{}", "-".repeat(col_width));
+
+            let reach_header = if check_reachability { "  Reachable" } else { "" };
+            println!(
+                "{:<12} {:<25} {:<10} {:<35} {:<20}{}",
+                "APS Status".bold(),
+                "Event".bold(),
+                "System".bold(),
+                "Callback URL".bold(),
+                "Created".bold(),
+                reach_header.bold(),
+            );
+            println!("{}", "-".repeat(col_width));
+
+            for out in &outputs {
+                let status_col = if out.status == "active" {
+                    out.status.to_string().green().to_string()
+                } else {
+                    out.status.to_string().red().to_string()
+                };
+
+                let url = truncate_str(&out.callback_url, 35);
+                let created = out
+                    .created_date
+                    .as_deref()
+                    .unwrap_or("-")
+                    .chars()
+                    .take(20)
+                    .collect::<String>();
+
+                let reach_col = match out.reachable {
+                    Some(true) => "  \u{2713} reachable".green().to_string(),
+                    Some(false) => "  \u{2717} unreachable".red().to_string(),
+                    None => String::new(),
+                };
+
+                println!(
+                    "{:<12} {:<25} {:<10} {:<35} {:<20}{}",
+                    status_col,
+                    out.event.cyan(),
+                    out.system,
+                    url,
+                    created,
+                    reach_col,
+                );
+            }
+
+            println!("{}", "-".repeat(col_width));
+
+            let active_count = outputs.iter().filter(|o| o.status == "active").count();
+            let total = outputs.len();
+            println!(
+                "\n{} {} of {} webhook(s) active.",
+                "Summary:".bold(),
+                active_count,
+                total
+            );
+
+            if check_reachability {
+                let reachable_count =
+                    outputs.iter().filter(|o| o.reachable == Some(true)).count();
+                println!(
+                    "         {} of {} callback URL(s) reachable.",
+                    reachable_count, total
+                );
+            }
+        }
+        _ => {
+            output_format.write(&outputs)?;
         }
     }
 
