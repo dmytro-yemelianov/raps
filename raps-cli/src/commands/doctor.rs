@@ -391,8 +391,74 @@ fn check_config_permissions() -> CheckResult {
     }
 }
 
+fn is_valid_uuid(s: &str) -> bool {
+    let re = regex::Regex::new(
+        r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    ).expect("valid UUID regex");
+    re.is_match(s)
+}
+
+/// Returns a list of human-readable issue descriptions, empty if all valid.
+fn validate_context_vars(
+    account_id: Option<&str>,
+    hub_id: Option<&str>,
+    project_id: Option<&str>,
+) -> Vec<String> {
+    let mut issues = Vec::new();
+
+    if let Some(id) = account_id {
+        if !is_valid_uuid(id) {
+            issues.push(format!("APS_ACCOUNT_ID '{}' is not a valid UUID", id));
+        }
+    }
+
+    if let Some(id) = hub_id {
+        // Hub IDs may have a "b." prefix followed by a UUID, or be a plain UUID
+        let bare = id.strip_prefix("b.").unwrap_or(id);
+        if bare.is_empty() || (!is_valid_uuid(bare) && !is_valid_uuid(id)) {
+            issues.push(format!("APS_HUB_ID '{}' does not look like a valid hub ID (expected UUID or b.<uuid>)", id));
+        }
+    }
+
+    if let Some(id) = project_id {
+        // Project IDs may have "b." prefix
+        let bare = id.strip_prefix("b.").unwrap_or(id);
+        if !is_valid_uuid(bare) {
+            issues.push(format!("APS_PROJECT_ID '{}' is not a valid project ID (expected UUID or b.<uuid>)", id));
+        }
+    }
+
+    issues
+}
+
 fn check_context_var_formats() -> CheckResult {
-    check("Context Vars", Status::Warn, "not implemented yet")
+    let account_id = std::env::var("APS_ACCOUNT_ID").ok();
+    let hub_id = std::env::var("APS_HUB_ID").ok();
+    let project_id = std::env::var("APS_PROJECT_ID").ok();
+
+    if account_id.is_none() && hub_id.is_none() && project_id.is_none() {
+        return check("Context Vars", Status::Pass, "No context variables set");
+    }
+
+    let issues = validate_context_vars(
+        account_id.as_deref(),
+        hub_id.as_deref(),
+        project_id.as_deref(),
+    );
+
+    if issues.is_empty() {
+        let set: Vec<&str> = [
+            account_id.as_ref().map(|_| "APS_ACCOUNT_ID"),
+            hub_id.as_ref().map(|_| "APS_HUB_ID"),
+            project_id.as_ref().map(|_| "APS_PROJECT_ID"),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        check("Context Vars", Status::Pass, &format!("{} set and valid", set.join(", ")))
+    } else {
+        check("Context Vars", Status::Fail, &issues.join("; "))
+    }
 }
 
 fn check_disk_space() -> CheckResult {
@@ -487,5 +553,41 @@ mod tests {
         std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o600)).unwrap();
         let result = check_config_file_permissions(tmp.path());
         assert_eq!(result.status, "pass");
+    }
+
+    #[test]
+    fn test_is_valid_uuid_accepts_valid() {
+        assert!(is_valid_uuid("01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"));
+        assert!(is_valid_uuid("00000000-0000-0000-0000-000000000000"));
+    }
+
+    #[test]
+    fn test_is_valid_uuid_rejects_invalid() {
+        assert!(!is_valid_uuid("not-a-uuid"));
+        assert!(!is_valid_uuid("01fb1602-2ec0-4b05-bf6e")); // too short
+        assert!(!is_valid_uuid(""));
+    }
+
+    #[test]
+    fn test_context_var_check_no_vars_set_passes() {
+        let issues = validate_context_vars(None, None, None);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_context_var_check_invalid_uuid_fails() {
+        let issues = validate_context_vars(Some("not-a-uuid"), None, None);
+        assert!(!issues.is_empty());
+        assert!(issues[0].contains("APS_ACCOUNT_ID"));
+    }
+
+    #[test]
+    fn test_context_var_check_valid_uuid_passes() {
+        let issues = validate_context_vars(
+            Some("01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"),
+            None,
+            None,
+        );
+        assert!(issues.is_empty());
     }
 }

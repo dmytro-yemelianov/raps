@@ -97,6 +97,9 @@ directories.workspace = true
 # Disk space queries
 fs2.workspace = true
 
+# Regular expressions (UUID validation in doctor)
+regex.workspace = true
+
 # Random number generation
 rand.workspace = true
 
