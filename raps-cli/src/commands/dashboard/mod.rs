@@ -891,38 +891,38 @@ impl App {
 // ============================================================================
 
 pub async fn run_dashboard(config: Config, http_config: HttpClientConfig) -> Result<()> {
-    let auth = AuthClient::new_with_http_config(config.clone(), http_config.clone());
+    let auth = AuthClient::new_with_http_config(config.clone(), http_config.clone())?;
     let clients = Arc::new(Clients {
         auth: auth.clone(),
-        oss: OssClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone()),
+        oss: OssClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone())?,
         dm: DataManagementClient::new_with_http_config(
             config.clone(),
             auth.clone(),
             http_config.clone(),
-        ),
+        )?,
         issues: IssuesClient::new_with_http_config(
             config.clone(),
             auth.clone(),
             http_config.clone(),
-        ),
-        rfi: RfiClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone()),
+        )?,
+        rfi: RfiClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone())?,
         da: DesignAutomationClient::new_with_http_config(
             config.clone(),
             auth.clone(),
             http_config.clone(),
-        ),
-        acc: AccClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone()),
+        )?,
+        acc: AccClient::new_with_http_config(config.clone(), auth.clone(), http_config.clone())?,
         derivative: DerivativeClient::new_with_http_config(
             config.clone(),
             auth.clone(),
             http_config.clone(),
-        ),
+        )?,
         webhooks: WebhooksClient::new_with_http_config(
             config.clone(),
             auth.clone(),
             http_config.clone(),
-        ),
-        reality: RealityCaptureClient::new_with_http_config(config, auth, http_config),
+        )?,
+        reality: RealityCaptureClient::new_with_http_config(config, auth, http_config)?,
     });
 
     // Guard restores terminal on both normal exit and panic

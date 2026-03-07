@@ -19,6 +19,7 @@ pub use types::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use anyhow::Context;
 use crate::config::Config;
 use crate::http::HttpClientConfig;
 use types::{CachedToken, TokenCache};
@@ -40,20 +41,25 @@ impl AuthClient {
     /// Create a new authentication client
     pub fn new(config: Config) -> Self {
         Self::new_with_http_config(config, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create a new authentication client with custom HTTP config
-    pub fn new_with_http_config(config: Config, http_config: HttpClientConfig) -> Self {
+    /// Create a new authentication client with custom HTTP config.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
+    pub fn new_with_http_config(
+        config: Config,
+        http_config: HttpClientConfig,
+    ) -> anyhow::Result<Self> {
         // Try to load stored 3-legged token synchronously
         let stored_token = Self::load_stored_token_static(&config);
 
-        // Create HTTP client with configured timeouts
-        let http_client = http_config.create_client().unwrap_or_else(|e| {
-            tracing::warn!("HTTP client configuration failed, using defaults: {e}");
-            reqwest::Client::new()
-        });
+        // Create HTTP client — propagate errors instead of silently falling back.
+        let http_client = http_config
+            .create_client()
+            .context("Failed to initialise HTTP client for authentication")?;
 
-        Self {
+        Ok(Self {
             config,
             http_client,
             cached_2leg_token: Arc::new(RwLock::new(None)),
@@ -62,7 +68,7 @@ impl AuthClient {
                 refreshing: false,
             })),
             token_refresh_notify: Arc::new(tokio::sync::Notify::new()),
-        }
+        })
     }
 
     /// Get config reference

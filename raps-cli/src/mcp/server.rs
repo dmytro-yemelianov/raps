@@ -98,10 +98,13 @@ impl RapsServer {
 
         let mut guard = self.auth_client.write().await;
         if guard.is_none() {
-            *guard = Some(AuthClient::new_with_http_config(
-                (*self.config).clone(),
-                self.http_config.clone(),
-            ));
+            *guard = Some(
+                AuthClient::new_with_http_config(
+                    (*self.config).clone(),
+                    self.http_config.clone(),
+                )
+                .expect("HTTP client configuration was validated at startup"),
+            );
         }
         guard
             .as_ref()
@@ -117,11 +120,14 @@ impl RapsServer {
         let auth = self.get_auth_client().await;
         let mut guard = self.oss_client.write().await;
         if guard.is_none() {
-            *guard = Some(OssClient::new_with_http_config(
-                (*self.config).clone(),
-                auth,
-                self.http_config.clone(),
-            ));
+            *guard = Some(
+                OssClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+                .expect("HTTP client configuration was validated at startup"),
+            );
         }
         guard
             .as_ref()
@@ -137,11 +143,14 @@ impl RapsServer {
         let auth = self.get_auth_client().await;
         let mut guard = self.derivative_client.write().await;
         if guard.is_none() {
-            *guard = Some(DerivativeClient::new_with_http_config(
-                (*self.config).clone(),
-                auth,
-                self.http_config.clone(),
-            ));
+            *guard = Some(
+                DerivativeClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+                .expect("HTTP client configuration was validated at startup"),
+            );
         }
         guard
             .as_ref()
@@ -157,11 +166,14 @@ impl RapsServer {
         let auth = self.get_auth_client().await;
         let mut guard = self.dm_client.write().await;
         if guard.is_none() {
-            *guard = Some(DataManagementClient::new_with_http_config(
-                (*self.config).clone(),
-                auth,
-                self.http_config.clone(),
-            ));
+            *guard = Some(
+                DataManagementClient::new_with_http_config(
+                    (*self.config).clone(),
+                    auth,
+                    self.http_config.clone(),
+                )
+                .expect("HTTP client configuration was validated at startup"),
+            );
         }
         guard
             .as_ref()
@@ -178,6 +190,7 @@ impl RapsServer {
             auth,
             self.http_config.clone(),
         )
+        .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_users_client(&self) -> ProjectUsersClient {
@@ -187,21 +200,25 @@ impl RapsServer {
             auth,
             self.http_config.clone(),
         )
+        .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_issues_client(&self) -> IssuesClient {
         let auth = self.get_auth_client().await;
         IssuesClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_rfi_client(&self) -> RfiClient {
         let auth = self.get_auth_client().await;
         RfiClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_acc_client(&self) -> AccClient {
         let auth = self.get_auth_client().await;
         AccClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_permissions_client(&self) -> FolderPermissionsClient {
@@ -211,11 +228,13 @@ impl RapsServer {
             auth,
             self.http_config.clone(),
         )
+        .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_webhooks_client(&self) -> WebhooksClient {
         let auth = self.get_auth_client().await;
         WebhooksClient::new_with_http_config((*self.config).clone(), auth, self.http_config.clone())
+            .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_da_client(&self) -> DesignAutomationClient {
@@ -225,6 +244,7 @@ impl RapsServer {
             auth,
             self.http_config.clone(),
         )
+        .expect("HTTP client configuration was validated at startup")
     }
 
     pub(crate) async fn get_reality_client(&self) -> RealityCaptureClient {
@@ -234,6 +254,7 @@ impl RapsServer {
             auth,
             self.http_config.clone(),
         )
+        .expect("HTTP client configuration was validated at startup")
     }
 
     // ========================================================================

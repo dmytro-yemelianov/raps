@@ -139,7 +139,7 @@ pub(crate) async fn execute_csv_update(
         config.clone(),
         auth_client.clone(),
         http_config.clone(),
-    );
+    )?;
 
     let project_filter = parse_filter_with_ids(&filter, &project_ids)?;
 
@@ -242,7 +242,7 @@ pub(crate) async fn execute_csv_update(
                     config.clone(),
                     auth_client.clone(),
                     http_config.clone(),
-                ));
+                )?);
 
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
@@ -483,7 +483,7 @@ pub(crate) async fn execute_csv_import(
     // Create users client and call import_users (concurrent with semaphore)
     let http_config = HttpClientConfig::default();
     let users_client =
-        ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config);
+        ProjectUsersClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
 
     let result = users_client.import_users(project_id, users).await?;
 
