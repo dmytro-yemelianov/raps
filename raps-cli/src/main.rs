@@ -363,6 +363,22 @@ enum Commands {
         output_dir: Option<std::path::PathBuf>,
     },
 
+    /// Show recent command history
+    History {
+        /// Number of recent entries to show
+        #[arg(long, short = 'n', value_name = "N", default_value = "20")]
+        last: usize,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Re-run a command from history by its index
+    Replay {
+        /// 1-based index from `raps history`
+        index: usize,
+    },
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -455,6 +471,16 @@ mod help_transform_tests {
 #[tokio::main]
 async fn main() -> Result<()> {
     raps_kernel::profiler::init();
+
+    // Record this invocation to history (skip history/replay themselves)
+    let raw_args: Vec<String> = std::env::args().collect();
+    let skip_record = raw_args
+        .get(1)
+        .map(|s| s == "history" || s == "replay")
+        .unwrap_or(false);
+    if !skip_record {
+        record_history(&raw_args);
+    }
 
     // Handle clap errors (invalid arguments) - clap already exits with code 2
     let cli = match Cli::try_parse_from(transform_help_args(std::env::args())) {
@@ -973,6 +999,154 @@ async fn run_piped_stdin(
     Ok(())
 }
 
+// ── History helpers ──────────────────────────────────────────────────────────
+
+/// Returns the path to the history file, creating parent dirs if needed.
+fn history_path() -> Option<std::path::PathBuf> {
+    let dirs = directories::ProjectDirs::from("xyz", "rapscli", "raps")?;
+    let cache = dirs.cache_dir().to_path_buf();
+    std::fs::create_dir_all(&cache).ok()?;
+    Some(cache.join("history.json"))
+}
+
+/// Loads existing history entries from disk.
+fn load_history() -> Vec<serde_json::Value> {
+    let path = match history_path() {
+        Some(p) => p,
+        None => return vec![],
+    };
+    let data = match std::fs::read_to_string(&path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
+    serde_json::from_str::<Vec<serde_json::Value>>(&data).unwrap_or_default()
+}
+
+/// Appends the current invocation to the history file (silently ignores errors).
+fn record_history(args: &[String]) {
+    let _ = (|| -> Option<()> {
+        let path = history_path()?;
+
+        let mut entries = {
+            let data = std::fs::read_to_string(&path).unwrap_or_default();
+            serde_json::from_str::<Vec<serde_json::Value>>(&data).unwrap_or_default()
+        };
+
+        let next_index = entries.len() + 1;
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        let args_json: Vec<serde_json::Value> =
+            args.iter().map(|s| serde_json::Value::String(s.clone())).collect();
+
+        entries.push(serde_json::json!({
+            "index": next_index,
+            "timestamp": timestamp,
+            "args": args_json,
+        }));
+
+        // Keep only the last 100 entries
+        if entries.len() > 100 {
+            let drain_count = entries.len() - 100;
+            entries.drain(0..drain_count);
+            // Re-index
+            for (i, entry) in entries.iter_mut().enumerate() {
+                entry["index"] = serde_json::Value::Number((i + 1).into());
+            }
+        }
+
+        let json = serde_json::to_string_pretty(&entries).ok()?;
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &json).ok()?;
+        std::fs::rename(&tmp, &path).ok()?;
+        Some(())
+    })();
+}
+
+/// Handler for `raps history`.
+fn execute_history(last: usize, json_output: bool) -> Result<()> {
+    let entries = load_history();
+    let entries: Vec<_> = entries
+        .iter()
+        .rev()
+        .take(last)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&entries)?);
+        return Ok(());
+    }
+
+    if entries.is_empty() {
+        println!("No history recorded yet.");
+        return Ok(());
+    }
+
+    println!("{:>4}  {:<21}  {}", "N", "TIME", "COMMAND");
+    for entry in &entries {
+        let index = entry.get("index").and_then(|v| v.as_u64()).unwrap_or(0);
+        let timestamp = entry
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .unwrap_or("-");
+        // Format timestamp: truncate to "YYYY-MM-DD HH:MM:SS"
+        let display_time = chrono::DateTime::parse_from_rfc3339(timestamp)
+            .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_else(|_| timestamp[..timestamp.len().min(19)].to_string());
+
+        let args: Vec<&str> = entry
+            .get("args")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect())
+            .unwrap_or_default();
+        let command_str = args.join(" ");
+
+        println!("{:>4}  {:<21}  {}", index, display_time, command_str);
+    }
+
+    Ok(())
+}
+
+/// Handler for `raps replay <index>`.
+fn execute_replay(index: usize) -> Result<()> {
+    let entries = load_history();
+    let entry = entries
+        .iter()
+        .find(|e| e.get("index").and_then(|v| v.as_u64()) == Some(index as u64))
+        .ok_or_else(|| anyhow::anyhow!("No history entry with index {}", index))?;
+
+    let args: Vec<String> = entry
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.to_string())
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if args.is_empty() {
+        anyhow::bail!("History entry {} has no arguments", index);
+    }
+
+    let command_str = args.join(" ");
+    println!("Replaying: {}", command_str);
+
+    let status = std::process::Command::new(&args[0])
+        .args(&args[1..])
+        .status()
+        .map_err(|e| anyhow::anyhow!("Failed to execute '{}': {}", args[0], e))?;
+
+    if !status.success() {
+        let code = status.code().unwrap_or(1);
+        std::process::exit(code);
+    }
+
+    Ok(())
+}
+
 fn command_name(cmd: &Commands) -> &'static str {
     match cmd {
         Commands::Auth(_) => "auth",
@@ -1015,6 +1189,8 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Schema(_) => "schema",
         Commands::Man { .. } => "man",
         Commands::External(_) => "external",
+        Commands::History { .. } => "history",
+        Commands::Replay { .. } => "replay",
     }
 }
 
@@ -1246,6 +1422,14 @@ async fn execute_command(
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => {
             unreachable!()
+        }
+
+        Commands::History { last, json } => {
+            execute_history(last, json)?;
+        }
+
+        Commands::Replay { index } => {
+            execute_replay(index)?;
         }
 
         Commands::External(args) => {
