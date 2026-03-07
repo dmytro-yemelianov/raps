@@ -69,6 +69,7 @@ pub async fn execute(output_format: OutputFormat) -> Result<()> {
     checks.push(check_config());
     checks.push(check_two_leg_auth().await);
     checks.push(check_three_leg_auth().await);
+    checks.push(check_token_expiry_headroom().await);
     checks.push(check_cache());
     checks.push(check_api_health());
     checks.push(check_plugins());
@@ -198,6 +199,56 @@ async fn check_three_leg_auth() -> CheckResult {
             "3-Legged Auth",
             Status::Warn,
             "Not logged in (run: raps auth login)",
+        )
+    }
+}
+
+async fn check_token_expiry_headroom() -> CheckResult {
+    let config = match raps_kernel::config::Config::from_env_lenient() {
+        Ok(c) => c,
+        Err(_) => return check("Token Expiry Headroom", Status::Pass, "No config — skipping"),
+    };
+
+    let auth = raps_kernel::auth::AuthClient::new(config);
+    let expiry = match auth.get_token_expiry().await {
+        Some(e) => e,
+        None => {
+            return check(
+                "Token Expiry Headroom",
+                Status::Pass,
+                "Not logged in — no 3-legged token to check",
+            );
+        }
+    };
+
+    let now = chrono::Utc::now().timestamp();
+    let remaining_secs = expiry - now;
+
+    if remaining_secs < 2 * 60 {
+        let msg = if remaining_secs <= 0 {
+            "Token already expired — run: raps auth login".to_string()
+        } else {
+            format!(
+                "Token expires in {}s — run: raps auth login",
+                remaining_secs
+            )
+        };
+        check("Token Expiry Headroom", Status::Fail, &msg)
+    } else if remaining_secs < 15 * 60 {
+        let mins = remaining_secs / 60;
+        let secs = remaining_secs % 60;
+        check(
+            "Token Expiry Headroom",
+            Status::Warn,
+            &format!("Token expires in {mins}m {secs}s — consider re-authenticating"),
+        )
+    } else {
+        let hours = remaining_secs / 3600;
+        let mins = (remaining_secs % 3600) / 60;
+        check(
+            "Token Expiry Headroom",
+            Status::Pass,
+            &format!("expires in {hours}h {mins}m"),
         )
     }
 }

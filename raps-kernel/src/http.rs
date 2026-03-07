@@ -395,6 +395,222 @@ where
     }
 }
 
+/// Send HTTP request with automatic retry on 429/5xx, network errors, and transparent 401 token refresh.
+///
+/// Before the first request, checks whether the current token expires within 10 minutes.
+/// If so, refreshes it proactively.
+///
+/// On receiving HTTP 401, attempts to force-refresh the token once and retries.  If the
+/// token refresh itself fails, or a second 401 is received, the function bails out with an
+/// actionable error message.
+///
+/// `build_request` receives the current bearer token as a `&str` on every attempt.
+pub async fn send_with_retry_auth<F>(
+    config: &HttpClientConfig,
+    auth: &crate::auth::AuthClient,
+    build_request: F,
+) -> Result<reqwest::Response>
+where
+    F: Fn(&str) -> reqwest::RequestBuilder,
+{
+    // --- Pre-flight: pre-emptive token expiry check (10-minute window) ---
+    let mut current_token = {
+        const PREEMPT_SECS: u64 = 10 * 60;
+        let expiry_opt = auth.get_2leg_token_expiry().await;
+        let needs_preemptive_refresh = expiry_opt
+            .map(|exp| {
+                exp.checked_duration_since(std::time::Instant::now())
+                    .map(|remaining| remaining.as_secs() < PREEMPT_SECS)
+                    .unwrap_or(true) // already expired
+            })
+            .unwrap_or(false); // no cached token yet — get_token() will fetch fresh
+
+        if needs_preemptive_refresh {
+            tracing::info!("Token expiring soon — refreshing preemptively");
+            match auth.force_refresh_token().await {
+                Ok(t) => t,
+                Err(e) => {
+                    tracing::warn!(error = %e, "Preemptive token refresh failed, proceeding with existing token");
+                    auth.get_token().await?
+                }
+            }
+        } else {
+            auth.get_token().await?
+        }
+    };
+
+    // --- Pre-flight: circuit breaker check ---
+    let probe_req = build_request(&current_token).build();
+    let endpoint_group = match &probe_req {
+        Ok(r) => crate::circuit_breaker::endpoint_group(r.url().as_str()).to_string(),
+        Err(_) => "other".to_string(),
+    };
+
+    if let Err(cb_err) = crate::circuit_breaker::registry().check(&endpoint_group) {
+        tracing::warn!(endpoint = %endpoint_group, "circuit breaker open — rejecting request");
+        anyhow::bail!(cb_err);
+    }
+
+    // --- Pre-flight: rate budget check ---
+    match crate::rate_budget::registry().check(&endpoint_group) {
+        crate::rate_budget::RateStatus::Exhausted { retry_after } => {
+            tracing::warn!(
+                endpoint = %endpoint_group,
+                retry_after_ms = retry_after.as_millis() as u64,
+                "rate limit exhausted — waiting before request"
+            );
+            tokio::time::sleep(retry_after).await;
+        }
+        crate::rate_budget::RateStatus::NearLimit { remaining, limit } => {
+            tracing::debug!(
+                endpoint = %endpoint_group,
+                remaining,
+                limit,
+                "rate limit near exhaustion"
+            );
+        }
+        _ => {}
+    }
+
+    // --- Request loop with retry ---
+    let mut attempt = 0u32;
+    let mut token_refreshed = false;
+    let mut total_network_time = std::time::Duration::ZERO;
+    let mut ep_stats = crate::endpoint_stats::EndpointStats::load();
+    let request_url = probe_req
+        .as_ref()
+        .map(|r| r.url().to_string())
+        .unwrap_or_default();
+
+    loop {
+        let start = std::time::Instant::now();
+        match build_request(&current_token).send().await {
+            Ok(response) => {
+                let elapsed = start.elapsed();
+                total_network_time += elapsed;
+                let status = response.status().as_u16();
+                let elapsed_ms = elapsed.as_millis() as u64;
+                tracing::debug!(
+                    http.status = status,
+                    url = %response.url(),
+                    elapsed_ms,
+                    "HTTP response"
+                );
+
+                ep_stats.record_request(response.url().as_str(), elapsed_ms, status >= 400);
+                ep_stats.save();
+
+                crate::rate_budget::registry()
+                    .record_from_headers(&endpoint_group, response.headers());
+
+                {
+                    let rl = crate::rate_limit::RateLimitState::from_headers(response.headers());
+                    if let Some(delay) = rl.throttle_delay() {
+                        tracing::debug!(
+                            remaining = ?rl.remaining,
+                            limit = ?rl.limit,
+                            delay_secs = delay.as_secs(),
+                            "rate limit: {}/{} — throttling before next request",
+                            rl.remaining.unwrap_or(0),
+                            rl.limit.unwrap_or(0),
+                        );
+                        tokio::time::sleep(delay).await;
+                    } else if let (Some(remaining), Some(limit)) = (rl.remaining, rl.limit) {
+                        tracing::debug!(remaining, limit, "rate limit: {}/{}", remaining, limit);
+                    }
+                }
+
+                let failure_type = crate::retry_policy::FailureType::from_status(status);
+                if let Some(ft) = failure_type {
+                    if ft.triggers_circuit_breaker() {
+                        crate::circuit_breaker::registry().record_failure(&endpoint_group);
+                    }
+                } else if status < 400 {
+                    crate::circuit_breaker::registry().record_success(&endpoint_group);
+                }
+
+                // --- 401 handling: transparent token refresh ---
+                if status == 401 {
+                    if token_refreshed {
+                        anyhow::bail!(
+                            "Authentication failed after token refresh (HTTP 401). \
+                             Re-run `raps auth login`."
+                        );
+                    }
+                    tracing::info!("401 received — attempting token refresh");
+                    match auth.force_refresh_token().await {
+                        Ok(new_token) => {
+                            current_token = new_token;
+                            token_refreshed = true;
+                            crate::profiler::record_http_retry();
+                            continue;
+                        }
+                        Err(e) => {
+                            anyhow::bail!(
+                                "Token expired and refresh failed: {}. Re-run `raps auth login`.",
+                                e
+                            );
+                        }
+                    }
+                }
+
+                if is_retryable_status(status) && attempt < config.max_retries {
+                    let base_delay = retry_delay_from_response(&response, attempt, config);
+                    let multiplier = ep_stats.backoff_multiplier(response.url().as_str());
+                    let delay = base_delay.saturating_mul(multiplier);
+                    attempt += 1;
+                    crate::profiler::record_http_retry();
+                    tracing::warn!(
+                        http.status = status,
+                        attempt,
+                        max_retries = config.max_retries,
+                        delay_secs = delay.as_secs_f64(),
+                        backoff_multiplier = multiplier,
+                        "Retryable HTTP status, retrying"
+                    );
+                    tokio::time::sleep(delay).await;
+                    continue;
+                }
+
+                crate::profiler::record_http_request(total_network_time);
+                crate::api_health::record_latency(total_network_time);
+                return Ok(response);
+            }
+            Err(err) => {
+                let elapsed = start.elapsed();
+                total_network_time += elapsed;
+
+                ep_stats.record_request(&request_url, elapsed.as_millis() as u64, true);
+                ep_stats.save();
+
+                crate::circuit_breaker::registry().record_failure(&endpoint_group);
+
+                let retriable = err.is_timeout() || err.is_connect() || err.is_request();
+                if !retriable || attempt >= config.max_retries {
+                    crate::profiler::record_http_request(total_network_time);
+                    crate::api_health::record_failure();
+                    tracing::error!(error = %err, attempt, "HTTP request failed");
+                    return Err(err).context("HTTP request failed");
+                }
+                attempt += 1;
+                crate::profiler::record_http_retry();
+                let base_delay = calculate_delay(attempt, config.base_delay, config.max_wait);
+                let multiplier = ep_stats.backoff_multiplier(&request_url);
+                let delay = base_delay.saturating_mul(multiplier);
+                tracing::warn!(
+                    error = %err,
+                    attempt,
+                    max_retries = config.max_retries,
+                    delay_secs = delay.as_secs_f64(),
+                    backoff_multiplier = multiplier,
+                    "Network error, retrying"
+                );
+                tokio::time::sleep(delay).await;
+            }
+        }
+    }
+}
+
 /// Calculate delay with exponential backoff and jitter
 pub fn calculate_delay(attempt: u32, base_delay: u64, max_wait: u64) -> Duration {
     use rand::Rng;
