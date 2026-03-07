@@ -105,24 +105,27 @@ impl ProjectUsersClient {
     /// Create a new Project Users client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create client with custom HTTP configuration
+    /// Create client with custom HTTP configuration.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
+    ) -> anyhow::Result<Self> {
         let http_client = http_config
             .create_client()
-            .unwrap_or_else(|_| reqwest::Client::new());
+            .context("Failed to initialise HTTP client for Project Users")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
             account_id: None,
-        }
+        })
     }
 
     /// Get the base URL for ACC Construction Admin v1 project endpoint

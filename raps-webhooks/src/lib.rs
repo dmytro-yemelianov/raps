@@ -127,25 +127,26 @@ impl WebhooksClient {
     /// Create a new Webhooks client
     pub fn new(config: Config, auth: AuthClient) -> Self {
         Self::new_with_http_config(config, auth, HttpClientConfig::default())
+            .expect("default HTTP client configuration must always succeed")
     }
 
-    /// Create a new Webhooks client with custom HTTP config
+    /// Create a new Webhooks client with custom HTTP config.
+    ///
+    /// Returns an error if the HTTP client cannot be built (e.g. invalid proxy URL).
     pub fn new_with_http_config(
         config: Config,
         auth: AuthClient,
         http_config: HttpClientConfig,
-    ) -> Self {
-        // Create HTTP client with configured timeouts
-        let http_client = http_config.create_client().unwrap_or_else(|e| {
-            tracing::warn!("HTTP client configuration failed, using defaults: {e}");
-            reqwest::Client::new()
-        });
+    ) -> anyhow::Result<Self> {
+        let http_client = http_config
+            .create_client()
+            .context("Failed to initialise HTTP client for Webhooks")?;
 
-        Self {
+        Ok(Self {
             config,
             auth,
             http_client,
-        }
+        })
     }
 
     /// List all webhooks for a system and event
