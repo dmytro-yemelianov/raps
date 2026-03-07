@@ -13,7 +13,7 @@ use serde::Serialize;
 use base64::Engine as _;
 use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
-use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat};
+use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat, TranslationCache};
 use raps_kernel::{progress, prompts};
 
 /// Client-side polling timeout for translations (2 hours).
@@ -208,6 +208,62 @@ pub(super) async fn start_translation(
         }
     };
 
+    // ------------------------------------------------------------------
+    // Translation deduplication cache (issue #205)
+    // ------------------------------------------------------------------
+    let format_key = derivative_format.type_name().to_string();
+    let mut cache = TranslationCache::load();
+
+    if force {
+        // Invalidate any stale cache entry so we re-translate unconditionally.
+        cache.invalidate(&source_urn, &format_key);
+    } else {
+        // 1. Check local disk cache first (fast, no network).
+        if let Some(entry) = cache.get(&source_urn, &format_key) {
+            if entry.status == "success" {
+                if output_format.supports_colors() {
+                    println!(
+                        "{} Translation already complete (cached). Use --force to re-translate.",
+                        "\u{2713}".green().bold()
+                    );
+                } else {
+                    println!(
+                        "Translation already complete (cached). Use --force to re-translate."
+                    );
+                }
+                return Ok(());
+            }
+        } else {
+            // 2. No local cache entry — check the live manifest to avoid
+            //    re-submitting a job that succeeded in a previous session.
+            match client.get_manifest(&source_urn).await {
+                Ok(manifest) if manifest.status == "success" => {
+                    // Cache it for next time and skip submission.
+                    cache.insert(
+                        &source_urn,
+                        &format_key,
+                        manifest.urn.clone(),
+                        "success".to_string(),
+                    );
+                    cache.save();
+                    if output_format.supports_colors() {
+                        println!(
+                            "{} Translation already complete (manifest exists). Use --force to re-translate.",
+                            "\u{2713}".green().bold()
+                        );
+                    } else {
+                        println!(
+                            "Translation already complete (manifest exists). Use --force to re-translate."
+                        );
+                    }
+                    return Ok(());
+                }
+                // 404, inprogress, pending, or any error → fall through and submit.
+                _ => {}
+            }
+        }
+    }
+
     // Show cost estimate if requested, using file extension from URN
     if cost_estimate {
         // Decode the URN to extract the file extension heuristic
@@ -309,6 +365,10 @@ pub(super) async fn start_translation(
             &output_format,
         )
         .await?;
+
+        // Persist success to the deduplication cache.
+        cache.insert(&source_urn, &format_key, response.urn.clone(), "success".to_string());
+        cache.save();
     }
 
     Ok(())

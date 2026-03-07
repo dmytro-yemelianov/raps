@@ -9,9 +9,11 @@
 
 mod download;
 mod metadata;
+pub mod translation_cache;
 mod translations;
 pub mod types;
 
+pub use translation_cache::TranslationCache;
 pub use types::*;
 
 use raps_kernel::auth::AuthClient;
