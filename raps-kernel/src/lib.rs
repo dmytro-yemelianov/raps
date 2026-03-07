@@ -20,6 +20,7 @@ pub mod cache_backend;
 pub mod checkpoint;
 pub mod circuit_breaker;
 pub mod config;
+pub mod endpoint_stats;
 pub mod error;
 pub mod http;
 pub mod interactive;
