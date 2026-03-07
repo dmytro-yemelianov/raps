@@ -5,12 +5,14 @@
 //!
 //! Commands for uploading, downloading, listing, and deleting objects in OSS buckets.
 
+mod audit;
 mod copy;
 mod diff;
 pub(crate) mod download;
 mod download_bulk;
 mod inspect;
 pub(crate) mod secret_scan;
+mod tag;
 pub(crate) mod upload;
 
 use anyhow::Result;
@@ -21,11 +23,13 @@ use crate::output::OutputFormat;
 use raps_kernel::prompts;
 use raps_oss::OssClient;
 
+use audit::audit_bucket;
 use copy::{batch_copy_objects, batch_rename_objects, copy_object, rename_object};
 use diff::diff_objects;
 use download::{delete_object, download_object, get_signed_url, list_objects, object_info};
 use download_bulk::download_bulk;
 use inspect::inspect_object;
+use tag::{tag_delete, tag_get, tag_search, tag_set};
 use upload::{upload_batch, upload_object};
 
 #[derive(Debug, Subcommand)]
@@ -285,6 +289,63 @@ pub enum ObjectCommands {
         #[arg(long, short = 'e')]
         extract: Option<String>,
     },
+
+    /// Cost and access analysis for an OSS bucket
+    ///
+    /// Lists all objects, computes totals, groups by extension and age,
+    /// and shows stale candidates (not modified in >90 days).
+    Audit {
+        /// Bucket key to audit
+        bucket: String,
+    },
+
+    /// Manage custom attributes (tags) on OSS objects
+    ///
+    /// Tags are stored as a JSON side-car file alongside the object.
+    /// Use `set`, `get`, `delete`, and `search` sub-commands.
+    #[command(subcommand)]
+    Tag(TagCommands),
+}
+
+/// Sub-commands for `raps object tag`
+#[derive(Debug, clap::Subcommand)]
+pub enum TagCommands {
+    /// Set one or more custom attributes on an object (attr=value, repeatable)
+    Set {
+        /// Bucket key
+        bucket: String,
+        /// Object key
+        key: String,
+        /// Attributes to set (attr=value, repeatable)
+        #[arg(required = true)]
+        attrs: Vec<String>,
+    },
+
+    /// Show all custom attributes on an object
+    Get {
+        /// Bucket key
+        bucket: String,
+        /// Object key
+        key: String,
+    },
+
+    /// Remove a custom attribute from an object
+    Delete {
+        /// Bucket key
+        bucket: String,
+        /// Object key
+        key: String,
+        /// Attribute name to remove
+        attr: String,
+    },
+
+    /// List objects whose custom attributes match attr=value (client-side scan)
+    Search {
+        /// Bucket key
+        bucket: String,
+        /// Filter expression attr=value
+        filter: String,
+    },
 }
 
 impl ObjectCommands {
@@ -420,6 +481,21 @@ impl ObjectCommands {
                 object,
                 extract,
             } => inspect_object(client, bucket, object, extract, output_format).await,
+            ObjectCommands::Audit { bucket } => audit_bucket(client, bucket, output_format).await,
+            ObjectCommands::Tag(tag_cmd) => match tag_cmd {
+                TagCommands::Set { bucket, key, attrs } => {
+                    tag_set(client, bucket, key, attrs, output_format).await
+                }
+                TagCommands::Get { bucket, key } => {
+                    tag_get(client, bucket, key, output_format).await
+                }
+                TagCommands::Delete { bucket, key, attr } => {
+                    tag_delete(client, bucket, key, attr, output_format).await
+                }
+                TagCommands::Search { bucket, filter } => {
+                    tag_search(client, bucket, filter, output_format).await
+                }
+            },
         }
     }
 }
