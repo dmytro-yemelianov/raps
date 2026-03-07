@@ -207,6 +207,13 @@ where
     // --- Request loop with retry ---
     let mut attempt = 0;
     let mut total_network_time = std::time::Duration::ZERO;
+    // Load per-endpoint stats once; we update and save after each request.
+    let mut ep_stats = crate::endpoint_stats::EndpointStats::load();
+    // Peek at the URL for adaptive backoff lookups (best-effort).
+    let request_url = probe_req
+        .as_ref()
+        .map(|r| r.url().to_string())
+        .unwrap_or_default();
     loop {
         let start = std::time::Instant::now();
         match build_request().send().await {
@@ -214,12 +221,18 @@ where
                 let elapsed = start.elapsed();
                 total_network_time += elapsed;
                 let status = response.status().as_u16();
+                let elapsed_ms = elapsed.as_millis() as u64;
                 tracing::debug!(
                     http.status = status,
                     url = %response.url(),
-                    elapsed_ms = elapsed.as_millis() as u64,
+                    elapsed_ms,
                     "HTTP response"
                 );
+
+                // Record per-endpoint stats
+                let failed = status >= 400;
+                ep_stats.record_request(response.url().as_str(), elapsed_ms, failed);
+                ep_stats.save();
 
                 // Record rate limit headers into the global budget tracker
                 crate::rate_budget::registry()
@@ -263,7 +276,9 @@ where
                 }
 
                 if is_retryable_status(status) && attempt < config.max_retries {
-                    let delay = retry_delay_from_response(&response, attempt, config);
+                    let base_delay = retry_delay_from_response(&response, attempt, config);
+                    let multiplier = ep_stats.backoff_multiplier(response.url().as_str());
+                    let delay = base_delay.saturating_mul(multiplier);
                     attempt += 1;
                     crate::profiler::record_http_retry();
                     tracing::warn!(
@@ -271,6 +286,7 @@ where
                         attempt,
                         max_retries = config.max_retries,
                         delay_secs = delay.as_secs_f64(),
+                        backoff_multiplier = multiplier,
                         "Retryable HTTP status, retrying"
                     );
                     sleep(delay).await;
@@ -281,7 +297,12 @@ where
                 return Ok(response);
             }
             Err(err) => {
-                total_network_time += start.elapsed();
+                let elapsed = start.elapsed();
+                total_network_time += elapsed;
+
+                // Record per-endpoint stats for network-level failures
+                ep_stats.record_request(&request_url, elapsed.as_millis() as u64, true);
+                ep_stats.save();
 
                 // Network error → record circuit breaker failure
                 crate::circuit_breaker::registry().record_failure(&endpoint_group);
@@ -295,12 +316,15 @@ where
                 }
                 attempt += 1;
                 crate::profiler::record_http_retry();
-                let delay = calculate_delay(attempt, config.base_delay, config.max_wait);
+                let base_delay = calculate_delay(attempt, config.base_delay, config.max_wait);
+                let multiplier = ep_stats.backoff_multiplier(&request_url);
+                let delay = base_delay.saturating_mul(multiplier);
                 tracing::warn!(
                     error = %err,
                     attempt,
                     max_retries = config.max_retries,
                     delay_secs = delay.as_secs_f64(),
+                    backoff_multiplier = multiplier,
                     "Network error, retrying"
                 );
                 sleep(delay).await;
