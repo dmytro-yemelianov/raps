@@ -14,6 +14,10 @@ test-utils = []
 redis = ["dep:deadpool-redis", "dep:redis", "dep:hostname"]
 prometheus = ["dep:prometheus"]
 kubernetes = ["dep:axum", "prometheus"]
+# Enable HTTP/3 (QUIC) transport for swarm inter-agent communication.
+# Requires a nightly toolchain or a build environment with QUIC support
+# (quinn backend). Enable with: cargo build --features h3
+h3 = ["reqwest/http3"]
 
 [dependencies]
 # Error handling

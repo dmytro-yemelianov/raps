@@ -130,9 +130,6 @@ hex.workspace = true
 # SHA-1 for sync checksum comparison
 sha1.workspace = true
 
-# Glob patterns for sync --exclude
-glob.workspace = true
-
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
 
@@ -148,6 +145,10 @@ default = []
 dashboard = ["ratatui", "crossterm"]
 redis = ["raps-kernel/redis", "dep:hostname", "dep:redis", "dep:deadpool-redis"]
 kubernetes = ["raps-kernel/kubernetes", "redis", "dep:axum"]
+# Enable HTTP/3 (QUIC) transport for swarm inter-agent communication.
+# Activates the h3 feature in raps-kernel (quinn/QUIC backend).
+# Set RAPS_SWARM_QUIC=1 or pass --quic to swarm worker start to use it.
+h3 = ["raps-kernel/h3"]
 
 [dev-dependencies]
 assert_cmd.workspace = true
