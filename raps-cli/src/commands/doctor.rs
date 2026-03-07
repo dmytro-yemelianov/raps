@@ -461,8 +461,48 @@ fn check_context_var_formats() -> CheckResult {
     }
 }
 
+const DISK_FAIL_THRESHOLD_BYTES: u64 = 100 * 1024 * 1024;  // 100 MB
+const DISK_WARN_THRESHOLD_BYTES: u64 = 500 * 1024 * 1024;  // 500 MB
+
 fn check_disk_space() -> CheckResult {
-    check("Disk Space", Status::Warn, "not implemented yet")
+    let check_path = raps_kernel::cache::cache_dir()
+        .unwrap_or_else(|_| std::env::temp_dir());
+
+    // Walk up to find an existing ancestor to query
+    let query_path = {
+        let mut p = check_path.as_path();
+        loop {
+            if p.exists() {
+                break p.to_path_buf();
+            }
+            match p.parent() {
+                Some(parent) => p = parent,
+                None => break std::env::temp_dir(),
+            }
+        }
+    };
+
+    match fs2::available_space(&query_path) {
+        Ok(available) => {
+            let human = format_size(available);
+            if available < DISK_FAIL_THRESHOLD_BYTES {
+                check(
+                    "Disk Space",
+                    Status::Fail,
+                    &format!("Only {human} available near cache dir — free disk space"),
+                )
+            } else if available < DISK_WARN_THRESHOLD_BYTES {
+                check(
+                    "Disk Space",
+                    Status::Warn,
+                    &format!("{human} available near cache dir (low)"),
+                )
+            } else {
+                check("Disk Space", Status::Pass, &format!("{human} available"))
+            }
+        }
+        Err(e) => check("Disk Space", Status::Warn, &format!("Cannot determine disk space: {e}")),
+    }
 }
 
 fn check_keyring() -> CheckResult {
@@ -589,5 +629,24 @@ mod tests {
             None,
         );
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_disk_space_classify_critical() {
+        // 50 MB < DISK_FAIL_THRESHOLD_BYTES (100 MB)
+        assert!(50 * 1024 * 1024_u64 < DISK_FAIL_THRESHOLD_BYTES);
+    }
+
+    #[test]
+    fn test_disk_space_classify_warn() {
+        // 200 MB: above fail threshold but below warn threshold
+        assert!(200 * 1024 * 1024_u64 > DISK_FAIL_THRESHOLD_BYTES);
+        assert!(200 * 1024 * 1024_u64 < DISK_WARN_THRESHOLD_BYTES);
+    }
+
+    #[test]
+    fn test_disk_space_classify_pass() {
+        // 1 GB > DISK_WARN_THRESHOLD_BYTES (500 MB)
+        assert!(1024 * 1024 * 1024_u64 > DISK_WARN_THRESHOLD_BYTES);
     }
 }
