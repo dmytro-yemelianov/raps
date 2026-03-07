@@ -53,7 +53,7 @@ use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, JobCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
-    RealityCommands, ReportCommands, RfiCommands, TemplateCommands, TranslateCommands,
+    RealityCommands, ReportCommands, RfiCommands, SnapshotCommands, TemplateCommands, TranslateCommands,
     WebhookCommands, WorkflowCommands,
 };
 
@@ -114,6 +114,7 @@ const GROUPED_COMMANDS_HELP: &str = "\
   cache         Manage the download cache (stats, clear)
   pipeline      Run pipeline from YAML/JSON file
   plugin        Manage plugins, hooks, and aliases
+  lint          Pre-commit validation: pipeline YAML, secrets, .raps-project
   man           Generate man pages for raps and its subcommands";
 
 /// RAPS (rapeseed) - Rust Autodesk Platform Services CLI
@@ -353,6 +354,10 @@ enum Commands {
     #[command(subcommand)]
     Serve(commands::serve::ServeCommands),
 
+    /// Record, compare, and list bucket object snapshots
+    #[command(subcommand)]
+    Snapshot(SnapshotCommands),
+
     /// Run diagnostic checks (auth, cache, config, plugins, API health)
     Doctor,
 
@@ -412,6 +417,15 @@ enum Commands {
     #[command(subcommand)]
     Logs(commands::logs::LogsCommands),
 
+    /// Pre-commit validation: lint pipeline YAML, scan for secrets, validate .raps-project
+    ///
+    /// If no paths are given, lints everything in the current directory tree.
+    /// Exits with code 1 if any errors are found (suitable for pre-commit hooks).
+    Lint {
+        /// Paths to lint (files or directories; defaults to current directory)
+        paths: Vec<std::path::PathBuf>,
+    },
+
     /// External plugins and custom commands
     #[command(external_subcommand)]
     External(Vec<String>),
@@ -423,7 +437,7 @@ const KNOWN_SUBCOMMANDS: &[&str] = &[
     "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
     "api", "rfi", "report", "template", "reality", "inspect", "plugin", "generate", "demo",
     "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm",
-    "schema", "history", "replay", "man", "logs",
+    "schema", "history", "replay", "man", "logs", "lint", "snapshot",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -1325,6 +1339,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Mcp => "mcp",
         #[cfg(feature = "kubernetes")]
         Commands::Serve(_) => "serve",
+        Commands::Snapshot(_) => "snapshot",
         Commands::Doctor => "doctor",
         Commands::Cache(_) => "cache",
         Commands::Swarm(_) => "swarm",
@@ -1338,6 +1353,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Stats { .. } => "stats",
         Commands::Watch(_) => "watch",
         Commands::Logs(_) => "logs",
+        Commands::Lint { .. } => "lint",
     }
 }
 
@@ -1577,6 +1593,10 @@ async fn execute_command(
             cmd.execute().await?;
         }
 
+        Commands::Snapshot(cmd) => {
+            cmd.execute(&get_oss_client(), output_format).await?;
+        }
+
         Commands::Doctor => {
             commands::doctor::execute(output_format).await?;
         }
@@ -1628,6 +1648,10 @@ async fn execute_command(
 
         Commands::Logs(cmd) => {
             cmd.execute(output_format).await?;
+        }
+
+        Commands::Lint { paths } => {
+            commands::lint::run_lint(paths, output_format).await?;
         }
 
         Commands::External(args) => {
