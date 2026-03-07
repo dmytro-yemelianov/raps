@@ -119,7 +119,7 @@ ratatui = "0.29"
 crossterm = "0.28"
 
 # Interactive shell
-reedline = "0.45"
+reedline = "0.46"
 nu-ansi-term = "0.50"
 shlex = "1.3"
 
