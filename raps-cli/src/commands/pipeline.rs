@@ -41,6 +41,17 @@ pub enum PipelineCommands {
         /// Maximum number of steps to run concurrently within a dependency level (0 = unlimited)
         #[arg(long = "max-parallel", default_value_t = 0)]
         max_parallel: usize,
+        /// Resume previous run, skipping already-completed steps
+        #[arg(long)]
+        resume: bool,
+
+        /// Clear saved run state and start fresh (overrides --resume)
+        #[arg(long)]
+        reset: bool,
+
+        /// Clear state from this step onwards, re-run from here
+        #[arg(long)]
+        reset_from: Option<String>,
     },
 
     /// Validate a pipeline file
@@ -187,6 +198,100 @@ pub struct StepResult {
 
 type StepContext = Arc<Mutex<HashMap<String, StepResult>>>;
 
+// ── Idempotent run-state ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+enum StepRunStatus {
+    Pending,
+    Completed,
+    Failed,
+    Skipped,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct StepRunRecord {
+    name: String,
+    status: StepRunStatus,
+    exit_code: Option<i32>,
+    completed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PipelineRunState {
+    pipeline_hash: String,
+    pipeline_file: String,
+    started_at: String,
+    steps: Vec<StepRunRecord>,
+}
+
+impl PipelineRunState {
+    fn state_path(pipeline_file: &std::path::Path) -> Option<std::path::PathBuf> {
+        let dirs = directories::ProjectDirs::from("com", "autodesk", "raps")?;
+        let name = pipeline_file.file_stem()?.to_string_lossy();
+        Some(
+            dirs.cache_dir()
+                .join("pipeline_runs")
+                .join(format!("{}.json", name)),
+        )
+    }
+
+    fn load(pipeline_file: &std::path::Path, current_hash: &str) -> Option<Self> {
+        let path = Self::state_path(pipeline_file)?;
+        let content = std::fs::read_to_string(&path).ok()?;
+        let state: Self = serde_json::from_str(&content).ok()?;
+        if state.pipeline_hash != current_hash {
+            return None;
+        }
+        Some(state)
+    }
+
+    fn save(&self, pipeline_file: &std::path::Path) {
+        if let Some(path) = Self::state_path(pipeline_file) {
+            if let Some(p) = path.parent() {
+                let _ = std::fs::create_dir_all(p);
+            }
+            if let Ok(s) = serde_json::to_string_pretty(self) {
+                let _ = std::fs::write(path, s);
+            }
+        }
+    }
+
+    fn clear(pipeline_file: &std::path::Path) {
+        if let Some(path) = Self::state_path(pipeline_file) {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    fn is_completed(&self, step_name: &str) -> bool {
+        self.steps
+            .iter()
+            .any(|s| s.name == step_name && s.status == StepRunStatus::Completed)
+    }
+
+    fn mark(&mut self, step_name: &str, status: StepRunStatus, exit_code: Option<i32>) {
+        let now = chrono::Utc::now().to_rfc3339();
+        if let Some(rec) = self.steps.iter_mut().find(|s| s.name == step_name) {
+            rec.status = status;
+            rec.exit_code = exit_code;
+            rec.completed_at = Some(now);
+        } else {
+            self.steps.push(StepRunRecord {
+                name: step_name.to_string(),
+                status,
+                exit_code,
+                completed_at: Some(now),
+            });
+        }
+    }
+}
+
+fn pipeline_hash(content: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(content.as_bytes()))
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+
 impl PipelineCommands {
     pub async fn execute(self, output_format: OutputFormat) -> Result<()> {
         match self {
@@ -197,6 +302,22 @@ impl PipelineCommands {
                 var,
                 max_parallel,
             } => run_pipeline(&file, ignore_failure, dry_run, var, max_parallel, output_format).await,
+                resume,
+                reset,
+                reset_from,
+            } => {
+                run_pipeline(
+                    &file,
+                    ignore_failure,
+                    dry_run,
+                    var,
+                    output_format,
+                    resume,
+                    reset,
+                    reset_from,
+                )
+                .await
+            }
             PipelineCommands::Validate { file } => validate_pipeline(&file, output_format).await,
             PipelineCommands::Sample { out_file } => generate_sample(&out_file, output_format),
             PipelineCommands::Create {
@@ -678,7 +799,72 @@ async fn run_pipeline(
     var_overrides: Vec<(String, String)>,
     max_parallel: usize,
     output_format: OutputFormat,
+    resume: bool,
+    reset: bool,
+    reset_from: Option<String>,
 ) -> Result<()> {
+    // Read raw content for hashing (stdin pipelines are not stateful)
+    let raw_content = if file.as_os_str() == "-" {
+        String::new()
+    } else {
+        tokio::fs::read_to_string(file)
+            .await
+            .with_context(|| format!("Failed to read pipeline file: {}", file.display()))?
+    };
+    let hash = pipeline_hash(&raw_content);
+    let canonical_file = file.canonicalize().unwrap_or_else(|_| file.clone());
+
+    // Handle state reset/resume
+    if reset {
+        PipelineRunState::clear(&canonical_file);
+    }
+
+    let mut state: PipelineRunState = if reset {
+        PipelineRunState {
+            pipeline_hash: hash.clone(),
+            pipeline_file: canonical_file.display().to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            steps: Vec::new(),
+        }
+    } else if let Some(ref from_step) = reset_from {
+        // Load existing state, mark `from_step` and everything after it as Pending
+        let mut s = PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
+            PipelineRunState {
+                pipeline_hash: hash.clone(),
+                pipeline_file: canonical_file.display().to_string(),
+                started_at: chrono::Utc::now().to_rfc3339(),
+                steps: Vec::new(),
+            }
+        });
+        // Find the index of the reset-from step and clear from there
+        let reset_idx = s.steps.iter().position(|r| &r.name == from_step);
+        if let Some(idx) = reset_idx {
+            for rec in s.steps[idx..].iter_mut() {
+                rec.status = StepRunStatus::Pending;
+                rec.exit_code = None;
+                rec.completed_at = None;
+            }
+        }
+        s.save(&canonical_file);
+        s
+    } else if resume {
+        PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
+            PipelineRunState {
+                pipeline_hash: hash.clone(),
+                pipeline_file: canonical_file.display().to_string(),
+                started_at: chrono::Utc::now().to_rfc3339(),
+                steps: Vec::new(),
+            }
+        })
+    } else {
+        PipelineRunState {
+            pipeline_hash: hash.clone(),
+            pipeline_file: canonical_file.display().to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            steps: Vec::new(),
+        }
+    };
+
     let mut pipeline = load_pipeline(file).await?;
     apply_variable_overrides(&mut pipeline.variables, &var_overrides);
     let context: StepContext = Arc::new(Mutex::new(HashMap::new()));
@@ -731,6 +917,51 @@ async fn run_pipeline(
                     println!("  {} parallel steps", "⫸".dimmed());
                 } else if step.for_each.is_some() {
                     println!("  {} for-each loop", "⟳".dimmed());
+        // Skip already-completed steps when resuming
+        if state.is_completed(&step.name) {
+            if output_format.supports_colors() {
+                println!(
+                    "  {} {} (skipped — already completed)",
+                    "✓".green().dimmed(),
+                    step.name.dimmed()
+                );
+            }
+            skipped += 1;
+            continue;
+        }
+
+        let outcome = execute_step(
+            step.clone(),
+            pipeline.variables.clone(),
+            context.clone(),
+            pipeline.defaults.clone(),
+            output_format,
+            dry_run,
+        )
+        .await?;
+
+        match outcome {
+            StepOutcome::Success(code) => {
+                if output_format.supports_colors() {
+                    println!("  {} Success", "✓".green().bold());
+                }
+                state.mark(&step.name, StepRunStatus::Completed, Some(code));
+                state.save(&canonical_file);
+                passed += 1;
+            }
+            StepOutcome::Failed(code) => {
+                if output_format.supports_colors() {
+                    println!("  {} Failed (exit code: {})", "✗".red().bold(), code);
+                }
+                state.mark(&step.name, StepRunStatus::Failed, Some(code));
+                state.save(&canonical_file);
+                failed += 1;
+                if !step.ignore_failure && !global_ignore_failure {
+                    anyhow::bail!(
+                        "Pipeline aborted at step '{}' (exit code: {})",
+                        step.name,
+                        code
+                    );
                 }
             }
 
@@ -856,6 +1087,9 @@ async fn run_pipeline(
                     Ok(Err(e)) => return Err(e),
                     Err(e) => anyhow::bail!("Parallel step task panicked: {}", e),
                 }
+                state.mark(&step.name, StepRunStatus::Skipped, None);
+                state.save(&canonical_file);
+                skipped += 1;
             }
         }
     }
