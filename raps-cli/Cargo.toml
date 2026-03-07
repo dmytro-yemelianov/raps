@@ -133,6 +133,10 @@ sha1.workspace = true
 # Text diffing (unified diff output for object diff command)
 similar.workspace = true
 
+# Archive inspection (tar.gz / zip via Range requests)
+flate2.workspace = true
+tar.workspace = true
+
 # Worker hostname identification
 hostname = { workspace = true, optional = true }
 
