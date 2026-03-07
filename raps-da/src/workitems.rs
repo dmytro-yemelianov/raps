@@ -18,6 +18,7 @@ impl DesignAutomationClient {
         activity_id: &str,
         arguments: std::collections::HashMap<String, WorkItemArgument>,
     ) -> Result<WorkItem> {
+        tracing::info!(activity_id, "submit_workitem");
         let token = self.auth.get_token().await?;
         let url = format!("{}/workitems", self.config.da_url());
 
@@ -85,6 +86,7 @@ impl DesignAutomationClient {
 
     /// Get work item status
     pub async fn get_workitem_status(&self, id: &str) -> Result<WorkItem> {
+        tracing::info!(workitem_id = id, "poll_workitem_status");
         let token = self.auth.get_token().await?;
         let url = format!("{}/workitems/{}", self.config.da_url(), id);
 

@@ -1335,6 +1335,8 @@ async fn execute_command(
 ) -> Result<()> {
     // Log command name for diagnostics
     let cmd_name = command_name(&command);
+    let span = tracing::info_span!("command", name = cmd_name);
+    let _enter = span.enter();
     tracing::info!(command = cmd_name, "Executing command");
 
     // Run pre-command hooks (ignore errors — hooks should not block the command)

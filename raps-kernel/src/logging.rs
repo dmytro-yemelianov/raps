@@ -75,7 +75,7 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool) {
             if debug {
                 EnvFilter::new("debug")
             } else if verbose {
-                EnvFilter::new("info")
+                EnvFilter::new("info,raps=debug")
             } else if quiet {
                 EnvFilter::new("error")
             } else {
