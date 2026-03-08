@@ -1554,7 +1554,7 @@ steps:
       in: ["building.rvt", "site.dwg"]
       parallel: true
       max_concurrency: 4
-    command: "translate download urn:${BUCKET}/${MODEL} --out-dir ./output/${MODEL}"
+    command: "translate download urn:${BUCKET}/${MODEL} --all --out-dir ./output/${MODEL}"
 
   - name: "Cleanup bucket"
     command: "bucket delete ${BUCKET} -y"
