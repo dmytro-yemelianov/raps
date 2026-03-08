@@ -801,7 +801,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_HTTP2", "0");
         }
-        let config = HttpClientConfig::from_cli_and_env(None);
+        let config = HttpClientConfig::from_cli_and_env(None).unwrap();
         assert!(!config.http2, "RAPS_HTTP2=0 should disable HTTP/2");
         unsafe {
             std::env::remove_var("RAPS_HTTP2");
@@ -813,7 +813,7 @@ mod tests {
         unsafe {
             std::env::remove_var("RAPS_HTTP2");
         }
-        let config = HttpClientConfig::from_cli_and_env(None);
+        let config = HttpClientConfig::from_cli_and_env(None).unwrap();
         assert!(config.http2, "HTTP/2 should be enabled when RAPS_HTTP2 is unset");
     }
 
@@ -823,7 +823,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_HTTP2", "1");
         }
-        let config = HttpClientConfig::from_cli_and_env(None);
+        let config = HttpClientConfig::from_cli_and_env(None).unwrap();
         assert!(config.http2, "RAPS_HTTP2=1 should keep HTTP/2 enabled");
         unsafe {
             std::env::remove_var("RAPS_HTTP2");
