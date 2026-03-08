@@ -27,6 +27,7 @@ pub mod interactive;
 #[cfg(feature = "redis")]
 pub mod job_queue;
 pub mod logging;
+pub mod marketplace;
 pub mod metrics;
 pub mod output;
 pub mod profiler;

@@ -3,7 +3,7 @@
 
 //! Auth command handlers: login, logout, status, license
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use colored::Colorize;
 
 use crate::marketplace::{MarketplaceAuth, SubscriptionManager};
@@ -11,36 +11,16 @@ use crate::output::OutputFormat;
 
 use super::LicenseArgs;
 
-pub(super) async fn login(output_format: OutputFormat) -> Result<()> {
-    let auth = MarketplaceAuth::new();
-    let token_response = auth.login().await?;
-
-    match output_format {
-        OutputFormat::Table => {
-            println!("{} Logged in successfully!", "✓".green().bold());
-            println!(
-                "  {} expires in {} seconds",
-                "Token".dimmed(),
-                token_response.expires_in
-            );
-        }
-        _ => {
-            output_format.write(&serde_json::json!({
-                "logged_in": true,
-                "expires_in": token_response.expires_in
-            }))?;
-        }
-    }
-
-    Ok(())
+pub(super) async fn login(_output_format: OutputFormat) -> Result<()> {
+    anyhow::bail!(
+        "Marketplace authentication uses a license key.\n\
+         Run `raps marketplace license <key>` to store your license key."
+    )
 }
 
 pub(super) async fn logout(output_format: OutputFormat) -> Result<()> {
-    let auth = MarketplaceAuth::new();
-    auth.clear_tokens().await?;
-
-    let sub_manager = SubscriptionManager::new()?;
-    sub_manager.clear_cache().await?;
+    MarketplaceAuth::clear_tokens()?;
+    SubscriptionManager::clear_cache();
 
     match output_format {
         OutputFormat::Table => {
@@ -57,14 +37,14 @@ pub(super) async fn logout(output_format: OutputFormat) -> Result<()> {
 }
 
 pub(super) async fn status(output_format: OutputFormat) -> Result<()> {
-    let auth = MarketplaceAuth::new();
-    auth.load_tokens().await?;
-
-    if !auth.is_authenticated().await {
+    if !MarketplaceAuth::is_authenticated() {
         match output_format {
             OutputFormat::Table => {
                 println!("{}", "Not logged in.".yellow());
-                println!("Run {} to authenticate.", "raps marketplace login".cyan());
+                println!(
+                    "Run {} to authenticate.",
+                    "raps marketplace license <key>".cyan()
+                );
             }
             _ => {
                 output_format.write(&serde_json::json!({
@@ -75,22 +55,39 @@ pub(super) async fn status(output_format: OutputFormat) -> Result<()> {
         return Ok(());
     }
 
-    let sub_manager = SubscriptionManager::new()?;
-    let token: String = auth.get_access_token().await.context("Not authenticated. Run 'raps auth login' first.")?;
-    let subscription = sub_manager.get_subscription(&token).await?;
-
-    match output_format {
-        OutputFormat::Table => {
-            println!("\n{}", "Subscription Status:".bold());
-            println!("{}", "─".repeat(40));
-            println!(
-                "{}",
-                SubscriptionManager::format_subscription_status(&subscription)
-            );
-            println!("{}", "─".repeat(40));
+    match SubscriptionManager::get_subscription() {
+        Some(subscription) => {
+            match output_format {
+                OutputFormat::Table => {
+                    println!("\n{}", "Subscription Status:".bold());
+                    println!("{}", "─".repeat(40));
+                    println!(
+                        "{}",
+                        SubscriptionManager::format_subscription_status(&subscription)
+                    );
+                    println!("{}", "─".repeat(40));
+                }
+                _ => {
+                    output_format.write(&subscription)?;
+                }
+            }
         }
-        _ => {
-            output_format.write(&subscription)?;
+        None => {
+            match output_format {
+                OutputFormat::Table => {
+                    println!("{}", "License key stored but not yet validated.".yellow());
+                    println!(
+                        "Run {} to validate.",
+                        "raps marketplace license <key>".cyan()
+                    );
+                }
+                _ => {
+                    output_format.write(&serde_json::json!({
+                        "authenticated": true,
+                        "validated": false
+                    }))?;
+                }
+            }
         }
     }
 
@@ -98,17 +95,8 @@ pub(super) async fn status(output_format: OutputFormat) -> Result<()> {
 }
 
 pub(super) async fn license(args: LicenseArgs, output_format: OutputFormat) -> Result<()> {
-    let auth = MarketplaceAuth::new();
-    auth.load_tokens().await?;
-
-    if !auth.is_authenticated().await {
-        anyhow::bail!("Please login first: raps marketplace login");
-    }
-
-    let sub_manager = SubscriptionManager::new()?;
-    let token: String = auth.get_access_token().await.context("Not authenticated. Run 'raps auth login' first.")?;
-
-    let subscription = sub_manager.register_license(&token, &args.key).await?;
+    // Validate first (before storing), then store on success
+    let subscription = SubscriptionManager::register_license(&args.key).await?;
 
     match output_format {
         OutputFormat::Table => {
@@ -117,6 +105,12 @@ pub(super) async fn license(args: LicenseArgs, output_format: OutputFormat) -> R
                 "{}",
                 SubscriptionManager::format_subscription_status(&subscription)
             );
+            if !subscription.plugins.is_empty() {
+                println!("\n{}", "Entitled plugins:".bold());
+                for plugin in &subscription.plugins {
+                    println!("  • {}", plugin.as_str().cyan());
+                }
+            }
         }
         _ => {
             output_format.write(&subscription)?;

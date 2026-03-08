@@ -7,46 +7,48 @@ use anyhow::Result;
 use colored::Colorize;
 use serde::Serialize;
 
-use crate::marketplace::{CacheManager, MarketplaceClient};
+use crate::marketplace::MarketplaceClient;
 use crate::output::OutputFormat;
-use raps_kernel::marketplace::Plugin;
 
 use super::SearchArgs;
 use super::truncate_str;
 
 #[derive(Serialize, schemars::JsonSchema)]
 struct PluginSearchOutput {
+    slug: String,
     name: String,
-    version: String,
     description: String,
-    tier: String,
-    rating: Option<f32>,
-    downloads: u64,
+    price_monthly_cents: u32,
+    price_yearly_cents: u32,
+    latest_version: Option<String>,
 }
 
 pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Result<()> {
-    let client = MarketplaceClient::new();
-    let cache = CacheManager::new(client)?;
+    let client = MarketplaceClient::new()?;
+    let mut plugins: Vec<raps_kernel::marketplace::Plugin> = client.list_plugins().await?;
 
-    let query = if args.query.is_empty() {
-        None
-    } else {
-        Some(args.query.as_str())
-    };
+    // Filter by query string (name/description match)
+    if !args.query.is_empty() {
+        let q = args.query.to_lowercase();
+        plugins.retain(|p| {
+            p.name.to_lowercase().contains(&q)
+                || p.description.to_lowercase().contains(&q)
+                || p.slug.to_lowercase().contains(&q)
+        });
+    }
 
-    let plugins: Vec<Plugin> = cache
-        .search_cached(query, args.tier.as_deref(), args.category.as_deref())
-        .await?;
+    // Only show published plugins
+    plugins.retain(|p| p.published);
 
     let outputs: Vec<PluginSearchOutput> = plugins
         .iter()
         .map(|p| PluginSearchOutput {
+            slug: p.slug.clone(),
             name: p.name.clone(),
-            version: p.version.clone(),
             description: p.description.clone(),
-            tier: p.tier.to_string(),
-            rating: p.rating,
-            downloads: p.install_count,
+            price_monthly_cents: p.price_monthly_cents,
+            price_yearly_cents: p.price_yearly_cents,
+            latest_version: p.latest_version.clone(),
         })
         .collect();
 
@@ -58,34 +60,33 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
                 println!("\n{}", "Marketplace Plugins:".bold());
                 println!("{}", "─".repeat(100));
                 println!(
-                    "  {:<25} {:<10} {:<8} {:<6} {:<8} {}",
-                    "Name".bold(),
+                    "  {:<25} {:<15} {:<10} {}",
+                    "Slug".bold(),
                     "Version".bold(),
-                    "Tier".bold(),
-                    "Rating".bold(),
-                    "Downloads".bold(),
+                    "Price/mo".bold(),
                     "Description".bold()
                 );
                 println!("{}", "─".repeat(100));
 
                 for plugin in &outputs {
-                    let tier_display = match plugin.tier.as_str() {
-                        "pro" => "pro".magenta().to_string(),
-                        _ => "basic".green().to_string(),
+                    let version_display = plugin
+                        .latest_version
+                        .as_deref()
+                        .unwrap_or("-");
+                    let price_display = if plugin.price_monthly_cents == 0 {
+                        "free".green().to_string()
+                    } else {
+                        format!("${:.2}", plugin.price_monthly_cents as f32 / 100.0)
+                            .magenta()
+                            .to_string()
                     };
-                    let rating_display = plugin
-                        .rating
-                        .map(|r| format!("{:.1}★", r))
-                        .unwrap_or_else(|| "-".to_string());
 
                     println!(
-                        "  {:<25} {:<10} {:<8} {:<6} {:<8} {}",
-                        plugin.name.cyan(),
-                        plugin.version,
-                        tier_display,
-                        rating_display,
-                        plugin.downloads,
-                        truncate_str(&plugin.description, 35)
+                        "  {:<25} {:<15} {:<10} {}",
+                        plugin.slug.cyan(),
+                        version_display,
+                        price_display,
+                        truncate_str(&plugin.description, 45)
                     );
                 }
 
@@ -102,9 +103,7 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
 }
 
 pub(super) async fn clear_cache(output_format: OutputFormat) -> Result<()> {
-    let client = MarketplaceClient::new();
-    let cache = CacheManager::new(client)?;
-    cache.clear().await?;
+    crate::marketplace::SubscriptionManager::clear_cache();
 
     match output_format {
         OutputFormat::Table => {

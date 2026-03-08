@@ -14,6 +14,7 @@ pub mod cache;
 pub mod config;
 pub mod cost;
 pub mod da;
+pub mod marketplace;
 #[cfg(feature = "dashboard")]
 pub mod dashboard;
 pub mod demo;
@@ -53,6 +54,7 @@ pub mod webhook;
 pub mod workflow;
 
 pub use acc::AccCommands;
+pub use marketplace::MarketplaceCommands;
 pub use admin::AdminCommands;
 pub use api::ApiCommands;
 pub use auth::AuthCommands;
