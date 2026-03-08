@@ -11,6 +11,7 @@
 pub mod commands;
 pub mod context_banner;
 pub mod credits;
+pub mod marketplace;
 pub mod mcp;
 pub mod output;
 pub mod plugins;
