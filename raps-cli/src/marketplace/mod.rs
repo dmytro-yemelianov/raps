@@ -3,6 +3,8 @@
 
 pub mod auth;
 pub mod client;
+pub mod subscription;
 
 pub use auth::MarketplaceAuth;
 pub use client::MarketplaceClient;
+pub use subscription::{CachedValidation, SubscriptionManager};
