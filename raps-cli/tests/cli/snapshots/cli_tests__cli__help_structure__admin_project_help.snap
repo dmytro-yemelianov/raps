@@ -29,11 +29,12 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-      --output <FORMAT>       Output format: table, json, yaml, csv, or plain (default: auto-detect) [possible values: table, json, yaml, csv, plain]
+      --output <FORMAT>       Output format: table, json, yaml, csv, or plain (default: auto-detect) [possible values: table, json, yaml, csv, plain, ndjson]
       --no-color              Disable colored output
   -q, --quiet                 Print only the result payload (useful with JSON output)
   -v, --verbose               Show verbose output (request summaries)
       --debug                 Show debug output (full trace, secrets redacted)
+      --log-file <PATH>       Write log output to PATH instead of the default platform log directory
       --profile               Profile performance (execution time, HTTP network time)
       --non-interactive       Non-interactive mode: fail if prompts would be required
       --yes                   Auto-confirm destructive actions
@@ -43,6 +44,7 @@ Options:
       --base-delay <SECONDS>  Base delay in seconds for exponential backoff (default: 1, env: RAPS_BASE_DELAY)
       --max-wait <SECONDS>    Maximum wait time in seconds between retries (default: 60, env: RAPS_MAX_WAIT)
       --no-retry              Disable automatic retries (fail immediately on errors)
+      --proxy <URL>           HTTP/HTTPS proxy URL (env: RAPS_PROXY), e.g. http://proxy.corp.example.com:8080
       --concurrency <N>       Maximum concurrent operations for bulk commands (default: 5, env: RAPS_CONCURRENCY)
       --no-cache              Disable the download cache
       --cache-dir <PATH>      Custom cache directory (default: platform cache dir)
