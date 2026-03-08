@@ -34,6 +34,7 @@
 mod commands;
 mod context_banner;
 mod credits;
+mod marketplace;
 mod mcp;
 mod output;
 mod plugins;
@@ -52,9 +53,9 @@ use std::io::{self, BufRead, IsTerminal};
 use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
-    ItemCommands, JobCommands, ObjectCommands, PipelineCommands, PluginCommands, ProjectCommands,
-    RealityCommands, ReportCommands, RfiCommands, SnapshotCommands, TemplateCommands, TranslateCommands,
-    WebhookCommands, WorkflowCommands,
+    ItemCommands, JobCommands, MarketplaceCommands, ObjectCommands, PipelineCommands, PluginCommands,
+    ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SnapshotCommands, TemplateCommands,
+    TranslateCommands, WebhookCommands, WorkflowCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -309,6 +310,10 @@ enum Commands {
     #[command(subcommand)]
     Plugin(PluginCommands),
 
+    /// RAPS Plugin Marketplace (license, install, search, publish)
+    #[command(subcommand)]
+    Marketplace(MarketplaceCommands),
+
     /// Generate synthetic engineering files for testing
     Generate(GenerateArgs),
 
@@ -435,9 +440,9 @@ enum Commands {
 const KNOWN_SUBCOMMANDS: &[&str] = &[
     "auth", "bucket", "object", "translate", "workflow", "sync", "watch", "stats", "init",
     "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
-    "api", "rfi", "report", "template", "reality", "inspect", "plugin", "generate", "demo",
-    "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache", "swarm",
-    "schema", "history", "replay", "man", "logs", "lint", "snapshot",
+    "api", "rfi", "report", "template", "reality", "inspect", "plugin", "marketplace", "generate",
+    "demo", "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache",
+    "swarm", "schema", "history", "replay", "man", "logs", "lint", "snapshot",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -1327,6 +1332,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Reality(_) => "reality",
         Commands::Inspect(_) => "inspect",
         Commands::Plugin(_) => "plugin",
+        Commands::Marketplace(_) => "marketplace",
         Commands::Generate(_) => "generate",
         Commands::Demo(_) => "demo",
         Commands::Config(_) => "config",
@@ -1558,6 +1564,10 @@ async fn execute_command(
 
         Commands::Plugin(cmd) => {
             cmd.execute(output_format)?;
+        }
+
+        Commands::Marketplace(cmd) => {
+            cmd.execute(output_format).await?;
         }
 
         Commands::Generate(args) => {
