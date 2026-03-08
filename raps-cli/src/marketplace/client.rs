@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use reqwest::Client;
 use raps_kernel::marketplace::{Plugin, ValidateResponse, VersionInfo};
 
-const API_BASE: &str = "https://marketplace.rapscli.xyz";
+const API_BASE: &str = "https://api.rapscli.xyz";
 const USER_AGENT: &str = concat!("raps-cli/", env!("CARGO_PKG_VERSION"));
 
 /// HTTP client for the marketplace API.
@@ -58,10 +58,6 @@ impl MarketplaceClient {
 
     /// List all published plugins from the public catalog.
     pub async fn list_plugins(&self) -> Result<Vec<Plugin>> {
-        #[derive(serde::Deserialize)]
-        struct PluginsResponse {
-            plugins: Vec<Plugin>,
-        }
         let url = format!("{}/plugins", self.api_base);
         let resp = self
             .client
@@ -72,8 +68,7 @@ impl MarketplaceClient {
         if !resp.status().is_success() {
             anyhow::bail!("Failed to list plugins (HTTP {})", resp.status());
         }
-        let body = resp.json::<PluginsResponse>().await.context("Failed to parse plugins response")?;
-        Ok(body.plugins)
+        resp.json::<Vec<Plugin>>().await.context("Failed to parse plugins response")
     }
 
     /// Get version history for a plugin.
@@ -111,7 +106,7 @@ impl MarketplaceClient {
         license_key: &str,
     ) -> Result<(Vec<u8>, String, String, String)> {
         let url = format!(
-            "{}/plugins/{}/download?platform={}",
+            "{}/license/plugins/{}/download?platform={}",
             self.api_base, slug, platform
         );
         let resp = self
