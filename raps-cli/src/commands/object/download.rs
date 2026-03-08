@@ -90,7 +90,8 @@ pub(super) async fn download_object(
     // Try cache first — use SHA1 from object details
     if raps_kernel::cache::is_enabled()
         && let Ok(details) = client.get_object_details(&bucket_key, &object_key).await
-        && let Ok(true) = raps_kernel::cache::materialize(&details.sha1, &output_path)
+        && let Some(ref sha1) = details.sha1
+        && let Ok(true) = raps_kernel::cache::materialize(sha1, &output_path)
     {
         if output_format.supports_colors() {
             println!(
@@ -134,7 +135,9 @@ pub(super) async fn download_object(
     if raps_kernel::cache::is_enabled()
         && let Ok(details) = client.get_object_details(&bucket_key, &object_key).await
     {
-        let _ = raps_kernel::cache::store(&details.sha1, &output_path);
+        if let Some(ref sha1) = details.sha1 {
+            let _ = raps_kernel::cache::store(sha1, &output_path);
+        }
     }
 
     let output = DownloadOutput {
@@ -411,7 +414,7 @@ pub(crate) struct ObjectInfoOutput {
     size: u64,
     size_human: String,
     content_type: String,
-    sha1: String,
+    sha1: Option<String>,
     created_date: Option<String>,
     last_modified_date: Option<String>,
     urn: String,
@@ -458,7 +461,9 @@ pub(super) async fn object_info(
                 output.size
             );
             println!("  {} {}", "Content-Type:".bold(), output.content_type);
-            println!("  {} {}", "SHA1:".bold(), output.sha1.dimmed());
+            if let Some(ref sha1) = output.sha1 {
+                println!("  {} {}", "SHA1:".bold(), sha1.dimmed());
+            }
             println!(
                 "  {} {}",
                 "Created:".bold(),

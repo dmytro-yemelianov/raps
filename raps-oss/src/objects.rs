@@ -412,7 +412,7 @@ impl OssClient {
             .await
             .context("Failed to parse object details response")?;
 
-        Ok(Some(details.sha1))
+        Ok(details.sha1)
     }
 
     /// Compute the SHA-1 of a local file and compare it to the remote object.
@@ -452,7 +452,7 @@ impl OssClient {
                     bucket_key: details.bucket_key,
                     object_key: details.object_key,
                     object_id: details.object_id,
-                    sha1: Some(details.sha1),
+                    sha1: details.sha1,
                     size: details.size,
                     location: details.location,
                     content_type: Some(details.content_type),

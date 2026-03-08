@@ -523,7 +523,7 @@ impl RapsServer {
                     details.size,
                     size_display,
                     details.content_type,
-                    details.sha1,
+                    details.sha1.as_deref().unwrap_or("-"),
                     details.created_date.unwrap_or_else(|| "-".to_string()),
                     details
                         .last_modified_date

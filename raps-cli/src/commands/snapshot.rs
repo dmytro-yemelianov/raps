@@ -26,8 +26,8 @@ pub enum SnapshotCommands {
         bucket: String,
 
         /// Output JSON file (default: snapshot-<bucket>-<timestamp>.json)
-        #[arg(long, short)]
-        output: Option<PathBuf>,
+        #[arg(long = "out-file", short = 'o')]
+        out_file: Option<PathBuf>,
     },
 
     /// Compare two snapshots and show added/removed/changed objects
@@ -50,8 +50,8 @@ pub enum SnapshotCommands {
 impl SnapshotCommands {
     pub async fn execute(self, oss_client: &OssClient, output_format: OutputFormat) -> Result<()> {
         match self {
-            SnapshotCommands::Create { bucket, output } => {
-                create_snapshot(oss_client, &bucket, output, output_format).await
+            SnapshotCommands::Create { bucket, out_file } => {
+                create_snapshot(oss_client, &bucket, out_file, output_format).await
             }
             SnapshotCommands::Diff { old, new, json } => diff_snapshots(&old, &new, json),
             SnapshotCommands::List => list_snapshots(),

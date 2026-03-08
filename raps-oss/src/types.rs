@@ -326,8 +326,9 @@ pub struct ObjectDetails {
     pub object_key: String,
     /// Object ID (URN format)
     pub object_id: String,
-    /// SHA-1 hash of the object
-    pub sha1: String,
+    /// SHA-1 hash of the object (may be null immediately after upload while APS computes it)
+    #[serde(default)]
+    pub sha1: Option<String>,
     /// Object size in bytes
     pub size: u64,
     /// MIME content type

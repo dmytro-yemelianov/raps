@@ -1522,6 +1522,7 @@ steps:
     ignore_failure: true
 
   - name: "Create bucket if missing"
+    depends_on: ["Check if bucket exists"]
     command: "bucket create --key ${BUCKET} --policy persistent"
     if: "${{ steps.check_bucket.exit_code != 0 }}"
 
@@ -1553,7 +1554,7 @@ steps:
       in: ["building.rvt", "site.dwg"]
       parallel: true
       max_concurrency: 4
-    command: "translate download urn:${BUCKET}/${MODEL} --output ./output/${MODEL}"
+    command: "translate download urn:${BUCKET}/${MODEL} --out-dir ./output/${MODEL}"
 
   - name: "Cleanup bucket"
     command: "bucket delete ${BUCKET} -y"
