@@ -21,6 +21,7 @@ extend-exclude = [
                                     DA = "DA"
                                     TUI = "TUI"
                                     MCP = "MCP"
+                                    AKS = "AKS"
                                     ratatui = "ratatui"
                                     rapscli = "rapscli"
                                     ervices = "ervices"
