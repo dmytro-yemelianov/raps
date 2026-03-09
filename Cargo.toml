@@ -15,7 +15,7 @@ exclude = ["python-bindings"]
 resolver = "2"
 
 [workspace.package]
-version = "5.4.5"
+version = "5.4.6"
 edition = "2024"
 authors = ["Dmytro Yemelianov"]
 license = "Apache-2.0"
@@ -26,15 +26,15 @@ rust-version = "1.88"
 
 [workspace.dependencies]
 # Internal crates
-raps-kernel = { path = "raps-kernel", version = "5.4.5" }
-raps-oss = { path = "raps-oss", version = "5.4.5" }
-raps-derivative = { path = "raps-derivative", version = "5.4.5" }
-raps-dm = { path = "raps-dm", version = "5.4.5" }
-raps-da = { path = "raps-da", version = "5.4.5" }
-raps-acc = { path = "raps-acc", version = "5.4.5" }
-raps-webhooks = { path = "raps-webhooks", version = "5.4.5" }
-raps-reality = { path = "raps-reality", version = "5.4.5" }
-raps-admin = { path = "raps-admin", version = "5.4.5" }
+raps-kernel = { path = "raps-kernel", version = "5.4.6" }
+raps-oss = { path = "raps-oss", version = "5.4.6" }
+raps-derivative = { path = "raps-derivative", version = "5.4.6" }
+raps-dm = { path = "raps-dm", version = "5.4.6" }
+raps-da = { path = "raps-da", version = "5.4.6" }
+raps-acc = { path = "raps-acc", version = "5.4.6" }
+raps-webhooks = { path = "raps-webhooks", version = "5.4.6" }
+raps-reality = { path = "raps-reality", version = "5.4.6" }
+raps-admin = { path = "raps-admin", version = "5.4.6" }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive"] }
