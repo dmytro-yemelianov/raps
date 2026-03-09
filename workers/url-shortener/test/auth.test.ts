@@ -27,6 +27,8 @@ describe('adminAuth middleware', () => {
       { headers: { Authorization: 'Bearer test-token' } },
       env,
     )
-    expect(res.status).not.toBe(401)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ ok: true })
   })
 })
