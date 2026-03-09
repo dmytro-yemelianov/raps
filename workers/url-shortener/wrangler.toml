@@ -4,7 +4,7 @@ compatibility_date = "2024-12-01"
 compatibility_flags = ["nodejs_compat"]
 
 kv_namespaces = [
-  { binding = "KV", id = "placeholder-replace-after-create" }
+  { binding = "KV", id = "cadc9df0822044969e38611c20753c61" }
 ]
 
 routes = [
