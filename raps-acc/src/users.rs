@@ -42,6 +42,51 @@ pub struct AddProjectUserRequest {
     pub products: Vec<ProductAccess>,
 }
 
+/// Single entry in a BIM 360 HQ v2 add-users request array
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Bim360AddUserEntry {
+    email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    role_id: Option<String>,
+}
+
+/// Single entry in a BIM 360 HQ v2 users response array
+#[derive(Debug, Clone, serde::Deserialize)]
+struct Bim360ProjectUserEntry {
+    #[serde(default)]
+    uid: Option<String>,
+    #[serde(default)]
+    id: Option<String>,
+    #[serde(default)]
+    email: Option<String>,
+    #[serde(default)]
+    first_name: Option<String>,
+    #[serde(default)]
+    last_name: Option<String>,
+}
+
+impl From<Bim360ProjectUserEntry> for crate::types::ProjectUser {
+    fn from(e: Bim360ProjectUserEntry) -> Self {
+        let id = e.uid.or(e.id).unwrap_or_default();
+        let name = match (e.first_name, e.last_name) {
+            (Some(f), Some(l)) => Some(format!("{f} {l}")),
+            (Some(f), None) => Some(f),
+            (None, Some(l)) => Some(l),
+            _ => None,
+        };
+        crate::types::ProjectUser {
+            id,
+            email: e.email,
+            name,
+            role_ids: vec![],
+            role_name: None,
+            products: None,
+            added_on: None,
+        }
+    }
+}
+
 /// Request to update a project user
 #[derive(Debug, Clone, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -265,6 +310,10 @@ impl ProjectUsersClient {
     }
 
     /// Add a user to a BIM 360 project via HQ v2 endpoint.
+    ///
+    /// BIM 360 differs from ACC in two ways:
+    /// - Request body is an **array** of `{ email, roleId }` (singular roleId)
+    /// - User must already be an account member; 404 means not-in-account
     async fn add_user_bim360(
         &self,
         account_id: &str,
@@ -274,25 +323,44 @@ impl ProjectUsersClient {
         let token = self.auth.get_3leg_token().await?;
         let url = self.project_url_bim360(account_id, project_id);
 
+        // BIM 360 HQ v2 expects an array body with singular `roleId`
+        let role_id = request.role_ids.into_iter().next();
+        let body = vec![Bim360AddUserEntry {
+            email: request.email.clone(),
+            role_id,
+        }];
+
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client
                 .post(&url)
                 .bearer_auth(&token)
                 .header("Content-Type", "application/json")
-                .json(&request)
+                .json(&body)
         })
         .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to add user to BIM 360 project ({status}): {error_text}");
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        if status == 404 {
+            anyhow::bail!(
+                "User '{}' not found in BIM 360 account. \
+                 Add the user to the account in BIM 360 Account Admin first.",
+                request.email
+            );
         }
 
-        response
-            .json()
-            .await
-            .context("Failed to parse BIM 360 add user response")
+        if !(200..300).contains(&(status as usize)) {
+            anyhow::bail!("Failed to add user to BIM 360 project (HTTP {status}): {error_text}");
+        }
+
+        // Response is an array — parse and return first element
+        let mut entries: Vec<Bim360ProjectUserEntry> =
+            serde_json::from_str(&error_text).context("Failed to parse BIM 360 add user response")?;
+        entries
+            .pop()
+            .map(Into::into)
+            .ok_or_else(|| anyhow::anyhow!("BIM 360 returned empty user list"))
     }
 
     /// Update a user's role or product access in a project
