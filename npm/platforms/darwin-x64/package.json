@@ -1,6 +1,6 @@
 {
   "name": "@dmytro-yemelianov/raps-cli-darwin-x64",
-  "version": "5.4.4",
+  "version": "5.4.5",
   "description": "RAPS CLI binary for macOS x64 (Intel)",
   "license": "Apache-2.0",
   "repository": {
