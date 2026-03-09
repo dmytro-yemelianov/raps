@@ -4,7 +4,7 @@ import app from '../src/index'
 
 describe('adminAuth middleware', () => {
   it('returns 401 when Authorization header is missing', async () => {
-    const res = await app.request('/api/test', {}, env)
+    const res = await app.request('/api/links', {}, env)
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body).toEqual({ error: 'Unauthorized' })
@@ -12,7 +12,7 @@ describe('adminAuth middleware', () => {
 
   it('returns 401 when token is wrong', async () => {
     const res = await app.request(
-      '/api/test',
+      '/api/links',
       { headers: { Authorization: 'Bearer wrong-token' } },
       env,
     )
@@ -23,12 +23,12 @@ describe('adminAuth middleware', () => {
 
   it('passes through when token is correct', async () => {
     const res = await app.request(
-      '/api/test',
+      '/api/links',
       { headers: { Authorization: 'Bearer test-token' } },
       env,
     )
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body).toEqual({ ok: true })
+    expect(Array.isArray(body)).toBe(true)
   })
 })

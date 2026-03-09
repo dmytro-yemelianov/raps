@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { adminAuth } from './auth'
 import { handleRedirect } from './redirect'
+import { shortenHandler, deleteHandler, listHandler } from './api'
 
 export type Env = {
   KV: KVNamespace
@@ -14,7 +15,9 @@ app.get('/', (c) => c.text('go.rapscli.xyz'))
 
 app.use('/api/*', adminAuth)
 
-app.get('/api/test', (c) => c.json({ ok: true }))
+app.post('/api/shorten', shortenHandler)
+app.delete('/api/links/:code', deleteHandler)
+app.get('/api/links', listHandler)
 
 app.get('/:code', handleRedirect)
 
