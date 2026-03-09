@@ -106,7 +106,7 @@ export function adminUI(c: Context<{ Bindings: Env }>): Response {
         const shortUrl = window.location.origin + '/' + escapeHtml(link.code);
         return '<tr>' +
           '<td><a href="/' + escapeHtml(link.code) + '" target="_blank">' + escapeHtml(link.code) + '</a></td>' +
-          '<td><a href="' + escapeHtml(link.url) + '" target="_blank">' + escapeHtml(link.url) + '</a></td>' +
+          '<td><a href="' + safeHref(link.url) + '" target="_blank">' + escapeHtml(link.url) + '</a></td>' +
           '<td><button class="delete-btn" onclick="deleteLink(' + JSON.stringify(link.code) + ')">Delete</button></td>' +
           '</tr>';
       }).join('');
@@ -179,6 +179,14 @@ export function adminUI(c: Context<{ Bindings: Env }>): Response {
       }
 
       loadLinks();
+    }
+
+    function safeHref(url) {
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '#';
+        return escapeHtml(url);
+      } catch { return '#'; }
     }
 
     function escapeHtml(str) {
