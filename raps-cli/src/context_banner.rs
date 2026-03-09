@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2024-2025 Dmytro Yemelianov
 
-//! Visual context banner for Personal vs Enterprise hub display.
+//! Visual context banner for hub type display.
 
 /// Width of the terminal box borders (total line width).
 pub const BOX_WIDTH: usize = 80;
@@ -11,7 +11,11 @@ pub const INNER_WIDTH: usize = 76;
 /// Hub account tier — determines visual treatment.
 #[derive(Debug, Clone, PartialEq)]
 pub enum HubTier {
+    /// A360 personal hub (autodesk.a360)
     Personal,
+    /// Autodesk Team Hub (autodesk.core:Hub) — collaboration hub, not ACC/BIM 360
+    Team,
+    /// ACC or BIM 360 construction hub (autodesk.acc, autodesk.bim360, autodesk.accproject)
     Enterprise,
     Unknown,
 }
@@ -28,7 +32,8 @@ pub struct HubEntry {
 /// Derive tier from APS extension_type string.
 pub fn tier_from_extension(ext: Option<&str>) -> HubTier {
     match ext {
-        Some(e) if e.contains("autodesk.core:Hub") => HubTier::Personal,
+        Some(e) if e.contains("autodesk.a360") => HubTier::Personal,
+        Some(e) if e.contains("autodesk.core:Hub") => HubTier::Team,
         Some(e)
             if e.contains("autodesk.bim360:Account")
                 || e.contains("autodesk.acc:Account")
@@ -66,6 +71,7 @@ impl HubEntry {
     pub fn tier_label(&self) -> &'static str {
         match self.tier {
             HubTier::Personal   => "○ PERSONAL  ",
+            HubTier::Team       => "◇ TEAM      ",
             HubTier::Enterprise => "◆ ENTERPRISE",
             HubTier::Unknown    => "? UNKNOWN   ",
         }
@@ -137,7 +143,8 @@ impl ContextBanner {
     ///
     /// Format (80-col safe):
     ///   ○ PERSONAL    My Projects              a.aBcD…xyz  [US]
-    ///   ◆ ENTERPRISE  Acme Corp                01fb…ae05   [US]
+    ///   ◇ TEAM        RAPS HUB                 a.YnVz…MTAz [US]
+    ///   ◆ ENTERPRISE  Acme Corp                b.01fb…ae05  [US]
     pub fn print_inline(&self) {
         for entry in &self.hubs {
             let region = entry.region.as_deref().unwrap_or("--");
@@ -152,6 +159,7 @@ impl ContextBanner {
             );
             match entry.tier {
                 HubTier::Personal   => eprintln!("{}", line.dimmed()),
+                HubTier::Team       => eprintln!("{}", line),
                 HubTier::Enterprise => eprintln!("{}", line.cyan().bold()),
                 HubTier::Unknown    => eprintln!("{}", line.dimmed()),
             }
@@ -235,9 +243,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_personal_hub_tier() {
+    fn test_team_hub_tier() {
         assert_eq!(
             tier_from_extension(Some("hubs:autodesk.core:Hub")),
+            HubTier::Team
+        );
+    }
+
+    #[test]
+    fn test_personal_a360_tier() {
+        assert_eq!(
+            tier_from_extension(Some("hubs:autodesk.a360:PersonalHub")),
             HubTier::Personal
         );
     }
@@ -304,7 +320,7 @@ mod tests {
         ];
         let banner = ContextBanner::from_hubs(&hubs);
         assert_eq!(banner.hubs.len(), 2);
-        assert_eq!(banner.hubs[0].tier, HubTier::Personal);
+        assert_eq!(banner.hubs[0].tier, HubTier::Team);
         assert_eq!(banner.hubs[1].tier, HubTier::Enterprise);
     }
 

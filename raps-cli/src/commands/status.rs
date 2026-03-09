@@ -222,6 +222,7 @@ pub async fn run_status(
                     // Tier glyph + label
                     let (glyph, tier_label) = match tier {
                         HubTier::Personal   => ("○", "PERSONAL   "),
+                        HubTier::Team       => ("◇", "TEAM       "),
                         HubTier::Enterprise => ("◆", "ENTERPRISE "),
                         HubTier::Unknown    => ("?", "UNKNOWN    "),
                     };
@@ -248,6 +249,7 @@ pub async fn run_status(
 
                     match tier {
                         HubTier::Personal   => println!("{}", hub_line.dimmed()),
+                        HubTier::Team       => println!("{}", hub_line),
                         HubTier::Enterprise => println!("{}", hub_line.cyan().bold()),
                         HubTier::Unknown    => println!("{}", hub_line.dimmed()),
                     }
