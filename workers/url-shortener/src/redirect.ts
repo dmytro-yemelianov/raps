@@ -19,5 +19,6 @@ export async function handleRedirect(c: Context<{ Bindings: Env }>): Promise<Res
     return c.redirect(url, 301)
   }
 
-  return c.html(`<h1>Not found</h1><p>No link for <code>${code}</code></p>`, 404)
+  const safe = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return c.html(`<h1>Not found</h1><p>No link for <code>${safe}</code></p>`, 404)
 }

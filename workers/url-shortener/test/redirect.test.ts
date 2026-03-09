@@ -22,5 +22,6 @@ describe('redirect', () => {
     expect(res.status).toBe(404)
     const body = await res.text()
     expect(body).toContain('nonexistent')
+    expect(res.headers.get('Content-Type')).toContain('text/html')
   })
 })
