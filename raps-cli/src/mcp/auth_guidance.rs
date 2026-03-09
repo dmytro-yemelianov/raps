@@ -99,7 +99,7 @@ pub fn get_tool_auth_requirement(tool_name: &str) -> AuthRequirement {
         "admin_user_add"
         | "admin_user_remove"
         | "admin_user_update_role"
-        | "admin_folder_rights" => AuthRequirement::TwoLegged,
+        | "admin_folder_set_permissions" => AuthRequirement::TwoLegged,
 
         // Data Management tools - 3-legged required
         "hub_list" | "project_list" | "folder_list" | "folder_create" | "item_info"

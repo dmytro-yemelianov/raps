@@ -429,16 +429,32 @@ impl RapsServer {
         &self,
         project_id: String,
         email: String,
-        role_id: Option<String>,
+        role: Option<String>,
     ) -> String {
         use raps_acc::users::AddProjectUserRequest;
 
         let client = self.get_users_client().await;
+        let role_name = role.as_deref().unwrap_or("member");
+
+        // Resolve role name to products or UUID
+        let admin_client = self.get_admin_client().await;
+        let (role_ids, products) = match admin_client.resolve_role("", role_name).await {
+            Ok(raps_acc::admin::ResolvedRole::Uuid(id)) => (vec![id], vec![]),
+            Ok(raps_acc::admin::ResolvedRole::Products(prods)) => (vec![], prods),
+            Err(_) => {
+                // If resolution fails, try as raw UUID
+                if role.is_some() {
+                    (vec![role_name.to_string()], vec![])
+                } else {
+                    (vec![], vec![])
+                }
+            }
+        };
 
         let request = AddProjectUserRequest {
             email: email.clone(),
-            role_ids: role_id.map(|s| vec![s]).unwrap_or_default(),
-            products: vec![],
+            role_ids,
+            products,
             suppress_administrative_emails: false,
         };
 
@@ -470,7 +486,7 @@ impl RapsServer {
                 let email = v.get("email")?.as_str()?.to_string();
                 Some(ImportUserRequest {
                     email,
-                    role_ids: v.get("role_id").and_then(|r| r.as_str()).map(|s| vec![s.to_string()]).unwrap_or_default(),
+                    role_ids: v.get("role").and_then(|r| r.as_str()).map(|s| vec![s.to_string()]).unwrap_or_default(),
                     products: None,
                 })
             })
@@ -574,19 +590,28 @@ impl RapsServer {
         &self,
         project_id: String,
         user_id: String,
-        role_id: Option<String>,
+        role: Option<String>,
     ) -> String {
         use raps_acc::users::UpdateProjectUserRequest;
 
         let client = self.get_users_client().await;
 
-        if role_id.is_none() {
-            return "Error: At least role_id must be provided.".to_string();
+        if role.is_none() {
+            return "Error: role must be provided (e.g. admin, member, editor, viewer, or a UUID).".to_string();
         }
+        let role_name = role.as_deref().unwrap();
+
+        // Resolve role name to products or UUID
+        let admin_client = self.get_admin_client().await;
+        let (role_ids, products) = match admin_client.resolve_role("", role_name).await {
+            Ok(raps_acc::admin::ResolvedRole::Uuid(id)) => (vec![id], None),
+            Ok(raps_acc::admin::ResolvedRole::Products(prods)) => (vec![], Some(prods)),
+            Err(_) => (vec![role_name.to_string()], None),
+        };
 
         let request = UpdateProjectUserRequest {
-            role_ids: role_id.map(|s| vec![s]).unwrap_or_default(),
-            products: None,
+            role_ids,
+            products,
         };
 
         match client.update_user(&project_id, &user_id, request).await {

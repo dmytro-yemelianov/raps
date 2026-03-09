@@ -49,7 +49,7 @@ pub const TOOLS: &[&str] = &[
     "admin_user_add",
     "admin_user_remove",
     "admin_user_update_role",
-    "admin_folder_rights",
+    "admin_folder_set_permissions",
     "admin_operation_list",
     "admin_operation_status",
     "admin_operation_resume",

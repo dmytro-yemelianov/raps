@@ -21,7 +21,7 @@ For 3-legged auth in headless environments: `raps auth login --device`
 |---|---|---|
 | `auth_test` | either | Test 2-legged OAuth authentication with APS |
 | `auth_status` | either | Check authentication status (2-legged and 3-legged) |
-| `auth_login` | either | Get instructions for 3-legged OAuth login. Login requires browser interaction and must be done via CLI. |
+| `auth_login` | either | Get instructions for 3-legged OAuth login. Supports browser-based and device code flow (headless). Must be done via CLI. |
 | `auth_logout` | either | Logout from 3-legged OAuth and clear stored tokens. WARNING: destructive — only call when the user explicitly requests logout. |
 | `bucket_list` | 2-leg | List OSS buckets. Buckets are containers for storing files. |
 | `bucket_create` | 2-leg | Create a new OSS bucket. Keys must be globally unique, 3-128 chars. |
@@ -37,12 +37,12 @@ For 3-legged auth in headless environments: `raps auth login --device`
 | `hub_info` | 2-leg | Get details of a specific hub (name, type, region). Requires 3-legged auth. |
 | `project_list` | 3-leg | List projects in a hub. Requires 3-legged auth. |
 | `admin_project_list` | 2-leg | List projects in an ACC/BIM360 account with advanced filtering. Supports name patterns, status, platform, date ranges, and regions. |
-| `admin_user_add` | 2-leg | Bulk add a user to multiple projects across an account. Supports dry-run mode. |
-| `admin_user_remove` | 2-leg | Bulk remove a user from multiple projects across an account. Supports dry-run mode. |
-| `admin_user_update_role` | 2-leg | Bulk update a user's role across multiple projects. Supports dry-run mode. |
+| `admin_user_add` | 2-leg | [bulk] Add a user to multiple projects across an account. Use project_user_add for a single project. Supports dry-run mode. |
+| `admin_user_remove` | 2-leg | [bulk] Remove a user from multiple projects across an account. Use project_user_remove for a single project. Supports dry-run mode. |
+| `admin_user_update_role` | 2-leg | [bulk] Update a user's role across multiple projects. Use project_user_update for a single project. Supports dry-run mode. |
 | `admin_operation_list` | 2-leg | List recent bulk admin operations for status tracking and resume. |
 | `admin_operation_status` | 2-leg | Get detailed status of a bulk admin operation. |
-| `admin_folder_rights` | 2-leg | Bulk update folder permissions for a user across multiple projects. Supports dry-run mode. |
+| `admin_folder_set_permissions` | 2-leg | Bulk update folder permissions for a user across multiple projects. Supports dry-run mode. |
 | `admin_operation_resume` | 2-leg | Resume an interrupted bulk admin operation from where it left off. |
 | `admin_operation_cancel` | 2-leg | Cancel an in-progress bulk admin operation. |
 | `folder_list` | 3-leg | List contents of a folder (files and subfolders). Requires 3-legged auth. |
@@ -82,7 +82,7 @@ For 3-legged auth in headless environments: `raps auth login --device`
 | `project_users_list` | 3-leg | List users with access to a project with pagination. Requires 3-legged auth. |
 | `folder_contents` | 3-leg | List all items and subfolders within a folder. Requires 3-legged auth. |
 | `project_create` | 3-leg | Create a new ACC project from scratch or from a template. ACC only (not BIM 360). Polls until project is activated. Requires 3-legged auth. |
-| `project_user_add` | 3-leg | Add a user to an ACC project with optional role assignment. Requires 3-legged auth. |
+| `project_user_add` | 3-leg | Add a user to a single ACC project by email. Accepts role name (admin, member, editor, viewer) or UUID. Requires 3-legged auth. |
 | `project_users_import` | 3-leg | Import multiple users to an ACC project at once. Requires 3-legged auth. |
 | `project_update` | 2-leg | Update an ACC project's metadata (name, status, dates). Requires 3-legged auth. |
 | `project_archive` | 2-leg | Archive an ACC project (soft delete). Archived projects can be restored later. Requires 3-legged auth. |

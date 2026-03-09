@@ -238,7 +238,7 @@ impl RapsServer {
                 let operation_id = Self::optional_arg(&args, "operation_id");
                 self.admin_operation_status(operation_id).await
             }
-            "admin_folder_rights" => {
+            "admin_folder_set_permissions" => {
                 let account_id = match Self::required_arg(&args, "account_id") {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
@@ -257,7 +257,7 @@ impl RapsServer {
                     .get("dry_run")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                self.admin_folder_rights(account_id, email, level, folder, filter, dry_run)
+                self.admin_folder_set_permissions(account_id, email, level, folder, filter, dry_run)
                     .await
             }
             "admin_operation_resume" => {
@@ -833,8 +833,8 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                let role_id = Self::optional_arg(&args, "role_id");
-                self.project_user_add(project_id, email, role_id).await
+                let role = Self::optional_arg(&args, "role");
+                self.project_user_add(project_id, email, role).await
             }
             "project_users_import" => {
                 let project_id = match Self::required_arg(&args, "project_id") {
@@ -895,8 +895,8 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                let role_id = Self::optional_arg(&args, "role_id");
-                self.project_user_update(project_id, user_id, role_id).await
+                let role = Self::optional_arg(&args, "role");
+                self.project_user_update(project_id, user_id, role).await
             }
 
             // ================================================================

@@ -251,7 +251,7 @@ impl RapsServer {
         }
     }
 
-    pub(crate) async fn admin_folder_rights(
+    pub(crate) async fn admin_folder_set_permissions(
         &self,
         account_id: String,
         email: String,

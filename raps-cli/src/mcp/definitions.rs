@@ -32,7 +32,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "auth_login",
-            "Get instructions for 3-legged OAuth login. Login requires browser interaction and must be done via CLI.",
+            "Get instructions for 3-legged OAuth login. Supports browser-based and device code flow (headless). Must be done via CLI.",
             schema(json!({}), &[]),
         ),
         Tool::new(
@@ -197,7 +197,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "admin_user_add",
-            "Bulk add a user to multiple projects across an account. Supports dry-run mode.",
+            "[bulk] Add a user to multiple projects across an account. Use project_user_add for a single project. Supports dry-run mode.",
             schema(
                 json!({
                     "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
@@ -211,7 +211,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "admin_user_remove",
-            "Bulk remove a user from multiple projects across an account. Supports dry-run mode.",
+            "[bulk] Remove a user from multiple projects across an account. Use project_user_remove for a single project. Supports dry-run mode.",
             schema(
                 json!({
                     "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
@@ -224,7 +224,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "admin_user_update_role",
-            "Bulk update a user's role across multiple projects. Supports dry-run mode.",
+            "[bulk] Update a user's role across multiple projects. Use project_user_update for a single project. Supports dry-run mode.",
             schema(
                 json!({
                     "account_id": {"type": "string", "description": "The ACC/BIM360 account ID"},
@@ -257,7 +257,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
             ),
         ),
         Tool::new(
-            "admin_folder_rights",
+            "admin_folder_set_permissions",
             "Bulk update folder permissions for a user across multiple projects. Supports dry-run mode.",
             schema(
                 json!({
@@ -767,12 +767,12 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "project_user_add",
-            "Add a user to an ACC project with optional role assignment. Requires 3-legged auth.",
+            "Add a user to a single ACC project by email. Accepts role name (admin, member, editor, viewer) or UUID. Requires 3-legged auth.",
             schema(
                 json!({
                     "project_id": {"type": "string", "description": "Project ID"},
                     "email": {"type": "string", "description": "User email address"},
-                    "role_id": {"type": "string", "description": "Optional role ID to assign"}
+                    "role": {"type": "string", "description": "Role name (admin, member, editor, viewer) or role UUID. Defaults to member if omitted."}
                 }),
                 &["project_id", "email"],
             ),
@@ -783,7 +783,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
             schema(
                 json!({
                     "project_id": {"type": "string", "description": "Project ID"},
-                    "users": {"type": "array", "items": {"type": "object", "properties": {"email": {"type": "string"}, "role_id": {"type": "string"}}, "required": ["email"]}, "description": "Array of users to import"}
+                    "users": {"type": "array", "items": {"type": "object", "properties": {"email": {"type": "string"}, "role": {"type": "string"}}, "required": ["email"]}, "description": "Array of users to import"}
                 }),
                 &["project_id", "users"],
             ),
@@ -832,7 +832,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
                 json!({
                     "project_id": {"type": "string", "description": "Project ID"},
                     "user_id": {"type": "string", "description": "User ID to update"},
-                    "role_id": {"type": "string", "description": "New role ID to assign"}
+                    "role": {"type": "string", "description": "New role name (admin, member, editor, viewer) or UUID"}
                 }),
                 &["project_id", "user_id"],
             ),
