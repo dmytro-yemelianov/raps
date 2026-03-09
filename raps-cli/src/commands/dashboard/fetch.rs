@@ -212,7 +212,460 @@ async fn fetch_data(
     }
 
     match view {
-        // ... (earlier match arms)
+        ViewKind::BucketList => {
+            let buckets = clients.oss.list_buckets().await?;
+            let rows: Vec<resources::buckets::BucketRow> = buckets
+                .into_iter()
+                .map(|b| resources::buckets::BucketRow {
+                    key: b.bucket_key,
+                    policy: b.policy_key,
+                    created: util::format_timestamp(b.created_date),
+                })
+                .collect();
+            Ok(ResourceData::Buckets(resources::buckets::BucketList { rows }))
+        }
+        ViewKind::BucketDetail { bucket_key } => {
+            let detail = clients.oss.get_bucket_details(bucket_key).await?;
+            let fields = vec![
+                DetailField {
+                    label: "Bucket Key".into(),
+                    value: detail.bucket_key,
+                },
+                DetailField {
+                    label: "Owner".into(),
+                    value: detail.bucket_owner,
+                },
+                DetailField {
+                    label: "Policy".into(),
+                    value: detail.policy_key,
+                },
+                DetailField {
+                    label: "Created".into(),
+                    value: util::format_timestamp(detail.created_date),
+                },
+                DetailField {
+                    label: "Permissions".into(),
+                    value: format!("{:?}", detail.permissions),
+                },
+            ];
+            Ok(ResourceData::BucketDetail(fields))
+        }
+        ViewKind::ObjectList { bucket_key } => {
+            let objects = clients.oss.list_objects(bucket_key).await?;
+            let rows: Vec<resources::objects::ObjectRow> = objects
+                .into_iter()
+                .map(|o| resources::objects::ObjectRow {
+                    key: o.object_key,
+                    size: util::format_size(o.size),
+                    sha1: o.sha1.unwrap_or_default(),
+                })
+                .collect();
+            Ok(ResourceData::Objects(resources::objects::ObjectList {
+                bucket_key: bucket_key.to_string(),
+                rows,
+            }))
+        }
+        ViewKind::ObjectDetail {
+            bucket_key,
+            object_key,
+        } => {
+            let detail = clients
+                .oss
+                .get_object_details(bucket_key, object_key)
+                .await?;
+            let fields = vec![
+                DetailField {
+                    label: "Bucket".into(),
+                    value: detail.bucket_key,
+                },
+                DetailField {
+                    label: "Object Key".into(),
+                    value: detail.object_key,
+                },
+                DetailField {
+                    label: "Object ID".into(),
+                    value: detail.object_id,
+                },
+                DetailField {
+                    label: "Size".into(),
+                    value: util::format_size(detail.size),
+                },
+                DetailField {
+                    label: "SHA1".into(),
+                    value: detail.sha1.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Content Type".into(),
+                    value: detail.content_type,
+                },
+                DetailField {
+                    label: "Location".into(),
+                    value: detail.location.unwrap_or_default(),
+                },
+            ];
+            Ok(ResourceData::ObjectDetail(fields))
+        }
+        ViewKind::HubList => {
+            // Try AEC Data Model GraphQL first (faster), fall back to REST
+            let hubs = match clients.dm.list_hubs_graphql().await {
+                Ok(h) => h,
+                Err(gql_err) => {
+                    tracing::info!("GraphQL hubs failed, falling back to REST: {gql_err:#}");
+                    clients.dm.list_hubs().await?
+                }
+            };
+            let rows: Vec<resources::hubs::HubRow> = hubs
+                .into_iter()
+                .map(|h| resources::hubs::HubRow {
+                    name: h.attributes.name,
+                    id: h.id,
+                    region: h.attributes.region.unwrap_or_default(),
+                })
+                .collect();
+            Ok(ResourceData::Hubs(resources::hubs::HubList { rows }))
+        }
+        ViewKind::ProjectList { hub_id } => {
+            // Try AEC Data Model GraphQL first (faster), fall back to REST
+            let projects = match clients.dm.list_projects_graphql(hub_id).await {
+                Ok(p) => p,
+                Err(gql_err) => {
+                    tracing::info!("GraphQL projects failed, falling back to REST: {gql_err:#}");
+                    clients.dm.list_projects(hub_id).await?
+                }
+            };
+            let rows: Vec<resources::projects::ProjectRow> = projects
+                .into_iter()
+                .map(|p| resources::projects::ProjectRow {
+                    name: p.attributes.name,
+                    id: p.id,
+                })
+                .collect();
+            Ok(ResourceData::Projects(resources::projects::ProjectList {
+                hub_id: hub_id.to_string(),
+                rows,
+            }))
+        }
+        ViewKind::FolderList {
+            project_id,
+            folder_id,
+        } => {
+            if let Some(hub_id) = folder_id.strip_prefix("__top__") {
+                let folders = clients.dm.get_top_folders(hub_id, project_id).await?;
+                let rows: Vec<resources::folders::FolderContentRow> = folders
+                    .into_iter()
+                    .map(|f| resources::folders::FolderContentRow {
+                        name: f.attributes.display_name.unwrap_or(f.attributes.name),
+                        content_type: "folder".into(),
+                        id: f.id,
+                        modified: f.attributes.last_modified_time.unwrap_or_default(),
+                    })
+                    .collect();
+                Ok(ResourceData::FolderContents(resources::folders::FolderList {
+                    project_id: project_id.to_string(),
+                    rows,
+                }))
+            } else {
+                let contents = clients
+                    .dm
+                    .list_folder_contents(project_id, folder_id)
+                    .await?;
+                let rows: Vec<resources::folders::FolderContentRow> = contents
+                    .into_iter()
+                    .filter_map(|val| {
+                        let obj = val.as_object()?;
+                        let item_type = obj.get("type")?.as_str()?.to_string();
+                        let id = obj.get("id")?.as_str()?.to_string();
+                        let attrs = obj.get("attributes")?.as_object()?;
+                        let name = attrs
+                            .get("displayName")
+                            .or_else(|| attrs.get("name"))
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("(unknown)")
+                            .to_string();
+                        let modified = attrs
+                            .get("lastModifiedTime")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let content_type = if item_type.contains("folder") {
+                            "folder"
+                        } else {
+                            "item"
+                        }
+                        .to_string();
+                        Some(resources::folders::FolderContentRow {
+                            name,
+                            content_type,
+                            id,
+                            modified,
+                        })
+                    })
+                    .collect();
+                Ok(ResourceData::FolderContents(resources::folders::FolderList {
+                    project_id: project_id.to_string(),
+                    rows,
+                }))
+            }
+        }
+        ViewKind::ItemDetail {
+            project_id,
+            item_id,
+        } => {
+            let item = clients.dm.get_item(project_id, item_id).await?;
+            let mut fields = vec![
+                DetailField {
+                    label: "ID".into(),
+                    value: item.id,
+                },
+                DetailField {
+                    label: "Name".into(),
+                    value: item.attributes.display_name,
+                },
+                DetailField {
+                    label: "Type".into(),
+                    value: item.item_type,
+                },
+                DetailField {
+                    label: "Created".into(),
+                    value: item.attributes.create_time.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Modified".into(),
+                    value: item.attributes.last_modified_time.unwrap_or_default(),
+                },
+            ];
+            if let Ok(versions) = clients.dm.get_item_versions(project_id, item_id).await {
+                fields.push(DetailField {
+                    label: "Versions".into(),
+                    value: format!("{}", versions.len()),
+                });
+                for v in versions.iter().take(5) {
+                    let ver_num = v
+                        .attributes
+                        .version_number
+                        .map(|n| n.to_string())
+                        .unwrap_or_default();
+                    let size = v
+                        .attributes
+                        .storage_size
+                        .map(|s| util::format_size(s as u64))
+                        .unwrap_or_default();
+                    fields.push(DetailField {
+                        label: format!("  v{ver_num}"),
+                        value: format!(
+                            "{} ({})",
+                            v.attributes
+                                .display_name
+                                .as_deref()
+                                .unwrap_or(&v.attributes.name),
+                            size
+                        ),
+                    });
+                }
+            }
+            Ok(ResourceData::ItemDetail(fields))
+        }
+        ViewKind::IssueList { project_id } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let issues = clients
+                .issues
+                .list_issues(&acc_pid, None)
+                .await
+                .map_err(|e| anyhow::anyhow!("Issues API (pid={acc_pid}): {e:#}"))?;
+            let rows: Vec<resources::construction::IssueRow> = issues
+                .into_iter()
+                .map(|i| resources::construction::IssueRow {
+                    title: i.title,
+                    status: i.status,
+                    assigned_to: i.assigned_to.unwrap_or_default(),
+                    created_at: i.created_at.unwrap_or_default(),
+                    id: i.id,
+                })
+                .collect();
+            Ok(ResourceData::Issues(resources::construction::IssueList {
+                project_id: project_id.to_string(),
+                rows,
+            }))
+        }
+        ViewKind::IssueDetail {
+            project_id,
+            issue_id,
+        } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let issue = clients.issues.get_issue(&acc_pid, issue_id).await?;
+            let fields = vec![
+                DetailField {
+                    label: "ID".into(),
+                    value: issue.id,
+                },
+                DetailField {
+                    label: "Title".into(),
+                    value: issue.title,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: issue.status,
+                },
+                DetailField {
+                    label: "Description".into(),
+                    value: issue.description.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Assigned To".into(),
+                    value: issue.assigned_to.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Due Date".into(),
+                    value: issue.due_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created At".into(),
+                    value: issue.created_at.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created By".into(),
+                    value: issue.created_by.unwrap_or_default(),
+                },
+            ];
+            Ok(ResourceData::IssueDetail(fields))
+        }
+        ViewKind::IssueCommentList {
+            project_id,
+            issue_id,
+        } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let comments = clients.issues.list_comments(&acc_pid, issue_id).await?;
+            let rows: Vec<IssueCommentRow> = comments
+                .into_iter()
+                .map(|c| IssueCommentRow {
+                    id: c.id,
+                    body: c.body.chars().take(80).collect(),
+                    created_by: c.created_by.unwrap_or_default(),
+                    created_at: c.created_at.unwrap_or_default(),
+                })
+                .collect();
+            Ok(ResourceData::IssueComments(rows))
+        }
+        ViewKind::IssueAttachmentList {
+            project_id,
+            issue_id,
+        } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let attachments = clients.issues.list_attachments(&acc_pid, issue_id).await?;
+            let rows: Vec<IssueAttachmentRow> = attachments
+                .into_iter()
+                .map(|a| IssueAttachmentRow {
+                    id: a.id,
+                    name: a.name,
+                    urn: a.urn.unwrap_or_default(),
+                })
+                .collect();
+            Ok(ResourceData::IssueAttachments(rows))
+        }
+        ViewKind::IssueTypeList { project_id } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let types = clients.issues.list_issue_types(&acc_pid).await?;
+            let rows: Vec<IssueTypeRow> = types
+                .into_iter()
+                .map(|t| IssueTypeRow {
+                    id: t.id,
+                    title: t.title,
+                    is_active: if t.is_active.unwrap_or(false) {
+                        "Yes"
+                    } else {
+                        "No"
+                    }
+                    .into(),
+                })
+                .collect();
+            Ok(ResourceData::IssueTypes(rows))
+        }
+        ViewKind::RfiList { project_id } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let rfis = clients
+                .rfi
+                .list_rfis(&acc_pid)
+                .await
+                .map_err(|e| anyhow::anyhow!("RFI API (pid={acc_pid}): {e:#}"))?;
+            let rows: Vec<resources::construction::RfiRow> = rfis
+                .into_iter()
+                .map(|r: Rfi| resources::construction::RfiRow {
+                    title: r.title,
+                    status: r.status,
+                    priority: r.priority.unwrap_or_default(),
+                    created_at: r.created_at.unwrap_or_default(),
+                    id: r.id,
+                })
+                .collect();
+            Ok(ResourceData::Rfis(resources::construction::RfiList {
+                project_id: project_id.to_string(),
+                rows,
+            }))
+        }
+        ViewKind::RfiDetail { project_id, rfi_id } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let rfi = clients.rfi.get_rfi(&acc_pid, rfi_id).await?;
+            let fields = vec![
+                DetailField {
+                    label: "ID".into(),
+                    value: rfi.id,
+                },
+                DetailField {
+                    label: "Title".into(),
+                    value: rfi.title,
+                },
+                DetailField {
+                    label: "Status".into(),
+                    value: rfi.status,
+                },
+                DetailField {
+                    label: "Priority".into(),
+                    value: rfi.priority.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Question".into(),
+                    value: rfi.question.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Answer".into(),
+                    value: rfi.answer.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Assigned To".into(),
+                    value: rfi.assigned_to_name.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Due Date".into(),
+                    value: rfi.due_date.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created At".into(),
+                    value: rfi.created_at.unwrap_or_default(),
+                },
+                DetailField {
+                    label: "Created By".into(),
+                    value: rfi.created_by_name.unwrap_or_default(),
+                },
+            ];
+            Ok(ResourceData::RfiDetail(fields))
+        }
+        ViewKind::AssetList { project_id } => {
+            let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
+            let assets = clients.acc.list_assets(&acc_pid).await?;
+            let rows: Vec<resources::construction::AssetRow> = assets
+                .into_iter()
+                .map(|a| resources::construction::AssetRow {
+                    id: a.id,
+                    client_asset_id: a.client_asset_id.unwrap_or_default(),
+                    description: a.description.unwrap_or_default(),
+                    status: a.status_id.unwrap_or_default(),
+                })
+                .collect();
+            Ok(ResourceData::Assets(resources::construction::AssetList {
+                project_id: project_id.to_string(),
+                rows,
+            }))
+        }
         ViewKind::AssetDetail {
             project_id,
             asset_id,
@@ -263,9 +716,9 @@ async fn fetch_data(
         ViewKind::SubmittalList { project_id } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let submittals = clients.acc.list_submittals(&acc_pid).await?;
-            let rows: Vec<SubmittalRow> = submittals
+            let rows: Vec<resources::construction::SubmittalRow> = submittals
                 .into_iter()
-                .map(|s| SubmittalRow {
+                .map(|s| resources::construction::SubmittalRow {
                     id: s.id,
                     title: s.title,
                     number: s.number.unwrap_or_default(),
@@ -273,7 +726,10 @@ async fn fetch_data(
                     due_date: s.due_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Submittals(rows))
+            Ok(ResourceData::Submittals(resources::construction::SubmittalList {
+                project_id: project_id.to_string(),
+                rows,
+            }))
         }
         ViewKind::SubmittalDetail {
             project_id,
@@ -325,9 +781,9 @@ async fn fetch_data(
         ViewKind::ChecklistList { project_id } => {
             let acc_pid = resolve_acc_project_id(clients, project_id, hub_context).await?;
             let checklists = clients.acc.list_checklists(&acc_pid).await?;
-            let rows: Vec<ChecklistRow> = checklists
+            let rows: Vec<resources::construction::ChecklistRow> = checklists
                 .into_iter()
-                .map(|c| ChecklistRow {
+                .map(|c| resources::construction::ChecklistRow {
                     id: c.id,
                     title: c.title,
                     status: c.status,
@@ -335,7 +791,10 @@ async fn fetch_data(
                     due_date: c.due_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Checklists(rows))
+            Ok(ResourceData::Checklists(resources::construction::ChecklistList {
+                project_id: project_id.to_string(),
+                rows,
+            }))
         }
         ViewKind::ChecklistDetail {
             project_id,
@@ -390,34 +849,34 @@ async fn fetch_data(
         }
         ViewKind::EngineList => {
             let engines = clients.da.list_engines_detailed().await?;
-            let rows: Vec<EngineRow> = engines
+            let rows: Vec<resources::design_automation::EngineRow> = engines
                 .into_iter()
-                .map(|e| EngineRow {
+                .map(|e| resources::design_automation::EngineRow {
                     id: e.id,
                     description: e.description.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Engines(rows))
+            Ok(ResourceData::Engines(resources::design_automation::EngineList { rows }))
         }
         ViewKind::ActivityList => {
             let activities = clients.da.list_activities().await?;
-            let rows: Vec<ActivityRow> = activities
+            let rows: Vec<resources::design_automation::ActivityRow> = activities
                 .into_iter()
-                .map(|id| ActivityRow { id })
+                .map(|id| resources::design_automation::ActivityRow { id })
                 .collect();
-            Ok(ResourceData::Activities(rows))
+            Ok(ResourceData::Activities(resources::design_automation::ActivityList { rows }))
         }
         ViewKind::WorkItemList => {
             let items = clients.da.list_workitems().await?;
-            let rows: Vec<WorkItemRow> = items
+            let rows: Vec<resources::design_automation::WorkItemRow> = items
                 .into_iter()
-                .map(|w| WorkItemRow {
+                .map(|w| resources::design_automation::WorkItemRow {
                     id: w.id,
                     status: w.status,
                     progress: w.progress.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::WorkItems(rows))
+            Ok(ResourceData::WorkItems(resources::design_automation::WorkItemList { rows }))
         }
         ViewKind::WorkItemDetail { id } => {
             let wi = clients.da.get_workitem_status(id).await?;
@@ -465,9 +924,9 @@ async fn fetch_data(
         }
         ViewKind::AppBundleList => {
             let bundles = clients.da.list_appbundles().await?;
-            let rows: Vec<AppBundleRow> =
-                bundles.into_iter().map(|id| AppBundleRow { id }).collect();
-            Ok(ResourceData::AppBundles(rows))
+            let rows: Vec<resources::design_automation::AppBundleRow> =
+                bundles.into_iter().map(|id| resources::design_automation::AppBundleRow { id }).collect();
+            Ok(ResourceData::AppBundles(resources::design_automation::AppBundleList { rows }))
         }
         ViewKind::ManifestView { urn } => {
             let manifest = clients.derivative.get_manifest(urn).await?;
@@ -512,9 +971,9 @@ async fn fetch_data(
                 .derivative
                 .list_downloadable_derivatives(urn)
                 .await?;
-            let rows: Vec<DerivativeRow> = derivs
+            let rows: Vec<resources::others::DerivativeRow> = derivs
                 .into_iter()
-                .map(|d| DerivativeRow {
+                .map(|d| resources::others::DerivativeRow {
                     name: d.name,
                     output_type: d.output_type,
                     role: d.role,
@@ -523,7 +982,10 @@ async fn fetch_data(
                     urn: d.urn,
                 })
                 .collect();
-            Ok(ResourceData::Derivatives(rows))
+            Ok(ResourceData::Derivatives(resources::others::DerivativeList {
+                urn: urn.to_string(),
+                rows,
+            }))
         }
         ViewKind::DerivativeDetail {
             urn: _,
@@ -545,9 +1007,9 @@ async fn fetch_data(
         }
         ViewKind::WebhookList => {
             let hooks = clients.webhooks.list_all_webhooks().await?;
-            let rows: Vec<WebhookRow> = hooks
+            let rows: Vec<resources::others::WebhookRow> = hooks
                 .into_iter()
-                .map(|h| WebhookRow {
+                .map(|h| resources::others::WebhookRow {
                     hook_id: h.hook_id,
                     event: h.event,
                     callback_url: h.callback_url,
@@ -556,7 +1018,7 @@ async fn fetch_data(
                     created: h.created_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Webhooks(rows))
+            Ok(ResourceData::Webhooks(resources::others::WebhookList { rows }))
         }
         ViewKind::WebhookDetail {
             system,
@@ -621,9 +1083,9 @@ async fn fetch_data(
         }
         ViewKind::PhotosceneList => {
             let scenes = clients.reality.list_photoscenes().await?;
-            let rows: Vec<PhotosceneRow> = scenes
+            let rows: Vec<resources::others::PhotosceneRow> = scenes
                 .into_iter()
-                .map(|s| PhotosceneRow {
+                .map(|s| resources::others::PhotosceneRow {
                     id: s.photoscene_id,
                     name: s.name.unwrap_or_default(),
                     scene_type: s.scene_type.unwrap_or_default(),
@@ -631,7 +1093,7 @@ async fn fetch_data(
                     status: s.status.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Photoscenes(rows))
+            Ok(ResourceData::Photoscenes(resources::others::PhotosceneList { rows }))
         }
         ViewKind::PhotosceneDetail { id } => {
             let progress = clients.reality.get_progress(id).await?;

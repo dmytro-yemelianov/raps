@@ -15,6 +15,8 @@
 mod fetch;
 mod keys;
 mod render;
+mod resources;
+mod traits;
 mod util;
 
 use std::collections::{HashMap, VecDeque};
@@ -286,92 +288,97 @@ const NUM_TABS: usize = ResourceTab::ALL.len();
 /// Holds table data for each view kind
 #[derive(Debug, Clone)]
 enum ResourceData {
-    Buckets(Vec<BucketRow>),
-    Objects(Vec<ObjectRow>),
+    Buckets(resources::buckets::BucketList),
+    Objects(resources::objects::ObjectList),
     BucketDetail(Vec<DetailField>),
     ObjectDetail(Vec<DetailField>),
-    Hubs(Vec<HubRow>),
-    Projects(Vec<ProjectRow>),
-    FolderContents(Vec<FolderContentRow>),
+    Hubs(resources::hubs::HubList),
+    Projects(resources::projects::ProjectList),
+    FolderContents(resources::folders::FolderList),
     ItemDetail(Vec<DetailField>),
-    Issues(Vec<IssueRow>),
+    Issues(resources::construction::IssueList),
     IssueDetail(Vec<DetailField>),
     IssueComments(Vec<IssueCommentRow>),
     IssueAttachments(Vec<IssueAttachmentRow>),
     IssueTypes(Vec<IssueTypeRow>),
-    Rfis(Vec<RfiRow>),
+    Rfis(resources::construction::RfiList),
     RfiDetail(Vec<DetailField>),
-    Assets(Vec<AssetRow>),
+    Assets(resources::construction::AssetList),
     AssetDetail(Vec<DetailField>),
-    Submittals(Vec<SubmittalRow>),
+    Submittals(resources::construction::SubmittalList),
     SubmittalDetail(Vec<DetailField>),
-    Checklists(Vec<ChecklistRow>),
+    Checklists(resources::construction::ChecklistList),
     ChecklistDetail(Vec<DetailField>),
-    Engines(Vec<EngineRow>),
-    Activities(Vec<ActivityRow>),
-    WorkItems(Vec<WorkItemRow>),
+    Engines(resources::design_automation::EngineList),
+    Activities(resources::design_automation::ActivityList),
+    WorkItems(resources::design_automation::WorkItemList),
     WorkItemDetail(Vec<DetailField>),
-    AppBundles(Vec<AppBundleRow>),
+    AppBundles(resources::design_automation::AppBundleList),
     Manifest(Vec<DetailField>),
-    Derivatives(Vec<DerivativeRow>),
+    Derivatives(resources::others::DerivativeList),
     DerivativeDetail(Vec<DetailField>),
-    Webhooks(Vec<WebhookRow>),
+    Webhooks(resources::others::WebhookList),
     WebhookDetail(Vec<DetailField>),
-    Photoscenes(Vec<PhotosceneRow>),
+    Photoscenes(resources::others::PhotosceneList),
     PhotosceneDetail(Vec<DetailField>),
     SwarmStatus(Vec<DetailField>),
 }
 
 impl ResourceData {
+    fn as_trait(&self) -> Option<&dyn traits::DashboardResource> {
+        match self {
+            ResourceData::Buckets(b) => Some(b),
+            ResourceData::Objects(o) => Some(o),
+            ResourceData::Hubs(h) => Some(h),
+            ResourceData::Projects(p) => Some(p),
+            ResourceData::FolderContents(f) => Some(f),
+            ResourceData::Issues(i) => Some(i),
+            ResourceData::Rfis(r) => Some(r),
+            ResourceData::Assets(a) => Some(a),
+            ResourceData::Submittals(s) => Some(s),
+            ResourceData::Checklists(c) => Some(c),
+            ResourceData::Engines(e) => Some(e),
+            ResourceData::Activities(a) => Some(a),
+            ResourceData::WorkItems(w) => Some(w),
+            ResourceData::AppBundles(b) => Some(b),
+            ResourceData::Derivatives(d) => Some(d),
+            ResourceData::Webhooks(w) => Some(w),
+            ResourceData::Photoscenes(p) => Some(p),
+            _ => None,
+        }
+    }
+
     /// Returns the number of rows after applying a filter.
     fn filtered_count(&self, filter: &str) -> usize {
+        if let Some(t) = self.as_trait() {
+            return t.filtered_count(filter);
+        }
         if filter.is_empty() {
             return match self {
-                ResourceData::Buckets(v) => v.len(),
-                ResourceData::Objects(v) => v.len(),
-                ResourceData::Hubs(v) => v.len(),
-                ResourceData::Projects(v) => v.len(),
-                ResourceData::FolderContents(v) => v.len(),
-                ResourceData::Issues(v) => v.len(),
-                ResourceData::Rfis(v) => v.len(),
-                ResourceData::Assets(v) => v.len(),
-                ResourceData::Submittals(v) => v.len(),
-                ResourceData::Checklists(v) => v.len(),
+                ResourceData::Buckets(_) | ResourceData::Objects(_) | ResourceData::Hubs(_) | ResourceData::Projects(_) | ResourceData::FolderContents(_)
+                | ResourceData::Issues(_) | ResourceData::Rfis(_) | ResourceData::Assets(_) | ResourceData::Submittals(_) | ResourceData::Checklists(_) => unreachable!(),
                 ResourceData::IssueComments(v) => v.len(),
                 ResourceData::IssueAttachments(v) => v.len(),
                 ResourceData::IssueTypes(v) => v.len(),
-                ResourceData::Engines(v) => v.len(),
-                ResourceData::Activities(v) => v.len(),
-                ResourceData::WorkItems(v) => v.len(),
-                ResourceData::AppBundles(v) => v.len(),
-                ResourceData::Derivatives(v) => v.len(),
-                ResourceData::Webhooks(v) => v.len(),
-                ResourceData::Photoscenes(v) => v.len(),
+                ResourceData::Engines(_) => unreachable!(),
+                ResourceData::Activities(_) => unreachable!(),
+                ResourceData::WorkItems(_) => unreachable!(),
+                ResourceData::AppBundles(_) => unreachable!(),
+                ResourceData::Derivatives(_) => unreachable!(),
+                ResourceData::Webhooks(_) => unreachable!(),
+                ResourceData::Photoscenes(_) => unreachable!(),
                 _ => self.raw_count(),
             };
         }
         let filter = filter.to_lowercase();
         match self {
-            ResourceData::Buckets(v) => v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count(),
-            ResourceData::Objects(v) => v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count(),
-            ResourceData::Hubs(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
-            ResourceData::Projects(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
-            ResourceData::FolderContents(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
-            ResourceData::Issues(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
-            ResourceData::Rfis(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
-            ResourceData::Assets(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter)).count(),
-            ResourceData::Submittals(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
-            ResourceData::Checklists(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Buckets(_) | ResourceData::Objects(_) | ResourceData::Hubs(_) | ResourceData::Projects(_) | ResourceData::FolderContents(_)
+            | ResourceData::Issues(_) | ResourceData::Rfis(_) | ResourceData::Assets(_) | ResourceData::Submittals(_) | ResourceData::Checklists(_)
+            | ResourceData::Engines(_) | ResourceData::Activities(_) | ResourceData::WorkItems(_) | ResourceData::AppBundles(_)
+            | ResourceData::Derivatives(_) | ResourceData::Webhooks(_) | ResourceData::Photoscenes(_) => unreachable!(),
             ResourceData::IssueComments(v) => v.iter().filter(|r| r.body.to_lowercase().contains(&filter)).count(),
             ResourceData::IssueAttachments(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
             ResourceData::IssueTypes(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
-            ResourceData::Engines(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
-            ResourceData::Activities(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
-            ResourceData::WorkItems(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
-            ResourceData::AppBundles(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
-            ResourceData::Derivatives(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
-            ResourceData::Webhooks(v) => v.iter().filter(|r| r.event.to_lowercase().contains(&filter) || r.callback_url.to_lowercase().contains(&filter)).count(),
-            ResourceData::Photoscenes(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
             // Detail views (also filterable now for better UX)
             ResourceData::BucketDetail(v)
             | ResourceData::ObjectDetail(v)
@@ -391,39 +398,42 @@ impl ResourceData {
     }
 
     fn raw_count(&self) -> usize {
+        if let Some(t) = self.as_trait() {
+            return t.raw_count();
+        }
         match self {
-            ResourceData::Buckets(v) => v.len(),
-            ResourceData::Objects(v) => v.len(),
+            ResourceData::Buckets(_) => unreachable!(),
+            ResourceData::Objects(_) => unreachable!(),
             ResourceData::BucketDetail(v) => v.len(),
             ResourceData::ObjectDetail(v) => v.len(),
-            ResourceData::Hubs(v) => v.len(),
-            ResourceData::Projects(v) => v.len(),
-            ResourceData::FolderContents(v) => v.len(),
+            ResourceData::Hubs(_) => unreachable!(),
+            ResourceData::Projects(_) => unreachable!(),
+            ResourceData::FolderContents(_) => unreachable!(),
             ResourceData::ItemDetail(v) => v.len(),
-            ResourceData::Issues(v) => v.len(),
+            ResourceData::Issues(_) => unreachable!(),
             ResourceData::IssueDetail(v) => v.len(),
             ResourceData::IssueComments(v) => v.len(),
             ResourceData::IssueAttachments(v) => v.len(),
             ResourceData::IssueTypes(v) => v.len(),
-            ResourceData::Rfis(v) => v.len(),
+            ResourceData::Rfis(_) => unreachable!(),
             ResourceData::RfiDetail(v) => v.len(),
-            ResourceData::Assets(v) => v.len(),
+            ResourceData::Assets(_) => unreachable!(),
             ResourceData::AssetDetail(v) => v.len(),
-            ResourceData::Submittals(v) => v.len(),
+            ResourceData::Submittals(_) => unreachable!(),
             ResourceData::SubmittalDetail(v) => v.len(),
-            ResourceData::Checklists(v) => v.len(),
+            ResourceData::Checklists(_) => unreachable!(),
             ResourceData::ChecklistDetail(v) => v.len(),
-            ResourceData::Engines(v) => v.len(),
-            ResourceData::Activities(v) => v.len(),
-            ResourceData::WorkItems(v) => v.len(),
+            ResourceData::Engines(_) => unreachable!(),
+            ResourceData::Activities(_) => unreachable!(),
+            ResourceData::WorkItems(_) => unreachable!(),
             ResourceData::WorkItemDetail(v) => v.len(),
-            ResourceData::AppBundles(v) => v.len(),
+            ResourceData::AppBundles(_) => unreachable!(),
             ResourceData::Manifest(v) => v.len(),
-            ResourceData::Derivatives(v) => v.len(),
+            ResourceData::Derivatives(_) => unreachable!(),
             ResourceData::DerivativeDetail(v) => v.len(),
-            ResourceData::Webhooks(v) => v.len(),
+            ResourceData::Webhooks(_) => unreachable!(),
             ResourceData::WebhookDetail(v) => v.len(),
-            ResourceData::Photoscenes(v) => v.len(),
+            ResourceData::Photoscenes(_) => unreachable!(),
             ResourceData::PhotosceneDetail(v) => v.len(),
             ResourceData::SwarmStatus(v) => v.len(),
         }
@@ -431,85 +441,6 @@ impl ResourceData {
 }
 
 // --- Row structs ---
-
-#[derive(Debug, Clone)]
-struct BucketRow {
-    key: String,
-    policy: String,
-    created: String,
-}
-
-#[derive(Debug, Clone)]
-struct ObjectRow {
-    key: String,
-    size: String,
-    sha1: String,
-}
-
-#[derive(Debug, Clone)]
-struct HubRow {
-    name: String,
-    id: String,
-    region: String,
-}
-
-#[derive(Debug, Clone)]
-struct ProjectRow {
-    name: String,
-    id: String,
-}
-
-#[derive(Debug, Clone)]
-struct FolderContentRow {
-    name: String,
-    content_type: String,
-    id: String,
-    modified: String,
-}
-
-#[derive(Debug, Clone)]
-struct IssueRow {
-    title: String,
-    status: String,
-    assigned_to: String,
-    created_at: String,
-    id: String,
-}
-
-#[derive(Debug, Clone)]
-struct RfiRow {
-    title: String,
-    status: String,
-    priority: String,
-    created_at: String,
-    id: String,
-}
-
-#[derive(Debug, Clone)]
-struct AssetRow {
-    id: String,
-    client_asset_id: String,
-    description: String,
-    status: String,
-}
-
-#[derive(Debug, Clone)]
-struct SubmittalRow {
-    id: String,
-    title: String,
-    number: String,
-    status: String,
-    due_date: String,
-}
-
-#[derive(Debug, Clone)]
-struct ChecklistRow {
-    id: String,
-    title: String,
-    status: String,
-    location: String,
-    due_date: String,
-}
 
 #[derive(Debug, Clone)]
 struct IssueCommentRow {
@@ -533,57 +464,7 @@ struct IssueTypeRow {
     is_active: String,
 }
 
-#[derive(Debug, Clone)]
-struct EngineRow {
-    id: String,
-    description: String,
-}
-
-#[derive(Debug, Clone)]
-struct ActivityRow {
-    id: String,
-}
-
-#[derive(Debug, Clone)]
-struct WorkItemRow {
-    id: String,
-    status: String,
-    progress: String,
-}
-
-#[derive(Debug, Clone)]
-struct AppBundleRow {
-    id: String,
-}
-
-#[derive(Debug, Clone)]
-struct DerivativeRow {
-    name: String,
-    output_type: String,
-    role: String,
-    mime: String,
-    size: String,
-    urn: String,
-}
-
-#[derive(Debug, Clone)]
-struct WebhookRow {
-    hook_id: String,
-    event: String,
-    callback_url: String,
-    status: String,
-    system: String,
-    created: String,
-}
-
-#[derive(Debug, Clone)]
-struct PhotosceneRow {
-    id: String,
-    name: String,
-    scene_type: String,
-    format: String,
-    status: String,
-}
+// --- Row structs ---
 
 #[derive(Debug, Clone)]
 struct DetailField {

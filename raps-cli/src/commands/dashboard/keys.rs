@@ -2,6 +2,7 @@
 // Key handling for the TUI dashboard
 
 use super::*;
+use crate::commands::dashboard::traits::DashboardResource;
 
 pub(super) fn handle_key(
     app: &mut App,
@@ -455,257 +456,60 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
         None => return,
     };
 
+    let filter = app.filter_text.to_lowercase();
+
+    // 1. Check if it's a trait-based resource
+    let mut trait_res: Option<Box<dyn DashboardResource>> = None;
+    if let Some(data) = &app.data {
+        match data {
+            ResourceData::Buckets(b) => trait_res = Some(Box::new(b.clone())),
+            ResourceData::Objects(o) => trait_res = Some(Box::new(o.clone())),
+            ResourceData::Hubs(h) => trait_res = Some(Box::new(h.clone())),
+            ResourceData::Projects(p) => trait_res = Some(Box::new(p.clone())),
+            ResourceData::FolderContents(f) => trait_res = Some(Box::new(f.clone())),
+            ResourceData::Issues(i) => trait_res = Some(Box::new(i.clone())),
+            ResourceData::Rfis(r) => trait_res = Some(Box::new(r.clone())),
+            ResourceData::Assets(a) => trait_res = Some(Box::new(a.clone())),
+            ResourceData::Submittals(s) => trait_res = Some(Box::new(s.clone())),
+            ResourceData::Checklists(c) => trait_res = Some(Box::new(c.clone())),
+            ResourceData::Engines(e) => trait_res = Some(Box::new(e.clone())),
+            ResourceData::Activities(a) => trait_res = Some(Box::new(a.clone())),
+            ResourceData::WorkItems(w) => trait_res = Some(Box::new(w.clone())),
+            ResourceData::AppBundles(b) => trait_res = Some(Box::new(b.clone())),
+            ResourceData::Derivatives(d) => trait_res = Some(Box::new(d.clone())),
+            ResourceData::Webhooks(w) => trait_res = Some(Box::new(w.clone())),
+            ResourceData::Photoscenes(p) => trait_res = Some(Box::new(p.clone())),
+            _ => {}
+        }
+    }
+
+    if let Some(res) = trait_res {
+        res.handle_enter(selected, &filter, app, clients, tx);
+        return;
+    }
+
+    // 2. Handle non-trait-based resources (mostly detail views)
     let data = match &app.data {
         Some(d) => d,
         None => return,
     };
 
-    let filter = app.filter_text.to_lowercase();
-
     match data {
-        ResourceData::Buckets(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                let bucket_key = row.key.clone();
-                app.push_view(ViewKind::BucketDetail { bucket_key });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
         ResourceData::BucketDetail(_) => {
-            // Enter on BucketDetail drills into ObjectList
             if let ViewKind::BucketDetail { bucket_key } = app.current_view().clone() {
                 app.push_view(ViewKind::ObjectList { bucket_key });
                 fetch::load_view(app, clients, tx, false);
             }
         }
-        ResourceData::Objects(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::ObjectList { bucket_key } = app.current_view().clone()
-            {
-                let object_key = row.key.clone();
-                app.push_view(ViewKind::ObjectDetail {
-                    bucket_key,
-                    object_key,
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Hubs(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                app.hub_context = Some(row.id.clone());
-                app.push_view(ViewKind::ProjectList {
-                    hub_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Projects(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                let project_id = row.id.clone();
-                let project_name = row.name.clone();
-                app.project_context = Some((project_id.clone(), project_name));
-                if app.tab == ResourceTab::Issues {
-                    // Issues tab: selecting a project navigates to its issues
-                    app.push_view(ViewKind::IssueList { project_id });
-                    fetch::load_view(app, clients, tx, false);
-                } else if let Some(hub_id) = &app.hub_context {
-                    let hub_id = hub_id.clone();
-                    app.push_view(ViewKind::FolderList {
-                        project_id,
-                        folder_id: format!("__top__{hub_id}"),
-                    });
-                    fetch::load_view(app, clients, tx, false);
-                }
-            }
-        }
-        ResourceData::FolderContents(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::FolderList { project_id, .. } = app.current_view().clone()
-            {
-                if row.content_type == "folder" {
-                    app.push_view(ViewKind::FolderList {
-                        project_id,
-                        folder_id: row.id.clone(),
-                    });
-                } else {
-                    app.push_view(ViewKind::ItemDetail {
-                        project_id,
-                        item_id: row.id.clone(),
-                    });
-                }
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Issues(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::IssueList { project_id } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::IssueDetail {
-                    project_id,
-                    issue_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
         ResourceData::IssueDetail(_) => {
-            // Enter on IssueDetail drills into comments
-            if let ViewKind::IssueDetail {
-                project_id,
-                issue_id,
-            } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::IssueCommentList {
-                    project_id,
-                    issue_id,
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Rfis(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::RfiList { project_id } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::RfiDetail {
-                    project_id,
-                    rfi_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Assets(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.id.to_lowercase().contains(&filter)
-                        || r.description.to_lowercase().contains(&filter)
-                })
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::AssetList { project_id } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::AssetDetail {
-                    project_id,
-                    asset_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Submittals(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::SubmittalList { project_id } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::SubmittalDetail {
-                    project_id,
-                    submittal_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Checklists(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::ChecklistList { project_id } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::ChecklistDetail {
-                    project_id,
-                    checklist_id: row.id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::WorkItems(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                app.push_view(ViewKind::WorkItemDetail { id: row.id.clone() });
+            if let ViewKind::IssueDetail { project_id, issue_id } = app.current_view().clone() {
+                app.push_view(ViewKind::IssueCommentList { project_id, issue_id });
                 fetch::load_view(app, clients, tx, false);
             }
         }
         ResourceData::Manifest(_) => {
-            // Enter on ManifestView drills into DerivativeList
             if let ViewKind::ManifestView { urn } = app.current_view().clone() {
                 app.push_view(ViewKind::DerivativeList { urn });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Derivatives(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected)
-                && let ViewKind::DerivativeList { urn } = app.current_view().clone()
-            {
-                app.push_view(ViewKind::DerivativeDetail {
-                    urn,
-                    deriv_urn: row.urn.clone(),
-                    name: row.name.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Webhooks(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.event.to_lowercase().contains(&filter)
-                        || r.callback_url.to_lowercase().contains(&filter)
-                })
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                app.push_view(ViewKind::WebhookDetail {
-                    system: row.system.clone(),
-                    event: row.event.clone(),
-                    hook_id: row.hook_id.clone(),
-                });
-                fetch::load_view(app, clients, tx, false);
-            }
-        }
-        ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            if let Some(row) = filtered.get(selected) {
-                app.push_view(ViewKind::PhotosceneDetail { id: row.id.clone() });
                 fetch::load_view(app, clients, tx, false);
             }
         }

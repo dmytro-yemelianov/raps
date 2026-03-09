@@ -101,344 +101,35 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
     let filter = app.filter_text.to_lowercase();
 
     match data {
-        ResourceData::Buckets(rows) => {
-            let filtered: Vec<&BucketRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Key", "Policy", "Created"],
-                &[
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(30),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| vec![r.key.as_str(), r.policy.as_str(), r.created.as_str()])
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Buckets(b) => {
+            render_resource_table(f, inner, b, &filter, &mut app.table_state);
         }
-        ResourceData::Objects(rows) => {
-            let filtered: Vec<&ObjectRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Name", "Size", "SHA1"],
-                &[
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(30),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| vec![r.key.as_str(), r.size.as_str(), r.sha1.as_str()])
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Objects(o) => {
+            render_resource_table(f, inner, o, &filter, &mut app.table_state);
         }
-        ResourceData::Hubs(rows) => {
-            let filtered: Vec<&HubRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Name", "ID", "Region"],
-                &[
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(20),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| vec![r.name.as_str(), r.id.as_str(), r.region.as_str()])
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Hubs(h) => {
+            render_resource_table(f, inner, h, &filter, &mut app.table_state);
         }
-        ResourceData::Projects(rows) => {
-            let filtered: Vec<&ProjectRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Name", "ID"],
-                &[Constraint::Percentage(50), Constraint::Percentage(50)],
-                filtered
-                    .iter()
-                    .map(|r| vec![r.name.as_str(), r.id.as_str()])
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Projects(p) => {
+            render_resource_table(f, inner, p, &filter, &mut app.table_state);
         }
-        ResourceData::FolderContents(rows) => {
-            let filtered: Vec<&FolderContentRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    let type_style = if r.content_type == "folder" {
-                        Style::default().fg(Color::Cyan)
-                    } else {
-                        Style::default().fg(Color::White)
-                    };
-                    let icon = if r.content_type == "folder" { "/" } else { " " };
-                    Row::new(vec![
-                        Cell::from(Span::styled(format!("{icon}{}", r.name), type_style)),
-                        Cell::from(r.content_type.as_str()),
-                        Cell::from(r.modified.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(35),
-                ],
-            )
-            .header(
-                Row::new(vec!["Name", "Type", "Modified"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::FolderContents(folders) => {
+            render_resource_table(f, inner, folders, &filter, &mut app.table_state);
         }
-        ResourceData::Issues(rows) => {
-            let filtered: Vec<&IssueRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    Row::new(vec![
-                        Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(
-                            r.status.as_str(),
-                            util::status_color(&r.status),
-                        )),
-                        Cell::from(r.assigned_to.as_str()),
-                        Cell::from(r.created_at.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(25),
-                ],
-            )
-            .header(
-                Row::new(vec!["Title", "Status", "Assigned", "Created"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::Issues(i) => {
+            render_resource_table(f, inner, i, &filter, &mut app.table_state);
         }
-        ResourceData::Rfis(rows) => {
-            let filtered: Vec<&RfiRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    Row::new(vec![
-                        Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(
-                            r.status.as_str(),
-                            util::status_color(&r.status),
-                        )),
-                        Cell::from(r.priority.as_str()),
-                        Cell::from(r.created_at.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(30),
-                ],
-            )
-            .header(
-                Row::new(vec!["Title", "Status", "Priority", "Created"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::Rfis(r) => {
+            render_resource_table(f, inner, r, &filter, &mut app.table_state);
         }
-        ResourceData::Assets(rows) => {
-            let filtered: Vec<&AssetRow> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.id.to_lowercase().contains(&filter)
-                        || r.description.to_lowercase().contains(&filter)
-                })
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["ID", "ClientAssetId", "Description", "Status"],
-                &[
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(35),
-                    Constraint::Percentage(20),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| {
-                        vec![
-                            r.id.as_str(),
-                            r.client_asset_id.as_str(),
-                            r.description.as_str(),
-                            r.status.as_str(),
-                        ]
-                    })
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Assets(a) => {
+            render_resource_table(f, inner, a, &filter, &mut app.table_state);
         }
-        ResourceData::Submittals(rows) => {
-            let filtered: Vec<&SubmittalRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    Row::new(vec![
-                        Cell::from(r.title.as_str()),
-                        Cell::from(r.number.as_str()),
-                        Cell::from(Span::styled(
-                            r.status.as_str(),
-                            util::status_color(&r.status),
-                        )),
-                        Cell::from(r.due_date.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(35),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(30),
-                ],
-            )
-            .header(
-                Row::new(vec!["Title", "Number", "Status", "Due Date"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::Submittals(s) => {
+            render_resource_table(f, inner, s, &filter, &mut app.table_state);
         }
-        ResourceData::Checklists(rows) => {
-            let filtered: Vec<&ChecklistRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    Row::new(vec![
-                        Cell::from(r.title.as_str()),
-                        Cell::from(Span::styled(
-                            r.status.as_str(),
-                            util::status_color(&r.status),
-                        )),
-                        Cell::from(r.location.as_str()),
-                        Cell::from(r.due_date.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(35),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                ],
-            )
-            .header(
-                Row::new(vec!["Title", "Status", "Location", "Due Date"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::Checklists(c) => {
+            render_resource_table(f, inner, c, &filter, &mut app.table_state);
         }
         ResourceData::IssueComments(rows) => {
             let filtered: Vec<&IssueCommentRow> = rows
@@ -509,190 +200,26 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
                 &mut app.table_state,
             );
         }
-        ResourceData::Engines(rows) => {
-            let filtered: Vec<&EngineRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["ID", "Description"],
-                &[Constraint::Percentage(60), Constraint::Percentage(40)],
-                filtered
-                    .iter()
-                    .map(|r| vec![r.id.as_str(), r.description.as_str()])
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Engines(e) => {
+            render_resource_table(f, inner, e, &filter, &mut app.table_state);
         }
-        ResourceData::Activities(rows) => {
-            let filtered: Vec<&ActivityRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["ID"],
-                &[Constraint::Percentage(100)],
-                filtered.iter().map(|r| vec![r.id.as_str()]).collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Activities(a) => {
+            render_resource_table(f, inner, a, &filter, &mut app.table_state);
         }
-        ResourceData::WorkItems(rows) => {
-            let filtered: Vec<&WorkItemRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            let table_rows: Vec<Row> = filtered
-                .iter()
-                .map(|r| {
-                    Row::new(vec![
-                        Cell::from(r.id.as_str()),
-                        Cell::from(Span::styled(
-                            r.status.as_str(),
-                            util::da_status_color(&r.status),
-                        )),
-                        Cell::from(r.progress.as_str()),
-                    ])
-                })
-                .collect();
-            let table = Table::new(
-                table_rows,
-                [
-                    Constraint::Percentage(40),
-                    Constraint::Percentage(30),
-                    Constraint::Percentage(30),
-                ],
-            )
-            .header(
-                Row::new(vec!["ID", "Status", "Progress"])
-                    .style(
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .bottom_margin(1),
-            )
-            .row_highlight_style(
-                Style::default()
-                    .bg(Color::DarkGray)
-                    .add_modifier(Modifier::BOLD),
-            )
-            .highlight_symbol("> ");
-            f.render_stateful_widget(table, inner, &mut app.table_state);
+        ResourceData::WorkItems(w) => {
+            render_resource_table(f, inner, w, &filter, &mut app.table_state);
         }
-        ResourceData::AppBundles(rows) => {
-            let filtered: Vec<&AppBundleRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["ID"],
-                &[Constraint::Percentage(100)],
-                filtered.iter().map(|r| vec![r.id.as_str()]).collect(),
-                &mut app.table_state,
-            );
+        ResourceData::AppBundles(b) => {
+            render_resource_table(f, inner, b, &filter, &mut app.table_state);
         }
-        ResourceData::Derivatives(rows) => {
-            let filtered: Vec<&DerivativeRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Name", "OutputType", "Role", "MIME", "Size"],
-                &[
-                    Constraint::Percentage(30),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(20),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| {
-                        vec![
-                            r.name.as_str(),
-                            r.output_type.as_str(),
-                            r.role.as_str(),
-                            r.mime.as_str(),
-                            r.size.as_str(),
-                        ]
-                    })
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Derivatives(d) => {
+            render_resource_table(f, inner, d, &filter, &mut app.table_state);
         }
-        ResourceData::Webhooks(rows) => {
-            let filtered: Vec<&WebhookRow> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.event.to_lowercase().contains(&filter)
-                        || r.callback_url.to_lowercase().contains(&filter)
-                })
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Event", "Callback URL", "Status", "System", "Created"],
-                &[
-                    Constraint::Percentage(20),
-                    Constraint::Percentage(30),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(20),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| {
-                        vec![
-                            r.event.as_str(),
-                            r.callback_url.as_str(),
-                            r.status.as_str(),
-                            r.system.as_str(),
-                            r.created.as_str(),
-                        ]
-                    })
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Webhooks(w) => {
+            render_resource_table(f, inner, w, &filter, &mut app.table_state);
         }
-        ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<&PhotosceneRow> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            render_table(
-                f,
-                inner,
-                &["Name", "ID", "Type", "Format", "Status"],
-                &[
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(15),
-                    Constraint::Percentage(20),
-                ],
-                filtered
-                    .iter()
-                    .map(|r| {
-                        vec![
-                            r.name.as_str(),
-                            r.id.as_str(),
-                            r.scene_type.as_str(),
-                            r.format.as_str(),
-                            r.status.as_str(),
-                        ]
-                    })
-                    .collect(),
-                &mut app.table_state,
-            );
+        ResourceData::Photoscenes(p) => {
+            render_resource_table(f, inner, p, &filter, &mut app.table_state);
         }
         // Detail views (key-value)
         ResourceData::BucketDetail(fields)
@@ -744,6 +271,43 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
     }
+}
+
+/// Renders a table using the DashboardResource trait
+fn render_resource_table(
+    f: &mut Frame,
+    area: Rect,
+    res: &dyn traits::DashboardResource,
+    filter: &str,
+    table_state: &mut TableState,
+) {
+    let count = res.filtered_count(filter);
+    let table_rows: Vec<Row> = (0..count)
+        .filter_map(|i| res.get_row(i, filter))
+        .collect();
+
+    let header = Row::new(
+        res.headers()
+            .iter()
+            .map(|h| Cell::from(*h))
+            .collect::<Vec<_>>(),
+    )
+    .style(
+        Style::default()
+            .fg(Color::Yellow)
+            .add_modifier(Modifier::BOLD),
+    )
+    .bottom_margin(1);
+
+    let table = Table::new(table_rows, res.widths())
+        .header(header)
+        .row_highlight_style(
+            Style::default()
+                .bg(Color::DarkGray)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("> ");
+    f.render_stateful_widget(table, area, table_state);
 }
 
 /// Generic table renderer for simple string-cell tables

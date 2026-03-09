@@ -2,6 +2,7 @@
 // Utility functions for the TUI dashboard
 
 use super::*;
+use crate::commands::dashboard::traits::DashboardResource;
 
 pub(super) fn format_timestamp(epoch_ms: u64) -> String {
     let secs = (epoch_ms / 1000) as i64;
@@ -116,79 +117,35 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
     let filter = app.filter_text.to_lowercase();
 
     match data {
-        ResourceData::Buckets(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.key.clone())
+        ResourceData::Buckets(b) => {
+            b.get_id(sel, &filter)
         }
-        ResourceData::Objects(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.key.clone())
+        ResourceData::Objects(o) => {
+            o.get_id(sel, &filter)
         }
-        ResourceData::Hubs(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Hubs(h) => {
+            h.get_id(sel, &filter)
         }
-        ResourceData::Projects(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Projects(p) => {
+            p.get_id(sel, &filter)
         }
-        ResourceData::FolderContents(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::FolderContents(f) => {
+            f.get_id(sel, &filter)
         }
-        ResourceData::Issues(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Issues(i) => {
+            i.get_id(sel, &filter)
         }
-        ResourceData::Rfis(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Rfis(r) => {
+            r.get_id(sel, &filter)
         }
-        ResourceData::Assets(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.id.to_lowercase().contains(&filter)
-                        || r.description.to_lowercase().contains(&filter)
-                })
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Assets(a) => {
+            a.get_id(sel, &filter)
         }
-        ResourceData::Submittals(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Submittals(s) => {
+            s.get_id(sel, &filter)
         }
-        ResourceData::Checklists(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Checklists(c) => {
+            c.get_id(sel, &filter)
         }
         ResourceData::IssueComments(rows) => {
             let filtered: Vec<_> = rows
@@ -211,58 +168,26 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
                 .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
-        ResourceData::Engines(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Engines(e) => {
+            e.get_id(sel, &filter)
         }
-        ResourceData::Activities(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Activities(a) => {
+            a.get_id(sel, &filter)
         }
-        ResourceData::WorkItems(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::WorkItems(w) => {
+            w.get_id(sel, &filter)
         }
-        ResourceData::AppBundles(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::AppBundles(b) => {
+            b.get_id(sel, &filter)
         }
-        ResourceData::Derivatives(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.urn.clone())
+        ResourceData::Derivatives(d) => {
+            d.get_id(sel, &filter)
         }
-        ResourceData::Webhooks(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| {
-                    filter.is_empty()
-                        || r.event.to_lowercase().contains(&filter)
-                        || r.callback_url.to_lowercase().contains(&filter)
-                })
-                .collect();
-            filtered.get(sel).map(|r| r.hook_id.clone())
+        ResourceData::Webhooks(w) => {
+            w.get_id(sel, &filter)
         }
-        ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<_> = rows
-                .iter()
-                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
-                .collect();
-            filtered.get(sel).map(|r| r.id.clone())
+        ResourceData::Photoscenes(p) => {
+            p.get_id(sel, &filter)
         }
         // Detail views — copy the value of the selected field
         ResourceData::BucketDetail(fields)
