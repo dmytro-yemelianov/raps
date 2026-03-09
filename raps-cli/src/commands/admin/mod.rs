@@ -112,6 +112,10 @@ pub enum UserCommands {
         #[arg(long)]
         concurrency: Option<usize>,
 
+        /// Delay between requests in milliseconds (reduces request rate)
+        #[arg(long)]
+        delay_ms: Option<u64>,
+
         /// Preview changes without executing
         #[arg(long)]
         dry_run: bool,
@@ -141,6 +145,10 @@ pub enum UserCommands {
         /// Parallel requests (defaults to global --concurrency, max: 50)
         #[arg(long)]
         concurrency: Option<usize>,
+
+        /// Delay between requests in milliseconds (reduces request rate)
+        #[arg(long)]
+        delay_ms: Option<u64>,
 
         /// Preview changes without executing
         #[arg(long)]
@@ -187,6 +195,10 @@ pub enum UserCommands {
         /// Parallel requests (defaults to global --concurrency, max: 50)
         #[arg(long)]
         concurrency: Option<usize>,
+
+        /// Delay between requests in milliseconds (reduces request rate)
+        #[arg(long)]
+        delay_ms: Option<u64>,
 
         /// Preview changes without executing
         #[arg(long)]

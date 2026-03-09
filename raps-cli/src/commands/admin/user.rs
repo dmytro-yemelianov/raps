@@ -293,6 +293,7 @@ impl UserCommands {
                 filter,
                 project_ids,
                 concurrency,
+                delay_ms,
                 dry_run,
                 yes: _,
             } => {
@@ -303,6 +304,7 @@ impl UserCommands {
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
                     dry_run,
+                    delay_ms: delay_ms.unwrap_or(0),
                     ..Default::default()
                 };
 
@@ -320,6 +322,9 @@ impl UserCommands {
                         println!("  Filter: {}", f);
                     }
                     println!("  Concurrency: {}", concurrency.min(50));
+                    if let Some(d) = delay_ms {
+                        println!("  Delay: {}ms between requests", d);
+                    }
                     if dry_run {
                         println!("  {} Dry-run mode enabled", "⚠".yellow());
                     }
@@ -392,6 +397,7 @@ impl UserCommands {
                 filter,
                 project_ids,
                 concurrency,
+                delay_ms,
                 dry_run,
                 yes: _,
             } => {
@@ -402,6 +408,7 @@ impl UserCommands {
                 let bulk_config = BulkConfig {
                     concurrency: concurrency.min(50),
                     dry_run,
+                    delay_ms: delay_ms.unwrap_or(0),
                     ..Default::default()
                 };
 
@@ -416,6 +423,9 @@ impl UserCommands {
                         println!("  Filter: {}", f);
                     }
                     println!("  Concurrency: {}", concurrency.min(50));
+                    if let Some(d) = delay_ms {
+                        println!("  Delay: {}ms between requests", d);
+                    }
                     if dry_run {
                         println!("  {} Dry-run mode enabled", "⚠".yellow());
                     }
@@ -478,6 +488,7 @@ impl UserCommands {
                 project_ids,
                 from_csv,
                 concurrency,
+                delay_ms,
                 dry_run,
                 yes: _,
             } => {
@@ -568,6 +579,7 @@ impl UserCommands {
                     let bulk_config = BulkConfig {
                         concurrency: concurrency.min(50),
                         dry_run,
+                        delay_ms: delay_ms.unwrap_or(0),
                         ..Default::default()
                     };
 

@@ -27,6 +27,8 @@ pub struct BulkConfig {
     pub continue_on_error: bool,
     /// Preview mode - don't execute actual API calls (default: false)
     pub dry_run: bool,
+    /// Fixed delay between dispatching each item in milliseconds (default: 0)
+    pub delay_ms: u64,
 }
 
 impl Default for BulkConfig {
@@ -37,6 +39,7 @@ impl Default for BulkConfig {
             retry_base_delay: Duration::from_secs(1),
             continue_on_error: true,
             dry_run: false,
+            delay_ms: 0,
         }
     }
 }
@@ -278,6 +281,10 @@ impl BulkExecutor {
             });
 
             handles.push(handle);
+
+            if self.config.delay_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(self.config.delay_ms)).await;
+            }
         }
 
         // Collect all results
