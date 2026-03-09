@@ -649,13 +649,17 @@ impl UserCommands {
                 project,
                 email,
                 role_id,
+                account,
             } => {
+                let account_id = account
+                    .or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
                 let http_config = HttpClientConfig::default();
-                let users_client = ProjectUsersClient::new_with_http_config(
+                let mut users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
                 )?;
+                users_client.account_id = account_id;
 
                 if output_format.supports_colors() {
                     println!(
@@ -670,6 +674,7 @@ impl UserCommands {
                     email: email.clone(),
                     role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
                     products: vec![],
+                    suppress_administrative_emails: false,
                 };
 
                 let user = users_client.add_user(&project, request).await?;
@@ -948,6 +953,7 @@ impl UserCommands {
                                 email: email.clone(),
                                 role_ids: role.clone().map(|s| vec![s]).unwrap_or_default(),
                                 products: vec![],
+                                suppress_administrative_emails: false,
                             };
                             match users_client.add_user(&project.id, request).await {
                                 Ok(_) => {

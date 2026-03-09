@@ -40,6 +40,9 @@ pub struct AddProjectUserRequest {
     /// Product access configurations
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub products: Vec<ProductAccess>,
+    /// Suppress project invite email to the user (default: false)
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub suppress_administrative_emails: bool,
 }
 
 // ── BIM 360 HQ v2 /users/import types ────────────────────────────────────────
@@ -343,8 +346,13 @@ impl ProjectUsersClient {
         let status = response.status().as_u16();
         let error_text = response.text().await.unwrap_or_default();
 
-        // On 400/404 try BIM 360 HQ v2 if we have an account_id
-        if (status == 400 || status == 404) && let Some(ref account_id) = self.account_id {
+        // On 400/404/500 try BIM 360 HQ v2 if we have an account_id.
+        // 500 with "reqBodyProducts is not iterable" occurs when the ACC endpoint
+        // is called against a BIM 360 project that doesn't support the products field.
+        let is_bim360_500 = status == 500 && error_text.contains("reqBodyProducts");
+        if (status == 400 || status == 404 || is_bim360_500)
+            && let Some(ref account_id) = self.account_id
+        {
             return self
                 .add_user_bim360(account_id, project_id, request)
                 .await;
@@ -603,6 +611,7 @@ impl ProjectUsersClient {
                     email: user.email.clone(),
                     role_ids: user.role_ids,
                     products: user.products.unwrap_or_default(),
+                    suppress_administrative_emails: false,
                 };
                 let result = client.add_user(&pid, request).await;
                 (email, result)
@@ -660,6 +669,7 @@ mod tests {
             email: "user@example.com".to_string(),
             role_ids: vec![],
             products: vec![],
+            suppress_administrative_emails: false,
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
@@ -678,6 +688,7 @@ mod tests {
                 key: "docs".to_string(),
                 access: "member".to_string(),
             }],
+            suppress_administrative_emails: false,
         };
 
         let json = serde_json::to_string(&request).unwrap();

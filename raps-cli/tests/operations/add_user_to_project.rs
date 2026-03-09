@@ -19,6 +19,7 @@ async fn test_add_user_sends_post_to_correct_endpoint() {
                 email: "new@example.com".into(),
                 role_ids: vec![],
                 products: vec![],
+        suppress_administrative_emails: false,
             },
         )
         .await
@@ -44,6 +45,7 @@ async fn test_add_user_with_role_id_sends_role_in_body() {
                 email: "roletest@example.com".into(),
                 role_ids: vec!["role-project-admin".into()],
                 products: vec![],
+        suppress_administrative_emails: false,
             },
         )
         .await
@@ -66,6 +68,7 @@ async fn test_add_user_without_role_omits_role_id_key() {
                 email: "norole@example.com".into(),
                 role_ids: vec![],
                 products: vec![],
+        suppress_administrative_emails: false,
             },
         )
         .await

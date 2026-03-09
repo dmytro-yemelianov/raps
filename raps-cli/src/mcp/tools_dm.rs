@@ -439,6 +439,7 @@ impl RapsServer {
             email: email.clone(),
             role_ids: role_id.map(|s| vec![s]).unwrap_or_default(),
             products: vec![],
+            suppress_administrative_emails: false,
         };
 
         match client.add_user(&project_id, request).await {

@@ -166,6 +166,7 @@ async fn add_user_to_project(
         email: email.to_string(),
         role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
         products,
+        suppress_administrative_emails: true,
     };
 
     match users_client.add_user(project_id, request).await {
@@ -215,8 +216,12 @@ async fn upsert_existing_member(
     let existing = match users_client.find_project_user_by_email(project_id, email).await {
         Ok(Some(u)) => u,
         Ok(None) => {
-            // Shouldn't happen after a 409, but treat as already handled
-            return ItemResult::Skipped { reason: "already_exists".to_string() };
+            // 409 fired but user not found by email lookup — the user may have
+            // no email in their project profile (e.g. invited via user_id).
+            // Treat as already in the project since we can't determine their role.
+            return ItemResult::Skipped {
+                reason: "already_exists_no_email_match".to_string(),
+            };
         }
         Err(e) => {
             return ItemResult::Failed {

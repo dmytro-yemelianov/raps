@@ -24,6 +24,7 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
                 email: "dup@example.com".into(),
                 role_ids: vec![],
                 products: vec![],
+        suppress_administrative_emails: false,
             },
         )
         .await
