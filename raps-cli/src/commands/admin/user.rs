@@ -648,18 +648,22 @@ impl UserCommands {
             UserCommands::AddToProject {
                 project,
                 email,
-                role_id,
+                role,
                 account,
             } => {
-                let account_id = account
-                    .or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
+                let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
                 let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config.clone(),
+                )?;
                 let mut users_client = ProjectUsersClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),
                     http_config,
                 )?;
-                users_client.account_id = account_id;
+                users_client.account_id = account_id.clone();
 
                 if output_format.supports_colors() {
                     println!(
@@ -670,10 +674,34 @@ impl UserCommands {
                     );
                 }
 
+                // Resolve role → either BIM 360 UUID (role_ids) or ACC products.
+                // Default to "member" when no role is given, so the ACC endpoint always
+                // receives a non-empty products array (empty array causes HTTP 500).
+                let role_name = role.as_deref().unwrap_or("member");
+                let (resolved_role_ids, resolved_products) = if let Some(ref aid) = account_id {
+                    match admin_client.resolve_role(aid, role_name).await? {
+                        ResolvedRole::Uuid(id) => (vec![id], vec![]),
+                        ResolvedRole::Products(products) => (vec![], products),
+                    }
+                } else {
+                    // No account_id → assume ACC hub, map by name directly
+                    match admin_client.resolve_role("", role_name).await {
+                        Ok(ResolvedRole::Products(products)) => (vec![], products),
+                        _ => {
+                            anyhow::bail!(
+                                "Could not resolve role {:?}. \
+                                 Known ACC roles: admin, member, editor, viewer. \
+                                 For BIM 360 UUIDs, also provide --account.",
+                                role_name
+                            )
+                        }
+                    }
+                };
+
                 let request = raps_acc::users::AddProjectUserRequest {
                     email: email.clone(),
-                    role_ids: role_id.clone().map(|s| vec![s]).unwrap_or_default(),
-                    products: vec![],
+                    role_ids: resolved_role_ids,
+                    products: resolved_products,
                     suppress_administrative_emails: false,
                 };
 

@@ -220,9 +220,13 @@ pub enum UserCommands {
         #[arg(short, long)]
         email: String,
 
-        /// Role ID to assign
+        /// Role to assign: "admin", "member", "editor", "viewer" (ACC) or a UUID (BIM 360 industry role)
         #[arg(short, long)]
-        role_id: Option<String>,
+        role: Option<String>,
+
+        /// Account ID (required for BIM 360 hubs; defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
     },
 
     /// Remove a user from a single project
