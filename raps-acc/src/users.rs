@@ -42,47 +42,91 @@ pub struct AddProjectUserRequest {
     pub products: Vec<ProductAccess>,
 }
 
-/// Single entry in a BIM 360 HQ v2 add-users request array
+// ── BIM 360 HQ v2 /users/import types ────────────────────────────────────────
+
+/// Single entry in a BIM 360 HQ v2 `users/import` request array.
+/// Uses snake_case fields (BIM 360 does NOT use camelCase).
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Bim360AddUserEntry {
+struct Bim360ImportEntry {
     email: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    role_id: Option<String>,
+    services: Bim360ImportServices,
+    industry_roles: Vec<String>,
 }
 
-/// Single entry in a BIM 360 HQ v2 users response array
-#[derive(Debug, Clone, serde::Deserialize)]
-struct Bim360ProjectUserEntry {
+#[derive(Debug, Clone, Serialize)]
+struct Bim360ImportServices {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_administration: Option<Bim360ServiceAccess>,
+    document_management: Bim360ServiceAccess,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct Bim360ServiceAccess {
+    access_level: String,
+}
+
+/// Response from BIM 360 HQ v2 `users/import`
+#[derive(Debug, serde::Deserialize)]
+struct Bim360ImportResponse {
+    success: u32,
+    failure: u32,
+    success_items: Vec<Bim360ImportItem>,
+    failure_items: Vec<Bim360ImportFailureItem>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Bim360ImportItem {
     #[serde(default)]
-    uid: Option<String>,
+    user_id: Option<String>,
     #[serde(default)]
-    id: Option<String>,
+    email: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct Bim360ImportFailureItem {
     #[serde(default)]
     email: Option<String>,
     #[serde(default)]
-    first_name: Option<String>,
-    #[serde(default)]
-    last_name: Option<String>,
+    errors: Vec<Bim360ImportError>,
 }
 
-impl From<Bim360ProjectUserEntry> for crate::types::ProjectUser {
-    fn from(e: Bim360ProjectUserEntry) -> Self {
-        let id = e.uid.or(e.id).unwrap_or_default();
-        let name = match (e.first_name, e.last_name) {
-            (Some(f), Some(l)) => Some(format!("{f} {l}")),
-            (Some(f), None) => Some(f),
-            (None, Some(l)) => Some(l),
-            _ => None,
+#[derive(Debug, serde::Deserialize)]
+struct Bim360ImportError {
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    code: Option<serde_json::Value>,
+}
+
+impl Bim360ImportEntry {
+    /// Build from an `AddProjectUserRequest`, mapping ACC products → BIM 360 services.
+    ///
+    /// - `products` non-empty: translate `projectAdministration.administrator` to admin,
+    ///   everything else to user
+    /// - `role_ids` non-empty: these are BIM 360 industry role UUIDs — put them in
+    ///   `industry_roles`, default to `document_management: user`
+    /// - Neither: default to `document_management: user`
+    fn from_request(req: &AddProjectUserRequest) -> Self {
+        let is_admin = req.products.iter().any(|p| {
+            p.key == "projectAdministration" && p.access == "administrator"
+        });
+
+        let services = if is_admin {
+            Bim360ImportServices {
+                project_administration: Some(Bim360ServiceAccess { access_level: "admin".to_string() }),
+                document_management: Bim360ServiceAccess { access_level: "admin".to_string() },
+            }
+        } else {
+            Bim360ImportServices {
+                project_administration: None,
+                document_management: Bim360ServiceAccess { access_level: "user".to_string() },
+            }
         };
-        crate::types::ProjectUser {
-            id,
-            email: e.email,
-            name,
-            role_ids: vec![],
-            role_name: None,
-            products: None,
-            added_on: None,
+
+        Bim360ImportEntry {
+            email: req.email.clone(),
+            services,
+            industry_roles: req.role_ids.clone(),
         }
     }
 }
@@ -182,11 +226,11 @@ impl ProjectUsersClient {
         )
     }
 
-    /// Get the base URL for BIM 360 HQ v2 project users endpoint
+    /// Get the base URL for a BIM 360 HQ v2 project (no trailing path segment)
     fn project_url_bim360(&self, account_id: &str, project_id: &str) -> String {
         let project_id = crate::strip_project_prefix(project_id);
         format!(
-            "{}/hq/v2/accounts/{}/projects/{}/users",
+            "{}/hq/v2/accounts/{}/projects/{}",
             self.config.base_url, account_id, project_id
         )
     }
@@ -309,11 +353,13 @@ impl ProjectUsersClient {
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
     }
 
-    /// Add a user to a BIM 360 project via HQ v2 endpoint.
+    /// Add a user to a BIM 360 project via HQ v2 `/users/import` endpoint.
     ///
-    /// BIM 360 differs from ACC in two ways:
-    /// - Request body is an **array** of `{ email, roleId }` (singular roleId)
-    /// - User must already be an account member; 404 means not-in-account
+    /// BIM 360 differs from ACC:
+    /// - Endpoint: `POST /hq/v2/accounts/{account}/projects/{project}/users/import`
+    /// - Request: array of `{ email, services: { document_management: { access_level } }, industry_roles: [] }`
+    /// - Response: `{ success, failure, success_items, failure_items }`
+    /// - 404: user not in BIM 360 account (must be added via Account Admin first)
     async fn add_user_bim360(
         &self,
         account_id: &str,
@@ -321,14 +367,9 @@ impl ProjectUsersClient {
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
         let token = self.auth.get_3leg_token().await?;
-        let url = self.project_url_bim360(account_id, project_id);
-
-        // BIM 360 HQ v2 expects an array body with singular `roleId`
-        let role_id = request.role_ids.into_iter().next();
-        let body = vec![Bim360AddUserEntry {
-            email: request.email.clone(),
-            role_id,
-        }];
+        let url = format!("{}/users/import", self.project_url_bim360(account_id, project_id));
+        let entry = Bim360ImportEntry::from_request(&request);
+        let body = vec![entry];
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client
@@ -340,27 +381,52 @@ impl ProjectUsersClient {
         .await?;
 
         let status = response.status().as_u16();
-        let error_text = response.text().await.unwrap_or_default();
+        let body_text = response.text().await.unwrap_or_default();
 
         if status == 404 {
             anyhow::bail!(
                 "User '{}' not found in BIM 360 account. \
-                 Add the user to the account in BIM 360 Account Admin first.",
+                 Add the user to the account in BIM 360 Account Admin → Members first.",
                 request.email
             );
         }
 
         if !(200..300).contains(&(status as usize)) {
-            anyhow::bail!("Failed to add user to BIM 360 project (HTTP {status}): {error_text}");
+            anyhow::bail!("Failed to add user to BIM 360 project (HTTP {status}): {body_text}");
         }
 
-        // Response is an array — parse and return first element
-        let mut entries: Vec<Bim360ProjectUserEntry> =
-            serde_json::from_str(&error_text).context("Failed to parse BIM 360 add user response")?;
-        entries
-            .pop()
-            .map(Into::into)
-            .ok_or_else(|| anyhow::anyhow!("BIM 360 returned empty user list"))
+        let result: Bim360ImportResponse = serde_json::from_str(&body_text)
+            .context("Failed to parse BIM 360 import response")?;
+
+        if result.success > 0 {
+            let item = result.success_items.into_iter().next().unwrap_or(Bim360ImportItem {
+                user_id: None,
+                email: Some(request.email.clone()),
+            });
+            return Ok(crate::types::ProjectUser {
+                id: item.user_id.unwrap_or_default(),
+                email: item.email.or(Some(request.email)),
+                name: None,
+                role_ids: vec![],
+                role_name: None,
+                products: None,
+                added_on: None,
+            });
+        }
+
+        // Report failure details
+        let error_msg = result.failure_items.into_iter()
+            .flat_map(|fi| {
+                fi.errors.into_iter().filter_map(|e| e.message)
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+
+        anyhow::bail!(
+            "BIM 360 failed to add user '{}' to project: {}",
+            request.email,
+            if error_msg.is_empty() { "unknown error".to_string() } else { error_msg }
+        )
     }
 
     /// Update a user's role or product access in a project
