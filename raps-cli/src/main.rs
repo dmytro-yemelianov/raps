@@ -612,6 +612,8 @@ async fn main() -> Result<()> {
                 ErrorKind::DisplayHelp => {
                     if ansi_supported() {
                         print!("{}", include_str!("../logo.ansi"));
+                    } else {
+                        print!("{}", include_str!("../logo.txt"));
                     }
                     let _ = e.print();
                     0
@@ -713,6 +715,8 @@ async fn run(cli: Cli) -> Result<()> {
             }
             if ansi_supported() {
                 print!("{}", include_str!("../logo.ansi"));
+            } else {
+                print!("{}", include_str!("../logo.txt"));
             }
             Cli::command().print_help()?;
             return Ok(());
