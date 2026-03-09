@@ -563,6 +563,29 @@ mod help_transform_tests {
     }
 }
 
+/// Returns true if the terminal is likely to render ANSI escape sequences.
+///
+/// Mirrors the logic in `raps_kernel::logging::init` but can be called before
+/// logging is initialised (e.g. for the logo printed on `--help`).
+fn ansi_supported() -> bool {
+    if std::env::var("NO_COLOR").is_ok() {
+        return false;
+    }
+    if std::env::var("CLICOLOR").as_deref() == Ok("0") {
+        return false;
+    }
+    if std::env::var("TERM").as_deref() == Ok("dumb") {
+        return false;
+    }
+    if std::env::var("CLICOLOR_FORCE").is_ok_and(|v| v != "0") {
+        return true;
+    }
+    // On Windows, ANSI VT processing is off by default in older terminals.
+    // `colored` (via `supports-color`) enables it when possible; if it reports
+    // no color support we follow suit.
+    colored::control::SHOULD_COLORIZE.should_colorize()
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     raps_kernel::profiler::init();
@@ -587,7 +610,9 @@ async fn main() -> Result<()> {
                     0
                 }
                 ErrorKind::DisplayHelp => {
-                    print!("{}", include_str!("../logo.ansi"));
+                    if ansi_supported() {
+                        print!("{}", include_str!("../logo.ansi"));
+                    }
                     let _ = e.print();
                     0
                 }
@@ -686,7 +711,9 @@ async fn run(cli: Cli) -> Result<()> {
             if !io::stdin().is_terminal() {
                 return run_piped_stdin(cli.timeout, cli.proxy, cli.output, cli.concurrency).await;
             }
-            print!("{}", include_str!("../logo.ansi"));
+            if ansi_supported() {
+                print!("{}", include_str!("../logo.ansi"));
+            }
             Cli::command().print_help()?;
             return Ok(());
         }
