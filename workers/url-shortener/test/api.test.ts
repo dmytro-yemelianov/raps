@@ -113,6 +113,13 @@ describe('DELETE /api/links/:code and GET /api/links', () => {
     const body = await res.json() as { error: string }
     expect(body.error).toBe('Cannot delete hardcoded link')
   })
+
+  it('DELETE non-existent code returns 404', async () => {
+    const res = await adminFetch('/api/links/does-not-exist', { method: 'DELETE' })
+    expect(res.status).toBe(404)
+    const body = await res.json() as { error: string }
+    expect(body.error).toBe('Link not found')
+  })
 })
 
 describe('GET /api/links', () => {

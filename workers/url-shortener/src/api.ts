@@ -3,8 +3,10 @@ import { Env } from './index'
 import { HARDCODED } from './redirect'
 
 function generateCode(): string {
-  const code = Math.random().toString(36).slice(2, 8)
-  return code.length === 6 ? code : generateCode()
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+  const bytes = new Uint8Array(6)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, b => chars[b % chars.length]).join('')
 }
 
 export async function shortenHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
@@ -73,18 +75,20 @@ export async function deleteHandler(c: Context<{ Bindings: Env }>): Promise<Resp
 }
 
 export async function listHandler(c: Context<{ Bindings: Env }>): Promise<Response> {
-  const list = await c.env.KV.list()
-  const results: { code: string; url: string; created_at: string }[] = []
-
-  for (const key of list.keys) {
-    const raw = await c.env.KV.get(key.name)
-    if (raw !== null) {
-      const { url, created_at } = JSON.parse(raw) as { url: string; created_at: string }
-      results.push({ code: key.name, url, created_at })
+  const items: Array<{ code: string; url: string; created_at: string }> = []
+  let cursor: string | undefined
+  while (true) {
+    const list = await c.env.KV.list({ cursor })
+    for (const key of list.keys) {
+      const val = await c.env.KV.get(key.name)
+      if (val) {
+        const data = JSON.parse(val) as { url: string; created_at: string }
+        items.push({ code: key.name, url: data.url, created_at: data.created_at })
+      }
     }
+    if (list.list_complete) break
+    cursor = list.cursor
   }
-
-  results.sort((a, b) => b.created_at.localeCompare(a.created_at))
-
-  return c.json(results, 200)
+  items.sort((a, b) => b.created_at.localeCompare(a.created_at))
+  return c.json(items)
 }
