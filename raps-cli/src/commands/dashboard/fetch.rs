@@ -138,11 +138,22 @@ async fn resolve_acc_project_id(
     project_id: &str,
     hub_context: Option<&str>,
 ) -> Result<String> {
+    // 0. Check cache first
+    {
+        let cache = clients.project_cache.lock().await;
+        if let Some(id) = cache.get(project_id) {
+            return Ok(id.clone());
+        }
+    }
+
     // First try: strip "b." prefix (standard ACC pattern)
     let stripped = project_id.strip_prefix("b.").unwrap_or(project_id);
 
     if is_guid(stripped) {
         tracing::info!("ACC project ID (stripped): {stripped}");
+        // Cache it
+        let mut cache = clients.project_cache.lock().await;
+        cache.insert(project_id.to_string(), stripped.to_string());
         return Ok(stripped.to_string());
     }
 
@@ -154,6 +165,9 @@ async fn resolve_acc_project_id(
                 tracing::info!(
                     "Resolved issues container GUID: project={project_id} → container={container_id}"
                 );
+                // Cache it
+                let mut cache = clients.project_cache.lock().await;
+                cache.insert(project_id.to_string(), container_id.clone());
                 return Ok(container_id);
             }
             Ok(Some(non_guid)) => {

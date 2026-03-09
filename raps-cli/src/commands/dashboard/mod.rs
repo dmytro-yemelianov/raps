@@ -516,6 +516,8 @@ struct Clients {
     derivative: DerivativeClient,
     webhooks: WebhooksClient,
     reality: RealityCaptureClient,
+    /// Cache for resolved ACC/BIM360 project IDs
+    project_cache: Arc<tokio::sync::Mutex<HashMap<String, String>>>,
 }
 
 /// Application state
@@ -720,6 +722,7 @@ pub async fn run_dashboard(config: Config, http_config: HttpClientConfig) -> Res
             http_config.clone(),
         )?,
         reality: RealityCaptureClient::new_with_http_config(config, auth, http_config)?,
+        project_cache: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
     });
 
     // Guard restores terminal on both normal exit and panic
