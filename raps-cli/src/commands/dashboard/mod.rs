@@ -80,10 +80,11 @@ enum ResourceTab {
     Webhooks,
     RealityCapture,
     Swarm,
+    Logs,
 }
 
 impl ResourceTab {
-    const ALL: [ResourceTab; 8] = [
+    const ALL: &'static [ResourceTab] = &[
         ResourceTab::Buckets,
         ResourceTab::DataManagement,
         ResourceTab::Issues,
@@ -92,6 +93,7 @@ impl ResourceTab {
         ResourceTab::Webhooks,
         ResourceTab::RealityCapture,
         ResourceTab::Swarm,
+        ResourceTab::Logs,
     ];
 
     fn index(self) -> usize {
@@ -104,6 +106,7 @@ impl ResourceTab {
             ResourceTab::Webhooks => 5,
             ResourceTab::RealityCapture => 6,
             ResourceTab::Swarm => 7,
+            ResourceTab::Logs => 8,
         }
     }
 
@@ -117,6 +120,7 @@ impl ResourceTab {
             ResourceTab::Webhooks => "F6 Webhooks",
             ResourceTab::RealityCapture => "F7 Reality",
             ResourceTab::Swarm => "F8 Swarm",
+            ResourceTab::Logs => "F9 Logs",
         }
     }
 }
@@ -229,6 +233,9 @@ enum ViewKind {
     },
     // Swarm tab (F8)
     SwarmOverview,
+
+    // Logs tab (F9)
+    LogList,
 }
 
 impl ViewKind {
@@ -279,6 +286,7 @@ impl ViewKind {
             ViewKind::PhotosceneList => "Photoscenes".into(),
             ViewKind::PhotosceneDetail { id } => format!("Photoscene: {id}"),
             ViewKind::SwarmOverview => "Swarm Status".into(),
+            ViewKind::LogList => "System Logs".into(),
         }
     }
 }
@@ -322,6 +330,7 @@ enum ResourceData {
     Photoscenes(resources::others::PhotosceneList),
     PhotosceneDetail(Vec<DetailField>),
     SwarmStatus(Vec<DetailField>),
+    Logs(resources::others::LogList),
 }
 
 impl ResourceData {
@@ -344,6 +353,7 @@ impl ResourceData {
             ResourceData::Derivatives(d) => Some(d),
             ResourceData::Webhooks(w) => Some(w),
             ResourceData::Photoscenes(p) => Some(p),
+            ResourceData::Logs(l) => Some(l),
             _ => None,
         }
     }
@@ -367,6 +377,7 @@ impl ResourceData {
                 ResourceData::Derivatives(_) => unreachable!(),
                 ResourceData::Webhooks(_) => unreachable!(),
                 ResourceData::Photoscenes(_) => unreachable!(),
+                ResourceData::Logs(_) => unreachable!(),
                 _ => self.raw_count(),
             };
         }
@@ -375,7 +386,7 @@ impl ResourceData {
             ResourceData::Buckets(_) | ResourceData::Objects(_) | ResourceData::Hubs(_) | ResourceData::Projects(_) | ResourceData::FolderContents(_)
             | ResourceData::Issues(_) | ResourceData::Rfis(_) | ResourceData::Assets(_) | ResourceData::Submittals(_) | ResourceData::Checklists(_)
             | ResourceData::Engines(_) | ResourceData::Activities(_) | ResourceData::WorkItems(_) | ResourceData::AppBundles(_)
-            | ResourceData::Derivatives(_) | ResourceData::Webhooks(_) | ResourceData::Photoscenes(_) => unreachable!(),
+            | ResourceData::Derivatives(_) | ResourceData::Webhooks(_) | ResourceData::Photoscenes(_) | ResourceData::Logs(_) => unreachable!(),
             ResourceData::IssueComments(v) => v.iter().filter(|r| r.body.to_lowercase().contains(&filter)).count(),
             ResourceData::IssueAttachments(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
             ResourceData::IssueTypes(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
@@ -436,6 +447,7 @@ impl ResourceData {
             ResourceData::Photoscenes(_) => unreachable!(),
             ResourceData::PhotosceneDetail(v) => v.len(),
             ResourceData::SwarmStatus(v) => v.len(),
+            ResourceData::Logs(_) => unreachable!(),
         }
     }
 }
@@ -567,6 +579,7 @@ impl App {
                 vec![ViewKind::WebhookList],    // Tab 5: Webhooks
                 vec![ViewKind::PhotosceneList], // Tab 6: Reality Capture
                 vec![ViewKind::SwarmOverview],  // Tab 7: Swarm
+                vec![ViewKind::LogList],        // Tab 8: Logs
             ],
             table_state: TableState::default(),
             data: None,
@@ -675,7 +688,7 @@ impl App {
         }
         stack
             .iter()
-            .map(|v| v.title())
+            .map(|v: &ViewKind| v.title())
             .collect::<Vec<_>>()
             .join(" > ")
     }

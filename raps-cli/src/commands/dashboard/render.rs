@@ -221,6 +221,9 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
         ResourceData::Photoscenes(p) => {
             render_resource_table(f, inner, p, &filter, &mut app.table_state);
         }
+        ResourceData::Logs(l) => {
+            render_resource_table(f, inner, l, &filter, &mut app.table_state);
+        }
         // Detail views (key-value)
         ResourceData::BucketDetail(fields)
         | ResourceData::ObjectDetail(fields)
@@ -499,6 +502,7 @@ fn shortcut_hints(app: &App) -> String {
             | ViewKind::WebhookDetail { .. }
             | ViewKind::PhotosceneDetail { .. }
             | ViewKind::SwarmOverview
+            | ViewKind::LogList
     ) {
         return "Esc:Back  y:Copy  r:Refresh  Enter:Drill  ?:Help".into();
     }

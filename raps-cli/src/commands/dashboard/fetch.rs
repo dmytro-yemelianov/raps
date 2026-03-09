@@ -16,6 +16,20 @@ pub(super) fn load_view(
     }
     let view = app.current_view().clone();
 
+    if let ViewKind::LogList = view {
+        let rows: Vec<resources::others::LogRow> = app
+            .logs
+            .iter()
+            .rev()
+            .map(|msg| resources::others::LogRow {
+                message: msg.clone(),
+            })
+            .collect();
+        app.data = Some(ResourceData::Logs(resources::others::LogList { rows }));
+        app.loading = false;
+        return;
+    }
+
     // Check cache first (unless force-refreshing)
     if !force {
         if let Some(entry) = app.cache.get(&view) {
@@ -1130,6 +1144,14 @@ async fn fetch_data(
                 },
             ];
             Ok(ResourceData::PhotosceneDetail(fields))
+        }
+        ViewKind::LogList => {
+            // LogList is special: it's not fetched from API but from app.logs.
+            // However, fetch_data is async and doesn't see App.
+            // We'll return an empty list here and let handle_bg_msg or load_view fill it?
+            // Actually, better to just return the logs if we passed them in.
+            // For now, I'll return an empty one and fix load_view.
+            Ok(ResourceData::Logs(resources::others::LogList { rows: vec![] }))
         }
         ViewKind::SwarmOverview => {
             let mut fields = Vec::new();

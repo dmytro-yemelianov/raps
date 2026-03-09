@@ -246,3 +246,58 @@ impl DashboardResource for PhotosceneList {
         }
     }
 }
+
+// --- Logs ---
+
+#[derive(Debug, Clone)]
+pub struct LogList {
+    pub rows: Vec<LogRow>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LogRow {
+    pub message: String,
+}
+
+impl DashboardResource for LogList {
+    fn headers(&self) -> Vec<&'static str> {
+        vec!["Message"]
+    }
+
+    fn widths(&self) -> Vec<Constraint> {
+        vec![Constraint::Percentage(100)]
+    }
+
+    fn raw_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn filtered_count(&self, filter: &str) -> usize {
+        if filter.is_empty() { return self.rows.len(); }
+        let filter = filter.to_lowercase();
+        self.rows.iter().filter(|r| r.message.to_lowercase().contains(&filter)).count()
+    }
+
+    fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
+        let filter = filter.to_lowercase();
+        let filtered: Vec<&LogRow> = self.rows.iter()
+            .filter(|r| filter.is_empty() || r.message.to_lowercase().contains(&filter))
+            .collect();
+        
+        filtered.get(index).map(|r| {
+            Row::new(vec![Cell::from(r.message.as_str())])
+        })
+    }
+
+    fn get_id(&self, index: usize, filter: &str) -> Option<String> {
+        let filter = filter.to_lowercase();
+        let filtered: Vec<&LogRow> = self.rows.iter()
+            .filter(|r| filter.is_empty() || r.message.to_lowercase().contains(&filter))
+            .collect();
+        filtered.get(index).map(|r| r.message.clone())
+    }
+
+    fn handle_enter(&self, _index: usize, _filter: &str, _app: &mut App, _clients: &Arc<Clients>, _tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+        // No drill-down for logs
+    }
+}

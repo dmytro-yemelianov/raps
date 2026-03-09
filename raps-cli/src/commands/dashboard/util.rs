@@ -189,6 +189,9 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
         ResourceData::Photoscenes(p) => {
             p.get_id(sel, &filter)
         }
+        ResourceData::Logs(l) => {
+            l.get_id(sel, &filter)
+        }
         // Detail views — copy the value of the selected field
         ResourceData::BucketDetail(fields)
         | ResourceData::ObjectDetail(fields)

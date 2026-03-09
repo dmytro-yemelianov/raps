@@ -99,7 +99,7 @@ pub(super) fn handle_key(
             KeyCode::Char(':') => {
                 app.input_mode = InputMode::Command(String::new());
             }
-            KeyCode::F(n @ 1..=8) => {
+            KeyCode::F(n @ 1..=9) => {
                 let tab = ResourceTab::ALL[(n as usize) - 1];
                 switch_tab(app, tab, clients, tx);
             }
@@ -139,6 +139,7 @@ pub(super) fn handle_key(
         KeyCode::F(6) => switch_tab(app, ResourceTab::Webhooks, clients, tx),
         KeyCode::F(7) => switch_tab(app, ResourceTab::RealityCapture, clients, tx),
         KeyCode::F(8) => switch_tab(app, ResourceTab::Swarm, clients, tx),
+        KeyCode::F(9) => switch_tab(app, ResourceTab::Logs, clients, tx),
         KeyCode::Tab => {
             cycle_tab(app, true, clients, tx);
         }
