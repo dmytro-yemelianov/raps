@@ -71,8 +71,9 @@ pub enum FolderCommands {
         hub_id: Option<String>,
     },
 
-    /// Show permissions (rights) for a folder
-    Rights {
+    /// Show your permissions for a folder
+    #[command(name = "permissions", alias = "rights")]
+    Permissions {
         /// Project ID
         project_id: Option<String>,
         /// Folder ID
@@ -133,7 +134,7 @@ impl FolderCommands {
                 }
                 delete_folder(client, &p_id, &f_id, output_format).await
             }
-            FolderCommands::Rights {
+            FolderCommands::Permissions {
                 project_id,
                 folder_id,
                 hub_id,

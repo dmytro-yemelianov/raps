@@ -34,7 +34,7 @@ impl FolderCommands {
         global_concurrency: usize,
     ) -> Result<()> {
         match self {
-            FolderCommands::Rights {
+            FolderCommands::SetPermissions {
                 email,
                 account,
                 level,
@@ -65,7 +65,7 @@ impl FolderCommands {
 
                 if output_format.supports_colors() {
                     println!(
-                        "\n{} Bulk update folder rights for: {} in account {}",
+                        "\n{} Bulk set folder permissions for: {} in account {}",
                         "→".cyan(),
                         email.green(),
                         account_id.cyan()

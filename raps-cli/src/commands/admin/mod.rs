@@ -33,7 +33,10 @@ use raps_kernel::config::Config;
 
 use crate::output::OutputFormat;
 
-/// Account admin bulk management commands
+/// Account admin bulk management
+///
+/// Requires Account Administrator role in ACC/BIM 360.
+/// Set APS_ACCOUNT_ID or use --account to specify your account.
 #[derive(Debug, Subcommand)]
 pub enum AdminCommands {
     /// Bulk user management operations
@@ -87,7 +90,7 @@ pub enum UserCommands {
         search: Option<String>,
     },
 
-    /// Add a user to multiple projects
+    /// [bulk] Add a user to multiple projects (use add-to-project for a single project)
     Add {
         /// Email address of the user to add
         email: String,
@@ -125,7 +128,7 @@ pub enum UserCommands {
         yes: bool,
     },
 
-    /// Remove a user from multiple projects
+    /// [bulk] Remove a user from multiple projects (use remove-from-project for a single project)
     Remove {
         /// Email address of the user to remove
         email: String,
@@ -159,7 +162,7 @@ pub enum UserCommands {
         yes: bool,
     },
 
-    /// Update user roles and/or company across multiple projects
+    /// [bulk] Update user roles and/or company across multiple projects (use update-in-project for a single project)
     Update {
         /// Email address of the user to update
         email: String,
@@ -209,7 +212,7 @@ pub enum UserCommands {
         yes: bool,
     },
 
-    /// Add a user to a single project by email
+    /// Add a user to a single project by email (use 'add' for multiple projects at once)
     #[command(name = "add-to-project")]
     AddToProject {
         /// Project ID
@@ -229,7 +232,7 @@ pub enum UserCommands {
         account: Option<String>,
     },
 
-    /// Remove a user from a single project
+    /// Remove a user from a single project (use 'remove' for multiple projects at once)
     #[command(name = "remove-from-project")]
     RemoveFromProject {
         /// Project ID
@@ -245,7 +248,7 @@ pub enum UserCommands {
         yes: bool,
     },
 
-    /// Update a user's role in a single project
+    /// Update a user's role in a single project (use 'update' for multiple projects at once)
     #[command(name = "update-in-project")]
     UpdateInProject {
         /// Project ID
@@ -300,8 +303,9 @@ pub enum UserCommands {
 /// Folder permission management subcommands
 #[derive(Debug, Subcommand)]
 pub enum FolderCommands {
-    /// Update folder permissions for a user across projects
-    Rights {
+    /// Set folder permissions for a user across projects
+    #[command(name = "set-permissions", alias = "rights")]
+    SetPermissions {
         /// Email address of the user
         email: String,
 

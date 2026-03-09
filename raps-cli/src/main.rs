@@ -278,7 +278,7 @@ enum Commands {
     #[command(subcommand)]
     Acc(AccCommands),
 
-    /// Account admin bulk management (add/remove users, update roles, folder rights)
+    /// Account admin bulk management (requires Account Administrator role)
     #[command(subcommand)]
     Admin(AdminCommands),
 
