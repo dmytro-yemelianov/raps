@@ -13,7 +13,10 @@ use serde::Serialize;
 use crate::commands::interactive;
 use crate::commands::tracked::tracked_op;
 use crate::output::OutputFormat;
+use raps_acc::admin::AccountAdminClient;
 use raps_dm::DataManagementClient;
+use raps_kernel::auth::AuthClient;
+use raps_kernel::config::Config;
 use raps_kernel::security::validate_resource_id;
 // use raps_kernel::output::OutputFormat;
 
@@ -38,10 +41,14 @@ impl ProjectCommands {
     pub async fn execute(
         self,
         client: &DataManagementClient,
+        config: &Config,
+        auth_client: &AuthClient,
         output_format: OutputFormat,
     ) -> Result<()> {
         match self {
-            ProjectCommands::List { hub_id } => list_projects(client, hub_id, output_format).await,
+            ProjectCommands::List { hub_id } => {
+                list_projects(client, config, auth_client, hub_id, output_format).await
+            }
             ProjectCommands::Info { hub_id, project_id } => {
                 project_info(client, &hub_id, &project_id, output_format).await
             }
@@ -51,14 +58,23 @@ impl ProjectCommands {
 
 #[derive(Serialize, schemars::JsonSchema)]
 pub struct ProjectListOutput {
-    id: String,
-    name: String,
-    project_type: String,
-    scopes: Option<Vec<String>>,
+    pub id: String,
+    pub name: String,
+    pub status: Option<String>,
+    pub platform: Option<String>,
+    pub project_type: Option<String>,
+    pub scopes: Option<Vec<String>>,
+}
+
+/// Returns Some(account_id) if hub_id is a BIM 360 Business hub (prefix "b.")
+fn bim360_account_id(hub_id: &str) -> Option<String> {
+    hub_id.strip_prefix("b.").map(|s| s.to_string())
 }
 
 async fn list_projects(
     client: &DataManagementClient,
+    config: &Config,
+    auth_client: &AuthClient,
     hub_id: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
@@ -71,6 +87,12 @@ async fn list_projects(
         }
         None => interactive::prompt_for_hub(client).await?,
     };
+
+    // BIM 360 hub → use Admin API
+    if let Some(account_id) = bim360_account_id(&hub) {
+        return list_projects_admin(config.clone(), auth_client.clone(), &account_id, output_format)
+            .await;
+    }
 
     let projects = tracked_op("Fetching projects", output_format, || async {
         client.list_projects(&hub).await.context(format!(
@@ -85,7 +107,9 @@ async fn list_projects(
         .map(|p| ProjectListOutput {
             id: p.id.clone(),
             name: p.attributes.name.clone(),
-            project_type: p.project_type.clone(),
+            status: None,
+            platform: None,
+            project_type: Some(p.project_type.clone()),
             scopes: p.attributes.scopes.clone(),
         })
         .collect();
@@ -122,6 +146,63 @@ async fn list_projects(
         _ => {
             output_format.write(&project_outputs)?;
         }
+    }
+    Ok(())
+}
+
+async fn list_projects_admin(
+    config: Config,
+    auth_client: AuthClient,
+    account_id: &str,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let admin_client = AccountAdminClient::new(config, auth_client);
+
+    let projects = tracked_op("Fetching projects", output_format, || async {
+        admin_client
+            .list_all_projects(account_id)
+            .await
+            .context("Failed to list BIM 360 projects")
+    })
+    .await?;
+
+    let outputs: Vec<ProjectListOutput> = projects
+        .iter()
+        .map(|p| ProjectListOutput {
+            id: p.id.clone(),
+            name: p.name.clone(),
+            status: p.status.clone(),
+            platform: p.platform.clone(),
+            project_type: None,
+            scopes: None,
+        })
+        .collect();
+
+    if outputs.is_empty() {
+        match output_format {
+            OutputFormat::Table => println!("{}", "No projects found.".yellow()),
+            _ => output_format.write(&Vec::<ProjectListOutput>::new())?,
+        }
+        return Ok(());
+    }
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Projects:".bold());
+            println!("{}", "-".repeat(80));
+            for p in &outputs {
+                println!("  {} {}", "-".cyan(), p.name.bold());
+                println!("    {} {}", "ID:".dimmed(), p.id);
+                if let Some(ref status) = p.status {
+                    println!("    {} {}", "Status:".dimmed(), status);
+                }
+                if let Some(ref platform) = p.platform {
+                    println!("    {} {}", "Platform:".dimmed(), platform);
+                }
+            }
+            println!("{}", "-".repeat(80));
+        }
+        _ => output_format.write(&outputs)?,
     }
     Ok(())
 }

@@ -1521,7 +1521,9 @@ async fn execute_command(
         }
 
         Commands::Project(cmd) => {
-            cmd.execute(&get_dm_client(), output_format).await?;
+            let auth_client = get_auth_client();
+            cmd.execute(&get_dm_client(), config, &auth_client, output_format)
+                .await?;
         }
 
         Commands::Folder(cmd) => {
