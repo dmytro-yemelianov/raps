@@ -378,6 +378,18 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
                 Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
             ));
         }
+        InputMode::MarkSet => {
+            spans.push(Span::styled(
+                " Set mark (press a-z)...",
+                Style::default().fg(Color::Yellow),
+            ));
+        }
+        InputMode::JumpToMark => {
+            spans.push(Span::styled(
+                " Jump to mark (press a-z)...",
+                Style::default().fg(Color::Cyan),
+            ));
+        }
         InputMode::Normal => {
             if !app.filter_text.is_empty() {
                 spans.push(Span::styled(
@@ -527,5 +539,5 @@ fn shortcut_hints(app: &App) -> String {
         _ => "",
     };
 
-    format!("{tab_hint}Enter:Open  Esc:Back  /:Filter  y:Copy  ?:Help")
+    format!("{tab_hint}Enter:Open  Esc:Back  /:Filter  m:Mark  ':Jump  y:Copy  ?:Help")
 }

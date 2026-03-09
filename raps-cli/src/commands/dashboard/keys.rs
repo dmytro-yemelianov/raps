@@ -83,7 +83,40 @@ pub(super) fn handle_key(
             }
             return;
         }
-        InputMode::Normal => {}
+        InputMode::MarkSet => {
+            if let KeyCode::Char(c) = key.code {
+                let mark = Mark {
+                    tab: app.tab,
+                    stack: app.nav_stacks[app.tab.index()].clone(),
+                    project_context: app.project_context.clone(),
+                    hub_context: app.hub_context.clone(),
+                };
+                app.marks.insert(c, mark);
+                app.set_status(format!("Mark '{c}' set"));
+            }
+            app.input_mode = InputMode::Normal;
+            return;
+        }
+        InputMode::JumpToMark => {
+            if let KeyCode::Char(c) = key.code {
+                if let Some(mark) = app.marks.get(&c).cloned() {
+                    app.tab = mark.tab;
+                    app.nav_stacks[mark.tab.index()] = mark.stack;
+                    app.project_context = mark.project_context;
+                    app.hub_context = mark.hub_context;
+                    app.set_status(format!("Jumped to mark '{c}'"));
+                    app.data = None;
+                    app.table_state.select(Some(0));
+                    fetch::load_view(app, clients, tx, false);
+                } else {
+                    app.set_status(format!("Mark '{c}' not found"));
+                }
+            }
+            app.input_mode = InputMode::Normal;
+            return;
+        }
+        InputMode::Normal => {
+}
     }
 
     // Guard: tabs with empty nav stacks (e.g. F5 before :urn) only allow
@@ -175,11 +208,18 @@ pub(super) fn handle_key(
             handle_enter(app, clients, tx);
         }
         KeyCode::Char('/') => {
-            app.input_mode = InputMode::Filter(app.filter_text.clone());
+            app.input_mode = InputMode::Filter(String::new());
         }
         KeyCode::Char(':') => {
             app.input_mode = InputMode::Command(String::new());
         }
+        KeyCode::Char('m') => {
+            app.input_mode = InputMode::MarkSet;
+        }
+        KeyCode::Char('\'') => {
+            app.input_mode = InputMode::JumpToMark;
+        }
+
         KeyCode::Char('r') => {
             fetch::load_view(app, clients, tx, true);
         }

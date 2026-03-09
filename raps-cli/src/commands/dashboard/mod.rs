@@ -61,6 +61,8 @@ enum InputMode {
     Filter(String),
     Command(String),
     Confirm(String),
+    MarkSet,
+    JumpToMark,
 }
 
 /// Actions that require special handling in the event loop (e.g. leaving TUI).
@@ -564,6 +566,16 @@ struct App {
     pending_action: Option<PendingAction>,
     /// Frame counter for spinner animation
     tick: u64,
+    /// Vim-style marks: char -> (Tab, Stack, Contexts)
+    marks: HashMap<char, Mark>,
+}
+
+#[derive(Clone)]
+struct Mark {
+    tab: ResourceTab,
+    stack: Vec<ViewKind>,
+    project_context: Option<(String, String)>,
+    hub_context: Option<String>,
 }
 
 impl App {
@@ -600,6 +612,7 @@ impl App {
             logged_in: false,
             pending_action: None,
             tick: 0,
+            marks: HashMap::new(),
         }
     }
 
