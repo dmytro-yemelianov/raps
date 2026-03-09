@@ -1,6 +1,6 @@
 {
   "name": "@dmytro-yemelianov/raps-cli-linux-arm64",
-  "version": "5.4.2",
+  "version": "5.4.3",
   "description": "RAPS CLI binary for Linux ARM64",
   "license": "Apache-2.0",
   "repository": {
