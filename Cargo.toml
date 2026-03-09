@@ -66,7 +66,7 @@ dotenvy = "0.15"
 indicatif = "0.18"
 
 # Terminal colors
-colored = "2.1"
+colored = "3.1"
 
 # Base64 encoding for URNs
 base64 = "0.22"
