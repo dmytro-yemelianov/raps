@@ -578,6 +578,8 @@ struct App {
     tick: u64,
     /// Vim-style marks: char -> (Tab, Stack, Contexts)
     marks: HashMap<char, Mark>,
+    /// IDs of items selected for bulk operations
+    selected_ids: std::collections::HashSet<String>,
 }
 
 #[derive(Clone)]
@@ -623,6 +625,7 @@ impl App {
             pending_action: None,
             tick: 0,
             marks: HashMap::new(),
+            selected_ids: std::collections::HashSet::new(),
         }
     }
 

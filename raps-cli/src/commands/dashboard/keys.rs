@@ -219,6 +219,15 @@ pub(super) fn handle_key(
         KeyCode::Char('\'') => {
             app.input_mode = InputMode::JumpToMark;
         }
+        KeyCode::Char(' ') => {
+            if let Some(id) = util::selected_id(app) {
+                if app.selected_ids.contains(&id) {
+                    app.selected_ids.remove(&id);
+                } else {
+                    app.selected_ids.insert(id);
+                }
+            }
+        }
 
         KeyCode::Char('r') => {
             fetch::load_view(app, clients, tx, true);
