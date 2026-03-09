@@ -102,13 +102,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     match data {
         ResourceData::Buckets(rows) => {
-            let filtered: Vec<&BucketRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&BucketRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -126,13 +123,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Objects(rows) => {
-            let filtered: Vec<&ObjectRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&ObjectRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -150,13 +144,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Hubs(rows) => {
-            let filtered: Vec<&HubRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&HubRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -174,13 +165,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Projects(rows) => {
-            let filtered: Vec<&ProjectRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&ProjectRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -194,13 +182,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::FolderContents(rows) => {
-            let filtered: Vec<&FolderContentRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&FolderContentRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -243,13 +228,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::Issues(rows) => {
-            let filtered: Vec<&IssueRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&IssueRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -291,13 +273,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::Rfis(rows) => {
-            let filtered: Vec<&RfiRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&RfiRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -339,16 +318,14 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::Assets(rows) => {
-            let filtered: Vec<&AssetRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.id.to_lowercase().contains(&filter)
-                            || r.description.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<&AssetRow> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.id.to_lowercase().contains(&filter)
+                        || r.description.to_lowercase().contains(&filter)
+                })
+                .collect();
             render_table(
                 f,
                 inner,
@@ -374,13 +351,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Submittals(rows) => {
-            let filtered: Vec<&SubmittalRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&SubmittalRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -422,13 +396,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::Checklists(rows) => {
-            let filtered: Vec<&ChecklistRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&ChecklistRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -470,13 +441,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::IssueComments(rows) => {
-            let filtered: Vec<&IssueCommentRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.body.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&IssueCommentRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.body.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -500,13 +468,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::IssueAttachments(rows) => {
-            let filtered: Vec<&IssueAttachmentRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&IssueAttachmentRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -524,13 +489,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::IssueTypes(rows) => {
-            let filtered: Vec<&IssueTypeRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&IssueTypeRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -548,13 +510,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Engines(rows) => {
-            let filtered: Vec<&EngineRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&EngineRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -568,13 +527,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Activities(rows) => {
-            let filtered: Vec<&ActivityRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&ActivityRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -585,13 +541,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::WorkItems(rows) => {
-            let filtered: Vec<&WorkItemRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&WorkItemRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|r| {
@@ -631,13 +584,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             f.render_stateful_widget(table, inner, &mut app.table_state);
         }
         ResourceData::AppBundles(rows) => {
-            let filtered: Vec<&AppBundleRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&AppBundleRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -648,13 +598,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Derivatives(rows) => {
-            let filtered: Vec<&DerivativeRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&DerivativeRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -682,16 +629,14 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Webhooks(rows) => {
-            let filtered: Vec<&WebhookRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.event.to_lowercase().contains(&filter)
-                            || r.callback_url.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<&WebhookRow> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.event.to_lowercase().contains(&filter)
+                        || r.callback_url.to_lowercase().contains(&filter)
+                })
+                .collect();
             render_table(
                 f,
                 inner,
@@ -719,13 +664,10 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<&PhotosceneRow> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<&PhotosceneRow> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             render_table(
                 f,
                 inner,
@@ -767,7 +709,15 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
         | ResourceData::WebhookDetail(fields)
         | ResourceData::PhotosceneDetail(fields)
         | ResourceData::SwarmStatus(fields) => {
-            let table_rows: Vec<Row> = fields
+            let filtered: Vec<&DetailField> = fields
+                .iter()
+                .filter(|f| {
+                    filter.is_empty()
+                        || f.label.to_lowercase().contains(&filter)
+                        || f.value.to_lowercase().contains(&filter)
+                })
+                .collect();
+            let table_rows: Vec<Row> = filtered
                 .iter()
                 .map(|field| {
                     Row::new(vec![

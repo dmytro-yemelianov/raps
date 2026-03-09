@@ -117,212 +117,154 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
 
     match data {
         ResourceData::Buckets(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.key.clone())
         }
         ResourceData::Objects(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.key.clone())
         }
         ResourceData::Hubs(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Projects(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::FolderContents(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Issues(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Rfis(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Assets(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.id.to_lowercase().contains(&filter)
-                            || r.description.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.id.to_lowercase().contains(&filter)
+                        || r.description.to_lowercase().contains(&filter)
+                })
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Submittals(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Checklists(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::IssueComments(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.body.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.body.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::IssueAttachments(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::IssueTypes(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Engines(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Activities(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::WorkItems(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::AppBundles(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
         ResourceData::Derivatives(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.urn.clone())
         }
         ResourceData::Webhooks(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.event.to_lowercase().contains(&filter)
-                            || r.callback_url.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.event.to_lowercase().contains(&filter)
+                        || r.callback_url.to_lowercase().contains(&filter)
+                })
+                .collect();
             filtered.get(sel).map(|r| r.hook_id.clone())
         }
         ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
-        // Detail views — copy the first field's value (usually the ID)
+        // Detail views — copy the value of the selected field
         ResourceData::BucketDetail(fields)
         | ResourceData::ObjectDetail(fields)
         | ResourceData::ItemDetail(fields)
@@ -336,7 +278,17 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
         | ResourceData::DerivativeDetail(fields)
         | ResourceData::WebhookDetail(fields)
         | ResourceData::PhotosceneDetail(fields)
-        | ResourceData::SwarmStatus(fields) => fields.first().map(|f| f.value.clone()),
+        | ResourceData::SwarmStatus(fields) => {
+            let filtered: Vec<_> = fields
+                .iter()
+                .filter(|f| {
+                    filter.is_empty()
+                        || f.label.to_lowercase().contains(&filter)
+                        || f.value.to_lowercase().contains(&filter)
+                })
+                .collect();
+            filtered.get(sel).map(|f| f.value.clone())
+        }
     }
 }
 

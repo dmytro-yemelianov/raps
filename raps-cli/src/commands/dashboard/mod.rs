@@ -259,8 +259,16 @@ impl ViewKind {
             ViewKind::WorkItemDetail { id } => format!("WorkItem: {id}"),
             ViewKind::AppBundleList => "AppBundles".into(),
             ViewKind::ManifestView { urn } => {
-                let short = if urn.len() > 20 { &urn[..20] } else { urn };
-                format!("Manifest: {short}…")
+                if urn.is_empty() {
+                    "Model Derivative".into()
+                } else {
+                    let short = if urn.len() > 24 {
+                        format!("…{}", &urn[urn.len() - 20..])
+                    } else {
+                        urn.clone()
+                    };
+                    format!("Manifest: {short}")
+                }
             }
             ViewKind::DerivativeList { .. } => "Derivatives".into(),
             ViewKind::DerivativeDetail { name, .. } => format!("Derivative: {name}"),
@@ -272,6 +280,8 @@ impl ViewKind {
         }
     }
 }
+
+const NUM_TABS: usize = ResourceTab::ALL.len();
 
 /// Holds table data for each view kind
 #[derive(Debug, Clone)]
@@ -310,6 +320,114 @@ enum ResourceData {
     Photoscenes(Vec<PhotosceneRow>),
     PhotosceneDetail(Vec<DetailField>),
     SwarmStatus(Vec<DetailField>),
+}
+
+impl ResourceData {
+    /// Returns the number of rows after applying a filter.
+    fn filtered_count(&self, filter: &str) -> usize {
+        if filter.is_empty() {
+            return match self {
+                ResourceData::Buckets(v) => v.len(),
+                ResourceData::Objects(v) => v.len(),
+                ResourceData::Hubs(v) => v.len(),
+                ResourceData::Projects(v) => v.len(),
+                ResourceData::FolderContents(v) => v.len(),
+                ResourceData::Issues(v) => v.len(),
+                ResourceData::Rfis(v) => v.len(),
+                ResourceData::Assets(v) => v.len(),
+                ResourceData::Submittals(v) => v.len(),
+                ResourceData::Checklists(v) => v.len(),
+                ResourceData::IssueComments(v) => v.len(),
+                ResourceData::IssueAttachments(v) => v.len(),
+                ResourceData::IssueTypes(v) => v.len(),
+                ResourceData::Engines(v) => v.len(),
+                ResourceData::Activities(v) => v.len(),
+                ResourceData::WorkItems(v) => v.len(),
+                ResourceData::AppBundles(v) => v.len(),
+                ResourceData::Derivatives(v) => v.len(),
+                ResourceData::Webhooks(v) => v.len(),
+                ResourceData::Photoscenes(v) => v.len(),
+                _ => self.raw_count(),
+            };
+        }
+        let filter = filter.to_lowercase();
+        match self {
+            ResourceData::Buckets(v) => v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count(),
+            ResourceData::Objects(v) => v.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count(),
+            ResourceData::Hubs(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            ResourceData::Projects(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            ResourceData::FolderContents(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            ResourceData::Issues(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Rfis(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Assets(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter)).count(),
+            ResourceData::Submittals(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Checklists(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::IssueComments(v) => v.iter().filter(|r| r.body.to_lowercase().contains(&filter)).count(),
+            ResourceData::IssueAttachments(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            ResourceData::IssueTypes(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Engines(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
+            ResourceData::Activities(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
+            ResourceData::WorkItems(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
+            ResourceData::AppBundles(v) => v.iter().filter(|r| r.id.to_lowercase().contains(&filter)).count(),
+            ResourceData::Derivatives(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            ResourceData::Webhooks(v) => v.iter().filter(|r| r.event.to_lowercase().contains(&filter) || r.callback_url.to_lowercase().contains(&filter)).count(),
+            ResourceData::Photoscenes(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
+            // Detail views (also filterable now for better UX)
+            ResourceData::BucketDetail(v)
+            | ResourceData::ObjectDetail(v)
+            | ResourceData::ItemDetail(v)
+            | ResourceData::IssueDetail(v)
+            | ResourceData::RfiDetail(v)
+            | ResourceData::AssetDetail(v)
+            | ResourceData::SubmittalDetail(v)
+            | ResourceData::ChecklistDetail(v)
+            | ResourceData::WorkItemDetail(v)
+            | ResourceData::Manifest(v)
+            | ResourceData::DerivativeDetail(v)
+            | ResourceData::WebhookDetail(v)
+            | ResourceData::PhotosceneDetail(v)
+            | ResourceData::SwarmStatus(v) => v.iter().filter(|f| f.label.to_lowercase().contains(&filter) || f.value.to_lowercase().contains(&filter)).count(),
+        }
+    }
+
+    fn raw_count(&self) -> usize {
+        match self {
+            ResourceData::Buckets(v) => v.len(),
+            ResourceData::Objects(v) => v.len(),
+            ResourceData::BucketDetail(v) => v.len(),
+            ResourceData::ObjectDetail(v) => v.len(),
+            ResourceData::Hubs(v) => v.len(),
+            ResourceData::Projects(v) => v.len(),
+            ResourceData::FolderContents(v) => v.len(),
+            ResourceData::ItemDetail(v) => v.len(),
+            ResourceData::Issues(v) => v.len(),
+            ResourceData::IssueDetail(v) => v.len(),
+            ResourceData::IssueComments(v) => v.len(),
+            ResourceData::IssueAttachments(v) => v.len(),
+            ResourceData::IssueTypes(v) => v.len(),
+            ResourceData::Rfis(v) => v.len(),
+            ResourceData::RfiDetail(v) => v.len(),
+            ResourceData::Assets(v) => v.len(),
+            ResourceData::AssetDetail(v) => v.len(),
+            ResourceData::Submittals(v) => v.len(),
+            ResourceData::SubmittalDetail(v) => v.len(),
+            ResourceData::Checklists(v) => v.len(),
+            ResourceData::ChecklistDetail(v) => v.len(),
+            ResourceData::Engines(v) => v.len(),
+            ResourceData::Activities(v) => v.len(),
+            ResourceData::WorkItems(v) => v.len(),
+            ResourceData::WorkItemDetail(v) => v.len(),
+            ResourceData::AppBundles(v) => v.len(),
+            ResourceData::Manifest(v) => v.len(),
+            ResourceData::Derivatives(v) => v.len(),
+            ResourceData::DerivativeDetail(v) => v.len(),
+            ResourceData::Webhooks(v) => v.len(),
+            ResourceData::WebhookDetail(v) => v.len(),
+            ResourceData::Photoscenes(v) => v.len(),
+            ResourceData::PhotosceneDetail(v) => v.len(),
+            ResourceData::SwarmStatus(v) => v.len(),
+        }
+    }
 }
 
 // --- Row structs ---
@@ -522,7 +640,7 @@ struct Clients {
 /// Application state
 struct App {
     tab: ResourceTab,
-    nav_stacks: [Vec<ViewKind>; 8],
+    nav_stacks: [Vec<ViewKind>; NUM_TABS],
     table_state: TableState,
     /// Currently displayed data for the active view (set from cache or fresh fetch).
     data: Option<ResourceData>,
@@ -562,7 +680,7 @@ impl App {
                 vec![ViewKind::HubList],        // Tab 1: Data Mgmt
                 vec![ViewKind::HubList],        // Tab 2: ACC (navigate Hub > Project > Issues)
                 vec![ViewKind::EngineList],     // Tab 3: Design Automation
-                vec![],                         // Tab 4: Model Derivative (empty until :urn)
+                vec![ViewKind::ManifestView { urn: String::new() }], // Tab 4: Model Derivative (avoid empty stack)
                 vec![ViewKind::WebhookList],    // Tab 5: Webhooks
                 vec![ViewKind::PhotosceneList], // Tab 6: Reality Capture
                 vec![ViewKind::SwarmOverview],  // Tab 7: Swarm
@@ -594,9 +712,14 @@ impl App {
         stack.last().expect("nav stack should never be empty")
     }
 
-    /// Returns true if the current tab's nav stack is non-empty.
+    /// Returns true if the current tab's nav stack is non-empty and has valid context.
     fn has_current_view(&self) -> bool {
-        !self.nav_stacks[self.tab.index()].is_empty()
+        let stack = &self.nav_stacks[self.tab.index()];
+        if let Some(ViewKind::ManifestView { urn }) = stack.last() {
+            !urn.is_empty()
+        } else {
+            !stack.is_empty()
+        }
     }
 
     /// Save current table selection into the cache entry for the current view.
@@ -664,7 +787,7 @@ impl App {
 
     fn breadcrumb(&self) -> String {
         let stack = &self.nav_stacks[self.tab.index()];
-        if stack.is_empty() {
+        if !self.has_current_view() {
             return "Use :urn <base64> to set context".into();
         }
         stack
@@ -675,214 +798,7 @@ impl App {
     }
 
     fn row_count(&self) -> usize {
-        let data = match &self.data {
-            Some(d) => d,
-            None => return 0,
-        };
-        let filter = self.filter_text.to_lowercase();
-        match data {
-            ResourceData::Buckets(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.key.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Objects(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.key.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Hubs(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Projects(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::FolderContents(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Issues(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.title.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Rfis(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.title.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Assets(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| {
-                            r.id.to_lowercase().contains(&filter)
-                                || r.description.to_lowercase().contains(&filter)
-                        })
-                        .count()
-                }
-            }
-            ResourceData::Submittals(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.title.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Checklists(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.title.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::IssueComments(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.body.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Engines(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.id.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Activities(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.id.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::WorkItems(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.id.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::AppBundles(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.id.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Derivatives(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::Webhooks(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| {
-                            r.event.to_lowercase().contains(&filter)
-                                || r.callback_url.to_lowercase().contains(&filter)
-                        })
-                        .count()
-                }
-            }
-            ResourceData::Photoscenes(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::IssueAttachments(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.name.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            ResourceData::IssueTypes(v) => {
-                if filter.is_empty() {
-                    v.len()
-                } else {
-                    v.iter()
-                        .filter(|r| r.title.to_lowercase().contains(&filter))
-                        .count()
-                }
-            }
-            // Detail views
-            ResourceData::BucketDetail(v)
-            | ResourceData::ObjectDetail(v)
-            | ResourceData::ItemDetail(v)
-            | ResourceData::IssueDetail(v)
-            | ResourceData::RfiDetail(v)
-            | ResourceData::AssetDetail(v)
-            | ResourceData::SubmittalDetail(v)
-            | ResourceData::ChecklistDetail(v)
-            | ResourceData::WorkItemDetail(v)
-            | ResourceData::Manifest(v)
-            | ResourceData::DerivativeDetail(v)
-            | ResourceData::WebhookDetail(v)
-            | ResourceData::PhotosceneDetail(v)
-            | ResourceData::SwarmStatus(v) => v.len(),
-        }
+        self.data.as_ref().map(|d| d.filtered_count(&self.filter_text)).unwrap_or(0)
     }
 }
 

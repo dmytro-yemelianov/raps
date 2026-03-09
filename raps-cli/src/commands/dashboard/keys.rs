@@ -206,9 +206,6 @@ pub(super) fn handle_key(
                 app.table_state.select(Some(prev));
             }
         }
-        KeyCode::Char('d') => {
-            app.input_mode = InputMode::Confirm("Delete selected? (y/N)".into());
-        }
         // F3 ACC tab sub-views
         KeyCode::Char('i') if app.tab == ResourceTab::Issues => {
             if let Some((pid, _)) = &app.project_context {
@@ -467,13 +464,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
 
     match data {
         ResourceData::Buckets(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 let bucket_key = row.key.clone();
                 app.push_view(ViewKind::BucketDetail { bucket_key });
@@ -488,13 +482,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Objects(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.key.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::ObjectList { bucket_key } = app.current_view().clone()
             {
@@ -507,13 +498,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Hubs(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 app.hub_context = Some(row.id.clone());
                 app.push_view(ViewKind::ProjectList {
@@ -523,13 +511,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Projects(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 let project_id = row.id.clone();
                 let project_name = row.name.clone();
@@ -549,13 +534,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::FolderContents(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::FolderList { project_id, .. } = app.current_view().clone()
             {
@@ -574,13 +556,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Issues(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::IssueList { project_id } = app.current_view().clone()
             {
@@ -606,13 +585,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Rfis(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::RfiList { project_id } = app.current_view().clone()
             {
@@ -624,16 +600,14 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Assets(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.id.to_lowercase().contains(&filter)
-                            || r.description.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.id.to_lowercase().contains(&filter)
+                        || r.description.to_lowercase().contains(&filter)
+                })
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::AssetList { project_id } = app.current_view().clone()
             {
@@ -645,13 +619,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Submittals(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::SubmittalList { project_id } = app.current_view().clone()
             {
@@ -663,13 +634,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Checklists(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.title.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::ChecklistList { project_id } = app.current_view().clone()
             {
@@ -681,13 +649,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::WorkItems(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.id.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 app.push_view(ViewKind::WorkItemDetail { id: row.id.clone() });
                 fetch::load_view(app, clients, tx, false);
@@ -701,13 +666,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Derivatives(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected)
                 && let ViewKind::DerivativeList { urn } = app.current_view().clone()
             {
@@ -720,16 +682,14 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Webhooks(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| {
-                        r.event.to_lowercase().contains(&filter)
-                            || r.callback_url.to_lowercase().contains(&filter)
-                    })
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| {
+                    filter.is_empty()
+                        || r.event.to_lowercase().contains(&filter)
+                        || r.callback_url.to_lowercase().contains(&filter)
+                })
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 app.push_view(ViewKind::WebhookDetail {
                     system: row.system.clone(),
@@ -740,13 +700,10 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::Photoscenes(rows) => {
-            let filtered: Vec<_> = if filter.is_empty() {
-                rows.iter().collect()
-            } else {
-                rows.iter()
-                    .filter(|r| r.name.to_lowercase().contains(&filter))
-                    .collect()
-            };
+            let filtered: Vec<_> = rows
+                .iter()
+                .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
+                .collect();
             if let Some(row) = filtered.get(selected) {
                 app.push_view(ViewKind::PhotosceneDetail { id: row.id.clone() });
                 fetch::load_view(app, clients, tx, false);
@@ -773,7 +730,8 @@ fn execute_command(
         Some("p" | "project") => {
             if let Some(id) = parts.get(1) {
                 let id = id.trim().to_string();
-                app.project_context = Some((id.clone(), id.clone()));
+                // Set name to (id) to show it's unresolved
+                app.project_context = Some((id.clone(), format!("({id})")));
                 // Push IssueList onto Issues tab stack (preserving any hub navigation)
                 let stack = &mut app.nav_stacks[ResourceTab::Issues.index()];
                 if let Some(last) = stack.last() {
