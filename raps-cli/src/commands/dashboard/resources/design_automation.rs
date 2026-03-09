@@ -189,6 +189,10 @@ impl DashboardResource for WorkItemList {
             fetch::load_view(app, clients, tx, false);
         }
     }
+
+    fn auto_refresh_interval(&self) -> Option<std::time::Duration> {
+        Some(std::time::Duration::from_secs(10))
+    }
 }
 
 // --- AppBundles ---

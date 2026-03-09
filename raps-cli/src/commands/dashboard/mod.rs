@@ -452,6 +452,16 @@ impl ResourceData {
             ResourceData::Logs(_) => unreachable!(),
         }
     }
+
+    fn auto_refresh_interval(&self) -> Option<Duration> {
+        if let Some(t) = self.as_trait() {
+            return t.auto_refresh_interval();
+        }
+        match self {
+            ResourceData::SwarmStatus(_) => Some(Duration::from_secs(5)),
+            _ => None,
+        }
+    }
 }
 
 // --- Row structs ---
@@ -811,6 +821,17 @@ async fn run_event_loop(
         // Drain background messages first (non-blocking)
         while let Ok(msg) = rx.try_recv() {
             fetch::handle_bg_msg(&mut app, msg);
+        }
+
+        // Auto-refresh logic
+        if let Some(data) = &app.data {
+            if let Some(interval) = data.auto_refresh_interval() {
+                if let Some(last) = app.last_refresh {
+                    if last.elapsed() >= interval && !app.loading {
+                        fetch::load_view(&mut app, &clients, &tx, true);
+                    }
+                }
+            }
         }
 
         // Poll for key events with a short timeout
