@@ -6,6 +6,7 @@
 //! Commands for interacting with the RAPS Plugin Marketplace.
 
 mod auth;
+mod credentials;
 mod discovery;
 mod install;
 mod publish;
@@ -53,6 +54,10 @@ pub enum MarketplaceCommands {
 
     /// Submit or view a plugin review
     Review(ReviewArgs),
+
+    /// Manage APS credentials for hosted MCP
+    #[command(subcommand)]
+    Credentials(credentials::CredentialCommands),
 
     /// Clear the local marketplace cache
     ClearCache,
@@ -175,6 +180,7 @@ impl MarketplaceCommands {
             MarketplaceCommands::Package(args) => publish::package(args, output_format).await,
             MarketplaceCommands::Publish(args) => publish::publish(args, output_format).await,
             MarketplaceCommands::Review(args) => publish::review(args, output_format).await,
+            MarketplaceCommands::Credentials(cmd) => credentials::execute(cmd, output_format).await,
             MarketplaceCommands::ClearCache => discovery::clear_cache(output_format).await,
         }
     }

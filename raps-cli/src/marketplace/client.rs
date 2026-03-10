@@ -153,4 +153,71 @@ impl MarketplaceClient {
         let bytes = resp.bytes().await.context("Failed to read response body")?.to_vec();
         Ok((bytes, sha256, signature, version))
     }
+
+    /// Store APS credentials (client_id / client_secret) under a label.
+    pub async fn store_credentials(
+        &self,
+        license_key: &str,
+        client_id: &str,
+        client_secret: &str,
+        label: &str,
+    ) -> Result<()> {
+        let url = format!("{}/credentials", self.api_base);
+        let resp = self
+            .client
+            .post(&url)
+            .bearer_auth(license_key)
+            .json(&serde_json::json!({
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "label": label,
+            }))
+            .send()
+            .await
+            .context("Failed to store credentials")?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to store credentials (HTTP {}): {}", status, body);
+        }
+        Ok(())
+    }
+
+    /// List stored credential labels.
+    pub async fn list_credentials(&self, license_key: &str) -> Result<serde_json::Value> {
+        let url = format!("{}/credentials", self.api_base);
+        let resp = self
+            .client
+            .get(&url)
+            .bearer_auth(license_key)
+            .send()
+            .await
+            .context("Failed to list credentials")?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to list credentials (HTTP {}): {}", status, body);
+        }
+        resp.json()
+            .await
+            .context("Failed to parse credentials response")
+    }
+
+    /// Delete stored credentials by label.
+    pub async fn delete_credentials(&self, license_key: &str, label: &str) -> Result<()> {
+        let url = format!("{}/credentials/{}", self.api_base, label);
+        let resp = self
+            .client
+            .delete(&url)
+            .bearer_auth(license_key)
+            .send()
+            .await
+            .context("Failed to delete credentials")?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to delete credentials (HTTP {}): {}", status, body);
+        }
+        Ok(())
+    }
 }
