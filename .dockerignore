@@ -1,0 +1,8 @@
+target/
+.git/
+.claude/
+.worktrees/
+docs/
+issues/
+node_modules/
+*.md
