@@ -5,6 +5,84 @@
       "version": "1.0",
       "description": "Use when calling any RAPS MCP tool, working with Autodesk Platform Services APIs, or setting up RAPS MCP for the first time \u2014 covers batch tool fetching, domain groupings, and common parameter patterns.",
       "path": "using-raps-mcp/SKILL.md"
+    },
+    {
+      "name": "adding-mcp-tool",
+      "version": "1.0",
+      "description": "Use when adding a new MCP tool to the RAPS MCP server \u2014 covers tool schema definition, handler implementation, dispatch registration, and the client accessor pattern.",
+      "path": "adding-mcp-tool/SKILL.md"
+    },
+    {
+      "name": "adding-raps-cli-command",
+      "version": "1.0",
+      "description": "Use when adding a new CLI command or subcommand to RAPS \u2014 covers the clap struct pattern, module wiring, output formatting, and test structure across the 10-crate workspace.",
+      "path": "adding-raps-cli-command/SKILL.md"
+    },
+    {
+      "name": "composing-raps-linkedin-posts",
+      "version": "1.0",
+      "description": "Use when new RAPS features ship and LinkedIn content is needed \u2014 adds posts to the raps-smm post bank following established tone, format, and hashtag conventions.",
+      "path": "composing-raps-linkedin-posts/SKILL.md"
+    },
+    {
+      "name": "cutting-raps-release",
+      "version": "1.0",
+      "description": "Use when bumping the RAPS version for a new release \u2014 updates Cargo.toml workspace version, 9 internal crate dependencies, 6 npm package.json files, creates git tag, and triggers the release workflow.",
+      "path": "cutting-raps-release/SKILL.md"
+    },
+    {
+      "name": "raps-ci-cd-templates",
+      "version": "1.0",
+      "description": "Use when adding or updating CI/CD integrations in the raps-actions repo \u2014 GitHub Actions composite actions, GitLab CI include templates, test workflows, and floating tag management.",
+      "path": "raps-ci-cd-templates/SKILL.md"
+    },
+    {
+      "name": "raps-security-audit",
+      "version": "1.0",
+      "description": "Use before releases or after dependency updates to run security checks \u2014 cargo-audit, ASVS compliance matrix review, clippy security lints, redaction pattern verification.",
+      "path": "raps-security-audit/SKILL.md"
+    },
+    {
+      "name": "shorten-url",
+      "version": "1.0",
+      "description": "Use when you need to create a shortened URL at go.rapscli.xyz \u2014 for long Cloudflare OAuth links, wrangler login URLs, or any URL that's unwieldy in the terminal.",
+      "path": "shorten-url/SKILL.md"
+    },
+    {
+      "name": "updating-devcon-materials",
+      "version": "1.0",
+      "description": "Use when DevCon 2026 session content needs updating \u2014 covers the 3 session files in raps-marketing, LinkedIn countdown posts in raps-smm, and forum announcements. DevCon is April 15-16 in Amsterdam.",
+      "path": "updating-devcon-materials/SKILL.md"
+    },
+    {
+      "name": "updating-raps-marketing",
+      "version": "1.0",
+      "description": "Use when new RAPS features or releases need reflecting in raps-marketing \u2014 press releases, campaign updates, DevCon session content, feature lists.",
+      "path": "updating-raps-marketing/SKILL.md"
+    },
+    {
+      "name": "updating-raps-website",
+      "version": "1.0",
+      "description": "Use when a new RAPS version is released or a major feature ships and the raps-website repo needs updating \u2014 release entries, docs pages, blog posts, stats.",
+      "path": "updating-raps-website/SKILL.md"
+    },
+    {
+      "name": "verifying-raps-release",
+      "version": "1.0",
+      "description": "Use after a RAPS release workflow completes to verify all distribution channels \u2014 GitHub release assets, npm packages, PyPI, install script, and binary functionality.",
+      "path": "verifying-raps-release/SKILL.md"
+    },
+    {
+      "name": "writing-cookbook-recipe",
+      "version": "1.0",
+      "description": "Use when writing a new cookbook recipe for the RAPS website \u2014 covers the MDX frontmatter format, section structure, category taxonomy, and Tailwind styling patterns for workflow visualizations.",
+      "path": "writing-cookbook-recipe/SKILL.md"
+    },
+    {
+      "name": "writing-raps-blog-post",
+      "version": "1.0",
+      "description": "Use when writing a technical blog post for the RAPS website \u2014 covers MDX frontmatter, Astro component imports, series linking, i18n stub creation, and common escaping pitfalls.",
+      "path": "writing-raps-blog-post/SKILL.md"
     }
   ]
 }

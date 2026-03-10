@@ -805,7 +805,7 @@ pub(crate) fn get_tools() -> Vec<Tool> {
         ),
         Tool::new(
             "project_archive",
-            "Archive an ACC project (soft delete). Archived projects can be restored later. Requires 3-legged auth.",
+            "Archive an ACC/BIM 360 project (soft delete). Archived projects can be restored later. Requires 3-legged auth.",
             schema(
                 json!({
                     "account_id": {"type": "string", "description": "ACC account ID"},

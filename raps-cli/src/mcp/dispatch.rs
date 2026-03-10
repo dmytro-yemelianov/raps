@@ -1398,7 +1398,24 @@ impl RapsServer {
     }
 
     /// If the result string looks like an auth error, append user-friendly guidance.
+    /// Only triggers on actual error responses (prefixed with error markers), not successful data.
     fn enrich_error(result: &str) -> String {
+        const ERROR_PREFIXES: &[&str] = &[
+            "Failed to",
+            "Error:",
+            "Error ",
+            "Authentication Error",
+            "Auth error",
+        ];
+
+        let looks_like_error = ERROR_PREFIXES
+            .iter()
+            .any(|prefix| result.starts_with(prefix));
+
+        if !looks_like_error {
+            return result.to_string();
+        }
+
         const AUTH_KEYWORDS: &[&str] = &[
             "401",
             "unauthorized",

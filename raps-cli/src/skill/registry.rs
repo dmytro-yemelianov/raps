@@ -23,6 +23,30 @@ pub struct BundledRegistry {
 // Embed the registry and skill files at compile time
 const REGISTRY_JSON: &str = include_str!("../../../skills/registry.json");
 const SKILL_USING_RAPS_MCP: &str = include_str!("../../../skills/using-raps-mcp/SKILL.md");
+const SKILL_ADDING_MCP_TOOL: &str = include_str!("../../../skills/adding-mcp-tool/SKILL.md");
+const SKILL_ADDING_RAPS_CLI_COMMAND: &str =
+    include_str!("../../../skills/adding-raps-cli-command/SKILL.md");
+const SKILL_COMPOSING_RAPS_LINKEDIN_POSTS: &str =
+    include_str!("../../../skills/composing-raps-linkedin-posts/SKILL.md");
+const SKILL_CUTTING_RAPS_RELEASE: &str =
+    include_str!("../../../skills/cutting-raps-release/SKILL.md");
+const SKILL_RAPS_CI_CD_TEMPLATES: &str =
+    include_str!("../../../skills/raps-ci-cd-templates/SKILL.md");
+const SKILL_RAPS_SECURITY_AUDIT: &str =
+    include_str!("../../../skills/raps-security-audit/SKILL.md");
+const SKILL_SHORTEN_URL: &str = include_str!("../../../skills/shorten-url/SKILL.md");
+const SKILL_UPDATING_DEVCON_MATERIALS: &str =
+    include_str!("../../../skills/updating-devcon-materials/SKILL.md");
+const SKILL_UPDATING_RAPS_MARKETING: &str =
+    include_str!("../../../skills/updating-raps-marketing/SKILL.md");
+const SKILL_UPDATING_RAPS_WEBSITE: &str =
+    include_str!("../../../skills/updating-raps-website/SKILL.md");
+const SKILL_VERIFYING_RAPS_RELEASE: &str =
+    include_str!("../../../skills/verifying-raps-release/SKILL.md");
+const SKILL_WRITING_COOKBOOK_RECIPE: &str =
+    include_str!("../../../skills/writing-cookbook-recipe/SKILL.md");
+const SKILL_WRITING_RAPS_BLOG_POST: &str =
+    include_str!("../../../skills/writing-raps-blog-post/SKILL.md");
 
 impl BundledRegistry {
     /// Load the embedded registry.
@@ -39,6 +63,19 @@ impl BundledRegistry {
     pub fn get_content(&self, name: &str) -> Option<&'static str> {
         match name {
             "using-raps-mcp" => Some(SKILL_USING_RAPS_MCP),
+            "adding-mcp-tool" => Some(SKILL_ADDING_MCP_TOOL),
+            "adding-raps-cli-command" => Some(SKILL_ADDING_RAPS_CLI_COMMAND),
+            "composing-raps-linkedin-posts" => Some(SKILL_COMPOSING_RAPS_LINKEDIN_POSTS),
+            "cutting-raps-release" => Some(SKILL_CUTTING_RAPS_RELEASE),
+            "raps-ci-cd-templates" => Some(SKILL_RAPS_CI_CD_TEMPLATES),
+            "raps-security-audit" => Some(SKILL_RAPS_SECURITY_AUDIT),
+            "shorten-url" => Some(SKILL_SHORTEN_URL),
+            "updating-devcon-materials" => Some(SKILL_UPDATING_DEVCON_MATERIALS),
+            "updating-raps-marketing" => Some(SKILL_UPDATING_RAPS_MARKETING),
+            "updating-raps-website" => Some(SKILL_UPDATING_RAPS_WEBSITE),
+            "verifying-raps-release" => Some(SKILL_VERIFYING_RAPS_RELEASE),
+            "writing-cookbook-recipe" => Some(SKILL_WRITING_COOKBOOK_RECIPE),
+            "writing-raps-blog-post" => Some(SKILL_WRITING_RAPS_BLOG_POST),
             _ => None,
         }
     }
@@ -63,7 +100,7 @@ mod tests {
     #[test]
     fn test_bundled_registry_parses() {
         let registry = BundledRegistry::load();
-        assert!(!registry.skills.is_empty(), "registry should have at least one skill");
+        assert_eq!(registry.skills.len(), 14, "registry should have 14 skills");
     }
 
     #[test]
@@ -78,20 +115,28 @@ mod tests {
     }
 
     #[test]
-    fn test_bundled_skill_content_exists() {
+    fn test_all_bundled_skills_have_content() {
         let registry = BundledRegistry::load();
-        let content = registry.get_content("using-raps-mcp");
-        assert!(content.is_some(), "using-raps-mcp content should be embedded");
-        let content = content.unwrap();
-        assert!(content.contains("# Using RAPS MCP Tools"));
+        for skill in &registry.skills {
+            let content = registry.get_content(&skill.name);
+            assert!(
+                content.is_some(),
+                "skill '{}' should have embedded content",
+                skill.name
+            );
+            assert!(
+                content.unwrap().contains(&format!("name: {}", skill.name)),
+                "skill '{}' content should contain its name in frontmatter",
+                skill.name
+            );
+        }
     }
 
     #[test]
     fn test_search_finds_by_name() {
         let registry = BundledRegistry::load();
         let results = registry.search("mcp");
-        assert!(!results.is_empty());
-        assert_eq!(results[0].name, "using-raps-mcp");
+        assert!(results.len() >= 2); // using-raps-mcp + adding-mcp-tool
     }
 
     #[test]

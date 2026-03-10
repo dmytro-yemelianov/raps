@@ -84,7 +84,7 @@ fn list(args: ListArgs, output_format: OutputFormat) -> Result<()> {
     let registry = BundledRegistry::load();
     let installed = installer::list_installed();
 
-    let rows: Vec<SkillRow> = if args.installed {
+    let mut rows: Vec<SkillRow> = if args.installed {
         registry
             .skills
             .iter()
@@ -115,6 +115,18 @@ fn list(args: ListArgs, output_format: OutputFormat) -> Result<()> {
             })
             .collect()
     };
+
+    // Add installed-but-not-bundled (custom/community) skills
+    for name in &installed {
+        if registry.get(name).is_none() {
+            rows.push(SkillRow {
+                name: name.clone(),
+                version: "-".to_string(),
+                status: "custom".to_string(),
+                description: "Locally installed skill".to_string(),
+            });
+        }
+    }
 
     match output_format {
         OutputFormat::Table => {

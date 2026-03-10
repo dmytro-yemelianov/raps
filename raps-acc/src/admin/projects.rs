@@ -86,6 +86,9 @@ impl AccountAdminClient {
 
     /// Get details of a specific project
     ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v2
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
+    ///
     /// # Arguments
     /// * `account_id` - The account ID
     /// * `project_id` - The project ID
@@ -94,6 +97,7 @@ impl AccountAdminClient {
         let account_id = normalize_account_id(account_id);
         let project_id = crate::strip_project_prefix(project_id);
 
+        // Try ACC v1 first
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
@@ -101,16 +105,42 @@ impl AccountAdminClient {
         })
         .await?;
 
+        if response.status().is_success() {
+            let project: AccountProject = response
+                .json()
+                .await
+                .context("Failed to parse project response")?;
+            return Ok(project);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!(
+            "{}/projects/{}",
+            self.hq_url(&account_id),
+            project_id
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token_2leg)
+        })
+        .await?;
+
         if !response.status().is_success() {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let project: AccountProject = response
+        let project: Bim360Project = response
             .json()
             .await
-            .context("Failed to parse project response")?;
+            .context("Failed to parse BIM 360 project response")?;
 
-        Ok(project)
+        Ok(AccountProject::from(project))
     }
 
     /// Fetch all projects in an account (handles pagination automatically).
@@ -321,6 +351,7 @@ impl AccountAdminClient {
         let account_id = normalize_account_id(account_id);
         let project_id = crate::strip_project_prefix(project_id);
 
+        // Try ACC v1 first (3-legged)
         let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
@@ -332,16 +363,46 @@ impl AccountAdminClient {
         })
         .await?;
 
+        if response.status().is_success() {
+            let project: AccountProject = response
+                .json()
+                .await
+                .context("Failed to parse project update response")?;
+            return Ok(project);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!(
+            "{}/projects/{}",
+            self.hq_url(&account_id),
+            project_id
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token_2leg)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
         if !response.status().is_success() {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let project: AccountProject = response
+        let project: Bim360Project = response
             .json()
             .await
-            .context("Failed to parse project update response")?;
+            .context("Failed to parse BIM 360 project update response")?;
 
-        Ok(project)
+        Ok(AccountProject::from(project))
     }
 
     /// Archive a project (soft delete)

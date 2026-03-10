@@ -12,34 +12,42 @@ impl RapsServer {
         let registry = BundledRegistry::load();
         let installed = installer::list_installed();
 
-        let skills: Vec<_> = registry
-            .skills
-            .iter()
-            .filter_map(|s| {
-                let is_installed = installed.contains(&s.name);
-                let status = if is_installed { "installed" } else { "available" };
+        let mut lines: Vec<String> = Vec::new();
 
-                match filter.as_deref() {
-                    Some("installed") if !is_installed => return None,
-                    Some("available") if is_installed => return None,
-                    _ => {}
+        // Bundled skills (with install status)
+        for s in &registry.skills {
+            let is_installed = installed.contains(&s.name);
+            let status = if is_installed { "installed" } else { "available" };
+
+            match filter.as_deref() {
+                Some("installed") if !is_installed => continue,
+                Some("available") if is_installed => continue,
+                _ => {}
+            }
+
+            lines.push(format!(
+                "  {} (v{}) [{}] — {}",
+                s.name, s.version, status, s.description
+            ));
+        }
+
+        // Installed-but-not-bundled skills (custom/community)
+        if filter.as_deref() != Some("available") {
+            for name in &installed {
+                if registry.get(name).is_none() {
+                    lines.push(format!("  {} [installed, custom]", name));
                 }
+            }
+        }
 
-                Some(format!(
-                    "  {} (v{}) [{}] — {}",
-                    s.name, s.version, status, s.description
-                ))
-            })
-            .collect();
-
-        if skills.is_empty() {
+        if lines.is_empty() {
             return "No skills found matching the filter.".to_string();
         }
 
         format!(
-            "Available skills ({}):\n\n{}\n\nInstall with: skill_install(name: \"<skill-name>\")",
-            skills.len(),
-            skills.join("\n")
+            "Skills ({}):\n\n{}\n\nInstall with: skill_install(name: \"<skill-name>\")",
+            lines.len(),
+            lines.join("\n")
         )
     }
 
@@ -84,10 +92,22 @@ impl RapsServer {
 
                 output
             }
-            None => format!(
-                "Unknown skill '{}'. Use skill_list to see available skills.",
-                name
-            ),
+            None => {
+                // Check if it's an installed custom skill
+                if installed.contains(&name) {
+                    let path = installer::skills_dir().join(&name).join("SKILL.md");
+                    format!(
+                        "Skill: {}\nStatus: installed (custom)\nSource: local\nPath: {}\n",
+                        name,
+                        path.display()
+                    )
+                } else {
+                    format!(
+                        "Unknown skill '{}'. Use skill_list to see available skills.",
+                        name
+                    )
+                }
+            }
         }
     }
 }
