@@ -36,6 +36,20 @@ raps marketplace credentials list
 
 This shows your stored credential labels and Client IDs (secrets are never displayed).
 
+### 4. Test the Connection
+
+Verify the hosted MCP server is reachable and your license key works:
+
+```bash
+curl -X POST https://mcp.rapscli.xyz/mcp \
+  -H "Authorization: Bearer <your-license-key>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'
+```
+
+You should see a response containing `"serverInfo":{"name":"rmcp",...}`. The first request may take 5-10 seconds (container cold start).
+
 ## Client Configuration
 
 All MCP clients that support Streamable HTTP can connect using the same URL and authorization header:
@@ -95,6 +109,59 @@ Add to `.mcp.json` in your project root:
       "url": "https://mcp.rapscli.xyz/mcp",
       "headers": {
         "Authorization": "Bearer <your-license-key>"
+      }
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "raps": {
+      "serverUrl": "https://mcp.rapscli.xyz/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-license-key>"
+      }
+    }
+  }
+}
+```
+
+### VS Code (GitHub Copilot)
+
+Add to `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "raps": {
+      "type": "http",
+      "url": "https://mcp.rapscli.xyz/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-license-key>"
+      }
+    }
+  }
+}
+```
+
+Or add to your VS Code `settings.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "raps": {
+        "type": "http",
+        "url": "https://mcp.rapscli.xyz/mcp",
+        "headers": {
+          "Authorization": "Bearer <your-license-key>"
+        }
       }
     }
   }
@@ -189,7 +256,7 @@ raps marketplace license <your-license-key>
 
 ### Connection Timeout on First Request
 
-**Cause:** Container cold start. The first request after a period of inactivity takes ~3-5 seconds while the container wakes up.
+**Cause:** Container cold start. The first request after a period of inactivity takes ~5-10 seconds while the container wakes up.
 
 **Fix:** This is expected. Subsequent requests within the same session are fast. No action needed.
 
@@ -219,7 +286,7 @@ raps marketplace credentials list
 | License | Free (open source) | Pro subscription required |
 | 3-Legged Auth | `raps auth login` (opens browser) | Not yet supported |
 | Tools | 107+ | 107+ (identical) |
-| Performance | Instant (local process) | ~3-5s cold start, then fast |
+| Performance | Instant (local process) | ~5-10s cold start, then ~300ms |
 
 ## Related
 
