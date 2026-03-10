@@ -39,6 +39,7 @@ mod mcp;
 mod output;
 mod plugins;
 mod shell;
+mod skill;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
