@@ -33,6 +33,8 @@ jobs:
             dockerfile: deploy/docker/Dockerfile.webhook
           - name: dashboard
             dockerfile: deploy/docker/Dockerfile.dashboard
+          - name: mcp
+            dockerfile: deploy/docker/Dockerfile.mcp
 
     steps:
       - name: Checkout
