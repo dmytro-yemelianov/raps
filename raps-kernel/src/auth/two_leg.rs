@@ -47,7 +47,7 @@ impl AuthClient {
             ("grant_type", "client_credentials"),
             (
                 "scope",
-                "data:read data:write data:create bucket:read bucket:create bucket:delete code:all",
+                "data:read data:write data:create bucket:read bucket:create bucket:delete code:all account:read account:write",
             ),
         ];
 
