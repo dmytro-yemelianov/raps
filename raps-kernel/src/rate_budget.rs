@@ -148,6 +148,13 @@ impl RateBudgetRegistry {
                 window: Duration::from_secs(60),
             },
         );
+        reg.known_limits.insert(
+            "account-admin".to_string(),
+            KnownLimit {
+                limit: 100,
+                window: Duration::from_secs(60),
+            },
+        );
 
         reg
     }

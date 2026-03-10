@@ -21,6 +21,7 @@ async fn test_bulk_add_success_all_items() {
         retry_base_delay: Duration::from_millis(10),
         continue_on_error: true,
         dry_run: false,
+        delay_ms: 0,
     });
 
     let items: Vec<ProcessItem> = (1..=10)
@@ -67,6 +68,7 @@ async fn test_bulk_add_mixed_results() {
         retry_base_delay: Duration::from_millis(1),
         continue_on_error: true,
         dry_run: false,
+        delay_ms: 0,
     });
 
     let items: Vec<ProcessItem> = (1..=9)
@@ -162,6 +164,7 @@ async fn test_bulk_add_retry_on_transient_failure() {
         retry_base_delay: Duration::from_millis(1),
         continue_on_error: true,
         dry_run: false,
+        delay_ms: 0,
     });
 
     let items = vec![ProcessItem {
@@ -255,6 +258,7 @@ async fn test_bulk_add_concurrency_limit() {
         retry_base_delay: Duration::from_millis(1),
         continue_on_error: true,
         dry_run: false,
+        delay_ms: 0,
     });
 
     let items: Vec<ProcessItem> = (1..=10)

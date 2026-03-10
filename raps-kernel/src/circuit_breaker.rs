@@ -267,6 +267,17 @@ impl CircuitBreakerRegistry {
         breaker.record_failure();
     }
 
+    /// Configure a specific endpoint with a custom failure threshold.
+    pub fn configure_endpoint(&self, endpoint: &str, failure_threshold: u32) {
+        self.breakers.insert(
+            endpoint.to_string(),
+            CircuitBreaker::new(CircuitBreakerConfig {
+                failure_threshold,
+                ..self.default_config.clone()
+            }),
+        );
+    }
+
     /// Clear all circuit breakers, resetting them to closed state.
     pub fn reset_all(&self) {
         self.breakers.clear();
@@ -302,6 +313,15 @@ pub fn init(config: CircuitBreakerConfig) {
     let _ = REGISTRY.set(CircuitBreakerRegistry::new(config));
 }
 
+/// Configure circuit breaker for bulk operations with higher thresholds.
+///
+/// Bulk operations send hundreds of requests and expect some transient failures.
+/// The default threshold (5) is too aggressive — raise it to allow the API time
+/// to recover without blocking all remaining requests.
+pub fn configure_for_bulk(endpoint: &str, failure_threshold: u32) {
+    registry().configure_endpoint(endpoint, failure_threshold);
+}
+
 /// Classify a URL into an endpoint group for circuit breaking.
 pub fn endpoint_group(url: &str) -> &str {
     if url.contains("/modelderivative/") {
@@ -314,6 +334,8 @@ pub fn endpoint_group(url: &str) -> &str {
         "design-automation"
     } else if url.contains("/authentication/") {
         "authentication"
+    } else if url.contains("/construction/") {
+        "account-admin"
     } else if url.contains("/issues/") || url.contains("/rfis/") {
         "acc"
     } else if url.contains("/photo-to-3d/") || url.contains("/photoscene/") {
@@ -439,6 +461,10 @@ mod tests {
         assert_eq!(
             endpoint_group("https://developer.api.autodesk.com/authentication/v2/token"),
             "authentication"
+        );
+        assert_eq!(
+            endpoint_group("https://developer.api.autodesk.com/construction/admin/v1/projects/abc/users"),
+            "account-admin"
         );
     }
 

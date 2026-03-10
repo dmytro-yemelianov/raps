@@ -39,7 +39,9 @@ use raps_webhooks::WebhooksClient;
 use super::definitions::get_tools;
 
 /// Default concurrency for bulk MCP operations.
-pub(crate) const MCP_BULK_CONCURRENCY: usize = 10;
+/// Tuned to ~20 to maximize throughput without tripping APS rate limits
+/// (data-management: 100 req/min, account-admin: 100 req/min).
+pub(crate) const MCP_BULK_CONCURRENCY: usize = 20;
 
 /// Headers that should be stripped from API responses before returning to AI.
 pub(crate) const SENSITIVE_HEADERS: &[&str] = &[

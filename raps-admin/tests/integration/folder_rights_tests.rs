@@ -21,6 +21,7 @@ async fn test_bulk_folder_rights_success_all_items() {
         retry_base_delay: Duration::from_millis(10),
         continue_on_error: true,
         dry_run: false,
+        delay_ms: 0,
     });
 
     let items: Vec<ProcessItem> = (1..=10)

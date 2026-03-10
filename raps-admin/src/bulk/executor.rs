@@ -176,6 +176,14 @@ impl BulkExecutor {
         let start_time = Instant::now();
         let total = items.len();
 
+        // Raise circuit breaker threshold for bulk operations.
+        // Default threshold (5) is too aggressive when sending hundreds of
+        // requests — transient 5xx errors are expected under load.
+        raps_kernel::circuit_breaker::configure_for_bulk(
+            "account-admin",
+            (total / 4).max(20) as u32,
+        );
+
         // If dry-run, simulate success for all items
         if self.config.dry_run {
             let details: Vec<ItemDetail> = items

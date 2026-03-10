@@ -4,6 +4,7 @@
 //! Project Users API client for ACC/BIM 360
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
 use serde::Serialize;
@@ -19,13 +20,14 @@ use crate::types::{PaginatedResponse, ProductAccess, ProjectUser};
 ///
 /// Provides operations for managing users within individual projects.
 /// Set `account_id` to enable BIM 360 HQ v2 fallback for Business hubs.
-#[derive(Clone)]
 pub struct ProjectUsersClient {
     config: Config,
     auth: AuthClient,
     http_client: reqwest::Client,
     /// Account ID for BIM 360 HQ v2 user endpoints (required for Business hubs)
     pub account_id: Option<String>,
+    /// Learned: ACC endpoint returns 500 for this account → skip probe, go straight to BIM 360
+    acc_probe_failed: Arc<AtomicBool>,
 }
 
 /// Request to add a user to a project
@@ -197,6 +199,18 @@ pub struct ImportUserSuccess {
     pub user_id: Option<String>,
 }
 
+impl Clone for ProjectUsersClient {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            auth: self.auth.clone(),
+            http_client: self.http_client.clone(),
+            account_id: self.account_id.clone(),
+            acc_probe_failed: Arc::clone(&self.acc_probe_failed),
+        }
+    }
+}
+
 impl ProjectUsersClient {
     /// Create a new Project Users client
     pub fn new(config: Config, auth: AuthClient) -> Self {
@@ -221,6 +235,7 @@ impl ProjectUsersClient {
             auth,
             http_client,
             account_id: None,
+            acc_probe_failed: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -328,17 +343,31 @@ impl ProjectUsersClient {
         project_id: &str,
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
+        // Fast path: if we've already learned that ACC returns 500 for this
+        // account, skip the probe and go straight to BIM 360.
+        if self.acc_probe_failed.load(Ordering::Relaxed) {
+            if let Some(ref account_id) = self.account_id {
+                return self
+                    .add_user_bim360(account_id, project_id, request)
+                    .await;
+            }
+        }
+
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/users", self.project_url(project_id));
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client
-                .post(&url)
-                .bearer_auth(&token)
-                .header("Content-Type", "application/json")
-                .json(&request)
-        })
-        .await?;
+        // Send a single probe to the ACC endpoint — do NOT use send_with_retry
+        // because 400/404/500 should fall back to BIM 360 immediately, not retry
+        // with exponential backoff (which wastes 60+s on BIM 360 accounts).
+        let response = self
+            .http_client
+            .post(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to send ACC add-user request")?;
 
         if response.status().is_success() {
             return response
@@ -348,20 +377,24 @@ impl ProjectUsersClient {
         }
 
         let status = response.status().as_u16();
-        let error_text = response.text().await.unwrap_or_default();
 
         // On 400/404/500 try BIM 360 HQ v2 if we have an account_id.
-        // 500 with "reqBodyProducts is not iterable" occurs when the ACC endpoint
-        // is called against a BIM 360 project that doesn't support the products field.
-        let is_bim360_500 = status == 500 && error_text.contains("reqBodyProducts");
-        if (status == 400 || status == 404 || is_bim360_500)
+        // 500 occurs when ACC endpoint is called against a BIM 360 project
+        // (e.g. "reqBodyProducts is not iterable" or other server-side errors).
+        if (status == 400 || status == 404 || status == 500)
             && let Some(ref account_id) = self.account_id
         {
+            // Remember that ACC doesn't work for this account so subsequent
+            // calls skip the probe entirely (saves ~200ms per request).
+            if status == 500 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
             return self
                 .add_user_bim360(account_id, project_id, request)
                 .await;
         }
 
+        let error_text = response.text().await.unwrap_or_default();
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
     }
 

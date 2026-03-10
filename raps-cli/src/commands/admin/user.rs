@@ -331,8 +331,12 @@ impl UserCommands {
                     println!();
                 }
 
-                // Create API clients
-                let http_config = HttpClientConfig::default();
+                // Create API clients — scale connection pool with concurrency
+                let effective_concurrency = concurrency.min(50);
+                let http_config = HttpClientConfig {
+                    pool_max_idle_per_host: effective_concurrency.max(10),
+                    ..HttpClientConfig::default()
+                };
                 let admin_client = AccountAdminClient::new_with_http_config(
                     config.clone(),
                     auth_client.clone(),

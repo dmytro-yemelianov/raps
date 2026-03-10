@@ -104,6 +104,8 @@ pub struct HttpClientConfig {
     pub http2: bool,
     /// Optional HTTP/HTTPS proxy URL (e.g. "http://proxy.corp.example.com:8080")
     pub proxy_url: Option<String>,
+    /// Maximum idle connections per host (default: 10, increase for high-concurrency bulk ops)
+    pub pool_max_idle_per_host: usize,
 }
 
 impl Default for HttpClientConfig {
@@ -116,6 +118,7 @@ impl Default for HttpClientConfig {
             connect_timeout: 30,
             http2: true,
             proxy_url: None,
+            pool_max_idle_per_host: 10,
         }
     }
 }
@@ -130,7 +133,7 @@ impl HttpClientConfig {
     pub fn create_client(&self) -> Result<Client> {
         let mut builder = Client::builder()
             .pool_idle_timeout(Duration::from_secs(90))
-            .pool_max_idle_per_host(10)
+            .pool_max_idle_per_host(self.pool_max_idle_per_host)
             .tcp_keepalive(Duration::from_secs(30))
             .timeout(Duration::from_secs(self.timeout))
             .connect_timeout(Duration::from_secs(self.connect_timeout));
