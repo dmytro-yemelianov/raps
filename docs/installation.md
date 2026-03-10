@@ -107,6 +107,24 @@ You should see output like:
 raps 1.0.0
 ```
 
+## Pro Features (Dashboard)
+
+To build with the TUI Dashboard (Pro-only):
+
+```bash
+cargo build --release -p raps-cli --features dashboard
+```
+
+This requires the `ratatui` and `crossterm` crates (pulled automatically) and a valid Pro license.
+
+### Registering a License Key
+
+```bash
+raps marketplace license <your-license-key>
+```
+
+On headless servers where the OS keychain is unavailable, the license key is stored in a file at `~/.config/raps/marketplace_key` with `0600` permissions. This is automatic — no extra configuration is needed.
+
 ## Shell Completions
 
 RAPS supports auto-completion for several shells. See the [Shell Completions](configuration.md#shell-completions) section for setup instructions.

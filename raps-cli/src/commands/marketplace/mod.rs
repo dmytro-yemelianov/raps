@@ -192,14 +192,3 @@ fn truncate_str(s: &str, max_len: usize) -> String {
     }
 }
 
-fn format_status(status: &str) -> String {
-    use colored::Colorize;
-
-    match status {
-        "pending" => "Pending".yellow().to_string(),
-        "reviewing" => "Under Review".cyan().to_string(),
-        "approved" => "Approved".green().to_string(),
-        "rejected" => "Rejected".red().to_string(),
-        _ => status.to_string(),
-    }
-}

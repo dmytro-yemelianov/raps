@@ -70,6 +70,7 @@ struct Bim360ServiceAccess {
 
 /// Response from BIM 360 HQ v2 `users/import`
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct Bim360ImportResponse {
     success: u32,
     failure: u32,
@@ -78,6 +79,7 @@ struct Bim360ImportResponse {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct Bim360ImportItem {
     #[serde(default)]
     user_id: Option<String>,
@@ -86,6 +88,7 @@ struct Bim360ImportItem {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct Bim360ImportFailureItem {
     #[serde(default)]
     email: Option<String>,
@@ -94,6 +97,7 @@ struct Bim360ImportFailureItem {
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 struct Bim360ImportError {
     #[serde(default)]
     message: Option<String>,

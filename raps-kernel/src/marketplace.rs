@@ -22,6 +22,7 @@ pub struct Plugin {
     pub price_monthly_cents: u32,
     pub price_yearly_cents: u32,
     pub latest_version: Option<String>,
+    #[serde(default)]
     pub published: bool,
 }
 

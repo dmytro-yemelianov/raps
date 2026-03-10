@@ -30,6 +30,7 @@ impl MarketplaceClient {
     }
 
     /// Create a client targeting a custom API base URL (for testing).
+    #[allow(dead_code)]
     pub fn with_base_url(base_url: impl Into<String>) -> Result<Self> {
         let client = Client::builder()
             .user_agent(USER_AGENT)
@@ -42,6 +43,7 @@ impl MarketplaceClient {
     }
 
     /// Fetch a single plugin by slug from the public catalog.
+    #[allow(dead_code)]
     pub async fn get_plugin(&self, slug: &str) -> Result<Plugin> {
         let url = format!("{}/plugins/{}", self.api_base, slug);
         let resp = self
@@ -57,6 +59,7 @@ impl MarketplaceClient {
     }
 
     /// List all published plugins from the public catalog.
+    #[allow(dead_code)]
     pub async fn list_plugins(&self) -> Result<Vec<Plugin>> {
         let url = format!("{}/plugins", self.api_base);
         let resp = self
@@ -73,6 +76,7 @@ impl MarketplaceClient {
 
     /// Get version history for a plugin.
     /// Returns an empty vec for now (endpoint not yet implemented on the server).
+    #[allow(dead_code)]
     pub async fn get_versions(&self, _slug: &str) -> Result<Vec<VersionInfo>> {
         Ok(vec![])
     }

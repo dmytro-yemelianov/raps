@@ -7,6 +7,5 @@ pub mod installer;
 pub mod subscription;
 
 pub use auth::MarketplaceAuth;
-pub use client::MarketplaceClient;
-pub use installer::{detect_platform, PluginInstaller};
-pub use subscription::{CachedValidation, SubscriptionManager};
+pub use installer::PluginInstaller;
+pub use subscription::SubscriptionManager;

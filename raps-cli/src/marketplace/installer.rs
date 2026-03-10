@@ -99,6 +99,7 @@ impl PluginInstaller {
     }
 
     /// Create an installer with a custom install directory (for testing).
+    #[allow(dead_code)]
     pub fn with_install_dir(dir: PathBuf) -> Self {
         Self { install_dir: dir }
     }
@@ -276,6 +277,7 @@ impl PluginInstaller {
 
     /// Check if the current raps version is compatible with a plugin version.
     /// Currently always returns true — semver compatibility check placeholder.
+    #[allow(dead_code)]
     pub fn check_raps_compatibility(&self, _plugin_version: &str) -> bool {
         true
     }

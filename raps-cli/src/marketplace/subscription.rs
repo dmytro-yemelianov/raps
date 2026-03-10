@@ -85,6 +85,7 @@ impl SubscriptionManager {
 
     /// Returns `true` if the license grants access to pro features.
     /// A valid subscription with at least one plugin entitlement grants pro access.
+    #[allow(dead_code)]
     pub fn can_use_pro() -> bool {
         Self::load_cache()
             .filter(|c| c.is_valid())
@@ -93,6 +94,7 @@ impl SubscriptionManager {
     }
 
     /// Returns `true` if the license grants access to a specific pro plugin.
+    #[allow(dead_code)]
     pub fn can_use_plugin(slug: &str) -> bool {
         Self::load_cache()
             .filter(|c| c.is_valid())

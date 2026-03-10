@@ -376,6 +376,66 @@ Webhook status is "inactive"
    raps webhook create --url https://your-server.com/webhook --event dm.version.added
    ```
 
+## Marketplace / License Issues
+
+### "Failed to create keyring entry" Error
+
+**Symptoms:**
+```
+Error: Failed to create keyring entry
+Caused by: No matching entry found in secure storage
+```
+
+**Solutions:**
+1. This happens on headless servers (SSH sessions, CI/CD) where the OS keychain is not available.
+   RAPS automatically falls back to file-based storage at `~/.config/raps/marketplace_key`.
+   If you see this error on an older version, update to v5.5.0+.
+
+2. To verify keychain availability:
+   ```bash
+   # Linux — check if gnome-keyring or KWallet is running
+   systemctl --user status gnome-keyring-daemon
+
+   # macOS — keychain is always available
+   security list-keychains
+   ```
+
+3. To explicitly use file storage (suppresses the warning):
+   ```bash
+   export RAPS_USE_FILE_STORAGE=true
+   ```
+
+### "Failed to parse plugins response" Error
+
+**Symptoms:**
+```
+Error: Failed to parse plugins response
+Caused by: missing field `published`
+```
+
+**Solutions:**
+Update to v5.5.0+ which handles optional fields in the marketplace API response.
+
+### Dashboard Says "Pro-only feature"
+
+**Symptoms:**
+```
+Error: The TUI Dashboard is a Pro-only feature.
+```
+
+**Solutions:**
+1. Register your license key:
+   ```bash
+   raps marketplace license <your-key>
+   ```
+
+2. Verify subscription status:
+   ```bash
+   raps marketplace status
+   ```
+
+3. If the license was registered but the cache expired, re-register.
+
 ## General Issues
 
 ### Command Not Found
