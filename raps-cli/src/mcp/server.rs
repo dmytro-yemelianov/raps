@@ -14,6 +14,10 @@
 //! - `definitions` – Tool schema definitions (`get_tools`)
 
 use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
+#[cfg(feature = "mcp-http")]
+use rmcp::transport::streamable_http_server::{
+    StreamableHttpService, session::local::LocalSessionManager,
+};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -527,13 +531,39 @@ mod tests {
     }
 }
 
-/// Run the MCP server using stdio transport
-pub async fn run_server() -> Result<(), Box<dyn std::error::Error>> {
+/// Run the MCP server using the specified transport
+pub async fn run_server(transport: &str, port: u16) -> Result<(), Box<dyn std::error::Error>> {
     // logging::init() in main.rs already set up a global subscriber;
     // no redundant init needed here.
+    let _ = port; // used only with mcp-http feature
 
-    let server = RapsServer::new()?;
-    let service = server.serve(stdio()).await?;
-    service.waiting().await?;
+    match transport {
+        "stdio" => {
+            let server = RapsServer::new()?;
+            let service = server.serve(stdio()).await?;
+            service.waiting().await?;
+        }
+        #[cfg(feature = "mcp-http")]
+        "http" => {
+            let config = rmcp::transport::streamable_http_server::StreamableHttpServerConfig::default();
+            let service = StreamableHttpService::new(
+                || RapsServer::new().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
+                LocalSessionManager::default().into(),
+                config,
+            );
+            let app = axum::Router::new().nest_service("/mcp", service);
+            let addr = format!("0.0.0.0:{}", port);
+            tracing::info!("MCP HTTP server listening on {}", addr);
+            let listener = tokio::net::TcpListener::bind(&addr).await?;
+            axum::serve(listener, app).await?;
+        }
+        #[cfg(not(feature = "mcp-http"))]
+        "http" => {
+            return Err("HTTP transport requires --features mcp-http".into());
+        }
+        other => {
+            return Err(format!("Unknown transport: '{}'. Use 'stdio' or 'http'.", other).into());
+        }
+    }
     Ok(())
 }

@@ -357,7 +357,15 @@ enum Commands {
     Dashboard,
 
     /// Start MCP (Model Context Protocol) server for AI assistant integration
-    Mcp,
+    Mcp {
+        /// Transport: stdio (default) or http
+        #[arg(long, default_value = "stdio")]
+        transport: String,
+
+        /// Port for HTTP transport (ignored for stdio)
+        #[arg(long, default_value = "8080")]
+        port: u16,
+    },
 
     /// Start a Kubernetes service component (proxy, coordinator, webhook, dashboard)
     #[cfg(feature = "kubernetes")]
@@ -804,8 +812,8 @@ async fn run(cli: Cli) -> Result<()> {
     }
 
     // Handle MCP server command
-    if let Commands::Mcp = &command {
-        mcp::server::run_server()
+    if let Commands::Mcp { transport, port } = &command {
+        mcp::server::run_server(transport, *port)
             .await
             .map_err(|e| anyhow::anyhow!("{}", e))?;
         return Ok(());
@@ -1391,7 +1399,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Shell => "shell",
         #[cfg(feature = "dashboard")]
         Commands::Dashboard => "dashboard",
-        Commands::Mcp => "mcp",
+        Commands::Mcp { .. } => "mcp",
         #[cfg(feature = "kubernetes")]
         Commands::Serve(_) => "serve",
         Commands::Snapshot(_) => "snapshot",
@@ -1649,7 +1657,7 @@ async fn execute_command(
             unreachable!()
         }
 
-        Commands::Mcp => {
+        Commands::Mcp { .. } => {
             unreachable!()
         }
 

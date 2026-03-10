@@ -156,6 +156,7 @@ kubernetes = ["raps-kernel/kubernetes", "redis", "dep:axum"]
 # Activates the h3 feature in raps-kernel (quinn/QUIC backend).
 # Set RAPS_SWARM_QUIC=1 or pass --quic to swarm worker start to use it.
 h3 = ["raps-kernel/h3"]
+mcp-http = ["dep:axum"]
 
 [dev-dependencies]
 assert_cmd.workspace = true
