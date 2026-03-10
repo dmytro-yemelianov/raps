@@ -1,0 +1,10 @@
+{
+  "skills": [
+    {
+      "name": "using-raps-mcp",
+      "version": "1.0",
+      "description": "Use when calling any RAPS MCP tool, working with Autodesk Platform Services APIs, or setting up RAPS MCP for the first time \u2014 covers batch tool fetching, domain groupings, and common parameter patterns.",
+      "path": "using-raps-mcp/SKILL.md"
+    }
+  ]
+}
