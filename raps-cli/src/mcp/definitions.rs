@@ -1298,6 +1298,50 @@ pub(crate) fn get_tools() -> Vec<Tool> {
             "Get swarm orchestration health: circuit breaker states, rate limit budgets, and response cache stats. Useful for diagnosing API connectivity issues.",
             schema(json!({}), &[]),
         ),
+        // ── Skill tools ──────────────────────────────────────────────
+        Tool::new(
+            "skill_list",
+            "List available and installed Claude Code skills. Skills teach Claude how to use RAPS tools efficiently.",
+            schema(
+                json!({
+                    "filter": {
+                        "type": "string",
+                        "description": "Filter: 'installed', 'available', or 'outdated' (default: all)"
+                    }
+                }),
+                &[],
+            ),
+        ),
+        Tool::new(
+            "skill_install",
+            "Install a Claude Code skill to ~/.claude/skills/. The 'using-raps-mcp' skill should be installed first — it provides efficient batch-fetch patterns for all RAPS MCP tools.",
+            schema(
+                json!({
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name (e.g. 'using-raps-mcp')"
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "description": "Overwrite existing installation (default: false)"
+                    }
+                }),
+                &["name"],
+            ),
+        ),
+        Tool::new(
+            "skill_info",
+            "Get detailed info about a skill including name, version, description, install status, and a content preview.",
+            schema(
+                json!({
+                    "name": {
+                        "type": "string",
+                        "description": "Skill name"
+                    }
+                }),
+                &["name"],
+            ),
+        ),
     ]
 }
 

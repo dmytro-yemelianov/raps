@@ -145,6 +145,10 @@ pub const TOOLS: &[&str] = &[
     "workflow_compare_versions",
     "workflow_setup_project",
     "swarm_status",
+    // Skills
+    "skill_list",
+    "skill_install",
+    "skill_info",
 ];
 
 #[cfg(test)]
@@ -155,8 +159,8 @@ mod tests {
     fn test_tools_array_count() {
         assert_eq!(
             TOOLS.len(),
-            111,
-            "TOOLS array has {} entries, expected 111 — sync with get_tools() in server.rs",
+            114,
+            "TOOLS array has {} entries, expected 114 — sync with get_tools() in server.rs",
             TOOLS.len()
         );
     }
