@@ -48,7 +48,7 @@ pub struct ProjectCreationJob {
     pub name: Option<String>,
 }
 
-/// Request to create an ACC project
+/// Request to create an ACC project (Construction Admin v1, camelCase)
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateProjectRequest {
@@ -57,15 +57,27 @@ pub struct CreateProjectRequest {
     /// Optional template project ID to clone from
     #[serde(skip_serializing_if = "Option::is_none")]
     pub template_project_id: Option<String>,
-    /// Products to enable (e.g., ["build", "docs", "model"])
+    /// Products to enable. Omit to get all defaults (ACC enables all products).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub products: Option<Vec<String>>,
-    /// Project type (default: "ACC")
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Project type (required: "ACC")
+    #[serde(rename = "type")]
     pub project_type: Option<String>,
 }
 
-/// ACC Project response from API
+/// Request to create a BIM 360 project (HQ v1, snake_case)
+#[derive(Debug, Serialize)]
+pub struct Bim360CreateProjectRequest {
+    /// Project name
+    pub name: String,
+    /// Comma-separated service types (e.g., "doc_manager,pm,field")
+    pub service_types: String,
+    /// Project type: "project" or "template"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub r#type: Option<String>,
+}
+
+/// ACC Project response from API (camelCase)
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccProject {
@@ -78,6 +90,19 @@ pub struct AccProject {
     /// Account ID
     pub account_id: Option<String>,
     /// Job ID (for tracking creation progress)
+    pub job_id: Option<String>,
+}
+
+/// BIM 360 Project response from HQ v1 API (snake_case)
+#[derive(Debug, Clone, Deserialize)]
+pub struct Bim360Project {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub account_id: Option<String>,
+    #[serde(default)]
     pub job_id: Option<String>,
 }
 

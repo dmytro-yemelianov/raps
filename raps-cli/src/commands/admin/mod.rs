@@ -467,6 +467,34 @@ pub enum AdminProjectCommands {
         #[arg(short, long)]
         project: String,
     },
+
+    /// Create multiple projects in parallel (batch)
+    #[command(name = "create-batch")]
+    CreateBatch {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Name prefix for projects (e.g., "Test-Project" -> "Test-Project-001")
+        #[arg(short, long)]
+        prefix: String,
+
+        /// Number of projects to create
+        #[arg(short = 'c', long)]
+        count: usize,
+
+        /// Starting number (default: 1)
+        #[arg(long, default_value = "1")]
+        start: usize,
+
+        /// Max concurrent requests (default: 20)
+        #[arg(long, default_value = "20")]
+        concurrency: usize,
+
+        /// Don't wait for project activation (fire-and-forget)
+        #[arg(long)]
+        no_wait: bool,
+    },
 }
 
 /// Operation management subcommands

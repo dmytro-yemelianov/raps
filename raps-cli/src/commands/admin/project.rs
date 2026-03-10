@@ -7,7 +7,11 @@ use anyhow::Result;
 use colored::Colorize;
 use serde::Serialize;
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use raps_acc::admin::{AccountAdminClient, CreateProjectRequest, UpdateProjectRequest};
+use raps_acc::extended::AccClient;
 use raps_acc::types::ProjectClassification;
 use raps_admin::ProjectFilter;
 use raps_kernel::auth::AuthClient;
@@ -418,6 +422,157 @@ impl AdminProjectCommands {
                             "updated": true
                         }))?;
                     }
+                }
+
+                Ok(())
+            }
+            AdminProjectCommands::CreateBatch {
+                account,
+                prefix,
+                count,
+                start,
+                concurrency,
+                no_wait,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Creating {} projects with prefix '{}' in account {}",
+                        "→".cyan(),
+                        count.to_string().cyan(),
+                        prefix.cyan(),
+                        account_id.cyan()
+                    );
+                    println!(
+                        "  Concurrency: {}, Start: {}, Wait: {}",
+                        concurrency,
+                        start,
+                        if no_wait { "no" } else { "yes" }
+                    );
+                    println!();
+                }
+
+                let http_config = HttpClientConfig::default();
+                let acc_client = Arc::new(AccClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?);
+
+                let created = Arc::new(AtomicUsize::new(0));
+                let failed = Arc::new(AtomicUsize::new(0));
+                let semaphore = Arc::new(tokio::sync::Semaphore::new(concurrency));
+
+                let mut handles = Vec::new();
+
+                for i in start..(start + count) {
+                    let client = Arc::clone(&acc_client);
+                    let acct = account_id.clone();
+                    let name = format!("{}-{:03}", prefix, i);
+                    let sem = Arc::clone(&semaphore);
+                    let created = Arc::clone(&created);
+                    let failed = Arc::clone(&failed);
+                    let wait = !no_wait;
+
+                    handles.push(tokio::spawn(async move {
+                        let _permit = sem.acquire().await.unwrap();
+                        let request = raps_acc::CreateProjectRequest {
+                            name: name.clone(),
+                            template_project_id: None,
+                            products: None,
+                            project_type: Some("ACC".to_string()),
+                        };
+
+                        match client.create_project(&acct, request).await {
+                            Ok(job) => {
+                                let project_id = job
+                                    .project_id
+                                    .as_deref()
+                                    .unwrap_or("unknown")
+                                    .to_string();
+
+                                if wait {
+                                    // Wait for activation (up to 60s)
+                                    match client
+                                        .wait_for_project_activation(
+                                            &acct,
+                                            &project_id,
+                                            Some(60),
+                                            Some(2000),
+                                        )
+                                        .await
+                                    {
+                                        Ok(_) => {
+                                            let n = created.fetch_add(1, Ordering::Relaxed) + 1;
+                                            eprintln!(
+                                                "  {} [{}/{}] {} ({})",
+                                                "✓".green(),
+                                                n,
+                                                n + failed.load(Ordering::Relaxed),
+                                                name,
+                                                project_id
+                                            );
+                                        }
+                                        Err(e) => {
+                                            let n = created.fetch_add(1, Ordering::Relaxed) + 1;
+                                            eprintln!(
+                                                "  {} [{}/{}] {} ({}) - activation: {}",
+                                                "~".yellow(),
+                                                n,
+                                                n + failed.load(Ordering::Relaxed),
+                                                name,
+                                                project_id,
+                                                e
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    let n = created.fetch_add(1, Ordering::Relaxed) + 1;
+                                    eprintln!(
+                                        "  {} [{}/{}] {} ({})",
+                                        "✓".green(),
+                                        n,
+                                        n + failed.load(Ordering::Relaxed),
+                                        name,
+                                        project_id
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                failed.fetch_add(1, Ordering::Relaxed);
+                                eprintln!("  {} {} - {}", "✗".red(), name, e);
+                            }
+                        }
+                    }));
+                }
+
+                // Wait for all tasks to complete
+                for handle in handles {
+                    let _ = handle.await;
+                }
+
+                let total_created = created.load(Ordering::Relaxed);
+                let total_failed = failed.load(Ordering::Relaxed);
+
+                if output_format.supports_colors() {
+                    println!();
+                    println!(
+                        "{} Batch complete: {} created, {} failed",
+                        "→".cyan(),
+                        total_created.to_string().green(),
+                        if total_failed > 0 {
+                            total_failed.to_string().red().to_string()
+                        } else {
+                            "0".to_string()
+                        }
+                    );
+                } else {
+                    output_format.write(&serde_json::json!({
+                        "created": total_created,
+                        "failed": total_failed,
+                        "total": count,
+                    }))?;
                 }
 
                 Ok(())

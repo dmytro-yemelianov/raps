@@ -381,10 +381,13 @@ impl RapsServer {
 
         let client = self.get_acc_client().await;
 
+        // ACC auto-enables all products; only pass products if explicitly specified
+        // and not empty (API rejects string product names, would need object format)
+        let _ = products; // consumed but not used — ACC enables all products by default
         let request = CreateProjectRequest {
             name: name.clone(),
             template_project_id,
-            products,
+            products: None,
             project_type: Some("ACC".to_string()),
         };
 

@@ -298,6 +298,9 @@ impl AccountAdminClient {
 
     /// Create a new project in an account
     ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v1
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
+    ///
     /// # Arguments
     /// * `account_id` - The account ID
     /// * `request` - Project creation parameters
@@ -312,6 +315,7 @@ impl AccountAdminClient {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
+        // Try ACC v1 first (3-legged)
         let url = format!("{}/projects", self.admin_url(&account_id));
 
         let response = http::send_with_retry(&self.config.http_config, || {
@@ -323,16 +327,42 @@ impl AccountAdminClient {
         })
         .await?;
 
+        if response.status().is_success() {
+            let project: AccountProject = response
+                .json()
+                .await
+                .context("Failed to parse project creation response")?;
+            return Ok(project);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!("{}/projects", self.hq_url(&account_id));
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token_2leg)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
         if !response.status().is_success() {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let project: AccountProject = response
+        let project: Bim360Project = response
             .json()
             .await
-            .context("Failed to parse project creation response")?;
+            .context("Failed to parse BIM 360 project creation response")?;
 
-        Ok(project)
+        Ok(AccountProject::from(project))
     }
 
     /// Update an existing project
