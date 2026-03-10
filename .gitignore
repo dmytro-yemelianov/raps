@@ -125,3 +125,6 @@ archive/
 # RAPS history
 .raps_history
 .worktrees/
+.claude/worktrees/
+docs/superpowers/
+package.json
