@@ -12,6 +12,24 @@ use crate::output::OutputFormat;
 use super::{InstallArgs, UninstallArgs, UpdateArgs};
 
 pub(super) async fn install(args: InstallArgs, output_format: OutputFormat) -> Result<()> {
+    if args.name == "dashboard" {
+        match output_format {
+            OutputFormat::Table => {
+                println!("{} The TUI Dashboard is already included in your RAPS binary.", "i".cyan().bold());
+                println!("  To use it, you just need a valid Pro license.");
+                println!("  Run {} to authenticate.", "raps marketplace license <key>".cyan());
+            }
+            _ => {
+                output_format.write(&serde_json::json!({
+                    "slug": "dashboard",
+                    "status": "builtin",
+                    "requires_license": true
+                }))?;
+            }
+        }
+        return Ok(());
+    }
+
     let installer = PluginInstaller::new();
     let result = installer.install(&args.name).await?;
 

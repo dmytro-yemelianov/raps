@@ -347,7 +347,7 @@ enum Commands {
     /// Start an interactive shell session
     Shell,
 
-    /// Open the interactive TUI dashboard (requires --features dashboard)
+    /// Open the interactive TUI dashboard (Pro feature, requires --features dashboard)
     #[cfg(feature = "dashboard")]
     Dashboard,
 
@@ -775,6 +775,18 @@ async fn run(cli: Cli) -> Result<()> {
     // Handle dashboard command (before config loading, it manages its own setup)
     #[cfg(feature = "dashboard")]
     if let Commands::Dashboard = &command {
+        // Pro check: dashboard is a pro-only feature
+        if !marketplace::SubscriptionManager::can_use_pro() {
+            println!("{}", "Error: The TUI Dashboard is a Pro-only feature.".red().bold());
+            println!(
+                "To use the dashboard, you need a RAPS Pro license.\n\
+                 Run {} to authenticate, or visit {} to purchase a license.",
+                "raps marketplace license <key>".cyan(),
+                "https://buy.rapscli.xyz".cyan()
+            );
+            return Ok(());
+        }
+
         let config = Config::from_env_lenient()?;
         let http_config = HttpClientConfig::from_cli_and_env_full(
             cli.timeout,
