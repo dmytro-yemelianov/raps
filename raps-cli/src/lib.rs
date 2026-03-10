@@ -16,3 +16,4 @@ pub mod mcp;
 pub mod output;
 pub mod plugins;
 pub mod shell;
+pub mod skill;

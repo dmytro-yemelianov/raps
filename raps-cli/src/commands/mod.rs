@@ -41,6 +41,7 @@ pub mod rfi;
 pub mod schema;
 #[cfg(feature = "kubernetes")]
 pub mod serve;
+pub mod skill;
 pub mod snapshot;
 pub mod stats;
 pub mod status;
@@ -75,6 +76,7 @@ pub use project::ProjectCommands;
 pub use reality::RealityCommands;
 pub use report::ReportCommands;
 pub use rfi::RfiCommands;
+pub use skill::SkillCommands;
 pub use snapshot::SnapshotCommands;
 pub use template::TemplateCommands;
 pub use translate::TranslateCommands;
