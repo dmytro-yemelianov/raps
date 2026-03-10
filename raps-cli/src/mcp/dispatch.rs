@@ -1355,6 +1355,30 @@ impl RapsServer {
             }
             "swarm_status" => self.swarm_status_tool().await,
 
+            // ── Skill tools ──────────────────────────────────────────
+            "skill_list" => {
+                let filter = Self::optional_arg(&args, "filter");
+                self.skill_list(filter).await
+            }
+            "skill_install" => {
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                let force = args
+                    .get("force")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                self.skill_install(name, force).await
+            }
+            "skill_info" => {
+                let name = match Self::required_arg(&args, "name") {
+                    Ok(val) => val,
+                    Err(err) => return CallToolResult::success(vec![Content::text(err)]),
+                };
+                self.skill_info(name).await
+            }
+
             _ => format!("Unknown tool: {}", name),
         };
 

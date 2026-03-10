@@ -39,6 +39,7 @@ mod mcp;
 mod output;
 mod plugins;
 mod shell;
+mod skill;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser, Subcommand, error::ErrorKind};
@@ -54,7 +55,7 @@ use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, JobCommands, MarketplaceCommands, ObjectCommands, PipelineCommands, PluginCommands,
-    ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SnapshotCommands, TemplateCommands,
+    ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SkillCommands, SnapshotCommands, TemplateCommands,
     TranslateCommands, WebhookCommands, WorkflowCommands,
 };
 
@@ -314,6 +315,10 @@ enum Commands {
     #[command(subcommand)]
     Marketplace(MarketplaceCommands),
 
+    /// Manage Claude Code skills (list, install, uninstall)
+    #[command(subcommand)]
+    Skill(SkillCommands),
+
     /// Generate synthetic engineering files for testing
     Generate(GenerateArgs),
 
@@ -442,7 +447,7 @@ const KNOWN_SUBCOMMANDS: &[&str] = &[
     "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
     "api", "rfi", "report", "template", "reality", "inspect", "plugin", "marketplace", "generate",
     "demo", "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache",
-    "swarm", "schema", "history", "replay", "man", "logs", "lint", "snapshot",
+    "swarm", "schema", "history", "replay", "man", "logs", "lint", "snapshot", "skill",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -1376,6 +1381,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Inspect(_) => "inspect",
         Commands::Plugin(_) => "plugin",
         Commands::Marketplace(_) => "marketplace",
+        Commands::Skill(_) => "skill",
         Commands::Generate(_) => "generate",
         Commands::Demo(_) => "demo",
         Commands::Config(_) => "config",
@@ -1612,6 +1618,10 @@ async fn execute_command(
         }
 
         Commands::Marketplace(cmd) => {
+            cmd.execute(output_format).await?;
+        }
+
+        Commands::Skill(cmd) => {
             cmd.execute(output_format).await?;
         }
 

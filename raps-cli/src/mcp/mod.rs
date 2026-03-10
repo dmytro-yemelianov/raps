@@ -18,3 +18,4 @@ mod tools_compound;
 mod tools_dm;
 mod tools_misc;
 mod tools_oss;
+mod tools_skill;
