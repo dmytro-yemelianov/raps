@@ -328,6 +328,8 @@ where
 {
     let max_wait = 60u64;
     let mut attempts = 0u32;
+    // Rate-limit (429) errors get extra retries since they always resolve
+    let rate_limit_extra_retries = 3usize;
 
     loop {
         attempts += 1;
@@ -337,14 +339,28 @@ where
             ItemResult::Success | ItemResult::Skipped { .. } => {
                 return (result, attempts);
             }
-            ItemResult::Failed { retryable, .. } => {
-                if !retryable || attempts as usize >= max_retries {
+            ItemResult::Failed { retryable, error } => {
+                let is_rate_limit = error.contains("429") || error.contains("rate limit");
+                let effective_max = if is_rate_limit {
+                    max_retries + rate_limit_extra_retries
+                } else {
+                    max_retries
+                };
+
+                if !retryable || attempts as usize >= effective_max {
                     return (result, attempts);
                 }
 
-                // Wait before retry with exponential backoff + jitter
-                let delay = calculate_delay(attempts - 1, base_delay.as_secs(), max_wait);
-                tokio::time::sleep(delay).await;
+                if is_rate_limit {
+                    // Use calculate_delay with a high base (30s) + its built-in jitter
+                    // to spread retries across the quota window and avoid thundering herd.
+                    let delay = calculate_delay(attempts - 1, 30, max_wait);
+                    tokio::time::sleep(delay).await;
+                } else {
+                    // Standard exponential backoff + jitter for other errors
+                    let delay = calculate_delay(attempts - 1, base_delay.as_secs(), max_wait);
+                    tokio::time::sleep(delay).await;
+                }
             }
         }
     }
