@@ -166,13 +166,16 @@ async fn list_projects_admin(
     })
     .await?;
 
+    // This path is only reached for BIM 360 hubs (gated by bim360_account_id),
+    // but the ACC admin API returns platform:"acc" for all projects regardless.
+    // Override to "bim360" since we know the hub type.
     let outputs: Vec<ProjectListOutput> = projects
         .iter()
         .map(|p| ProjectListOutput {
             id: p.id.clone(),
             name: p.name.clone(),
             status: p.status.clone(),
-            platform: p.platform.clone(),
+            platform: Some("bim360".to_string()),
             project_type: None,
             scopes: None,
         })

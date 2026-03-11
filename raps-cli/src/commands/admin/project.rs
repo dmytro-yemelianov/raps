@@ -214,6 +214,30 @@ impl AdminProjectCommands {
                     http_config,
                 )?;
 
+                // Determine actual hub platform from hub extension_type.
+                // The ACC admin API returns platform:"acc" for all projects
+                // regardless of whether the account is ACC or BIM 360.
+                let hub_platform = match dm_client.list_hubs().await {
+                    Ok(hubs) => {
+                        let hub_id = format!("b.{}", account_id);
+                        hubs.iter()
+                            .find(|h| h.id == hub_id)
+                            .and_then(|h| {
+                                h.attributes.extension.as_ref()?.extension_type.as_deref().map(|ext| {
+                                    if ext.contains("bim360") {
+                                        "bim360"
+                                    } else if ext.contains("accproject") {
+                                        "acc"
+                                    } else {
+                                        "acc"
+                                    }
+                                })
+                            })
+                            .unwrap_or("acc")
+                    }
+                    Err(_) => "acc",
+                };
+
                 // List all projects
                 let all_projects = admin_client.list_all_projects(&account_id).await?;
 
@@ -232,13 +256,7 @@ impl AdminProjectCommands {
                         id: p.id.clone(),
                         name: p.name.clone(),
                         status: p.status.clone().unwrap_or_else(|| "unknown".to_string()),
-                        platform: if p.is_acc() {
-                            "acc".to_string()
-                        } else if p.is_bim360() {
-                            "bim360".to_string()
-                        } else {
-                            "unknown".to_string()
-                        },
+                        platform: hub_platform.to_string(),
                         created_at: p.created_at.map(|d| d.to_rfc3339()),
                     })
                     .collect();
