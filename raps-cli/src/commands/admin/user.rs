@@ -860,6 +860,31 @@ impl UserCommands {
                 .await
             }
 
+            UserCommands::ClonePermissions {
+                from,
+                to,
+                account,
+                folders,
+                concurrency,
+                dry_run,
+                yes,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+                clone_permissions(
+                    config.clone(),
+                    auth_client.clone(),
+                    &account_id,
+                    &from,
+                    &to,
+                    folders,
+                    concurrency,
+                    dry_run,
+                    yes,
+                    output_format,
+                )
+                .await
+            }
+
             UserCommands::AddToAllProjects {
                 email,
                 account,
@@ -1290,6 +1315,473 @@ async fn export_permissions(
         }
     } else {
         output_format.write(&rows)?;
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn clone_permissions(
+    config: Config,
+    auth_client: AuthClient,
+    account_id: &str,
+    source_email: &str,
+    target_email: &str,
+    include_folders: bool,
+    concurrency: usize,
+    dry_run: bool,
+    yes: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use futures_util::stream::{self, StreamExt};
+    use raps_acc::permissions::FolderPermissionsClient;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    let http_config = HttpClientConfig {
+        pool_max_idle_per_host: concurrency.max(10),
+        ..HttpClientConfig::default()
+    };
+    let admin_client = AccountAdminClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    )?;
+    let users_client = ProjectUsersClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    )?;
+
+    // Validate both users exist in the account
+    let source_user = admin_client
+        .find_user_by_email(account_id, source_email)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Source user not found in account: {source_email}"))?;
+    let target_user = admin_client
+        .find_user_by_email(account_id, target_email)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Target user not found in account: {target_email}"))?;
+
+    // List all projects
+    let all_projects = admin_client.list_all_projects(account_id).await?;
+    let total_projects = all_projects.len();
+
+    if output_format.supports_colors() {
+        eprintln!(
+            "Scanning {} projects for source user {}...",
+            total_projects, source_email
+        );
+    }
+
+    // Scan: find projects where source user is a member, capture their role/products
+    #[derive(Clone)]
+    struct SourceMembership {
+        project_id: String,
+        project_name: String,
+        role_ids: Vec<String>,
+        products: Vec<raps_acc::types::ProductAccess>,
+    }
+
+    let memberships: Vec<Option<SourceMembership>> = stream::iter(all_projects)
+        .map(|project| {
+            let users_client = &users_client;
+            let source_email = source_email;
+            async move {
+                match users_client
+                    .find_project_user_by_email(&project.id, source_email)
+                    .await
+                {
+                    Ok(Some(pu)) => Some(SourceMembership {
+                        project_id: project.id,
+                        project_name: project.name,
+                        role_ids: pu.role_ids.clone(),
+                        products: pu
+                            .products
+                            .clone()
+                            .unwrap_or_default(),
+                    }),
+                    _ => None,
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .collect()
+        .await;
+
+    let memberships: Vec<SourceMembership> = memberships.into_iter().flatten().collect();
+
+    if memberships.is_empty() {
+        if output_format.supports_colors() {
+            eprintln!("Source user {source_email} is not a member of any project.");
+        }
+        return Ok(());
+    }
+
+    if output_format.supports_colors() {
+        eprintln!(
+            "Source user is a member of {} project(s) out of {}",
+            memberships.len(),
+            total_projects
+        );
+    }
+
+    // Dry run: show what would happen
+    if dry_run {
+        #[derive(Serialize, schemars::JsonSchema)]
+        struct DryRunOutput {
+            source: String,
+            target: String,
+            projects: Vec<DryRunProject>,
+        }
+        #[derive(Serialize, schemars::JsonSchema)]
+        struct DryRunProject {
+            id: String,
+            name: String,
+            role_ids: Vec<String>,
+        }
+
+        let projects: Vec<DryRunProject> = memberships
+            .iter()
+            .map(|m| DryRunProject {
+                id: m.project_id.clone(),
+                name: m.project_name.clone(),
+                role_ids: m.role_ids.clone(),
+            })
+            .collect();
+
+        match output_format {
+            OutputFormat::Table => {
+                for p in &projects {
+                    println!(
+                        "  {} {} ({}) — roles: [{}]",
+                        "→".dimmed(),
+                        p.name.cyan(),
+                        p.id.dimmed(),
+                        p.role_ids.join(", ")
+                    );
+                }
+                println!();
+                println!(
+                    "{} Dry run: would clone permissions to {} in {} project(s)",
+                    "✓".green().bold(),
+                    target_email.green(),
+                    projects.len()
+                );
+                if include_folders {
+                    println!("  Including folder-level permissions");
+                }
+            }
+            _ => {
+                output_format.write(&DryRunOutput {
+                    source: source_email.to_string(),
+                    target: target_email.to_string(),
+                    projects,
+                })?;
+            }
+        }
+        return Ok(());
+    }
+
+    // Confirmation prompt
+    if !yes && output_format.supports_colors() {
+        println!(
+            "\n{} Clone permissions from {} to {} across {} project(s)?",
+            "⚠".yellow(),
+            source_email.cyan(),
+            target_email.green(),
+            memberships.len()
+        );
+        if include_folders {
+            println!("  Including folder-level permissions");
+        }
+        print!("Continue? [y/N] ");
+        use std::io::{self, Write};
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if !input.trim().eq_ignore_ascii_case("y") {
+            println!("Cancelled.");
+            return Ok(());
+        }
+    }
+
+    // Execute: add/update target user in each project with source's role/products
+    let succeeded = AtomicUsize::new(0);
+    let failed = AtomicUsize::new(0);
+    let skipped = AtomicUsize::new(0);
+
+    #[derive(Serialize, schemars::JsonSchema)]
+    struct CloneResult {
+        project_id: String,
+        project_name: String,
+        status: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    }
+
+    let results: Vec<CloneResult> = stream::iter(memberships.clone())
+        .map(|membership| {
+            let users_client = &users_client;
+            let target_email = target_email;
+            let succeeded = &succeeded;
+            let failed = &failed;
+            let skipped = &skipped;
+            async move {
+                // Try to add user first
+                let request = raps_acc::users::AddProjectUserRequest {
+                    email: target_email.to_string(),
+                    role_ids: membership.role_ids.clone(),
+                    products: membership.products.clone(),
+                    suppress_administrative_emails: false,
+                };
+                match users_client.add_user(&membership.project_id, request).await {
+                    Ok(_) => {
+                        succeeded.fetch_add(1, Ordering::Relaxed);
+                        CloneResult {
+                            project_id: membership.project_id,
+                            project_name: membership.project_name,
+                            status: "added".to_string(),
+                            error: None,
+                        }
+                    }
+                    Err(e) => {
+                        let err_str = e.to_string();
+                        // User already exists — try updating their role instead
+                        if err_str.contains("409")
+                            || err_str.to_lowercase().contains("already")
+                            || err_str.to_lowercase().contains("exists")
+                        {
+                            match users_client
+                                .find_project_user_by_email(
+                                    &membership.project_id,
+                                    target_email,
+                                )
+                                .await
+                            {
+                                Ok(Some(existing)) => {
+                                    // Check if roles already match
+                                    if existing.role_ids == membership.role_ids {
+                                        skipped.fetch_add(1, Ordering::Relaxed);
+                                        return CloneResult {
+                                            project_id: membership.project_id,
+                                            project_name: membership.project_name,
+                                            status: "already_matching".to_string(),
+                                            error: None,
+                                        };
+                                    }
+                                    // Update role
+                                    let update_req =
+                                        raps_acc::users::UpdateProjectUserRequest {
+                                            role_ids: membership.role_ids.clone(),
+                                            products: Some(membership.products.clone()),
+                                        };
+                                    match users_client
+                                        .update_user(
+                                            &membership.project_id,
+                                            &existing.id,
+                                            update_req,
+                                        )
+                                        .await
+                                    {
+                                        Ok(_) => {
+                                            succeeded.fetch_add(1, Ordering::Relaxed);
+                                            CloneResult {
+                                                project_id: membership.project_id,
+                                                project_name: membership.project_name,
+                                                status: "updated".to_string(),
+                                                error: None,
+                                            }
+                                        }
+                                        Err(ue) => {
+                                            failed.fetch_add(1, Ordering::Relaxed);
+                                            CloneResult {
+                                                project_id: membership.project_id,
+                                                project_name: membership.project_name,
+                                                status: "failed".to_string(),
+                                                error: Some(ue.to_string()),
+                                            }
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    skipped.fetch_add(1, Ordering::Relaxed);
+                                    CloneResult {
+                                        project_id: membership.project_id,
+                                        project_name: membership.project_name,
+                                        status: "skipped".to_string(),
+                                        error: Some(
+                                            "user exists but could not look up".to_string(),
+                                        ),
+                                    }
+                                }
+                            }
+                        } else {
+                            failed.fetch_add(1, Ordering::Relaxed);
+                            CloneResult {
+                                project_id: membership.project_id,
+                                project_name: membership.project_name,
+                                status: "failed".to_string(),
+                                error: Some(err_str),
+                            }
+                        }
+                    }
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .collect()
+        .await;
+
+    // Clone folder permissions if requested
+    let mut folder_cloned = 0usize;
+    let mut folder_failed = 0usize;
+    if include_folders {
+        let perms_client = FolderPermissionsClient::new_with_http_config(
+            config.clone(),
+            auth_client.clone(),
+            http_config,
+        )?;
+
+        let source_id = &source_user.id;
+        let target_id = &target_user.id;
+
+        // Only clone folders for projects where the target was successfully added/updated
+        let ok_project_ids: Vec<String> = results
+            .iter()
+            .filter(|r| r.status == "added" || r.status == "updated" || r.status == "already_matching")
+            .map(|r| r.project_id.clone())
+            .collect();
+
+        let folder_results: Vec<bool> = stream::iter(ok_project_ids)
+            .map(|pid| {
+                let perms_client = &perms_client;
+                let source_id = source_id;
+                let target_id = target_id;
+                async move {
+                    // Get the Project Files folder
+                    let folder_id = match perms_client.get_project_files_folder_id(&pid).await {
+                        Ok(fid) => fid,
+                        Err(_) => return false,
+                    };
+
+                    // Get current permissions
+                    let perms = match perms_client.get_permissions(&pid, &folder_id).await {
+                        Ok(p) => p,
+                        Err(_) => return false,
+                    };
+
+                    // Find source user's permissions
+                    let source_perm = perms.iter().find(|p| {
+                        p.subject_id == *source_id && p.subject_type == "USER"
+                    });
+
+                    let Some(source_perm) = source_perm else {
+                        return true; // No folder perms to clone
+                    };
+
+                    // Apply to target user
+                    let request = raps_acc::permissions::BatchUpdatePermissionsRequest {
+                        permissions: vec![raps_acc::permissions::UpdatePermissionRequest {
+                            subject_id: target_id.to_string(),
+                            subject_type: "USER".to_string(),
+                            actions: source_perm.actions.clone(),
+                        }],
+                    };
+
+                    perms_client
+                        .update_permissions(&pid, &folder_id, request)
+                        .await
+                        .is_ok()
+                }
+            })
+            .buffer_unordered(concurrency)
+            .collect()
+            .await;
+
+        for ok in &folder_results {
+            if *ok {
+                folder_cloned += 1;
+            } else {
+                folder_failed += 1;
+            }
+        }
+    }
+
+    // Display results
+    let total = results.len();
+    let ok = succeeded.load(Ordering::Relaxed);
+    let skip = skipped.load(Ordering::Relaxed);
+    let fail = failed.load(Ordering::Relaxed);
+
+    match output_format {
+        OutputFormat::Table => {
+            for r in &results {
+                let icon = match r.status.as_str() {
+                    "added" | "updated" => "✓".green().to_string(),
+                    "already_matching" | "skipped" => "○".yellow().to_string(),
+                    _ => "✗".red().to_string(),
+                };
+                print!(
+                    "  {} {} ({}) [{}]",
+                    icon,
+                    r.project_name.cyan(),
+                    r.project_id.dimmed(),
+                    r.status
+                );
+                if let Some(ref e) = r.error {
+                    print!(" — {}", e.red());
+                }
+                println!();
+            }
+
+            println!();
+            println!("{}", "─".repeat(60));
+            println!(
+                "  Projects: {}  Cloned: {}  Already matched: {}  Failed: {}",
+                total,
+                ok.to_string().green(),
+                skip.to_string().yellow(),
+                fail.to_string().red()
+            );
+            if include_folders {
+                println!(
+                    "  Folder permissions: {} cloned, {} failed",
+                    folder_cloned.to_string().green(),
+                    folder_failed.to_string().red()
+                );
+            }
+        }
+        _ => {
+            #[derive(Serialize, schemars::JsonSchema)]
+            struct CloneOutput {
+                source: String,
+                target: String,
+                total: usize,
+                cloned: usize,
+                already_matched: usize,
+                failed: usize,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                folder_cloned: Option<usize>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                folder_failed: Option<usize>,
+                results: Vec<CloneResult>,
+            }
+            output_format.write(&CloneOutput {
+                source: source_email.to_string(),
+                target: target_email.to_string(),
+                total,
+                cloned: ok,
+                already_matched: skip,
+                failed: fail,
+                folder_cloned: if include_folders { Some(folder_cloned) } else { None },
+                folder_failed: if include_folders { Some(folder_failed) } else { None },
+                results,
+            })?;
+        }
+    }
+
+    if fail > 0 {
+        anyhow::bail!("{} project(s) failed during permission cloning", fail);
     }
 
     Ok(())

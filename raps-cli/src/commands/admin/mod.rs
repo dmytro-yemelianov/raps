@@ -296,6 +296,32 @@ pub enum UserCommands {
         concurrency: usize,
     },
 
+    /// Clone permissions from one user to another across all projects
+    #[command(name = "clone-permissions")]
+    ClonePermissions {
+        /// Source user email (copy permissions FROM this user)
+        #[arg(long)]
+        from: String,
+        /// Target user email (copy permissions TO this user)
+        #[arg(long)]
+        to: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(long, short)]
+        account: Option<String>,
+        /// Include folder-level permissions (slower)
+        #[arg(long)]
+        folders: bool,
+        /// Concurrency for parallel operations
+        #[arg(long, default_value = "10")]
+        concurrency: usize,
+        /// Preview changes without executing
+        #[arg(long)]
+        dry_run: bool,
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
+    },
+
     /// Add a user to all active projects in an account with an optional role
     #[command(name = "add-to-all-projects")]
     AddToAllProjects {
