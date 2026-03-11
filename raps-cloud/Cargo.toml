@@ -1,0 +1,44 @@
+[package]
+name = "raps-cloud"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "RAPS SaaS API gateway"
+license.workspace = true
+
+[[bin]]
+name = "raps-cloud"
+path = "src/main.rs"
+
+[dependencies]
+raps-kernel = { workspace = true }
+raps-oss = { workspace = true }
+raps-derivative = { workspace = true }
+raps-dm = { workspace = true }
+raps-da = { workspace = true }
+raps-acc = { workspace = true }
+raps-webhooks = { workspace = true }
+raps-reality = { workspace = true }
+raps-admin = { workspace = true }
+
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+reqwest = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+dotenvy = { workspace = true }
+hex = { workspace = true }
+
+sqlx = { workspace = true }
+jsonwebtoken = { workspace = true }
+aes-gcm = { workspace = true }
+argon2 = { workspace = true }
+tower-http = { workspace = true }
+envy = { workspace = true }
+deadpool-redis = { workspace = true }
+redis = { workspace = true }
