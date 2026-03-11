@@ -53,19 +53,35 @@ pub async fn bulk_remove_user<P>(
 where
     P: Fn(ProgressUpdate) + Send + Sync + 'static,
 {
-    // Step 1: Look up user by email to get their user ID
-    let user = admin_client
-        .find_user_by_email(account_id, user_email)
-        .await?
-        .ok_or_else(|| AdminError::UserNotFound {
-            email: user_email.to_string(),
-        })?;
-
-    let user_id = user.id.clone();
-
-    // Step 2: Get list of projects matching the filter
+    // Step 1: Get list of projects matching the filter (need this for fallback lookup too)
     let all_projects = admin_client.list_all_projects(account_id).await?;
     let filtered_projects = project_filter.apply(all_projects);
+
+    // Step 2: Look up user by email to get their user ID.
+    // Try account-level search first; if not found (e.g. user added via ACC
+    // project-level API), fall back to searching within the first matching project.
+    let user_id = match admin_client
+        .find_user_by_email(account_id, user_email)
+        .await?
+    {
+        Some(user) => user.id,
+        None => {
+            // Account-level lookup failed — try project-level search
+            let mut found_id = None;
+            for project in &filtered_projects {
+                if let Ok(Some(project_user)) = users_client
+                    .find_project_user_by_email(&project.id, user_email)
+                    .await
+                {
+                    found_id = Some(project_user.id);
+                    break;
+                }
+            }
+            found_id.ok_or_else(|| AdminError::UserNotFound {
+                email: user_email.to_string(),
+            })?
+        }
+    };
 
     if filtered_projects.is_empty() {
         return Ok(BulkOperationResult {

@@ -21,6 +21,7 @@ async fn test_add_user_sends_post_to_correct_endpoint() {
                 products: vec![],
         suppress_administrative_emails: false,
                 project_product_keys: None,
+                platform: None,
             },
         )
         .await
@@ -48,6 +49,7 @@ async fn test_add_user_with_role_id_sends_role_in_body() {
                 products: vec![],
         suppress_administrative_emails: false,
                 project_product_keys: None,
+                platform: None,
             },
         )
         .await
@@ -72,6 +74,7 @@ async fn test_add_user_without_role_omits_role_id_key() {
                 products: vec![],
         suppress_administrative_emails: false,
                 project_product_keys: None,
+                platform: None,
             },
         )
         .await

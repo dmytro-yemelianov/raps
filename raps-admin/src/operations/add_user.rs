@@ -104,25 +104,28 @@ where
         )
         .await?;
 
-    // Step 3: Build a map of project_id → product keys so the BIM 360 import
-    // path knows which services each project actually has (avoids nil:NilClass
-    // crash when sending services the project doesn't support).
-    let product_keys_map: HashMap<String, Vec<String>> = filtered_projects
-        .iter()
-        .map(|p| {
-            let keys = p
-                .products
-                .as_ref()
-                .map(|prods| {
-                    prods
-                        .iter()
-                        .filter_map(|v| v.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()))
-                        .collect()
-                })
-                .unwrap_or_default();
-            (p.id.clone(), keys)
-        })
-        .collect();
+    // Step 3: Build maps of project_id → product keys and project_id → platform
+    // so the add-user path can route directly to the correct endpoint (ACC vs
+    // BIM 360) without probing, and the BIM 360 import path knows which services
+    // each project actually has (avoids nil:NilClass crash).
+    let mut product_keys_map: HashMap<String, Vec<String>> = HashMap::new();
+    let mut platform_map: HashMap<String, String> = HashMap::new();
+    for p in &filtered_projects {
+        let keys = p
+            .products
+            .as_ref()
+            .map(|prods| {
+                prods
+                    .iter()
+                    .filter_map(|v| v.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        product_keys_map.insert(p.id.clone(), keys);
+        if let Some(ref platform) = p.platform {
+            platform_map.insert(p.id.clone(), platform.clone());
+        }
+    }
 
     // Step 4: Prepare items for processing
     let items: Vec<ProcessItem> = filtered_projects
@@ -145,9 +148,10 @@ where
         let products = products_clone.clone();
         let users_client = Arc::clone(&users_client_clone);
         let project_keys = product_keys_map.get(&project_id).cloned();
+        let platform = platform_map.get(&project_id).cloned();
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, project_keys).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, project_keys, platform).await
         }
     };
 
@@ -179,6 +183,7 @@ async fn add_user_to_project(
     role_id: Option<&str>,
     products: Vec<ProductAccess>,
     project_product_keys: Option<Vec<String>>,
+    platform: Option<String>,
 ) -> ItemResult {
     // Add the user to the project by email; ACC sends an invitation if the
     // user is not yet an account member.
@@ -191,6 +196,7 @@ async fn add_user_to_project(
         products,
         suppress_administrative_emails: true,
         project_product_keys,
+        platform,
     };
 
     match users_client.add_user(project_id, request).await {
@@ -421,8 +427,8 @@ where
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            // Resume path: no cached product keys — the BIM 360 path will fetch if needed
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, None).await
+            // Resume path: no cached product keys or platform — will probe/fetch if needed
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, None, None).await
         }
     };
 

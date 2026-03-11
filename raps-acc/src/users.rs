@@ -39,8 +39,7 @@ pub struct AddProjectUserRequest {
     /// Role IDs to assign (ACC API uses an array, even for a single role)
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub role_ids: Vec<String>,
-    /// Product access configurations
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// Product access configurations (ACC requires this field even when empty)
     pub products: Vec<ProductAccess>,
     /// Suppress project invite email to the user (default: false)
     #[serde(skip_serializing_if = "std::ops::Not::not")]
@@ -50,6 +49,10 @@ pub struct AddProjectUserRequest {
     /// `None` means unknown — the BIM 360 path will fetch the project info.
     #[serde(skip)]
     pub project_product_keys: Option<Vec<String>>,
+    /// Platform hint from the project listing (e.g. `"acc"` or `"bim360"`).
+    /// When set, skips the ACC probe and goes directly to the correct endpoint.
+    #[serde(skip)]
+    pub platform: Option<String>,
 }
 
 // ── BIM 360 HQ v2 /users/import types ────────────────────────────────────────
@@ -368,8 +371,19 @@ impl ProjectUsersClient {
         project_id: &str,
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
-        // Fast path: if we've already learned that ACC returns 500 for this
-        // account, skip the probe and go straight to BIM 360.
+        // Fast path: if the caller knows the platform, skip the probe entirely.
+        if let Some(ref platform) = request.platform {
+            if platform == "bim360" {
+                if let Some(ref account_id) = self.account_id {
+                    return self
+                        .add_user_bim360(account_id, project_id, request)
+                        .await;
+                }
+            }
+        }
+
+        // Cached fast path: if we've learned that ACC returns 404 for this
+        // account (no platform hint available), go straight to BIM 360.
         if self.acc_probe_failed.load(Ordering::Relaxed) {
             if let Some(ref account_id) = self.account_id {
                 return self
@@ -402,16 +416,22 @@ impl ProjectUsersClient {
         }
 
         let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
 
         // On 400/404/500 try BIM 360 HQ v2 if we have an account_id.
-        // 500 occurs when ACC endpoint is called against a BIM 360 project
-        // (e.g. "reqBodyProducts is not iterable" or other server-side errors).
+        // 404 occurs when the project is BIM 360 (ACC endpoint doesn't know it).
+        // 400/500 can also indicate a BIM 360 project, but 500 with messages like
+        // "reqBodyProducts is not iterable" is a request validation bug — don't
+        // cache that as a blanket "ACC never works" signal.
         if (status == 400 || status == 404 || status == 500)
             && let Some(ref account_id) = self.account_id
         {
-            // Remember that ACC doesn't work for this account so subsequent
-            // calls skip the probe entirely (saves ~200ms per request).
-            if status == 500 {
+            // Only cache the probe failure for errors that strongly indicate
+            // the entire account is BIM 360 (404 = endpoint not found for project).
+            // Do NOT cache 500 — it may be a transient server bug or a request
+            // validation error (e.g. missing products field) that affects one
+            // request, not the whole account.
+            if status == 404 {
                 self.acc_probe_failed.store(true, Ordering::Relaxed);
             }
             return self
@@ -419,7 +439,6 @@ impl ProjectUsersClient {
                 .await;
         }
 
-        let error_text = response.text().await.unwrap_or_default();
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
     }
 
@@ -788,6 +807,7 @@ impl ProjectUsersClient {
                     products: user.products.unwrap_or_default(),
                     suppress_administrative_emails: false,
                     project_product_keys: None,
+                    platform: None,
                 };
                 let result = client.add_user(&pid, request).await;
                 (email, result)
@@ -847,6 +867,7 @@ mod tests {
             products: vec![],
             suppress_administrative_emails: false,
             project_product_keys: None,
+            platform: None,
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
@@ -867,6 +888,7 @@ mod tests {
             }],
             suppress_administrative_emails: false,
             project_product_keys: None,
+            platform: None,
         };
 
         let json = serde_json::to_string(&request).unwrap();
@@ -899,6 +921,7 @@ mod tests {
             ],
             suppress_administrative_emails: false,
             project_product_keys: None,
+            platform: None,
         };
 
         // Project without Document Management (only projectAdministration + insight)
@@ -923,6 +946,7 @@ mod tests {
             ],
             suppress_administrative_emails: false,
             project_product_keys: None,
+            platform: None,
         };
 
         // Project WITH Document Management
@@ -941,6 +965,7 @@ mod tests {
             products: vec![],
             suppress_administrative_emails: false,
             project_product_keys: None,
+            platform: None,
         };
 
         // Empty product keys = unknown → safe default: include document_management

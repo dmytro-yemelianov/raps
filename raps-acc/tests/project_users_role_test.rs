@@ -68,6 +68,7 @@ async fn test_add_user_with_role_id_propagates_to_api() {
         products: vec![],
         suppress_administrative_emails: false,
         project_product_keys: None,
+        platform: None,
     };
 
     let result = client.add_user("proj-001", request).await.unwrap();
@@ -88,6 +89,7 @@ async fn test_add_user_without_role_id_omits_role_from_body() {
         products: vec![],
         suppress_administrative_emails: false,
         project_product_keys: None,
+        platform: None,
     };
 
     // Server default when roleIds absent from body is "role-default"
@@ -110,6 +112,7 @@ async fn test_add_duplicate_user_returns_error() {
         products: vec![],
         suppress_administrative_emails: false,
         project_product_keys: None,
+        platform: None,
     };
 
     // First add should succeed (mock allows re-insert via OR REPLACE)

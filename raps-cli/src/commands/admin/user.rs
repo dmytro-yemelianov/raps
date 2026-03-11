@@ -708,6 +708,7 @@ impl UserCommands {
                     products: resolved_products,
                     suppress_administrative_emails: false,
                     project_product_keys: None,
+                    platform: None,
                 };
 
                 let user = users_client.add_user(&project, request).await?;
@@ -1034,6 +1035,7 @@ impl UserCommands {
                                 products: vec![],
                                 suppress_administrative_emails: false,
                                 project_product_keys: None,
+                                platform: None,
                             };
                             match users_client.add_user(&project.id, request).await {
                                 Ok(_) => {
@@ -1536,6 +1538,7 @@ async fn clone_permissions(
                     products: membership.products.clone(),
                     suppress_administrative_emails: false,
                     project_product_keys: None,
+                    platform: None,
                 };
                 match users_client.add_user(&membership.project_id, request).await {
                     Ok(_) => {
