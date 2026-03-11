@@ -24,6 +24,9 @@ reqwest.workspace = true
 # Async runtime
 tokio.workspace = true
 
+# URL encoding
+urlencoding.workspace = true
+
 # Logging
 tracing.workspace = true
 

@@ -170,6 +170,50 @@ impl DataManagementClient {
         Ok(api_response.data)
     }
 
+    /// Get the download URL for the latest version of an item.
+    ///
+    /// Fetches the tip version and extracts the storage download link from
+    /// `relationships.storage.meta.link.href`.
+    pub async fn get_item_download_url(
+        &self,
+        project_id: &str,
+        item_id: &str,
+    ) -> Result<Option<String>> {
+        let versions = self.get_item_versions(project_id, item_id).await?;
+        let tip = match versions.first() {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+
+        // Fetch the version detail to get storage relationship
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/projects/{}/versions/{}",
+            self.config.data_url(),
+            project_id,
+            urlencoding::encode(&tip.id)
+        );
+
+        let response = raps_kernel::http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            return Ok(None);
+        }
+
+        let body: serde_json::Value = response.json().await?;
+
+        // Extract: data.relationships.storage.meta.link.href
+        let download_url = body
+            .pointer("/data/relationships/storage/meta/link/href")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        Ok(download_url)
+    }
+
     /// Delete an item from a project
     ///
     /// This removes the item (file lineage) from the project folder.

@@ -512,6 +512,18 @@ pub enum AdminProjectCommands {
         /// Project ID
         #[arg(short, long)]
         project: String,
+
+        /// Export all project files to this directory before archiving
+        #[arg(long, value_name = "DIR")]
+        export_dir: Option<PathBuf>,
+
+        /// Concurrency for file downloads (default: 5)
+        #[arg(long, default_value = "5")]
+        concurrency: usize,
+
+        /// Skip confirmation prompt
+        #[arg(short, long)]
+        yes: bool,
     },
 
     /// Create multiple projects in parallel (batch)
