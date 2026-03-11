@@ -10,6 +10,7 @@ mod jobs;
 mod middleware;
 mod response;
 mod routes;
+pub mod ws;
 
 use axum::{middleware as axum_mw, routing::{get, post}, Json, Router};
 use config::CloudConfig;
@@ -20,6 +21,7 @@ use tower_http::trace::TraceLayer;
 pub struct AppState {
     pub config: CloudConfig,
     pub db: sqlx::PgPool,
+    pub progress_tx: ws::ProgressTx,
 }
 
 async fn health() -> Json<serde_json::Value> {
@@ -34,14 +36,18 @@ async fn main() -> anyhow::Result<()> {
     let db = sqlx::PgPool::connect(&config.database_url).await?;
     sqlx::migrate!().run(&db).await?;
 
+    let (progress_tx, _rx) = ws::new_progress_channel();
+
     let state = AppState {
         config: config.clone(),
         db,
+        progress_tx,
     };
 
-    // Public routes (no auth required)
+    // Public routes (no auth required; /ws does its own auth via query param)
     let public_routes = Router::new()
         .route("/health", get(health))
+        .route("/ws", get(ws::ws_handler))
         .route("/api/v1/auth/signup", post(routes::auth_routes::signup))
         .route("/api/v1/auth/login", post(routes::auth_routes::login));
 

@@ -16,6 +16,7 @@ use raps_admin::{BulkConfig, BulkOperationResult};
 
 use super::aps;
 use crate::AppState;
+use crate::ws::JobProgressEvent;
 
 /// Expected input JSON for bulk_user_add:
 /// {
@@ -62,6 +63,10 @@ pub async fn execute_add(
         ..Default::default()
     };
 
+    let tx = state.progress_tx.clone();
+    let job_id = job.id;
+    let tenant_id = job.tenant_id;
+
     let result = raps_admin::operations::bulk_add_user(
         &clients.admin,
         Arc::new(clients.users),
@@ -71,7 +76,18 @@ pub async fn execute_add(
         products,
         &project_filter,
         config,
-        |_progress| {},
+        move |progress| {
+            let _ = tx.send(JobProgressEvent {
+                job_id,
+                tenant_id,
+                status: "running".to_string(),
+                completed: progress.completed,
+                failed: progress.failed,
+                skipped: progress.skipped,
+                total: progress.total,
+                current_item: progress.current_item.clone(),
+            });
+        },
     )
     .await?;
 
@@ -114,6 +130,10 @@ pub async fn execute_remove(
         ..Default::default()
     };
 
+    let tx = state.progress_tx.clone();
+    let job_id = job.id;
+    let tenant_id = job.tenant_id;
+
     let result = raps_admin::operations::bulk_remove_user(
         &clients.admin,
         Arc::new(clients.users),
@@ -121,7 +141,18 @@ pub async fn execute_remove(
         email,
         &project_filter,
         config,
-        |_progress| {},
+        move |progress| {
+            let _ = tx.send(JobProgressEvent {
+                job_id,
+                tenant_id,
+                status: "running".to_string(),
+                completed: progress.completed,
+                failed: progress.failed,
+                skipped: progress.skipped,
+                total: progress.total,
+                current_item: progress.current_item.clone(),
+            });
+        },
     )
     .await?;
 
