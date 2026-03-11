@@ -20,6 +20,7 @@ pub struct Job {
     pub completed_at: Option<DateTime<Utc>>,
     pub duration_ms: Option<i64>,
     pub created_at: DateTime<Utc>,
+    pub timeout_seconds: i32,
 }
 
 pub async fn create(
@@ -28,18 +29,34 @@ pub async fn create(
     credential_id: Option<Uuid>,
     kind: &str,
     input: serde_json::Value,
+    timeout_seconds: i32,
 ) -> anyhow::Result<Job> {
     let job = sqlx::query_as::<_, Job>(
-        "INSERT INTO jobs (tenant_id, credential_id, kind, input)
-         VALUES ($1, $2, $3, $4) RETURNING *",
+        "INSERT INTO jobs (tenant_id, credential_id, kind, input, timeout_seconds)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *",
     )
     .bind(tenant_id)
     .bind(credential_id)
     .bind(kind)
     .bind(input)
+    .bind(timeout_seconds)
     .fetch_one(pool)
     .await?;
     Ok(job)
+}
+
+pub async fn find_timed_out(pool: &PgPool) -> anyhow::Result<Vec<Job>> {
+    let jobs = sqlx::query_as::<_, Job>(
+        "UPDATE jobs SET status = 'failed', error = 'Job timed out',
+         completed_at = now(),
+         duration_ms = EXTRACT(EPOCH FROM (now() - started_at))::bigint * 1000
+         WHERE status = 'running'
+           AND started_at + (timeout_seconds || ' seconds')::interval < now()
+         RETURNING *",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(jobs)
 }
 
 pub async fn get_by_id(pool: &PgPool, id: Uuid) -> anyhow::Result<Option<Job>> {
