@@ -19,6 +19,7 @@ pub struct CreateJobRequest {
     pub kind: String,
     pub credential_id: Option<Uuid>,
     pub input: serde_json::Value,
+    pub timeout_seconds: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -43,12 +44,14 @@ pub async fn create_job(
         return Err(ApiError::BadRequest(format!("Invalid job kind: {}", req.kind)));
     }
 
+    let timeout_seconds = req.timeout_seconds.unwrap_or(3600);
     let job = db::jobs::create(
         &state.db,
         auth_user.tenant_id,
         req.credential_id,
         &req.kind,
         req.input,
+        timeout_seconds,
     )
     .await
     .map_err(|e| ApiError::Internal(e))?;
@@ -173,6 +176,7 @@ pub async fn retry_job(
         original.credential_id,
         &original.kind,
         original.input,
+        original.timeout_seconds,
     )
     .await
     .map_err(|e| ApiError::Internal(e))?;

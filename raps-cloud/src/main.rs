@@ -12,6 +12,8 @@ mod response;
 mod routes;
 pub mod ws;
 
+use std::time::Duration;
+
 use axum::{middleware as axum_mw, routing::{get, post}, Json, Router};
 use config::CloudConfig;
 use tower_http::cors::{Any, CorsLayer};
@@ -44,6 +46,9 @@ async fn main() -> anyhow::Result<()> {
         progress_tx,
     };
 
+    // Shutdown channel: send `true` to signal all background tasks to stop.
+    let (shutdown_tx, shutdown_rx) = tokio::sync::watch::channel(false);
+
     // Public routes (no auth required; /ws does its own auth via query param)
     let public_routes = Router::new()
         .route("/health", get(health))
@@ -74,14 +79,47 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .with_state(state.clone());
 
-    // Spawn background job runner
+    // Spawn background job runner with shutdown signal
     let job_state = state.clone();
+    let runner_shutdown = shutdown_rx.clone();
     tokio::spawn(async move {
-        jobs::runner::run_loop(job_state).await;
+        jobs::runner::run_loop(job_state, runner_shutdown).await;
+    });
+
+    // Spawn timeout reaper with shutdown signal
+    let reaper_state = state.clone();
+    let reaper_shutdown = shutdown_rx.clone();
+    tokio::spawn(async move {
+        jobs::runner::run_timeout_reaper(reaper_state, reaper_shutdown).await;
     });
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", config.port)).await?;
     tracing::info!("raps-cloud listening on port {}", config.port);
-    axum::serve(listener, app).await?;
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            // Wait for SIGTERM or SIGINT (Ctrl-C)
+            #[cfg(unix)]
+            {
+                use tokio::signal::unix::{signal, SignalKind};
+                let mut sigterm = signal(SignalKind::terminate())
+                    .expect("failed to install SIGTERM handler");
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {}
+                    _ = sigterm.recv() => {}
+                }
+            }
+            #[cfg(not(unix))]
+            {
+                tokio::signal::ctrl_c().await.ok();
+            }
+
+            tracing::info!("Shutdown signal received, draining in-flight jobs...");
+            let _ = shutdown_tx.send(true);
+            // Give workers time to finish their current jobs
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        })
+        .await?;
+
     Ok(())
 }

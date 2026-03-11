@@ -12,11 +12,18 @@ use sqlx;
 ///
 /// Polls for queued jobs every `poll_interval` and executes them.
 /// Each job type is dispatched to its handler.
-pub async fn run_loop(state: AppState) {
+/// Shuts down cleanly when `shutdown` receives `true`.
+pub async fn run_loop(state: AppState, mut shutdown: tokio::sync::watch::Receiver<bool>) {
     let poll_interval = Duration::from_secs(2);
     tracing::info!("Job runner started");
 
     loop {
+        // Check shutdown flag before doing any work
+        if *shutdown.borrow() {
+            tracing::info!("Job runner shutting down");
+            break;
+        }
+
         match crate::db::jobs::claim_next(&state.db).await {
             Ok(Some(job)) => {
                 let state = state.clone();
@@ -54,12 +61,52 @@ pub async fn run_loop(state: AppState) {
                 });
             }
             Ok(None) => {
-                // No jobs to process, wait before polling again
-                tokio::time::sleep(poll_interval).await;
+                // No jobs to process; wait before polling again, but wake early on shutdown
+                tokio::select! {
+                    _ = shutdown.changed() => {
+                        tracing::info!("Job runner shutting down");
+                        break;
+                    }
+                    _ = tokio::time::sleep(poll_interval) => {}
+                }
             }
             Err(e) => {
                 tracing::error!("Job runner error: {e:#}");
-                tokio::time::sleep(poll_interval).await;
+                tokio::select! {
+                    _ = shutdown.changed() => {
+                        tracing::info!("Job runner shutting down");
+                        break;
+                    }
+                    _ = tokio::time::sleep(poll_interval) => {}
+                }
+            }
+        }
+    }
+}
+
+/// Periodically scan for jobs that have exceeded their `timeout_seconds` and mark them failed.
+///
+/// Shuts down cleanly when `shutdown` receives `true`.
+pub async fn run_timeout_reaper(state: AppState, mut shutdown: tokio::sync::watch::Receiver<bool>) {
+    let reap_interval = Duration::from_secs(30);
+    tracing::info!("Timeout reaper started");
+
+    loop {
+        tokio::select! {
+            _ = shutdown.changed() => {
+                tracing::info!("Timeout reaper shutting down");
+                break;
+            }
+            _ = tokio::time::sleep(reap_interval) => {
+                match crate::db::jobs::find_timed_out(&state.db).await {
+                    Ok(jobs) if !jobs.is_empty() => {
+                        for job in &jobs {
+                            tracing::warn!(job_id = %job.id, "Job timed out");
+                        }
+                    }
+                    Err(e) => tracing::error!("Timeout reaper error: {e:#}"),
+                    _ => {}
+                }
             }
         }
     }
