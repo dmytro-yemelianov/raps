@@ -3,6 +3,7 @@
 
 //! Bulk add user operation
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -103,7 +104,27 @@ where
         )
         .await?;
 
-    // Step 3: Prepare items for processing
+    // Step 3: Build a map of project_id → product keys so the BIM 360 import
+    // path knows which services each project actually has (avoids nil:NilClass
+    // crash when sending services the project doesn't support).
+    let product_keys_map: HashMap<String, Vec<String>> = filtered_projects
+        .iter()
+        .map(|p| {
+            let keys = p
+                .products
+                .as_ref()
+                .map(|prods| {
+                    prods
+                        .iter()
+                        .filter_map(|v| v.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+            (p.id.clone(), keys)
+        })
+        .collect();
+
+    // Step 4: Prepare items for processing
     let items: Vec<ProcessItem> = filtered_projects
         .into_iter()
         .map(|p| ProcessItem {
@@ -112,7 +133,7 @@ where
         })
         .collect();
 
-    // Step 4: Create the processor closure
+    // Step 5: Create the processor closure
     let email_clone = user_email.to_string();
     let role_id_clone = role_id.map(|s| s.to_string());
     let products_clone = products.clone();
@@ -123,19 +144,20 @@ where
         let role_id = role_id_clone.clone();
         let products = products_clone.clone();
         let users_client = Arc::clone(&users_client_clone);
+        let project_keys = product_keys_map.get(&project_id).cloned();
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products).await
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, project_keys).await
         }
     };
 
-    // Step 5: Execute bulk operation
+    // Step 6: Execute bulk operation
     let executor = BulkExecutor::new(config);
     let result = executor
         .execute(operation_id, items, processor, on_progress)
         .await;
 
-    // Step 6: Update final operation status
+    // Step 7: Update final operation status
     let final_status = if result.failed > 0 {
         crate::types::OperationStatus::Failed
     } else {
@@ -156,6 +178,7 @@ async fn add_user_to_project(
     email: &str,
     role_id: Option<&str>,
     products: Vec<ProductAccess>,
+    project_product_keys: Option<Vec<String>>,
 ) -> ItemResult {
     // Add the user to the project by email; ACC sends an invitation if the
     // user is not yet an account member.
@@ -167,6 +190,7 @@ async fn add_user_to_project(
         role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
         products,
         suppress_administrative_emails: true,
+        project_product_keys,
     };
 
     match users_client.add_user(project_id, request).await {
@@ -397,7 +421,8 @@ where
         let users_client = Arc::clone(&users_client_clone);
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products).await
+            // Resume path: no cached product keys — the BIM 360 path will fetch if needed
+            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, None).await
         }
     };
 

@@ -707,6 +707,7 @@ impl UserCommands {
                     role_ids: resolved_role_ids,
                     products: resolved_products,
                     suppress_administrative_emails: false,
+                    project_product_keys: None,
                 };
 
                 let user = users_client.add_user(&project, request).await?;
@@ -1032,6 +1033,7 @@ impl UserCommands {
                                 role_ids: role.clone().map(|s| vec![s]).unwrap_or_default(),
                                 products: vec![],
                                 suppress_administrative_emails: false,
+                                project_product_keys: None,
                             };
                             match users_client.add_user(&project.id, request).await {
                                 Ok(_) => {
@@ -1533,6 +1535,7 @@ async fn clone_permissions(
                     role_ids: membership.role_ids.clone(),
                     products: membership.products.clone(),
                     suppress_administrative_emails: false,
+                    project_product_keys: None,
                 };
                 match users_client.add_user(&membership.project_id, request).await {
                     Ok(_) => {

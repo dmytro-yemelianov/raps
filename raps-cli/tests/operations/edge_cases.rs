@@ -25,6 +25,7 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
                 role_ids: vec![],
                 products: vec![],
         suppress_administrative_emails: false,
+                project_product_keys: None,
             },
         )
         .await

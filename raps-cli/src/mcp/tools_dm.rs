@@ -459,6 +459,7 @@ impl RapsServer {
             role_ids,
             products,
             suppress_administrative_emails: false,
+            project_product_keys: None,
         };
 
         match client.add_user(&project_id, request).await {

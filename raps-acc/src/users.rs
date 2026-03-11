@@ -45,6 +45,11 @@ pub struct AddProjectUserRequest {
     /// Suppress project invite email to the user (default: false)
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub suppress_administrative_emails: bool,
+    /// Product keys activated on the target project (e.g. `["docs", "projectAdministration"]`).
+    /// Used by the BIM 360 import path to avoid sending services the project doesn't have.
+    /// `None` means unknown — the BIM 360 path will fetch the project info.
+    #[serde(skip)]
+    pub project_product_keys: Option<Vec<String>>,
 }
 
 // ── BIM 360 HQ v2 /users/import types ────────────────────────────────────────
@@ -62,7 +67,8 @@ struct Bim360ImportEntry {
 struct Bim360ImportServices {
     #[serde(skip_serializing_if = "Option::is_none")]
     project_administration: Option<Bim360ServiceAccess>,
-    document_management: Bim360ServiceAccess,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    document_management: Option<Bim360ServiceAccess>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -115,21 +121,40 @@ impl Bim360ImportEntry {
     /// - `role_ids` non-empty: these are BIM 360 industry role UUIDs — put them in
     ///   `industry_roles`, default to `document_management: user`
     /// - Neither: default to `document_management: user`
-    fn from_request(req: &AddProjectUserRequest) -> Self {
+    ///
+    /// Only includes services that are actually activated on the target project.
+    /// BIM 360 returns `nil:NilClass` if sent a service the project doesn't have.
+    fn from_request(req: &AddProjectUserRequest, project_product_keys: &[String]) -> Self {
         let is_admin = req.products.iter().any(|p| {
             p.key == "projectAdministration" && p.access == "administrator"
         });
 
-        let services = if is_admin {
-            Bim360ImportServices {
-                project_administration: Some(Bim360ServiceAccess { access_level: "admin".to_string() }),
-                document_management: Bim360ServiceAccess { access_level: "admin".to_string() },
-            }
+        // Only include services the project actually has.
+        // BIM 360 product keys: "docs" = Document Management, "projectAdministration" = Project Admin.
+        // An empty product list means we don't know → include all services (safe default
+        // for most BIM 360 projects which do have Document Management).
+        let has_doc_management = project_product_keys.is_empty()
+            || project_product_keys.iter().any(|k| {
+                let lower = k.to_lowercase();
+                lower == "docs"
+                    || lower == "document_management"
+                    || lower == "documentmanagement"
+            });
+
+        let doc_management = if has_doc_management {
+            let level = if is_admin { "admin" } else { "user" };
+            Some(Bim360ServiceAccess { access_level: level.to_string() })
         } else {
-            Bim360ImportServices {
-                project_administration: None,
-                document_management: Bim360ServiceAccess { access_level: "user".to_string() },
-            }
+            None
+        };
+
+        let services = Bim360ImportServices {
+            project_administration: if is_admin {
+                Some(Bim360ServiceAccess { access_level: "admin".to_string() })
+            } else {
+                None
+            },
+            document_management: doc_management,
         };
 
         Bim360ImportEntry {
@@ -398,6 +423,35 @@ impl ProjectUsersClient {
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
     }
 
+    /// Fetch a BIM 360 project's activated product keys via ACC Admin v1.
+    ///
+    /// Returns product keys like `["docs", "projectAdministration", "insight"]`.
+    /// On failure (e.g. 404), returns an empty vec (caller should treat as unknown).
+    async fn fetch_project_product_keys(&self, project_id: &str) -> Vec<String> {
+        let Ok(token) = self.auth.get_3leg_token().await else {
+            return vec![];
+        };
+        let url = format!("{}", self.project_url(project_id));
+
+        let Ok(response) = self.http_client.get(&url).bearer_auth(&token).send().await else {
+            return vec![];
+        };
+        if !response.status().is_success() {
+            return vec![];
+        }
+        let Ok(body) = response.json::<serde_json::Value>().await else {
+            return vec![];
+        };
+        body.get("products")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|p| p.get("key").and_then(|k| k.as_str()).map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Add a user to a BIM 360 project via HQ v2 `/users/import` endpoint.
     ///
     /// BIM 360 differs from ACC:
@@ -413,7 +467,15 @@ impl ProjectUsersClient {
     ) -> Result<ProjectUser> {
         let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/users/import", self.project_url_bim360(account_id, project_id));
-        let entry = Bim360ImportEntry::from_request(&request);
+
+        // Determine which services the project supports. If the caller already
+        // provided product keys (bulk path), use them; otherwise fetch.
+        let product_keys = match &request.project_product_keys {
+            Some(keys) if !keys.is_empty() => keys.clone(),
+            _ => self.fetch_project_product_keys(project_id).await,
+        };
+
+        let entry = Bim360ImportEntry::from_request(&request, &product_keys);
         let body = vec![entry];
 
         let response = http::send_with_retry(&self.config.http_config, || {
@@ -474,7 +536,10 @@ impl ProjectUsersClient {
         )
     }
 
-    /// Update a user's role or product access in a project
+    /// Update a user's role or product access in a project.
+    ///
+    /// Tries the ACC Construction Admin v1 endpoint first. On 400 (platform
+    /// mismatch) falls back to BIM 360 HQ v2 PATCH if `account_id` is set.
     ///
     /// # Arguments
     /// * `project_id` - The project ID
@@ -486,31 +551,104 @@ impl ProjectUsersClient {
         user_id: &str,
         request: UpdateProjectUserRequest,
     ) -> Result<ProjectUser> {
-        let token = self.auth.get_3leg_token().await?;
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed) {
+            if let Some(ref account_id) = self.account_id {
+                return self
+                    .update_user_bim360(account_id, project_id, user_id, &request)
+                    .await;
+            }
+        }
 
+        let token = self.auth.get_3leg_token().await?;
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
+
+        let response = self
+            .http_client
+            .patch(&url)
+            .bearer_auth(&token)
+            .header("Content-Type", "application/json")
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to send ACC update-user request")?;
+
+        if response.status().is_success() {
+            return response
+                .json()
+                .await
+                .context("Failed to parse update user response");
+        }
+
+        let status = response.status().as_u16();
+
+        // On 400/500 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 500)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .update_user_bim360(account_id, project_id, user_id, &request)
+                .await;
+        }
+
+        let error_text = response.text().await.unwrap_or_default();
+        anyhow::bail!("Failed to update project user (HTTP {status}): {error_text}");
+    }
+
+    /// Update a user in a BIM 360 project via HQ v2 PATCH endpoint.
+    async fn update_user_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        user_id: &str,
+        request: &UpdateProjectUserRequest,
+    ) -> Result<ProjectUser> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users/{}",
+            self.project_url_bim360(account_id, project_id),
+            user_id
+        );
+
+        // BIM 360 HQ v2 uses snake_case: { "industry_roles": [...] }
+        // Map role_ids → industry_roles for BIM 360
+        let body = serde_json::json!({
+            "industry_roles": request.role_ids,
+        });
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client
                 .patch(&url)
                 .bearer_auth(&token)
                 .header("Content-Type", "application/json")
-                .json(&request)
+                .json(&body)
         })
         .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to update project user ({status}): {error_text}");
+        let status = response.status().as_u16();
+        let body_text = response.text().await.unwrap_or_default();
+
+        if !(200..300).contains(&(status as usize)) {
+            anyhow::bail!("Failed to update BIM 360 project user (HTTP {status}): {body_text}");
         }
 
-        let user: ProjectUser = response
-            .json()
-            .await
-            .context("Failed to parse update user response")?;
+        // BIM 360 HQ v2 returns snake_case fields (user_id, account_id, etc.)
+        // which don't match ProjectUser's camelCase expectations. Parse manually.
+        let v: serde_json::Value = serde_json::from_str(&body_text)
+            .context("Failed to parse BIM 360 update user response")?;
 
-        Ok(user)
+        Ok(ProjectUser {
+            id: v["user_id"].as_str().unwrap_or_default().to_string(),
+            email: v["email"].as_str().map(|s| s.to_string()),
+            name: None,
+            role_ids: v["industry_roles"]
+                .as_array()
+                .map(|arr| arr.iter().filter_map(|r| r.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or_default(),
+            role_name: None,
+            products: None,
+            added_on: None,
+        })
     }
 
     /// Remove a user from a project
@@ -649,6 +787,7 @@ impl ProjectUsersClient {
                     role_ids: user.role_ids,
                     products: user.products.unwrap_or_default(),
                     suppress_administrative_emails: false,
+                    project_product_keys: None,
                 };
                 let result = client.add_user(&pid, request).await;
                 (email, result)
@@ -707,6 +846,7 @@ mod tests {
             role_ids: vec![],
             products: vec![],
             suppress_administrative_emails: false,
+            project_product_keys: None,
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
@@ -726,6 +866,7 @@ mod tests {
                 access: "member".to_string(),
             }],
             suppress_administrative_emails: false,
+            project_product_keys: None,
         };
 
         let json = serde_json::to_string(&request).unwrap();
@@ -745,6 +886,67 @@ mod tests {
         assert!(json.contains("\"roleIds\":[\"new-role\"]"), "must send roleIds array: {json}");
         // products should be skipped when None
         assert!(!json.contains("products"));
+    }
+
+    #[test]
+    fn test_bim360_import_omits_doc_management_when_project_lacks_it() {
+        let request = AddProjectUserRequest {
+            email: "user@example.com".to_string(),
+            role_ids: vec![],
+            products: vec![
+                ProductAccess { key: "projectAdministration".to_string(), access: "administrator".to_string() },
+                ProductAccess { key: "docs".to_string(), access: "administrator".to_string() },
+            ],
+            suppress_administrative_emails: false,
+            project_product_keys: None,
+        };
+
+        // Project without Document Management (only projectAdministration + insight)
+        let keys = vec!["projectAdministration".to_string(), "insight".to_string()];
+        let entry = Bim360ImportEntry::from_request(&request, &keys);
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(
+            !json.contains("document_management"),
+            "must omit document_management when project lacks it: {json}"
+        );
+        assert!(json.contains("project_administration"), "must include project_administration: {json}");
+    }
+
+    #[test]
+    fn test_bim360_import_includes_doc_management_when_project_has_it() {
+        let request = AddProjectUserRequest {
+            email: "user@example.com".to_string(),
+            role_ids: vec![],
+            products: vec![
+                ProductAccess { key: "projectAdministration".to_string(), access: "administrator".to_string() },
+                ProductAccess { key: "docs".to_string(), access: "administrator".to_string() },
+            ],
+            suppress_administrative_emails: false,
+            project_product_keys: None,
+        };
+
+        // Project WITH Document Management
+        let keys = vec!["projectAdministration".to_string(), "docs".to_string(), "insight".to_string()];
+        let entry = Bim360ImportEntry::from_request(&request, &keys);
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("document_management"), "must include document_management: {json}");
+        assert!(json.contains("project_administration"), "must include project_administration: {json}");
+    }
+
+    #[test]
+    fn test_bim360_import_includes_doc_management_when_keys_unknown() {
+        let request = AddProjectUserRequest {
+            email: "user@example.com".to_string(),
+            role_ids: vec![],
+            products: vec![],
+            suppress_administrative_emails: false,
+            project_product_keys: None,
+        };
+
+        // Empty product keys = unknown → safe default: include document_management
+        let entry = Bim360ImportEntry::from_request(&request, &[]);
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("document_management"), "must default to including document_management: {json}");
     }
 
     #[test]
