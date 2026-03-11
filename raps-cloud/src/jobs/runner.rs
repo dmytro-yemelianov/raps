@@ -67,19 +67,12 @@ pub async fn run_loop(state: AppState) {
 
 /// Execute a job based on its kind.
 async fn execute_job(
-    _state: &AppState,
+    state: &AppState,
     job: &crate::db::jobs::Job,
 ) -> anyhow::Result<serde_json::Value> {
     match job.kind.as_str() {
-        "bulk_user_add" => {
-            // TODO: Wire up to raps-admin BulkExecutor
-            tracing::info!(job_id = %job.id, "Executing bulk_user_add");
-            Ok(serde_json::json!({"status": "completed", "message": "Not yet implemented"}))
-        }
-        "bulk_user_remove" => {
-            tracing::info!(job_id = %job.id, "Executing bulk_user_remove");
-            Ok(serde_json::json!({"status": "completed", "message": "Not yet implemented"}))
-        }
+        "bulk_user_add" => super::bulk_user::execute_add(state, job).await,
+        "bulk_user_remove" => super::bulk_user::execute_remove(state, job).await,
         "export_permissions" => {
             tracing::info!(job_id = %job.id, "Executing export_permissions");
             Ok(serde_json::json!({"status": "completed", "message": "Not yet implemented"}))
