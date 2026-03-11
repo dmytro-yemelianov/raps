@@ -839,6 +839,27 @@ impl UserCommands {
                 execute_csv_import(config, auth_client, &project, &from_csv, output_format).await
             }
 
+            UserCommands::ExportPermissions {
+                email,
+                account,
+                folders,
+                output,
+                concurrency,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+                export_permissions(
+                    config.clone(),
+                    auth_client.clone(),
+                    &account_id,
+                    &email,
+                    folders,
+                    output.as_deref(),
+                    concurrency,
+                    output_format,
+                )
+                .await
+            }
+
             UserCommands::AddToAllProjects {
                 email,
                 account,
@@ -1090,5 +1111,205 @@ impl UserCommands {
                 Ok(())
             }
         }
+    }
+}
+
+async fn export_permissions(
+    config: Config,
+    auth_client: AuthClient,
+    account_id: &str,
+    email: &str,
+    include_folders: bool,
+    output_path: Option<&str>,
+    concurrency: usize,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use futures_util::stream::{self, StreamExt};
+    use raps_acc::permissions::FolderPermissionsClient;
+
+    let http_config = HttpClientConfig {
+        pool_max_idle_per_host: concurrency.max(10),
+        ..HttpClientConfig::default()
+    };
+    let admin_client = AccountAdminClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    )?;
+    let users_client = ProjectUsersClient::new_with_http_config(
+        config.clone(),
+        auth_client.clone(),
+        http_config.clone(),
+    )?;
+
+    // Look up user to validate email
+    let account_user = admin_client
+        .find_user_by_email(account_id, email)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("User not found in account: {email}"))?;
+    let user_id = account_user.id.clone();
+
+    // List all active projects
+    let all_projects = admin_client.list_all_projects(account_id).await?;
+    let total = all_projects.len();
+
+    if output_format.supports_colors() {
+        eprintln!(
+            "Scanning {} projects for user {}...",
+            total, email
+        );
+    }
+
+    // For each project, check if user is a member (using filter[email])
+    #[derive(serde::Serialize)]
+    struct PermissionRow {
+        project_id: String,
+        project_name: String,
+        role: String,
+        products: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        folder_path: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        permission_level: Option<String>,
+    }
+
+    let rows: Vec<Option<PermissionRow>> = stream::iter(all_projects)
+        .map(|project| {
+            let users_client = &users_client;
+            let email = email;
+            let include_folders = include_folders;
+            async move {
+                match users_client
+                    .find_project_user_by_email(&project.id, email)
+                    .await
+                {
+                    Ok(Some(project_user)) => {
+                        let role = project_user
+                            .role_name
+                            .unwrap_or_else(|| "unknown".to_string());
+                        let products = project_user
+                            .products
+                            .map(|ps| {
+                                ps.iter()
+                                    .map(|p| p.key.clone())
+                                    .collect::<Vec<_>>()
+                                    .join("; ")
+                            })
+                            .unwrap_or_default();
+                        Some(PermissionRow {
+                            project_id: project.id,
+                            project_name: project.name,
+                            role,
+                            products,
+                            folder_path: if include_folders {
+                                Some(String::new())
+                            } else {
+                                None
+                            },
+                            permission_level: if include_folders {
+                                Some(String::new())
+                            } else {
+                                None
+                            },
+                        })
+                    }
+                    Ok(None) => None,
+                    Err(_) => None, // Skip errors (e.g. 403/404)
+                }
+            }
+        })
+        .buffer_unordered(concurrency)
+        .collect()
+        .await;
+
+    let mut rows: Vec<PermissionRow> = rows.into_iter().flatten().collect();
+
+    // If --folders, fetch folder permissions for projects where user exists
+    if include_folders {
+        let perms_client = FolderPermissionsClient::new_with_http_config(
+            config.clone(),
+            auth_client.clone(),
+            http_config,
+        )?;
+
+        // Collect project IDs that need folder permission lookups
+        let project_ids: Vec<String> = rows.iter().map(|r| r.project_id.clone()).collect();
+
+        // Fetch folder permissions concurrently
+        let folder_results: Vec<(String, Option<Vec<raps_acc::permissions::FolderPermission>>)> =
+            stream::iter(project_ids)
+                .map(|pid| {
+                    let perms_client = &perms_client;
+                    async move {
+                        let perms = match perms_client.get_project_files_folder_id(&pid).await {
+                            Ok(folder_id) => perms_client
+                                .get_permissions(&pid, &folder_id)
+                                .await
+                                .ok(),
+                            Err(_) => None,
+                        };
+                        (pid, perms)
+                    }
+                })
+                .buffer_unordered(concurrency)
+                .collect()
+                .await;
+
+        // Match folder permissions back to rows
+        for (project_id, perms) in folder_results {
+            if let Some(perms) = perms {
+                for perm in &perms {
+                    if perm.subject_id == user_id && perm.subject_type == "USER" {
+                        let level = actions_to_level(&perm.actions);
+                        if let Some(row) = rows.iter_mut().find(|r| r.project_id == project_id) {
+                            row.folder_path = Some("Project Files".to_string());
+                            row.permission_level = Some(level);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by project name
+    rows.sort_by(|a, b| a.project_name.cmp(&b.project_name));
+
+    if output_format.supports_colors() {
+        eprintln!("Found user in {} of {} projects", rows.len(), total);
+    }
+
+    // Output
+    if let Some(path) = output_path {
+        let mut wtr = csv::Writer::from_path(path)?;
+        for row in &rows {
+            wtr.serialize(row)?;
+        }
+        wtr.flush()?;
+        if output_format.supports_colors() {
+            eprintln!("Written to {path}");
+        }
+    } else {
+        output_format.write(&rows)?;
+    }
+
+    Ok(())
+}
+
+fn actions_to_level(actions: &[String]) -> String {
+    let has = |a: &str| actions.iter().any(|x| x == a);
+    if has("CONTROL") {
+        "Folder Control".to_string()
+    } else if has("EDIT") {
+        "View+Download+Upload+Edit".to_string()
+    } else if has("PUBLISH") && has("VIEW") {
+        "View+Download+Upload".to_string()
+    } else if has("PUBLISH") {
+        "Upload Only".to_string()
+    } else if has("DOWNLOAD") {
+        "View+Download".to_string()
+    } else if has("VIEW") {
+        "View Only".to_string()
+    } else {
+        actions.join(", ")
     }
 }
