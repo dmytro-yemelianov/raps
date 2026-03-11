@@ -365,6 +365,50 @@ impl AccountAdminClient {
         Ok(AccountProject::from(project))
     }
 
+    /// Create a project directly via BIM 360 HQ v1 endpoint (2-legged auth).
+    ///
+    /// Use this for accounts whose hub extension_type is `bim360`.
+    /// The ACC v1 endpoint accepts creates on BIM 360 hubs but registers
+    /// them as ACC projects, which is incorrect.
+    pub async fn create_project_bim360(
+        &self,
+        account_id: &str,
+        request: CreateProjectRequest,
+    ) -> Result<AccountProject> {
+        let token = self.auth.get_token().await?;
+        let user_info = self.auth.get_user_info().await?;
+        let account_id = normalize_account_id(account_id);
+        let url = format!("{}/projects", self.hq_url(&account_id));
+
+        // BIM 360 HQ v1 expects snake_case fields and requires service_types + x-user-id
+        let bim360_body = serde_json::json!({
+            "name": request.name,
+            "service_types": "doc_manager",
+            "project_type": request.r#type.as_deref().unwrap_or("Convention"),
+        });
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .header("x-user-id", &user_info.sub)
+                .json(&bim360_body)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        let project: Bim360Project = response
+            .json()
+            .await
+            .context("Failed to parse BIM 360 project creation response")?;
+
+        Ok(AccountProject::from(project))
+    }
+
     /// Update an existing project
     ///
     /// # Arguments

@@ -133,6 +133,45 @@ impl AccClient {
         self.parse_bim360_creation_response(response).await
     }
 
+    /// Create a project directly via BIM 360 HQ v1 endpoint (2-legged auth).
+    ///
+    /// Use this for accounts whose hub extension_type is `bim360`.
+    /// The ACC v1 endpoint accepts creates on BIM 360 hubs but registers
+    /// them as ACC projects, which is incorrect.
+    pub async fn create_project_bim360(
+        &self,
+        account_id: &str,
+        request: CreateProjectRequest,
+    ) -> Result<ProjectCreationJob> {
+        let token_2leg = self.auth.get_token().await?;
+        let user_info = self.auth.get_user_info().await?;
+        let url = format!("{}/projects", self.hq_url(account_id));
+
+        let bim360_request = Bim360CreateProjectRequest {
+            name: request.name,
+            service_types: products_to_service_types(&request.products),
+            r#type: Some("project".to_string()),
+        };
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token_2leg)
+                .header("Content-Type", "application/json")
+                .header("x-user-id", &user_info.sub)
+                .json(&bim360_request)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().await.unwrap_or_default();
+            anyhow::bail!("Failed to create BIM 360 project ({status}): {error_text}");
+        }
+
+        self.parse_bim360_creation_response(response).await
+    }
+
     /// Parse an ACC project creation response (camelCase) into a ProjectCreationJob
     async fn parse_acc_creation_response(
         &self,
