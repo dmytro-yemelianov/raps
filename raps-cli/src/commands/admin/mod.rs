@@ -276,6 +276,26 @@ pub enum UserCommands {
         from_csv: PathBuf,
     },
 
+    /// Export user permissions across all projects to CSV
+    #[command(name = "export-permissions")]
+    ExportPermissions {
+        /// User email
+        #[arg(long)]
+        email: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(long, short)]
+        account: Option<String>,
+        /// Include folder-level permissions (slower)
+        #[arg(long)]
+        folders: bool,
+        /// Output file path (default: stdout)
+        #[arg(long, short)]
+        output: Option<String>,
+        /// Concurrency for parallel fetching
+        #[arg(long, default_value = "10")]
+        concurrency: usize,
+    },
+
     /// Add a user to all active projects in an account with an optional role
     #[command(name = "add-to-all-projects")]
     AddToAllProjects {
