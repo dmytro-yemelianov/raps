@@ -32,8 +32,26 @@ pub async fn signup(
     State(state): State<AppState>,
     Json(req): Json<SignupRequest>,
 ) -> Result<(StatusCode, Json<ApiResponse<AuthResponse>>), ApiError> {
+    if req.email.is_empty() || !req.email.contains('@') {
+        return Err(ApiError::BadRequest("Invalid email address".to_string()));
+    }
+    if req.password.len() < 8 {
+        return Err(ApiError::BadRequest("Password must be at least 8 characters".to_string()));
+    }
+    if req.org_name.is_empty() || req.org_name.len() > 100 {
+        return Err(ApiError::BadRequest("Organization name must be 1-100 characters".to_string()));
+    }
+
     // Create slug from org name
-    let slug = req.org_name.to_lowercase().replace(' ', "-");
+    let slug: String = req.org_name.to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    if slug.is_empty() {
+        return Err(ApiError::BadRequest("Organization name must contain alphanumeric characters".to_string()));
+    }
 
     // Create tenant
     let tenant = db::tenants::create(&state.db, &req.org_name, &slug)

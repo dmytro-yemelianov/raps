@@ -6,6 +6,7 @@
 use std::time::Duration;
 
 use crate::AppState;
+use sqlx;
 
 /// Run the background job processing loop.
 ///
@@ -25,17 +26,28 @@ pub async fn run_loop(state: AppState) {
 
                     match result {
                         Ok(output) => {
-                            let _ = crate::db::jobs::update_status(
-                                &state.db, job.id, "completed", Some(output), None,
+                            // Only update if job is still running (not cancelled)
+                            let _ = sqlx::query(
+                                "UPDATE jobs SET status = 'completed', output = $1, completed_at = now(),
+                                 duration_ms = EXTRACT(EPOCH FROM (now() - started_at))::bigint * 1000
+                                 WHERE id = $2 AND status = 'running'",
                             )
+                            .bind(output)
+                            .bind(job.id)
+                            .execute(&state.db)
                             .await;
                             tracing::info!(job_id = %job.id, "Job completed");
                         }
                         Err(e) => {
                             tracing::error!(job_id = %job.id, "Job failed: {e:#}");
-                            let _ = crate::db::jobs::update_status(
-                                &state.db, job.id, "failed", None, Some(&e.to_string()),
+                            let _ = sqlx::query(
+                                "UPDATE jobs SET status = 'failed', error = $1, completed_at = now(),
+                                 duration_ms = EXTRACT(EPOCH FROM (now() - started_at))::bigint * 1000
+                                 WHERE id = $2 AND status = 'running'",
                             )
+                            .bind(&e.to_string())
+                            .bind(job.id)
+                            .execute(&state.db)
                             .await;
                         }
                     }

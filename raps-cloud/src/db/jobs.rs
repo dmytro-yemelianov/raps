@@ -55,27 +55,23 @@ pub async fn list_by_tenant(
     tenant_id: Uuid,
     limit: i64,
     cursor: Option<DateTime<Utc>>,
+    status: Option<&str>,
+    kind: Option<&str>,
 ) -> anyhow::Result<Vec<Job>> {
-    let jobs = if let Some(cursor) = cursor {
-        sqlx::query_as::<_, Job>(
-            "SELECT * FROM jobs WHERE tenant_id = $1 AND created_at < $2
-             ORDER BY created_at DESC LIMIT $3",
-        )
-        .bind(tenant_id)
-        .bind(cursor)
-        .bind(limit)
-        .fetch_all(pool)
-        .await?
-    } else {
-        sqlx::query_as::<_, Job>(
-            "SELECT * FROM jobs WHERE tenant_id = $1
-             ORDER BY created_at DESC LIMIT $2",
-        )
-        .bind(tenant_id)
-        .bind(limit)
-        .fetch_all(pool)
-        .await?
-    };
+    let jobs = sqlx::query_as::<_, Job>(
+        "SELECT * FROM jobs WHERE tenant_id = $1
+         AND ($2::timestamptz IS NULL OR created_at < $2)
+         AND ($3::text IS NULL OR status = $3)
+         AND ($4::text IS NULL OR kind = $4)
+         ORDER BY created_at DESC LIMIT $5",
+    )
+    .bind(tenant_id)
+    .bind(cursor)
+    .bind(status)
+    .bind(kind)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?;
     Ok(jobs)
 }
 

@@ -12,6 +12,7 @@ use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{db, error::ApiError, middleware::auth_mw::AuthUser, response::ApiResponse, AppState};
+use sqlx;
 
 #[derive(Deserialize)]
 pub struct CreateJobRequest {
@@ -25,6 +26,7 @@ pub struct ListJobsQuery {
     pub limit: Option<i64>,
     pub cursor: Option<String>,
     pub status: Option<String>,
+    pub kind: Option<String>,
 }
 
 pub async fn create_job(
@@ -68,9 +70,12 @@ pub async fn list_jobs(
         .and_then(|c| chrono::DateTime::parse_from_rfc3339(c).ok())
         .map(|c| c.with_timezone(&chrono::Utc));
 
-    let jobs = db::jobs::list_by_tenant(&state.db, auth_user.tenant_id, limit + 1, cursor)
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let jobs = db::jobs::list_by_tenant(
+        &state.db, auth_user.tenant_id, limit + 1, cursor,
+        query.status.as_deref(), query.kind.as_deref(),
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e))?;
 
     let has_more = jobs.len() as i64 > limit;
     let jobs: Vec<_> = jobs.into_iter().take(limit as usize).collect();
@@ -101,29 +106,34 @@ pub async fn cancel_job(
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ApiResponse<db::jobs::Job>>, ApiError> {
-    let job = db::jobs::get_by_id(&state.db, id)
-        .await
-        .map_err(|e| ApiError::Internal(e))?
-        .ok_or_else(|| ApiError::NotFound("Job not found".to_string()))?;
+    // Atomic cancel: only succeeds if job is in cancellable state and belongs to tenant
+    let updated = sqlx::query_as::<_, db::jobs::Job>(
+        "UPDATE jobs SET status = 'cancelled', completed_at = now()
+         WHERE id = $1 AND tenant_id = $2 AND status IN ('queued', 'running')
+         RETURNING *",
+    )
+    .bind(id)
+    .bind(auth_user.tenant_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
-    if job.tenant_id != auth_user.tenant_id {
-        return Err(ApiError::NotFound("Job not found".to_string()));
+    match updated {
+        Some(job) => Ok(ApiResponse::ok(job)),
+        None => {
+            // Check if job exists at all for better error message
+            let exists = db::jobs::get_by_id(&state.db, id)
+                .await
+                .map_err(|e| ApiError::Internal(e))?;
+            match exists {
+                Some(job) if job.tenant_id != auth_user.tenant_id => {
+                    Err(ApiError::NotFound("Job not found".to_string()))
+                }
+                Some(_) => Err(ApiError::BadRequest("Job is not cancellable".to_string())),
+                None => Err(ApiError::NotFound("Job not found".to_string())),
+            }
+        }
     }
-
-    if job.status != "queued" && job.status != "running" {
-        return Err(ApiError::BadRequest("Job is not cancellable".to_string()));
-    }
-
-    db::jobs::update_status(&state.db, id, "cancelled", None, None)
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
-
-    let updated = db::jobs::get_by_id(&state.db, id)
-        .await
-        .map_err(|e| ApiError::Internal(e))?
-        .ok_or_else(|| ApiError::NotFound("Job not found".to_string()))?;
-
-    Ok(ApiResponse::ok(updated))
 }
 
 pub async fn retry_job(
@@ -131,26 +141,38 @@ pub async fn retry_job(
     Extension(auth_user): Extension<AuthUser>,
     Path(id): Path<Uuid>,
 ) -> Result<(StatusCode, Json<ApiResponse<db::jobs::Job>>), ApiError> {
-    let job = db::jobs::get_by_id(&state.db, id)
-        .await
-        .map_err(|e| ApiError::Internal(e))?
-        .ok_or_else(|| ApiError::NotFound("Job not found".to_string()))?;
+    // Check the job exists and is retryable atomically
+    let original = sqlx::query_as::<_, db::jobs::Job>(
+        "SELECT * FROM jobs WHERE id = $1 AND tenant_id = $2 AND status IN ('failed', 'cancelled')",
+    )
+    .bind(id)
+    .bind(auth_user.tenant_id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|e| ApiError::Internal(e.into()))?;
 
-    if job.tenant_id != auth_user.tenant_id {
-        return Err(ApiError::NotFound("Job not found".to_string()));
-    }
+    let original = match original {
+        Some(job) => job,
+        None => {
+            let exists = db::jobs::get_by_id(&state.db, id)
+                .await
+                .map_err(|e| ApiError::Internal(e))?;
+            return match exists {
+                Some(job) if job.tenant_id != auth_user.tenant_id => {
+                    Err(ApiError::NotFound("Job not found".to_string()))
+                }
+                Some(_) => Err(ApiError::BadRequest("Only failed or cancelled jobs can be retried".to_string())),
+                None => Err(ApiError::NotFound("Job not found".to_string())),
+            };
+        }
+    };
 
-    if job.status != "failed" && job.status != "cancelled" {
-        return Err(ApiError::BadRequest("Only failed or cancelled jobs can be retried".to_string()));
-    }
-
-    // Create a new job with the same parameters
     let new_job = db::jobs::create(
         &state.db,
         auth_user.tenant_id,
-        job.credential_id,
-        &job.kind,
-        job.input,
+        original.credential_id,
+        &original.kind,
+        original.input,
     )
     .await
     .map_err(|e| ApiError::Internal(e))?;

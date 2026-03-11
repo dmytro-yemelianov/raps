@@ -8,7 +8,8 @@ pub struct CloudConfig {
     #[serde(default = "default_port")]
     pub port: u16,
     pub database_url: String,
-    pub redis_url: String,
+    #[serde(default)]
+    pub redis_url: Option<String>,
     pub jwt_secret: String,
     pub master_encryption_key: String,
     #[serde(default = "default_jwt_expiry")]
