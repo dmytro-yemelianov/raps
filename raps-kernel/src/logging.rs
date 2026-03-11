@@ -108,10 +108,10 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool, log_file: O
     // Determine the file appender: custom path overrides the default daily-rolling log.
     let (non_blocking_appender, guard) = if let Some(path) = log_file {
         // Ensure the parent directory exists.
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                let _ = crate::security::create_dir_restricted(parent);
-            }
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            let _ = crate::security::create_dir_restricted(parent);
         }
         let appender = tracing_appender::rolling::never(
             path.parent().unwrap_or_else(|| std::path::Path::new(".")),
