@@ -1,6 +1,5 @@
 ---
 source: raps-cli/tests/cli/help_structure.rs
-assertion_line: 27
 expression: stdout
 ---
 
@@ -23,6 +22,8 @@ Commands:
   remove-from-project  Remove a user from a single project (use 'remove' for multiple projects at once)
   update-in-project    Update a user's role in a single project (use 'update' for multiple projects at once)
   import               Import new users to a project from CSV
+  export-permissions   Export user permissions across all projects to CSV
+  clone-permissions    Clone permissions from one user to another across all projects
   add-to-all-projects  Add a user to all active projects in an account with an optional role
   help                 Print this message or the help of the given subcommand(s)
 

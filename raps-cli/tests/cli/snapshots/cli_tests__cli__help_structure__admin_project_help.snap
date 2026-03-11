@@ -1,6 +1,5 @@
 ---
 source: raps-cli/tests/cli/help_structure.rs
-assertion_line: 37
 expression: stdout
 ---
 
@@ -15,11 +14,12 @@ Project listing with filtering
 Usage: raps admin project [OPTIONS] <COMMAND>
 
 Commands:
-  list     List projects with filtering
-  create   Create a new project
-  update   Update an existing project
-  archive  Archive a project (sets status to archived)
-  help     Print this message or the help of the given subcommand(s)
+  list          List projects with filtering
+  create        Create a new project
+  update        Update an existing project
+  archive       Archive a project (sets status to archived)
+  create-batch  Create multiple projects in parallel (batch)
+  help          Print this message or the help of the given subcommand(s)
 
 Options:
       --output <FORMAT>       Output format: table, json, yaml, csv, or plain (default: auto-detect) [possible values: table, json, yaml, csv, plain, ndjson]
