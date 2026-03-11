@@ -9,6 +9,7 @@ members = [
     "raps-webhooks",
     "raps-reality",
     "raps-cli",
+    "raps-cloud",
 ]
 # python-bindings excluded from workspace - built separately with maturin
 exclude = ["python-bindings"]
@@ -179,6 +180,24 @@ tokio-test = "0.4"
 tempfile = "3.26"
 insta = { version = "1.42", features = ["yaml", "json", "redactions"] }
 rstest = "0.25"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# JWT authentication
+jsonwebtoken = "9"
+
+# Encryption
+aes-gcm = "0.10"
+
+# Password hashing
+argon2 = "0.5"
+
+# HTTP middleware
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Environment config
+envy = "0.4"
 
 # The profile that 'dist' will build with
 [profile.dist]
