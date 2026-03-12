@@ -14,11 +14,30 @@ use super::types::UpdateAccountUserRequest;
 use super::{AccountAdminClient, normalize_account_id};
 
 impl AccountAdminClient {
+    /// Build query string for user list pagination
+    fn build_user_query_params(limit: Option<usize>, offset: Option<usize>) -> String {
+        let mut params = Vec::new();
+        if let Some(l) = limit {
+            params.push(format!("limit={}", l.min(100)));
+        }
+        if let Some(o) = offset {
+            params.push(format!("offset={}", o));
+        }
+        if params.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", params.join("&"))
+        }
+    }
+
     /// List all users in an account (paginated)
+    ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v1
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
     ///
     /// # Arguments
     /// * `account_id` - The account ID (without "b." prefix if present)
-    /// * `limit` - Maximum number of results per page (max: 200)
+    /// * `limit` - Maximum number of results per page (max: 100)
     /// * `offset` - Starting index for pagination
     pub async fn list_users(
         &self,
@@ -28,20 +47,47 @@ impl AccountAdminClient {
     ) -> Result<PaginatedResponse<AccountUser>> {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
+        let query = Self::build_user_query_params(limit, offset);
 
-        let mut url = format!("{}/users", self.admin_url(&account_id));
+        // Try ACC v1 first (3-legged)
+        let url = format!("{}/users{}", self.admin_url(&account_id), query);
 
-        // Build query parameters
-        let mut params = Vec::new();
-        if let Some(l) = limit {
-            params.push(format!("limit={}", l.min(200)));
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if response.status().is_success() {
+            let users_response: PaginatedResponse<AccountUser> = response
+                .json()
+                .await
+                .context("Failed to parse users response")?;
+            return Ok(users_response);
         }
-        if let Some(o) = offset {
-            params.push(format!("offset={}", o));
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
         }
-        if !params.is_empty() {
-            url = format!("{}?{}", url, params.join("&"));
-        }
+
+        // Fall back to BIM 360 HQ v1 (2-legged auth)
+        self.list_users_bim360(&account_id, limit, offset).await
+    }
+
+    /// List users via BIM 360 HQ v1 API (for Business hubs).
+    ///
+    /// Uses 2-legged auth as required by the HQ v1 endpoint.
+    /// Endpoint: GET /hq/v1/accounts/:account_id/users
+    async fn list_users_bim360(
+        &self,
+        account_id: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<PaginatedResponse<AccountUser>> {
+        let token = self.auth.get_token().await?;
+        let query = Self::build_user_query_params(limit, offset);
+
+        let url = format!("{}/users{}", self.hq_url(account_id), query);
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
@@ -55,12 +101,15 @@ impl AccountAdminClient {
         let users_response: PaginatedResponse<AccountUser> = response
             .json()
             .await
-            .context("Failed to parse users response")?;
+            .context("Failed to parse BIM 360 users response")?;
 
         Ok(users_response)
     }
 
     /// Search for a user by email address
+    ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v1
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
     ///
     /// # Arguments
     /// * `account_id` - The account ID
@@ -76,6 +125,7 @@ impl AccountAdminClient {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
+        // Try ACC v1 first (POST /users/search with JSON body)
         let url = format!("{}/users/search", self.admin_url(&account_id));
 
         let request_body = serde_json::json!({
@@ -91,6 +141,36 @@ impl AccountAdminClient {
         })
         .await?;
 
+        let status_code = response.status().as_u16();
+
+        if response.status().is_success() {
+            let user: AccountUser = response
+                .json()
+                .await
+                .context("Failed to parse user search response")?;
+            return Ok(Some(user));
+        }
+
+        if status_code == 404 {
+            // Could be user-not-found OR endpoint-not-found (BIM 360 hub).
+            // Try BIM 360 fallback before returning None.
+        } else if status_code != 400 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (GET /users/search?email=... with 2-legged auth)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!(
+            "{}/users/search?email={}",
+            self.hq_url(&account_id),
+            urlencoding::encode(email)
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token_2leg)
+        })
+        .await?;
+
         if response.status().as_u16() == 404 {
             return Ok(None);
         }
@@ -99,11 +179,10 @@ impl AccountAdminClient {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        // The search endpoint returns a single user or array
         let user: AccountUser = response
             .json()
             .await
-            .context("Failed to parse user search response")?;
+            .context("Failed to parse BIM 360 user search response")?;
 
         Ok(Some(user))
     }
@@ -115,7 +194,7 @@ impl AccountAdminClient {
     pub async fn list_all_users(&self, account_id: &str) -> Result<Vec<AccountUser>> {
         let mut all_users = Vec::new();
         let mut offset = 0;
-        let limit = 200; // Maximum allowed
+        let limit = 100; // Maximum allowed per APS docs
 
         loop {
             let response = self
@@ -136,6 +215,9 @@ impl AccountAdminClient {
 
     /// Update an account user's properties (company, status, etc.)
     ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v1
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
+    ///
     /// # Arguments
     /// * `account_id` - The account ID
     /// * `user_id` - The user ID to update
@@ -149,12 +231,39 @@ impl AccountAdminClient {
         let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
+        // Try ACC v1 first (3-legged)
         let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client
                 .patch(&url)
                 .bearer_auth(&token)
+                .header("Content-Type", "application/json")
+                .json(&request)
+        })
+        .await?;
+
+        if response.status().is_success() {
+            let user: AccountUser = response
+                .json()
+                .await
+                .context("Failed to parse user update response")?;
+            return Ok(user);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (2-legged auth)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!("{}/users/{}", self.hq_url(&account_id), user_id);
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .patch(&url)
+                .bearer_auth(&token_2leg)
                 .header("Content-Type", "application/json")
                 .json(&request)
         })
@@ -167,7 +276,7 @@ impl AccountAdminClient {
         let user: AccountUser = response
             .json()
             .await
-            .context("Failed to parse user update response")?;
+            .context("Failed to parse BIM 360 user update response")?;
 
         Ok(user)
     }

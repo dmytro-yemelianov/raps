@@ -40,9 +40,12 @@ impl From<Bim360Project> for AccountProject {
 impl AccountAdminClient {
     /// List all projects in an account (paginated)
     ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v2
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
+    ///
     /// # Arguments
     /// * `account_id` - The account ID
-    /// * `limit` - Maximum results per page (max: 200)
+    /// * `limit` - Maximum results per page (max: 100)
     /// * `offset` - Starting index
     pub async fn list_projects(
         &self,
@@ -58,7 +61,7 @@ impl AccountAdminClient {
         // Build query parameters
         let mut params = Vec::new();
         if let Some(l) = limit {
-            params.push(format!("limit={}", l.min(200)));
+            params.push(format!("limit={}", l.min(100)));
         }
         if let Some(o) = offset {
             params.push(format!("offset={}", o));
@@ -72,16 +75,77 @@ impl AccountAdminClient {
         })
         .await?;
 
+        if response.status().is_success() {
+            let projects_response: PaginatedResponse<AccountProject> = response
+                .json()
+                .await
+                .context("Failed to parse projects response")?;
+            return Ok(projects_response);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v2 (3-legged)
+        self.list_projects_bim360(&account_id, &token, limit, offset)
+            .await
+    }
+
+    /// Single-page project list via BIM 360 HQ v2 API (for Business hubs).
+    ///
+    /// BIM 360 v2 returns a plain JSON array with `limit`/`offset` query params
+    /// and an `X-Total-Count` response header. We wrap this in a
+    /// `PaginatedResponse` for a consistent return type.
+    async fn list_projects_bim360(
+        &self,
+        account_id: &str,
+        token: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<PaginatedResponse<AccountProject>> {
+        let effective_limit = limit.map(|l| l.min(100)).unwrap_or(100);
+        let effective_offset = offset.unwrap_or(0);
+
+        let url = format!(
+            "{}/projects?limit={}&offset={}",
+            self.hq_v2_url(account_id),
+            effective_limit,
+            effective_offset
+        );
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(token)
+        })
+        .await?;
+
         if !response.status().is_success() {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let projects_response: PaginatedResponse<AccountProject> = response
+        let total: usize = response
+            .headers()
+            .get("X-Total-Count")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+
+        let page: Vec<Bim360Project> = response
             .json()
             .await
-            .context("Failed to parse projects response")?;
+            .context("Failed to parse BIM 360 projects response")?;
 
-        Ok(projects_response)
+        let results: Vec<AccountProject> = page.into_iter().map(AccountProject::from).collect();
+
+        Ok(PaginatedResponse {
+            results,
+            pagination: crate::types::PaginationInfo {
+                limit: effective_limit,
+                offset: effective_offset,
+                total_results: total,
+            },
+        })
     }
 
     /// Get details of a specific project
@@ -120,11 +184,7 @@ impl AccountAdminClient {
 
         // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
         let token_2leg = self.auth.get_token().await?;
-        let url = format!(
-            "{}/projects/{}",
-            self.hq_url(&account_id),
-            project_id
-        );
+        let url = format!("{}/projects/{}", self.hq_url(&account_id), project_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token_2leg)
@@ -151,10 +211,12 @@ impl AccountAdminClient {
     pub async fn list_all_projects(&self, account_id: &str) -> Result<Vec<AccountProject>> {
         let mut all_projects = Vec::new();
         let mut offset = 0;
-        let limit = 200;
+        let limit = 100;
 
         // Try ACC v1 first page; on 400 fall back to BIM 360 HQ v2.
-        let first = self.list_projects(account_id, Some(limit), Some(offset)).await;
+        let first = self
+            .list_projects(account_id, Some(limit), Some(offset))
+            .await;
         match first {
             Ok(response) => {
                 let has_more = response.has_more();
@@ -242,11 +304,16 @@ impl AccountAdminClient {
 
     /// List projects with optional classification and name filters
     ///
+    /// Tries ACC Construction Admin v1 first. Falls back to BIM 360 HQ v2
+    /// if the account is a BIM 360 Business hub (HTTP 400/404).
+    /// BIM 360 HQ v2 does not support filter query params, so filtering is
+    /// applied in-memory on the fallback path.
+    ///
     /// # Arguments
     /// * `account_id` - The account ID
     /// * `classification` - Filter by project classification (template, production, etc.)
     /// * `name_filter` - Filter by project name (partial match)
-    /// * `limit` - Maximum results per page (max: 200)
+    /// * `limit` - Maximum results per page (max: 100)
     /// * `offset` - Starting index
     pub async fn list_projects_filtered(
         &self,
@@ -264,7 +331,7 @@ impl AccountAdminClient {
         // Build query parameters
         let mut params = Vec::new();
         if let Some(l) = limit {
-            params.push(format!("limit={}", l.min(200)));
+            params.push(format!("limit={}", l.min(100)));
         }
         if let Some(o) = offset {
             params.push(format!("offset={}", o));
@@ -284,16 +351,34 @@ impl AccountAdminClient {
         })
         .await?;
 
-        if !response.status().is_success() {
+        if response.status().is_success() {
+            let projects_response: PaginatedResponse<AccountProject> = response
+                .json()
+                .await
+                .context("Failed to parse projects response")?;
+            return Ok(projects_response);
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let projects_response: PaginatedResponse<AccountProject> = response
-            .json()
-            .await
-            .context("Failed to parse projects response")?;
+        // Fall back to BIM 360 HQ v2 (3-legged) — no server-side filter support,
+        // so fetch a page and apply name filter in-memory.
+        let mut result = self
+            .list_projects_bim360(&account_id, &token, limit, offset)
+            .await?;
 
-        Ok(projects_response)
+        if let Some(name) = name_filter {
+            let lower = name.to_lowercase();
+            result
+                .results
+                .retain(|p| p.name.to_lowercase().contains(&lower));
+            result.pagination.total_results = result.results.len();
+        }
+
+        Ok(result)
     }
 
     /// Create a new project in an account
@@ -452,11 +537,7 @@ impl AccountAdminClient {
 
         // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
         let token_2leg = self.auth.get_token().await?;
-        let url = format!(
-            "{}/projects/{}",
-            self.hq_url(&account_id),
-            project_id
-        );
+        let url = format!("{}/projects/{}", self.hq_url(&account_id), project_id);
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client

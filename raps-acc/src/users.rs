@@ -128,9 +128,10 @@ impl Bim360ImportEntry {
     /// Only includes services that are actually activated on the target project.
     /// BIM 360 returns `nil:NilClass` if sent a service the project doesn't have.
     fn from_request(req: &AddProjectUserRequest, project_product_keys: &[String]) -> Self {
-        let is_admin = req.products.iter().any(|p| {
-            p.key == "projectAdministration" && p.access == "administrator"
-        });
+        let is_admin = req
+            .products
+            .iter()
+            .any(|p| p.key == "projectAdministration" && p.access == "administrator");
 
         // Only include services the project actually has.
         // BIM 360 product keys: "docs" = Document Management, "projectAdministration" = Project Admin.
@@ -139,21 +140,23 @@ impl Bim360ImportEntry {
         let has_doc_management = project_product_keys.is_empty()
             || project_product_keys.iter().any(|k| {
                 let lower = k.to_lowercase();
-                lower == "docs"
-                    || lower == "document_management"
-                    || lower == "documentmanagement"
+                lower == "docs" || lower == "document_management" || lower == "documentmanagement"
             });
 
         let doc_management = if has_doc_management {
             let level = if is_admin { "admin" } else { "user" };
-            Some(Bim360ServiceAccess { access_level: level.to_string() })
+            Some(Bim360ServiceAccess {
+                access_level: level.to_string(),
+            })
         } else {
             None
         };
 
         let services = Bim360ImportServices {
             project_administration: if is_admin {
-                Some(Bim360ServiceAccess { access_level: "admin".to_string() })
+                Some(Bim360ServiceAccess {
+                    access_level: "admin".to_string(),
+                })
             } else {
                 None
             },
@@ -289,7 +292,7 @@ impl ProjectUsersClient {
     ///
     /// # Arguments
     /// * `project_id` - The project ID
-    /// * `limit` - Maximum results per page (max: 200)
+    /// * `limit` - Maximum results per page (max: 100)
     /// * `offset` - Starting index
     pub async fn list_project_users(
         &self,
@@ -297,6 +300,15 @@ impl ProjectUsersClient {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<PaginatedResponse<ProjectUser>> {
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .list_project_users_bim360(account_id, project_id, limit, offset)
+                .await;
+        }
+
         let token = self.auth.get_3leg_token().await?;
 
         let mut url = format!("{}/users", self.project_url(project_id));
@@ -304,7 +316,68 @@ impl ProjectUsersClient {
         // Build query parameters
         let mut params = Vec::new();
         if let Some(l) = limit {
-            params.push(format!("limit={}", l.min(200)));
+            params.push(format!("limit={}", l.min(100)));
+        }
+        if let Some(o) = offset {
+            params.push(format!("offset={}", o));
+        }
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+
+        // Single probe — don't retry on 400/404 (fall back to BIM 360 instead).
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to send ACC list-project-users request")?;
+
+        if response.status().is_success() {
+            let users_response: PaginatedResponse<ProjectUser> = response
+                .json()
+                .await
+                .context("Failed to parse project users response")?;
+            return Ok(users_response);
+        }
+
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 404)
+            && let Some(ref account_id) = self.account_id
+        {
+            if status == 404 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
+            return self
+                .list_project_users_bim360(account_id, project_id, limit, offset)
+                .await;
+        }
+
+        anyhow::bail!("Failed to list project users (HTTP {status}): {error_text}");
+    }
+
+    /// List project users via BIM 360 HQ v2 endpoint.
+    ///
+    /// HQ v2 returns a plain JSON array (not a paginated wrapper), so we
+    /// construct a `PaginatedResponse` from the result.
+    async fn list_project_users_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<PaginatedResponse<ProjectUser>> {
+        let token = self.auth.get_3leg_token().await?;
+
+        let mut url = format!("{}/users", self.project_url_bim360(account_id, project_id));
+
+        let mut params = Vec::new();
+        if let Some(l) = limit {
+            params.push(format!("limit={}", l.min(100)));
         }
         if let Some(o) = offset {
             params.push(format!("offset={}", o));
@@ -318,18 +391,58 @@ impl ProjectUsersClient {
         })
         .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list project users ({status}): {error_text}");
+        let status = response.status().as_u16();
+        let body_text = response.text().await.unwrap_or_default();
+
+        if !(200..300).contains(&(status as usize)) {
+            anyhow::bail!("Failed to list BIM 360 project users (HTTP {status}): {body_text}");
         }
 
-        let users_response: PaginatedResponse<ProjectUser> = response
-            .json()
-            .await
-            .context("Failed to parse project users response")?;
+        // BIM 360 HQ v2 returns a plain JSON array with snake_case fields.
+        let arr: Vec<serde_json::Value> = serde_json::from_str(&body_text)
+            .context("Failed to parse BIM 360 project users response")?;
 
-        Ok(users_response)
+        let effective_limit = limit.map(|l| l.min(100)).unwrap_or(100);
+        let effective_offset = offset.unwrap_or(0);
+        let count = arr.len();
+
+        let users: Vec<ProjectUser> = arr
+            .into_iter()
+            .map(|v| ProjectUser {
+                id: v["user_id"].as_str().unwrap_or_default().to_string(),
+                email: v["email"].as_str().map(|s| s.to_string()),
+                name: v["name"].as_str().map(|s| s.to_string()),
+                role_ids: v["industry_roles"]
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter_map(|r| r.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                role_name: None,
+                products: None,
+                added_on: None,
+            })
+            .collect();
+
+        // BIM 360 HQ v2 doesn't return total count in the body; approximate
+        // based on whether a full page was returned.
+        let total_results = if count < effective_limit {
+            effective_offset + count
+        } else {
+            // There may be more — use a sentinel that makes has_more() return true
+            effective_offset + count + 1
+        };
+
+        Ok(PaginatedResponse {
+            results: users,
+            pagination: crate::types::PaginationInfo {
+                limit: effective_limit,
+                offset: effective_offset,
+                total_results,
+            },
+        })
     }
 
     /// Get a specific user's membership in a project
@@ -338,27 +451,99 @@ impl ProjectUsersClient {
     /// * `project_id` - The project ID
     /// * `user_id` - The user ID
     pub async fn get_project_user(&self, project_id: &str, user_id: &str) -> Result<ProjectUser> {
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .get_project_user_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
         let token = self.auth.get_3leg_token().await?;
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
+
+        // Single probe — don't retry on 400/404 (fall back to BIM 360 instead).
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to send ACC get-project-user request")?;
+
+        if response.status().is_success() {
+            return response
+                .json()
+                .await
+                .context("Failed to parse project user response");
+        }
+
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 404)
+            && let Some(ref account_id) = self.account_id
+        {
+            if status == 404 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
+            return self
+                .get_project_user_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
+        anyhow::bail!("Failed to get project user (HTTP {status}): {error_text}");
+    }
+
+    /// Get a project user via BIM 360 HQ v2 endpoint.
+    async fn get_project_user_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        user_id: &str,
+    ) -> Result<ProjectUser> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users/{}",
+            self.project_url_bim360(account_id, project_id),
+            user_id
+        );
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to get project user ({status}): {error_text}");
+        let status = response.status().as_u16();
+        let body_text = response.text().await.unwrap_or_default();
+
+        if !(200..300).contains(&(status as usize)) {
+            anyhow::bail!("Failed to get BIM 360 project user (HTTP {status}): {body_text}");
         }
 
-        let user: ProjectUser = response
-            .json()
-            .await
-            .context("Failed to parse project user response")?;
+        // BIM 360 HQ v2 returns snake_case fields — parse manually.
+        let v: serde_json::Value = serde_json::from_str(&body_text)
+            .context("Failed to parse BIM 360 project user response")?;
 
-        Ok(user)
+        Ok(ProjectUser {
+            id: v["user_id"].as_str().unwrap_or_default().to_string(),
+            email: v["email"].as_str().map(|s| s.to_string()),
+            name: v["name"].as_str().map(|s| s.to_string()),
+            role_ids: v["industry_roles"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|r| r.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            role_name: None,
+            products: None,
+            added_on: None,
+        })
     }
 
     /// Add a user to a project.
@@ -372,24 +557,19 @@ impl ProjectUsersClient {
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
         // Fast path: if the caller knows the platform, skip the probe entirely.
-        if let Some(ref platform) = request.platform {
-            if platform == "bim360" {
-                if let Some(ref account_id) = self.account_id {
-                    return self
-                        .add_user_bim360(account_id, project_id, request)
-                        .await;
-                }
-            }
+        if let Some(ref platform) = request.platform
+            && platform == "bim360"
+            && let Some(ref account_id) = self.account_id
+        {
+            return self.add_user_bim360(account_id, project_id, request).await;
         }
 
         // Cached fast path: if we've learned that ACC returns 404 for this
         // account (no platform hint available), go straight to BIM 360.
-        if self.acc_probe_failed.load(Ordering::Relaxed) {
-            if let Some(ref account_id) = self.account_id {
-                return self
-                    .add_user_bim360(account_id, project_id, request)
-                    .await;
-            }
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self.add_user_bim360(account_id, project_id, request).await;
         }
 
         let token = self.auth.get_3leg_token().await?;
@@ -434,9 +614,7 @@ impl ProjectUsersClient {
             if status == 404 {
                 self.acc_probe_failed.store(true, Ordering::Relaxed);
             }
-            return self
-                .add_user_bim360(account_id, project_id, request)
-                .await;
+            return self.add_user_bim360(account_id, project_id, request).await;
         }
 
         anyhow::bail!("Failed to add user to project (HTTP {status}): {error_text}");
@@ -450,7 +628,7 @@ impl ProjectUsersClient {
         let Ok(token) = self.auth.get_3leg_token().await else {
             return vec![];
         };
-        let url = format!("{}", self.project_url(project_id));
+        let url = self.project_url(project_id).to_string();
 
         let Ok(response) = self.http_client.get(&url).bearer_auth(&token).send().await else {
             return vec![];
@@ -485,7 +663,10 @@ impl ProjectUsersClient {
         request: AddProjectUserRequest,
     ) -> Result<ProjectUser> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/users/import", self.project_url_bim360(account_id, project_id));
+        let url = format!(
+            "{}/users/import",
+            self.project_url_bim360(account_id, project_id)
+        );
 
         // Determine which services the project supports. If the caller already
         // provided product keys (bulk path), use them; otherwise fetch.
@@ -521,14 +702,18 @@ impl ProjectUsersClient {
             anyhow::bail!("Failed to add user to BIM 360 project (HTTP {status}): {body_text}");
         }
 
-        let result: Bim360ImportResponse = serde_json::from_str(&body_text)
-            .context("Failed to parse BIM 360 import response")?;
+        let result: Bim360ImportResponse =
+            serde_json::from_str(&body_text).context("Failed to parse BIM 360 import response")?;
 
         if result.success > 0 {
-            let item = result.success_items.into_iter().next().unwrap_or(Bim360ImportItem {
-                user_id: None,
-                email: Some(request.email.clone()),
-            });
+            let item = result
+                .success_items
+                .into_iter()
+                .next()
+                .unwrap_or(Bim360ImportItem {
+                    user_id: None,
+                    email: Some(request.email.clone()),
+                });
             return Ok(crate::types::ProjectUser {
                 id: item.user_id.unwrap_or_default(),
                 email: item.email.or(Some(request.email)),
@@ -541,17 +726,21 @@ impl ProjectUsersClient {
         }
 
         // Report failure details
-        let error_msg = result.failure_items.into_iter()
-            .flat_map(|fi| {
-                fi.errors.into_iter().filter_map(|e| e.message)
-            })
+        let error_msg = result
+            .failure_items
+            .into_iter()
+            .flat_map(|fi| fi.errors.into_iter().filter_map(|e| e.message))
             .collect::<Vec<_>>()
             .join("; ");
 
         anyhow::bail!(
             "BIM 360 failed to add user '{}' to project: {}",
             request.email,
-            if error_msg.is_empty() { "unknown error".to_string() } else { error_msg }
+            if error_msg.is_empty() {
+                "unknown error".to_string()
+            } else {
+                error_msg
+            }
         )
     }
 
@@ -571,12 +760,12 @@ impl ProjectUsersClient {
         request: UpdateProjectUserRequest,
     ) -> Result<ProjectUser> {
         // Fast path: skip ACC probe if we already know this is a BIM 360 account.
-        if self.acc_probe_failed.load(Ordering::Relaxed) {
-            if let Some(ref account_id) = self.account_id {
-                return self
-                    .update_user_bim360(account_id, project_id, user_id, &request)
-                    .await;
-            }
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .update_user_bim360(account_id, project_id, user_id, &request)
+                .await;
         }
 
         let token = self.auth.get_3leg_token().await?;
@@ -662,7 +851,11 @@ impl ProjectUsersClient {
             name: None,
             role_ids: v["industry_roles"]
                 .as_array()
-                .map(|arr| arr.iter().filter_map(|r| r.as_str().map(|s| s.to_string())).collect())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|r| r.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
                 .unwrap_or_default(),
             role_name: None,
             products: None,
@@ -676,9 +869,63 @@ impl ProjectUsersClient {
     /// * `project_id` - The project ID
     /// * `user_id` - The user ID to remove
     pub async fn remove_user(&self, project_id: &str, user_id: &str) -> Result<()> {
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .remove_user_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
         let token = self.auth.get_3leg_token().await?;
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
+
+        // Single probe — don't retry on 400/404 (fall back to BIM 360 instead).
+        let response = self
+            .http_client
+            .delete(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to send ACC remove-user request")?;
+
+        if response.status().is_success() {
+            return Ok(());
+        }
+
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 404)
+            && let Some(ref account_id) = self.account_id
+        {
+            if status == 404 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
+            return self
+                .remove_user_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
+        anyhow::bail!("Failed to remove user from project (HTTP {status}): {error_text}");
+    }
+
+    /// Remove a user from a BIM 360 project via HQ v2 DELETE endpoint.
+    async fn remove_user_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        user_id: &str,
+    ) -> Result<()> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users/{}",
+            self.project_url_bim360(account_id, project_id),
+            user_id
+        );
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.delete(&url).bearer_auth(&token)
@@ -688,7 +935,7 @@ impl ProjectUsersClient {
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to remove user from project ({status}): {error_text}");
+            anyhow::bail!("Failed to remove user from BIM 360 project ({status}): {error_text}");
         }
 
         Ok(())
@@ -703,9 +950,62 @@ impl ProjectUsersClient {
     /// # Returns
     /// True if the user is a member of the project, false otherwise
     pub async fn user_exists(&self, project_id: &str, user_id: &str) -> Result<bool> {
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .user_exists_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
         let token = self.auth.get_3leg_token().await?;
 
         let url = format!("{}/users/{}", self.project_url(project_id), user_id);
+
+        // Single probe — don't retry on 400/404 (fall back to BIM 360 instead).
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to send ACC user-exists request")?;
+
+        if response.status().is_success() {
+            return Ok(true);
+        }
+
+        let status = response.status().as_u16();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 404)
+            && let Some(ref account_id) = self.account_id
+        {
+            if status == 404 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
+            return self
+                .user_exists_bim360(account_id, project_id, user_id)
+                .await;
+        }
+
+        Ok(false)
+    }
+
+    /// Check if a user exists in a BIM 360 project via HQ v2 endpoint.
+    async fn user_exists_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        user_id: &str,
+    ) -> Result<bool> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users/{}",
+            self.project_url_bim360(account_id, project_id),
+            user_id
+        );
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
@@ -724,6 +1024,15 @@ impl ProjectUsersClient {
         project_id: &str,
         email: &str,
     ) -> Result<Option<ProjectUser>> {
+        // Fast path: skip ACC probe if we already know this is a BIM 360 account.
+        if self.acc_probe_failed.load(Ordering::Relaxed)
+            && let Some(ref account_id) = self.account_id
+        {
+            return self
+                .find_project_user_by_email_bim360(account_id, project_id, email)
+                .await;
+        }
+
         let token = self.auth.get_3leg_token().await?;
         let url = format!(
             "{}/users?filter[email]={}&limit=1",
@@ -731,30 +1040,106 @@ impl ProjectUsersClient {
             urlencoding::encode(email),
         );
 
+        // Single probe — don't retry on 400/404 (fall back to BIM 360 instead).
+        let response = self
+            .http_client
+            .get(&url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .context("Failed to send ACC find-user-by-email request")?;
+
+        if response.status().is_success() {
+            let page: PaginatedResponse<ProjectUser> = response
+                .json()
+                .await
+                .context("Failed to parse project users response")?;
+            return Ok(page.results.into_iter().next());
+        }
+
+        let status = response.status().as_u16();
+        let error_text = response.text().await.unwrap_or_default();
+
+        // On 400/404 try BIM 360 HQ v2 if we have an account_id.
+        if (status == 400 || status == 404)
+            && let Some(ref account_id) = self.account_id
+        {
+            if status == 404 {
+                self.acc_probe_failed.store(true, Ordering::Relaxed);
+            }
+            return self
+                .find_project_user_by_email_bim360(account_id, project_id, email)
+                .await;
+        }
+
+        anyhow::bail!("Failed to find project user by email (HTTP {status}): {error_text}");
+    }
+
+    /// Find a project user by email via BIM 360 HQ v2 endpoint.
+    ///
+    /// BIM 360 HQ v2 may not support `filter[email]`, so we fetch the first
+    /// page of users (limit=100) and filter in memory.
+    async fn find_project_user_by_email_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+        email: &str,
+    ) -> Result<Option<ProjectUser>> {
+        let token = self.auth.get_3leg_token().await?;
+        let url = format!(
+            "{}/users?limit=100",
+            self.project_url_bim360(account_id, project_id)
+        );
+
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
         })
         .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to find project user by email ({status}): {body}");
+        let status = response.status().as_u16();
+        let body_text = response.text().await.unwrap_or_default();
+
+        if !(200..300).contains(&(status as usize)) {
+            anyhow::bail!(
+                "Failed to find BIM 360 project user by email (HTTP {status}): {body_text}"
+            );
         }
 
-        let page: PaginatedResponse<ProjectUser> = response
-            .json()
-            .await
-            .context("Failed to parse project users response")?;
+        // BIM 360 HQ v2 returns a plain JSON array with snake_case fields.
+        let arr: Vec<serde_json::Value> = serde_json::from_str(&body_text)
+            .context("Failed to parse BIM 360 project users response")?;
 
-        Ok(page.results.into_iter().next())
+        let email_lower = email.to_lowercase();
+        let found = arr.into_iter().find(|v| {
+            v["email"]
+                .as_str()
+                .map(|e| e.to_lowercase() == email_lower)
+                .unwrap_or(false)
+        });
+
+        Ok(found.map(|v| ProjectUser {
+            id: v["user_id"].as_str().unwrap_or_default().to_string(),
+            email: v["email"].as_str().map(|s| s.to_string()),
+            name: v["name"].as_str().map(|s| s.to_string()),
+            role_ids: v["industry_roles"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|r| r.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            role_name: None,
+            products: None,
+            added_on: None,
+        }))
     }
 
     /// Fetch all users in a project (handles pagination automatically)
     pub async fn list_all_project_users(&self, project_id: &str) -> Result<Vec<ProjectUser>> {
         let mut all_users = Vec::new();
         let mut offset = 0;
-        let limit = 200;
+        let limit = 100;
 
         loop {
             let response = self
@@ -893,7 +1278,10 @@ mod tests {
 
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
-        assert!(json.contains("\"roleIds\":[\"role-456\"]"), "must send roleIds array: {json}");
+        assert!(
+            json.contains("\"roleIds\":[\"role-456\"]"),
+            "must send roleIds array: {json}"
+        );
         assert!(json.contains("docs"));
     }
 
@@ -905,7 +1293,10 @@ mod tests {
         };
 
         let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains("\"roleIds\":[\"new-role\"]"), "must send roleIds array: {json}");
+        assert!(
+            json.contains("\"roleIds\":[\"new-role\"]"),
+            "must send roleIds array: {json}"
+        );
         // products should be skipped when None
         assert!(!json.contains("products"));
     }
@@ -916,8 +1307,14 @@ mod tests {
             email: "user@example.com".to_string(),
             role_ids: vec![],
             products: vec![
-                ProductAccess { key: "projectAdministration".to_string(), access: "administrator".to_string() },
-                ProductAccess { key: "docs".to_string(), access: "administrator".to_string() },
+                ProductAccess {
+                    key: "projectAdministration".to_string(),
+                    access: "administrator".to_string(),
+                },
+                ProductAccess {
+                    key: "docs".to_string(),
+                    access: "administrator".to_string(),
+                },
             ],
             suppress_administrative_emails: false,
             project_product_keys: None,
@@ -932,7 +1329,10 @@ mod tests {
             !json.contains("document_management"),
             "must omit document_management when project lacks it: {json}"
         );
-        assert!(json.contains("project_administration"), "must include project_administration: {json}");
+        assert!(
+            json.contains("project_administration"),
+            "must include project_administration: {json}"
+        );
     }
 
     #[test]
@@ -941,8 +1341,14 @@ mod tests {
             email: "user@example.com".to_string(),
             role_ids: vec![],
             products: vec![
-                ProductAccess { key: "projectAdministration".to_string(), access: "administrator".to_string() },
-                ProductAccess { key: "docs".to_string(), access: "administrator".to_string() },
+                ProductAccess {
+                    key: "projectAdministration".to_string(),
+                    access: "administrator".to_string(),
+                },
+                ProductAccess {
+                    key: "docs".to_string(),
+                    access: "administrator".to_string(),
+                },
             ],
             suppress_administrative_emails: false,
             project_product_keys: None,
@@ -950,11 +1356,21 @@ mod tests {
         };
 
         // Project WITH Document Management
-        let keys = vec!["projectAdministration".to_string(), "docs".to_string(), "insight".to_string()];
+        let keys = vec![
+            "projectAdministration".to_string(),
+            "docs".to_string(),
+            "insight".to_string(),
+        ];
         let entry = Bim360ImportEntry::from_request(&request, &keys);
         let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains("document_management"), "must include document_management: {json}");
-        assert!(json.contains("project_administration"), "must include project_administration: {json}");
+        assert!(
+            json.contains("document_management"),
+            "must include document_management: {json}"
+        );
+        assert!(
+            json.contains("project_administration"),
+            "must include project_administration: {json}"
+        );
     }
 
     #[test]
@@ -971,7 +1387,10 @@ mod tests {
         // Empty product keys = unknown → safe default: include document_management
         let entry = Bim360ImportEntry::from_request(&request, &[]);
         let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains("document_management"), "must default to including document_management: {json}");
+        assert!(
+            json.contains("document_management"),
+            "must default to including document_management: {json}"
+        );
     }
 
     #[test]

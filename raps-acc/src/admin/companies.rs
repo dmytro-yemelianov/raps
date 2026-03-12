@@ -22,7 +22,7 @@ impl AccountAdminClient {
     /// # Returns
     /// A vector of all companies in the account
     pub async fn list_companies(&self, account_id: &str) -> Result<Vec<Company>> {
-        let token = self.auth.get_3leg_token().await?;
+        let token = self.auth.get_token().await?;
         let account_id = normalize_account_id(account_id);
 
         let url = format!("{}/companies", self.hq_url(&account_id));
@@ -74,7 +74,7 @@ impl AccountAdminClient {
     pub async fn list_all_templates(&self, account_id: &str) -> Result<Vec<AccountProject>> {
         let mut all_templates = Vec::new();
         let mut offset = 0;
-        let limit = 200;
+        let limit = 100;
 
         loop {
             let response = self
