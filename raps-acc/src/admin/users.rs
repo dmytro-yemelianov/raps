@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use raps_kernel::error::RapsError;
 use raps_kernel::http;
 
-use crate::types::{AccountUser, PaginatedResponse};
+use crate::types::{AccountUser, PaginatedResponse, PaginationInfo};
 
 use super::types::UpdateAccountUserRequest;
 use super::{AccountAdminClient, normalize_account_id};
@@ -78,6 +78,9 @@ impl AccountAdminClient {
     ///
     /// Uses 2-legged auth as required by the HQ v1 endpoint.
     /// Endpoint: GET /hq/v1/accounts/:account_id/users
+    ///
+    /// BIM 360 HQ v1 returns a plain JSON array (not a paginated wrapper),
+    /// so we parse it and construct a PaginatedResponse manually.
     async fn list_users_bim360(
         &self,
         account_id: &str,
@@ -98,12 +101,30 @@ impl AccountAdminClient {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let users_response: PaginatedResponse<AccountUser> = response
+        // BIM 360 HQ v1 returns a plain JSON array, not {"results":[], "pagination":{}}
+        let users: Vec<AccountUser> = response
             .json()
             .await
             .context("Failed to parse BIM 360 users response")?;
 
-        Ok(users_response)
+        let page_limit = limit.unwrap_or(100).min(100);
+        let page_offset = offset.unwrap_or(0);
+        let count = users.len();
+
+        Ok(PaginatedResponse {
+            results: users,
+            pagination: PaginationInfo {
+                limit: page_limit,
+                offset: page_offset,
+                // HQ v1 doesn't return total count in the body; estimate from page size
+                total_results: if count < page_limit {
+                    page_offset + count
+                } else {
+                    // May have more pages — signal that by setting total > offset + count
+                    page_offset + count + 1
+                },
+            },
+        })
     }
 
     /// Search for a user by email address
