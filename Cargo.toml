@@ -81,7 +81,7 @@ tokio-util = { version = "0.7", features = ["io", "codec"] }
 futures-util = "0.3"
 
 # OAuth browser flow
-webbrowser = "1.1"
+webbrowser = "1.2"
 tiny_http = "0.12"
 
 # Secure token storage
@@ -114,7 +114,7 @@ glob = "0.3"
 notify = "6"
 
 # MCP Server
-rmcp = { version = "1.1", features = ["server", "transport-io", "transport-streamable-http-server", "transport-streamable-http-server-session", "schemars"] }
+rmcp = { version = "1.2", features = ["server", "transport-io", "transport-streamable-http-server", "transport-streamable-http-server-session", "schemars"] }
 schemars = "1.2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "registry", "json"] }
@@ -173,11 +173,11 @@ prometheus = { version = "0.13", default-features = false }
 axum = "0.8"
 
 # Testing
-assert_cmd = "2.1"
+assert_cmd = "2.2"
 predicates = "3.1"
 raps-mock = { git = "https://github.com/dmytro-yemelianov/raps-mock.git", tag = "v0.3.1" }
 tokio-test = "0.4"
-tempfile = "3.26"
+tempfile = "3.27"
 insta = { version = "1.42", features = ["yaml", "json", "redactions"] }
 rstest = "0.25"
 
