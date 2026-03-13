@@ -1047,6 +1047,7 @@ carol@example.com,,
             role: "Project Admin".to_string(),
             company: Some("Acme Corp".to_string()),
             status: Some("active".to_string()),
+            added_on: Some("2025-01-15".to_string()),
         };
         let json = serde_json::to_string(&output).unwrap();
         assert!(json.contains("\"email\":\"test@example.com\""));
@@ -1066,6 +1067,7 @@ carol@example.com,,
             role: "Admin".to_string(),
             company: None,
             status: None,
+            added_on: None,
         };
         let json = serde_json::to_string(&output).unwrap();
         // Fields with skip_serializing_if = "Option::is_none" should be absent

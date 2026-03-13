@@ -199,12 +199,90 @@ impl AccountAdminClient {
             return Err(RapsError::from_response(response).await.into());
         }
 
-        let user: AccountUser = response
+        // BIM 360 HQ v1 /users/search may return either:
+        // - A plain user object (matching AccountUser)
+        // - An array of user objects
+        // - A wrapper with different field names (snake_case)
+        // Parse as raw JSON first, then extract fields flexibly.
+        let body: serde_json::Value = response
             .json()
             .await
             .context("Failed to parse BIM 360 user search response")?;
 
-        Ok(Some(user))
+        // Try direct deserialization first
+        if let Ok(user) = serde_json::from_value::<AccountUser>(body.clone()) {
+            return Ok(Some(user));
+        }
+
+        // If the response is an array, take the first matching element
+        if let Some(arr) = body.as_array() {
+            for item in arr {
+                if let Ok(user) = serde_json::from_value::<AccountUser>(item.clone()) {
+                    if user.email.to_lowercase() == email.to_lowercase() {
+                        return Ok(Some(user));
+                    }
+                }
+            }
+            // Try manual extraction on first element
+            if let Some(first) = arr.first() {
+                if let Ok(user) = serde_json::from_value::<AccountUser>(first.clone()) {
+                    return Ok(Some(user));
+                }
+            }
+        }
+
+        // Manual extraction for non-standard BIM 360 response shapes
+        let obj = body
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!(
+                "Unexpected BIM 360 search response format: {}",
+                serde_json::to_string(&body).unwrap_or_default().chars().take(200).collect::<String>()
+            ))?;
+        let id = obj
+            .get("id")
+            .or_else(|| obj.get("uid"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string();
+        let user_email = obj
+            .get("email")
+            .and_then(|v| v.as_str())
+            .unwrap_or(email)
+            .to_string();
+        let name = obj
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let first_name = obj
+            .get("first_name")
+            .or_else(|| obj.get("firstName"))
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let last_name = obj
+            .get("last_name")
+            .or_else(|| obj.get("lastName"))
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let company_id = obj
+            .get("company_id")
+            .or_else(|| obj.get("companyId"))
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let status = obj
+            .get("status")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        Ok(Some(AccountUser {
+            id,
+            email: user_email,
+            name,
+            first_name,
+            last_name,
+            company_id,
+            status,
+            added_on: None,
+        }))
     }
 
     /// Fetch all users in an account (handles pagination automatically)

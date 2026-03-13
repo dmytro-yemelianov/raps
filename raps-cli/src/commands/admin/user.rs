@@ -3,6 +3,7 @@
 
 //! User management command implementations
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -38,6 +39,8 @@ pub(crate) struct UserListOutput {
     pub(crate) company: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) added_on: Option<String>,
 }
 
 pub(crate) fn display_user_list(
@@ -54,51 +57,92 @@ pub(crate) fn display_user_list(
 
     match output_format {
         OutputFormat::Table => {
-            println!("{}", "Users:".bold());
-            println!("{}", "─".repeat(110));
-            println!(
-                "{:<30} {:<25} {:<18} {:<18} {}",
-                "Email".bold(),
-                "Name".bold(),
-                "Role".bold(),
-                "Status".bold(),
-                "Company".bold()
-            );
-            println!("{}", "─".repeat(110));
+            // Check if any user has a role (project-level listing) vs account-level
+            let has_roles = users.iter().any(|u| !u.role.is_empty());
+            let has_added_on = users.iter().any(|u| u.added_on.is_some());
 
-            for u in users {
-                let email_truncated = if u.email.len() > 28 {
-                    format!("{}...", &u.email[..25])
-                } else {
-                    u.email.clone()
-                };
-                let name_truncated = if u.name.len() > 23 {
-                    format!("{}...", &u.name[..20])
-                } else {
-                    u.name.clone()
-                };
-                let role_display = if u.role.is_empty() {
-                    "-".to_string()
-                } else if u.role.len() > 16 {
-                    format!("{}...", &u.role[..13])
-                } else {
-                    u.role.clone()
-                };
-                let status_display = u.status.as_deref().unwrap_or("-");
-                let company_display = u.company.as_deref().unwrap_or("-");
-
+            let width = if has_roles { 120 } else { 110 };
+            println!("{}", "─".repeat(width));
+            if has_roles {
                 println!(
-                    "{:<30} {:<25} {:<18} {:<18} {}",
-                    email_truncated.cyan(),
-                    name_truncated,
-                    role_display,
-                    format_user_status(status_display),
-                    company_display.dimmed()
+                    "  {:<28} {:<22} {:<16} {:<14} {:<12} {}",
+                    "Email".bold(),
+                    "Name".bold(),
+                    "Company".bold(),
+                    "Role".bold(),
+                    "Status".bold(),
+                    "Added".bold()
+                );
+            } else {
+                println!(
+                    "  {:<28} {:<22} {:<24} {:<14} {}",
+                    "Email".bold(),
+                    "Name".bold(),
+                    "Company".bold(),
+                    "Status".bold(),
+                    "Added".bold()
                 );
             }
+            println!("{}", "─".repeat(width));
 
-            println!("{}", "─".repeat(110));
-            println!("{} {} user(s) found", "→".cyan(), users.len());
+            for u in users {
+                let email_display = truncate_str(&u.email, 27);
+                let name_display = truncate_str(&u.name, 21);
+                let company_display = u.company.as_deref().unwrap_or("—");
+                let status_display = u.status.as_deref().unwrap_or("—");
+                let added_display = u.added_on.as_deref().unwrap_or("—");
+
+                if has_roles {
+                    let role_display = if u.role.is_empty() {
+                        "—".to_string()
+                    } else {
+                        truncate_str(&u.role, 13)
+                    };
+                    let company_short = truncate_str(company_display, 15);
+                    println!(
+                        "  {:<28} {:<22} {:<16} {:<14} {:<12} {}",
+                        email_display.cyan(),
+                        name_display,
+                        company_short.dimmed(),
+                        role_display,
+                        format_user_status(status_display),
+                        added_display.dimmed()
+                    );
+                } else {
+                    let company_truncated = truncate_str(company_display, 23);
+                    println!(
+                        "  {:<28} {:<22} {:<24} {:<14} {}",
+                        email_display.cyan(),
+                        name_display,
+                        company_truncated.dimmed(),
+                        format_user_status(status_display),
+                        added_display.dimmed()
+                    );
+                }
+            }
+
+            println!("{}", "─".repeat(width));
+
+            // Summary with status counts
+            let active = users
+                .iter()
+                .filter(|u| u.status.as_deref() == Some("active"))
+                .count();
+            let inactive = users.len() - active;
+            if inactive > 0 {
+                println!(
+                    "  {} users ({} active, {} other)",
+                    users.len().to_string().bold(),
+                    active.to_string().green(),
+                    inactive.to_string().yellow()
+                );
+            } else {
+                println!(
+                    "  {} users (all {})",
+                    users.len().to_string().bold(),
+                    "active".green()
+                );
+            }
         }
         _ => {
             output_format.write(users)?;
@@ -106,6 +150,15 @@ pub(crate) fn display_user_list(
     }
 
     Ok(())
+}
+
+/// Truncate a string to `max_len` characters, appending "…" if truncated.
+fn truncate_str(s: &str, max_len: usize) -> String {
+    if s.len() > max_len {
+        format!("{}…", &s[..max_len - 1])
+    } else {
+        s.to_string()
+    }
 }
 
 pub(crate) fn format_user_status(status: &str) -> String {
@@ -198,6 +251,7 @@ impl UserCommands {
                             role: u.role_name.clone().unwrap_or_default(),
                             company: None,
                             status: None,
+                            added_on: u.added_on.map(|dt| dt.format("%Y-%m-%d").to_string()),
                         })
                         .collect();
 
@@ -220,6 +274,15 @@ impl UserCommands {
                     )?;
 
                     let all_users = admin_client.list_all_users(&account_id).await?;
+
+                    // Build company ID → name lookup (best-effort, don't fail on error)
+                    let company_map: HashMap<String, String> = admin_client
+                        .list_companies(&account_id)
+                        .await
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|c| (c.id, c.name))
+                        .collect();
 
                     // Apply filters
                     let filtered: Vec<_> = all_users
@@ -269,13 +332,22 @@ impl UserCommands {
                                 (None, Some(l)) => l.clone(),
                                 (None, None) => u.name.clone().unwrap_or_default(),
                             };
+                            // Resolve company UUID to name
+                            let company_display = u.company_id.as_ref().map(|cid| {
+                                company_map
+                                    .get(cid)
+                                    .cloned()
+                                    .unwrap_or_else(|| cid.clone())
+                            });
+                            let added_on = u.added_on.map(|dt| dt.format("%Y-%m-%d").to_string());
                             UserListOutput {
                                 id: u.id.clone(),
                                 email: u.email.clone(),
                                 name: display_name,
                                 role: String::new(),
-                                company: u.company_id.clone(),
+                                company: company_display,
                                 status: u.status.clone(),
+                                added_on,
                             }
                         })
                         .collect();
@@ -726,27 +798,51 @@ impl UserCommands {
                     company_name,
                 };
 
-                let user = users_client.add_user(&project, request).await?;
+                let result = users_client.add_user(&project, request).await;
 
-                #[derive(Serialize, schemars::JsonSchema)]
-                struct AddResult {
-                    user_id: String,
-                    email: String,
-                    role: Option<String>,
-                    project: String,
-                }
+                match result {
+                    Ok(user) => {
+                        #[derive(Serialize, schemars::JsonSchema)]
+                        struct AddResult {
+                            user_id: String,
+                            email: String,
+                            role: Option<String>,
+                            project: String,
+                        }
 
-                let result = AddResult {
-                    user_id: user.id,
-                    email: user.email.unwrap_or(email),
-                    role: user.role_name,
-                    project,
-                };
+                        let result = AddResult {
+                            user_id: user.id,
+                            email: user.email.unwrap_or(email),
+                            role: user.role_name,
+                            project,
+                        };
 
-                output_format.write(&result)?;
+                        output_format.write(&result)?;
 
-                if output_format.supports_colors() {
-                    println!("\n{} User added successfully", "✓".green());
+                        if output_format.supports_colors() {
+                            println!("\n{} User added successfully", "✓".green());
+                        }
+                    }
+                    Err(e) => {
+                        let msg = e.to_string();
+                        if msg.contains("409") || msg.contains("already belongs") || msg.contains("Conflict") {
+                            if output_format.supports_colors() {
+                                println!(
+                                    "\n{} User {} is already a member of project {}",
+                                    "ℹ".cyan(),
+                                    email.cyan(),
+                                    project.cyan()
+                                );
+                            } else {
+                                output_format.write_message(&format!(
+                                    "User {} already in project {}",
+                                    email, project
+                                ))?;
+                            }
+                        } else {
+                            return Err(e);
+                        }
+                    }
                 }
 
                 Ok(())

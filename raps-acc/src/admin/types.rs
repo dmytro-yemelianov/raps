@@ -156,8 +156,10 @@ pub struct UpdateProjectRequest {
 }
 
 /// Request to update an account-level user's properties
+///
+/// Uses snake_case serialization because BIM 360 HQ v1 requires it,
+/// and ACC v1 also accepts snake_case fields.
 #[derive(Debug, Clone, Serialize, Default)]
-#[serde(rename_all = "camelCase")]
 pub struct UpdateAccountUserRequest {
     /// Company ID to assign the user to
     #[serde(skip_serializing_if = "Option::is_none")]

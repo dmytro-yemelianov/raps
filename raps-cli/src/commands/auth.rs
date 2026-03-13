@@ -259,12 +259,27 @@ async fn login(
 ) -> Result<()> {
     // Check if already logged in
     if auth_client.is_logged_in().await {
-        let msg = "Already logged in. Use 'raps auth logout' to logout first.";
-        match output_format {
-            OutputFormat::Table => println!("{}", msg.yellow()),
-            _ => output_format.write_message(msg)?,
+        // Try to actually get a valid token — this will refresh if expired
+        match auth_client.get_3leg_token().await {
+            Ok(_) => {
+                let msg = "Already logged in. Use 'raps auth logout' to logout first.";
+                match output_format {
+                    OutputFormat::Table => println!("{}", msg.yellow()),
+                    _ => output_format.write_message(msg)?,
+                }
+                return Ok(());
+            }
+            Err(_) => {
+                // Token expired and refresh failed — clear stale session and proceed with fresh login
+                if output_format.supports_colors() {
+                    println!(
+                        "{}",
+                        "Session expired. Starting fresh login...".yellow()
+                    );
+                }
+                auth_client.logout().await.ok();
+            }
         }
-        return Ok(());
     }
 
     // Handle token-based login (CI/CD scenario)
@@ -345,8 +360,7 @@ async fn login(
     let device = if !device && raps_kernel::interactive::is_headless() {
         eprintln!(
             "{}",
-            "Headless environment detected. Using device code flow."
-                .yellow()
+            "Headless environment detected. Using device code flow.".yellow()
         );
         eprintln!(
             "{}",
