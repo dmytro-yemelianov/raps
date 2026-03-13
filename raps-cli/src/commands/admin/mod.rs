@@ -73,6 +73,63 @@ pub enum CompanyCommands {
         #[arg(short, long)]
         account: Option<String>,
     },
+
+    /// Get a company by ID
+    Get {
+        /// Company ID
+        company_id: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
+    /// Search companies by name
+    Search {
+        /// Company name to search for
+        name: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
+    /// Create a new company
+    Create {
+        /// Company name
+        name: String,
+        /// Trade or discipline
+        #[arg(long)]
+        trade: Option<String>,
+        /// City
+        #[arg(long)]
+        city: Option<String>,
+        /// Country
+        #[arg(long)]
+        country: Option<String>,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
+    /// Update a company's properties
+    Update {
+        /// Company ID
+        company_id: String,
+        /// New company name
+        #[arg(long)]
+        name: Option<String>,
+        /// Trade or discipline
+        #[arg(long)]
+        trade: Option<String>,
+        /// City
+        #[arg(long)]
+        city: Option<String>,
+        /// Country
+        #[arg(long)]
+        country: Option<String>,
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
 }
 
 /// Role management subcommands
@@ -775,6 +832,73 @@ impl AdminCommands {
                         config,
                         auth_client,
                         dm_client,
+                        account,
+                        output_format,
+                    )
+                    .await
+                }
+                CompanyCommands::Get {
+                    company_id,
+                    account,
+                } => {
+                    project::execute_company_get(
+                        config,
+                        auth_client,
+                        dm_client,
+                        company_id,
+                        account,
+                        output_format,
+                    )
+                    .await
+                }
+                CompanyCommands::Search { name, account } => {
+                    project::execute_company_search(
+                        config,
+                        auth_client,
+                        dm_client,
+                        name,
+                        account,
+                        output_format,
+                    )
+                    .await
+                }
+                CompanyCommands::Create {
+                    name,
+                    trade,
+                    city,
+                    country,
+                    account,
+                } => {
+                    project::execute_company_create(
+                        config,
+                        auth_client,
+                        dm_client,
+                        name,
+                        trade,
+                        city,
+                        country,
+                        account,
+                        output_format,
+                    )
+                    .await
+                }
+                CompanyCommands::Update {
+                    company_id,
+                    name,
+                    trade,
+                    city,
+                    country,
+                    account,
+                } => {
+                    project::execute_company_update(
+                        config,
+                        auth_client,
+                        dm_client,
+                        company_id,
+                        name,
+                        trade,
+                        city,
+                        country,
                         account,
                         output_format,
                     )

@@ -10,7 +10,10 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use raps_acc::admin::{AccountAdminClient, CreateProjectRequest, UpdateProjectRequest};
+use raps_acc::admin::{
+    AccountAdminClient, CreateCompanyRequest, CreateProjectRequest, UpdateCompanyRequest,
+    UpdateProjectRequest,
+};
 use raps_acc::extended::AccClient;
 use raps_acc::types::ProjectClassification;
 use raps_admin::ProjectFilter;
@@ -146,6 +149,321 @@ pub(crate) async fn execute_company_list(
         }
     }
 
+    Ok(())
+}
+
+/// Execute company get by ID
+pub(crate) async fn execute_company_get(
+    config: &Config,
+    auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
+    company_id: String,
+    account: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let account_id = resolve_account_id(account, dm_client).await?;
+
+    let http_config = HttpClientConfig::default();
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
+
+    let company = admin_client.get_company(&account_id, &company_id).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{}", "Company Details:".bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "ID:".bold(), company.id.cyan());
+            println!("{:<15} {}", "Name:".bold(), company.name);
+            println!(
+                "{:<15} {}",
+                "Trade:".bold(),
+                company.trade.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "City:".bold(),
+                company.city.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "Country:".bold(),
+                company.country.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "State:".bold(),
+                company.state_or_province.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "Address:".bold(),
+                company.address_line1.as_deref().unwrap_or("-")
+            );
+            if let Some(members) = company.member_count {
+                println!("{:<15} {}", "Members:".bold(), members);
+            }
+        }
+        _ => {
+            output_format.write(&CompanyListOutput {
+                id: company.id,
+                name: company.name,
+                trade: company.trade,
+                city: company.city,
+                country: company.country,
+                member_count: company.member_count,
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Execute company search by name
+pub(crate) async fn execute_company_search(
+    config: &Config,
+    auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
+    name: String,
+    account: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let account_id = resolve_account_id(account, dm_client).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Search companies matching '{}' in account {}",
+            "→".cyan(),
+            name.cyan(),
+            account_id.cyan()
+        );
+        println!();
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
+
+    let companies = admin_client.search_companies(&account_id, &name).await?;
+
+    let outputs: Vec<CompanyListOutput> = companies
+        .iter()
+        .map(|c| CompanyListOutput {
+            id: c.id.clone(),
+            name: c.name.clone(),
+            trade: c.trade.clone(),
+            city: c.city.clone(),
+            country: c.country.clone(),
+            member_count: c.member_count,
+        })
+        .collect();
+
+    match output_format {
+        OutputFormat::Table => {
+            if outputs.is_empty() {
+                println!("{}", "No companies found.".yellow());
+            } else {
+                println!("{}", "Companies:".bold());
+                println!("{}", "─".repeat(110));
+                println!(
+                    "{:<38} {:<25} {:<15} {:<15} {:<10} {}",
+                    "ID".bold(),
+                    "Name".bold(),
+                    "Trade".bold(),
+                    "City".bold(),
+                    "Country".bold(),
+                    "Members".bold()
+                );
+                println!("{}", "─".repeat(110));
+
+                for c in &outputs {
+                    let name_truncated = if c.name.len() > 23 {
+                        format!("{}...", &c.name[..20])
+                    } else {
+                        c.name.clone()
+                    };
+                    let trade_display = c.trade.as_deref().unwrap_or("-");
+                    let trade_truncated = if trade_display.len() > 13 {
+                        format!("{}...", &trade_display[..10])
+                    } else {
+                        trade_display.to_string()
+                    };
+                    let city_display = c.city.as_deref().unwrap_or("-");
+                    let country_display = c.country.as_deref().unwrap_or("-");
+                    let members_display = c
+                        .member_count
+                        .map(|m| m.to_string())
+                        .unwrap_or_else(|| "-".to_string());
+
+                    println!(
+                        "{:<38} {:<25} {:<15} {:<15} {:<10} {}",
+                        c.id.cyan(),
+                        name_truncated,
+                        trade_truncated,
+                        city_display,
+                        country_display,
+                        members_display.dimmed()
+                    );
+                }
+
+                println!("{}", "─".repeat(110));
+                println!("{} {} company(ies) found", "→".cyan(), outputs.len());
+            }
+        }
+        _ => {
+            output_format.write(&outputs)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Execute company creation
+pub(crate) async fn execute_company_create(
+    config: &Config,
+    auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
+    name: String,
+    trade: Option<String>,
+    city: Option<String>,
+    country: Option<String>,
+    account: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let account_id = resolve_account_id(account, dm_client).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Creating company '{}' in account {}",
+            "→".cyan(),
+            name.cyan(),
+            account_id.cyan()
+        );
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
+
+    let request = CreateCompanyRequest {
+        name,
+        trade,
+        city,
+        country,
+        address_line_1: None,
+        state_or_province: None,
+    };
+
+    let company = admin_client.create_company(&account_id, request).await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Company created!", "✓".green().bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "ID:".bold(), company.id.cyan());
+            println!("{:<15} {}", "Name:".bold(), company.name);
+            println!(
+                "{:<15} {}",
+                "Trade:".bold(),
+                company.trade.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "City:".bold(),
+                company.city.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "Country:".bold(),
+                company.country.as_deref().unwrap_or("-")
+            );
+        }
+        _ => {
+            output_format.write(&CompanyListOutput {
+                id: company.id,
+                name: company.name,
+                trade: company.trade,
+                city: company.city,
+                country: company.country,
+                member_count: company.member_count,
+            })?;
+        }
+    }
+    Ok(())
+}
+
+/// Execute company update
+pub(crate) async fn execute_company_update(
+    config: &Config,
+    auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
+    company_id: String,
+    name: Option<String>,
+    trade: Option<String>,
+    city: Option<String>,
+    country: Option<String>,
+    account: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let account_id = resolve_account_id(account, dm_client).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} Updating company {} in account {}",
+            "→".cyan(),
+            company_id.cyan(),
+            account_id.cyan()
+        );
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
+
+    let request = UpdateCompanyRequest {
+        name,
+        trade,
+        city,
+        country,
+        ..Default::default()
+    };
+
+    let company = admin_client
+        .update_company(&account_id, &company_id, request)
+        .await?;
+
+    match output_format {
+        OutputFormat::Table => {
+            println!("\n{} Company updated!", "✓".green().bold());
+            println!("{}", "─".repeat(60));
+            println!("{:<15} {}", "ID:".bold(), company.id.cyan());
+            println!("{:<15} {}", "Name:".bold(), company.name);
+            println!(
+                "{:<15} {}",
+                "Trade:".bold(),
+                company.trade.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "City:".bold(),
+                company.city.as_deref().unwrap_or("-")
+            );
+            println!(
+                "{:<15} {}",
+                "Country:".bold(),
+                company.country.as_deref().unwrap_or("-")
+            );
+        }
+        _ => {
+            output_format.write(&CompanyListOutput {
+                id: company.id,
+                name: company.name,
+                trade: company.trade,
+                city: company.city,
+                country: company.country,
+                member_count: company.member_count,
+            })?;
+        }
+    }
     Ok(())
 }
 
