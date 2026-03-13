@@ -45,7 +45,7 @@ pub fn scan_file(path: &Path) -> Result<Vec<SecretMatch>> {
         ),
         (
             "Password in env",
-            r"(?i)(password|passwd|secret|token)\s*[=:]\s*\S{6,}",
+            r#"(?i)(password|passwd|secret|token)\s*[=:]\s*["']?[A-Za-z0-9_\-/+=]{8,}"#,
         ),
         ("GitHub Token", r"gh[pousr]_[A-Za-z0-9]{36,}"),
     ];

@@ -183,6 +183,8 @@ pub(super) async fn create_issue(
     project_id: &str,
     title: Option<String>,
     description: Option<String>,
+    issue_subtype_id: Option<String>,
+    issue_type_id: Option<String>,
     from_csv: Option<PathBuf>,
     output_format: OutputFormat,
 ) -> Result<()> {
@@ -235,8 +237,8 @@ pub(super) async fn create_issue(
         title: issue_title,
         description: issue_desc,
         status: "open".to_string(),
-        issue_type_id: None,
-        issue_subtype_id: None,
+        issue_type_id,
+        issue_subtype_id,
         assigned_to: None,
         assigned_to_type: None,
         due_date: None,
@@ -571,7 +573,13 @@ pub(super) async fn list_issue_types(
                 } else {
                     " (inactive)".dimmed().to_string()
                 };
-                println!("    {} {}{}", "└".dimmed(), subtype.title, sub_active);
+                println!(
+                    "    {} {}{}  {}",
+                    "└".dimmed(),
+                    subtype.title,
+                    sub_active,
+                    format!("({})", subtype.id).dimmed()
+                );
             }
         }
     }

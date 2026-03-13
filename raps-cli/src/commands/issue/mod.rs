@@ -50,6 +50,14 @@ pub enum IssueCommands {
         #[arg(short, long)]
         description: Option<String>,
 
+        /// Issue subtype ID (required by ACC API; use `raps issue types <project_id>` to list)
+        #[arg(long)]
+        issue_subtype_id: Option<String>,
+
+        /// Issue type ID (optional; use `raps issue types <project_id>` to list)
+        #[arg(long)]
+        issue_type_id: Option<String>,
+
         /// Create issues from CSV file or stdin (columns: title, description, status; use `-` for stdin)
         #[arg(long, value_name = "FILE")]
         from_csv: Option<PathBuf>,
@@ -153,6 +161,8 @@ impl IssueCommands {
                 project_id,
                 title,
                 description,
+                issue_subtype_id,
+                issue_type_id,
                 from_csv,
             } => {
                 crud::create_issue(
@@ -160,6 +170,8 @@ impl IssueCommands {
                     &project_id,
                     title,
                     description,
+                    issue_subtype_id,
+                    issue_type_id,
                     from_csv,
                     output_format,
                 )

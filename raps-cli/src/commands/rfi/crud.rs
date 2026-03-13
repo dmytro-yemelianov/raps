@@ -377,7 +377,7 @@ async fn create_rfis_from_csv(
         let request = CreateRfiRequest {
             title: row.title.clone(),
             question: row.description.clone(),
-            priority: Some("normal".to_string()),
+            priority: Some("Normal".to_string()),
             due_date: None,
             assigned_to: row.assigned_to.clone(),
             location: None,

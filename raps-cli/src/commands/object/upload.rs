@@ -43,6 +43,14 @@ pub(super) async fn upload_object(
 ) -> Result<()> {
     let from_stdin = file.as_os_str() == "-";
 
+    // When reading from stdin, bucket must be explicitly provided (positional args are ambiguous)
+    if from_stdin && bucket.as_ref().map_or(true, |b| b.is_empty()) {
+        anyhow::bail!(
+            "Bucket must be explicitly provided when reading from stdin.\n\
+             Usage: raps object upload <BUCKET> - --key <NAME>"
+        );
+    }
+
     // Spool stdin to a temp file when `-` is given, otherwise validate the path
     let (_tmp_guard, actual_file) = if from_stdin {
         if resume {

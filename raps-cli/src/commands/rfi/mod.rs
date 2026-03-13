@@ -66,8 +66,8 @@ pub enum RfiCommands {
         #[arg(long)]
         question: Option<String>,
 
-        /// Priority (low, normal, high, critical)
-        #[arg(long, default_value = "normal")]
+        /// Priority (Low, Normal, High, Critical)
+        #[arg(long, default_value = "Normal")]
         priority: String,
 
         /// Due date (ISO 8601 format: YYYY-MM-DD)

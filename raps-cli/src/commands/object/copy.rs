@@ -46,10 +46,11 @@ pub(super) async fn copy_object(
         );
     }
 
-    // OSS does not have a native copy API, so we download to a temp file and re-upload
-    let temp_dir = std::env::temp_dir();
+    // OSS does not have a native copy API, so we download to a temp file and re-upload.
+    // Use the current working directory for the temp file to stay within the sandbox.
+    let temp_dir = std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
     let temp_path = temp_dir.join(format!(
-        "raps_copy_{}",
+        ".raps_copy_{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -134,10 +135,10 @@ pub(super) async fn rename_object(
     }
 
     // OSS does not have a native rename API; implement as copy + delete
-    // Step 1: Download to temp file
-    let temp_dir = std::env::temp_dir();
+    // Step 1: Download to temp file (use cwd to stay within sandbox)
+    let temp_dir = std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
     let temp_path = temp_dir.join(format!(
-        "raps_rename_{}",
+        ".raps_rename_{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
