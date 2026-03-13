@@ -10,7 +10,7 @@ use raps_kernel::http;
 
 use crate::types::{AccountUser, PaginatedResponse, PaginationInfo};
 
-use super::types::UpdateAccountUserRequest;
+use super::types::{CreateAccountUserRequest, UpdateAccountUserRequest};
 use super::{AccountAdminClient, normalize_account_id};
 
 impl AccountAdminClient {
@@ -300,5 +300,79 @@ impl AccountAdminClient {
             .context("Failed to parse BIM 360 user update response")?;
 
         Ok(user)
+    }
+
+    /// Create (invite) a new user at account level.
+    ///
+    /// Uses HQ v1 with 2-legged auth (POST /hq/v1/accounts/:account_id/users).
+    pub async fn create_user(
+        &self,
+        account_id: &str,
+        request: CreateAccountUserRequest,
+    ) -> Result<AccountUser> {
+        let token = self.auth.get_token().await?;
+        let account_id = normalize_account_id(account_id);
+        let url = format!("{}/users", self.hq_url(&account_id));
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&request)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse create user response")
+    }
+
+    /// Get a single account user by ID.
+    ///
+    /// Tries ACC v1 (3-legged) first, falls back to BIM 360 HQ v1 (2-legged).
+    pub async fn get_user(&self, account_id: &str, user_id: &str) -> Result<AccountUser> {
+        let token = self.auth.get_3leg_token().await?;
+        let account_id = normalize_account_id(account_id);
+        let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token)
+        })
+        .await?;
+
+        if response.status().is_success() {
+            return response
+                .json()
+                .await
+                .context("Failed to parse user response");
+        }
+
+        let status = response.status().as_u16();
+        if status != 400 && status != 404 {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        // Fall back to BIM 360 HQ v1 (2-legged)
+        let token_2leg = self.auth.get_token().await?;
+        let url = format!("{}/users/{}", self.hq_url(&account_id), user_id);
+
+        let response = http::send_with_retry(&self.config.http_config, || {
+            self.http_client.get(&url).bearer_auth(&token_2leg)
+        })
+        .await?;
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        response
+            .json()
+            .await
+            .context("Failed to parse BIM 360 user response")
     }
 }

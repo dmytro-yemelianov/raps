@@ -165,6 +165,9 @@ pub struct UpdateAccountUserRequest {
     /// Company name (for display purposes)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub company_name: Option<String>,
+    /// User status: "active" or "inactive"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 /// Request to create a new company in an account
@@ -210,6 +213,22 @@ pub struct UpdateCompanyRequest {
     /// Country
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country: Option<String>,
+}
+
+/// Request to create (invite) a new user at account level
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateAccountUserRequest {
+    /// Email address (required)
+    pub email: String,
+    /// First name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub first_name: Option<String>,
+    /// Last name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_name: Option<String>,
+    /// Company ID to associate the user with
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_id: Option<String>,
 }
 
 /// A role available in an account (ACC or BIM 360)
