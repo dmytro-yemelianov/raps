@@ -173,6 +173,50 @@ pub enum UserCommands {
         search: Option<String>,
     },
 
+    /// Create (invite) a user at account level
+    #[command(name = "create")]
+    Create {
+        /// Email address of the user to invite
+        email: String,
+        /// First name
+        #[arg(long)]
+        first_name: Option<String>,
+        /// Last name
+        #[arg(long)]
+        last_name: Option<String>,
+        /// Company ID to assign
+        #[arg(long)]
+        company: Option<String>,
+        /// Account ID (defaults to APS_ACCOUNT_ID)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
+    /// Get a user's details by ID
+    Get {
+        /// User ID
+        user_id: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
+    /// Update a user at account level (company, status)
+    #[command(name = "update-account")]
+    UpdateAccount {
+        /// User ID or email
+        user: String,
+        /// Company ID to assign
+        #[arg(long)]
+        company: Option<String>,
+        /// Status: active or inactive
+        #[arg(long)]
+        status: Option<String>,
+        /// Account ID (defaults to APS_ACCOUNT_ID)
+        #[arg(short, long)]
+        account: Option<String>,
+    },
+
     /// [bulk] Add a user to multiple projects (use add-to-project for a single project)
     Add {
         /// Email address of the user to add
@@ -534,6 +578,15 @@ pub enum AdminProjectCommands {
         /// Maximum projects to return
         #[arg(long)]
         limit: Option<usize>,
+    },
+
+    /// Get a project's details
+    Get {
+        /// Project ID
+        project_id: String,
+        /// Account ID (defaults to APS_ACCOUNT_ID)
+        #[arg(short, long)]
+        account: Option<String>,
     },
 
     /// Create a new project

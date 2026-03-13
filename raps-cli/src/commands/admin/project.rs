@@ -1104,6 +1104,48 @@ impl AdminProjectCommands {
 
                 Ok(())
             }
+
+            AdminProjectCommands::Get {
+                project_id,
+                account,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?;
+
+                let project = admin_client.get_project(&account_id, &project_id).await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!("\n{}", "Project Details:".bold());
+                        println!("{}", "─".repeat(60));
+                        println!("{:<15} {}", "ID:".bold(), project.id.cyan());
+                        println!("{:<15} {}", "Name:".bold(), project.name);
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            format_project_status(project.status.as_deref().unwrap_or("-"))
+                        );
+                        if let Some(created) = project.created_at {
+                            println!("{:<15} {}", "Created:".bold(), created.to_rfc3339());
+                        }
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": project.id,
+                            "name": project.name,
+                            "status": project.status,
+                            "created_at": project.created_at,
+                        }))?;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }

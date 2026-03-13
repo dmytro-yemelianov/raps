@@ -190,6 +190,7 @@ pub(crate) async fn execute_csv_update(
                         let update_req = raps_acc::admin::UpdateAccountUserRequest {
                             company_id: None,
                             company_name: Some(company_name.clone()),
+                            ..Default::default()
                         };
                         match admin_client
                             .update_user(&account_id, &user.id, update_req)
@@ -578,8 +579,7 @@ mod tests {
 
     #[test]
     fn test_csv_update_row_optional_fields() {
-        let mut reader =
-            csv::Reader::from_reader(b"email,role\nuser@example.com,editor" as &[u8]);
+        let mut reader = csv::Reader::from_reader(b"email,role\nuser@example.com,editor" as &[u8]);
         let row: CsvUpdateRow = reader.deserialize().next().unwrap().unwrap();
         assert_eq!(row.email, "user@example.com");
         assert_eq!(row.role, Some("editor".to_string()));
@@ -630,9 +630,8 @@ mod tests {
 
     #[test]
     fn test_csv_import_row_deserialization() {
-        let mut reader = csv::Reader::from_reader(
-            b"email,role_id\nuser@example.com,abc-123" as &[u8],
-        );
+        let mut reader =
+            csv::Reader::from_reader(b"email,role_id\nuser@example.com,abc-123" as &[u8]);
         let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
         assert_eq!(row.email, "user@example.com");
         assert_eq!(row.role_id, Some("abc-123".to_string()));
@@ -640,8 +639,7 @@ mod tests {
 
     #[test]
     fn test_csv_import_row_without_role_id() {
-        let mut reader =
-            csv::Reader::from_reader(b"email\nnewuser@example.com" as &[u8]);
+        let mut reader = csv::Reader::from_reader(b"email\nnewuser@example.com" as &[u8]);
         let row: CsvImportRow = reader.deserialize().next().unwrap().unwrap();
         assert_eq!(row.email, "newuser@example.com");
         assert!(row.role_id.is_none());

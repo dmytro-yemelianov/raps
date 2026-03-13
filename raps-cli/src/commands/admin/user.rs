@@ -557,6 +557,7 @@ impl UserCommands {
                         let update_req = raps_acc::admin::UpdateAccountUserRequest {
                             company_id: None,
                             company_name: Some(company_name.clone()),
+                            ..Default::default()
                         };
 
                         admin_client
@@ -1153,6 +1154,189 @@ impl UserCommands {
                     anyhow::bail!("{} project(s) failed", fail);
                 }
 
+                Ok(())
+            }
+
+            UserCommands::Create {
+                email,
+                first_name,
+                last_name,
+                company,
+                account,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?;
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Creating user {} in account {}",
+                        "→".cyan(),
+                        email.green(),
+                        account_id.cyan()
+                    );
+                }
+
+                let request = raps_acc::admin::CreateAccountUserRequest {
+                    email: email.clone(),
+                    first_name,
+                    last_name,
+                    company_id: company,
+                };
+
+                let user = admin_client.create_user(&account_id, request).await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!("\n{} User created successfully!", "✓".green().bold());
+                        println!("{:<15} {}", "ID:".bold(), user.id.cyan());
+                        println!("{:<15} {}", "Email:".bold(), user.email);
+                        println!("{:<15} {}", "Name:".bold(), user.display_name());
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            user.status.as_deref().unwrap_or("-")
+                        );
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": user.id,
+                            "email": user.email,
+                            "name": user.display_name(),
+                            "status": user.status,
+                            "created": true,
+                        }))?;
+                    }
+                }
+                Ok(())
+            }
+
+            UserCommands::Get { user_id, account } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?;
+
+                let user = admin_client.get_user(&account_id, &user_id).await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!("\n{}", "User Details:".bold());
+                        println!("{}", "─".repeat(60));
+                        println!("{:<15} {}", "ID:".bold(), user.id.cyan());
+                        println!("{:<15} {}", "Email:".bold(), user.email);
+                        if let Some(name) = &user.name {
+                            println!("{:<15} {}", "Name:".bold(), name);
+                        }
+                        if let Some(first) = &user.first_name {
+                            println!("{:<15} {}", "First Name:".bold(), first);
+                        }
+                        if let Some(last) = &user.last_name {
+                            println!("{:<15} {}", "Last Name:".bold(), last);
+                        }
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            format_user_status(user.status.as_deref().unwrap_or("-"))
+                        );
+                        if let Some(company) = &user.company_id {
+                            println!("{:<15} {}", "Company ID:".bold(), company);
+                        }
+                        if let Some(added) = user.added_on {
+                            println!("{:<15} {}", "Added On:".bold(), added.to_rfc3339());
+                        }
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": user.id,
+                            "email": user.email,
+                            "name": user.name,
+                            "first_name": user.first_name,
+                            "last_name": user.last_name,
+                            "status": user.status,
+                            "company_id": user.company_id,
+                            "added_on": user.added_on,
+                        }))?;
+                    }
+                }
+                Ok(())
+            }
+
+            UserCommands::UpdateAccount {
+                user,
+                company,
+                status,
+                account,
+            } => {
+                let account_id = resolve_account_id(account, dm_client).await?;
+                let http_config = HttpClientConfig::default();
+                let admin_client = AccountAdminClient::new_with_http_config(
+                    config.clone(),
+                    auth_client.clone(),
+                    http_config,
+                )?;
+
+                // Resolve email to user_id if needed
+                let user_id = if user.contains('@') {
+                    let found = admin_client
+                        .find_user_by_email(&account_id, &user)
+                        .await?
+                        .ok_or_else(|| anyhow::anyhow!("User '{}' not found in account", user))?;
+                    found.id
+                } else {
+                    user.clone()
+                };
+
+                if output_format.supports_colors() {
+                    println!(
+                        "\n{} Updating user {} in account {}",
+                        "→".cyan(),
+                        user_id.cyan(),
+                        account_id.cyan()
+                    );
+                }
+
+                let request = raps_acc::admin::UpdateAccountUserRequest {
+                    company_id: company,
+                    status,
+                    ..Default::default()
+                };
+
+                let updated = admin_client
+                    .update_user(&account_id, &user_id, request)
+                    .await?;
+
+                match output_format {
+                    OutputFormat::Table => {
+                        println!("\n{} User updated successfully!", "✓".green().bold());
+                        println!("{:<15} {}", "ID:".bold(), updated.id.cyan());
+                        println!("{:<15} {}", "Email:".bold(), updated.email);
+                        println!(
+                            "{:<15} {}",
+                            "Status:".bold(),
+                            updated.status.as_deref().unwrap_or("-")
+                        );
+                        if let Some(company) = &updated.company_id {
+                            println!("{:<15} {}", "Company ID:".bold(), company);
+                        }
+                    }
+                    _ => {
+                        output_format.write(&serde_json::json!({
+                            "id": updated.id,
+                            "email": updated.email,
+                            "status": updated.status,
+                            "company_id": updated.company_id,
+                            "updated": true,
+                        }))?;
+                    }
+                }
                 Ok(())
             }
         }
