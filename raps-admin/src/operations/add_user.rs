@@ -56,6 +56,7 @@ pub async fn bulk_add_user<P>(
     user_email: &str,
     role_id: Option<&str>,
     products: Vec<ProductAccess>,
+    company: Option<&str>,
     project_filter: &ProjectFilter,
     config: BulkConfig,
     on_progress: P,
@@ -88,6 +89,7 @@ where
         "user_email": user_email,
         "role_id": role_id,
         "products": products,
+        "company": company,
     });
 
     let operation_id = state_manager
@@ -141,6 +143,7 @@ where
     let role_id_clone = role_id.map(|s| s.to_string());
     let products_clone = products.clone();
     let users_client_clone = Arc::clone(&users_client);
+    let company_clone = company.map(|s| s.to_string());
 
     let processor = move |project_id: String| {
         let email = email_clone.clone();
@@ -149,9 +152,20 @@ where
         let users_client = Arc::clone(&users_client_clone);
         let project_keys = product_keys_map.get(&project_id).cloned();
         let platform = platform_map.get(&project_id).cloned();
+        let company = company_clone.clone();
 
         async move {
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, project_keys, platform).await
+            add_user_to_project(
+                &users_client,
+                &project_id,
+                &email,
+                role_id.as_deref(),
+                products,
+                project_keys,
+                platform,
+                company.as_deref(),
+            )
+            .await
         }
     };
 
@@ -184,19 +198,30 @@ async fn add_user_to_project(
     products: Vec<ProductAccess>,
     project_product_keys: Option<Vec<String>>,
     platform: Option<String>,
+    company: Option<&str>,
 ) -> ItemResult {
     // Add the user to the project by email; ACC sends an invitation if the
     // user is not yet an account member.
     // Note: no pre-check by email — user_exists requires a UUID, not an email.
     // Duplicate detection is handled by treating HTTP 409 as Skipped below.
     let products_for_upsert = products.clone();
+
+    // Determine company_id (ACC UUID) vs company_name (BIM 360 string)
+    let (company_id, company_name) = match company {
+        Some(c) if uuid::Uuid::parse_str(c).is_ok() => (Some(c.to_string()), None),
+        Some(c) => (None, Some(c.to_string())),
+        None => (None, None),
+    };
+
     let request = AddProjectUserRequest {
         email: email.to_string(),
         role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
         products,
+        company_id,
         suppress_administrative_emails: true,
         project_product_keys,
         platform,
+        company_name,
     };
 
     match users_client.add_user(project_id, request).await {
@@ -243,7 +268,10 @@ async fn upsert_existing_member(
     }
 
     // Find the user in the project by email
-    let existing = match users_client.find_project_user_by_email(project_id, email).await {
+    let existing = match users_client
+        .find_project_user_by_email(project_id, email)
+        .await
+    {
         Ok(Some(u)) => u,
         Ok(None) => {
             // 409 fired but user not found by email lookup — the user may have
@@ -280,7 +308,9 @@ async fn upsert_existing_member(
                 .unwrap_or(&[])
                 .iter()
                 .any(|cp| cp.key == p.key && cp.access == p.access)
-        }) && products.iter().all(|p| current_keys.contains(p.key.as_str()))
+        }) && products
+            .iter()
+            .all(|p| current_keys.contains(p.key.as_str()))
     } else {
         true
     };
@@ -294,10 +324,17 @@ async fn upsert_existing_member(
     // Role differs — update
     let update = UpdateProjectUserRequest {
         role_ids: role_id.map(|s| vec![s.to_string()]).unwrap_or_default(),
-        products: if products.is_empty() { None } else { Some(products) },
+        products: if products.is_empty() {
+            None
+        } else {
+            Some(products)
+        },
     };
 
-    match users_client.update_user(project_id, &existing.id, update).await {
+    match users_client
+        .update_user(project_id, &existing.id, update)
+        .await
+    {
         Ok(_) => ItemResult::Success,
         Err(e) => {
             let error_str = e.to_string();
@@ -328,7 +365,9 @@ fn is_insight_restriction_error(error: &str) -> bool {
     let lower = error.to_lowercase();
     lower.contains("cannot remove user access from insight")
         || lower.contains("insight")
-            && (lower.contains("cannot") || lower.contains("not allowed") || lower.contains("restricted"))
+            && (lower.contains("cannot")
+                || lower.contains("not allowed")
+                || lower.contains("restricted"))
 }
 
 /// Check if an error is retryable
@@ -365,6 +404,7 @@ where
         .to_string();
 
     let role_id = state.parameters["role_id"].as_str().map(|s| s.to_string());
+    let company = state.parameters["company"].as_str().map(|s| s.to_string());
     let products: Vec<ProductAccess> = state.parameters["products"]
         .as_array()
         .and_then(|arr| serde_json::from_value(serde_json::Value::Array(arr.clone())).ok())
@@ -425,10 +465,21 @@ where
         let role_id = role_id.clone();
         let products = products.clone();
         let users_client = Arc::clone(&users_client_clone);
+        let company = company.clone();
 
         async move {
             // Resume path: no cached product keys or platform — will probe/fetch if needed
-            add_user_to_project(&users_client, &project_id, &email, role_id.as_deref(), products, None, None).await
+            add_user_to_project(
+                &users_client,
+                &project_id,
+                &email,
+                role_id.as_deref(),
+                products,
+                None,
+                None,
+                company.as_deref(),
+            )
+            .await
         }
     };
 
@@ -468,7 +519,9 @@ mod tests {
 
     #[test]
     fn test_is_insight_restriction_error() {
-        assert!(is_insight_restriction_error("Cannot remove user access from Insight"));
+        assert!(is_insight_restriction_error(
+            "Cannot remove user access from Insight"
+        ));
         assert!(is_insight_restriction_error(
             r#"Failed to update project user (400 Bad Request): {"detail":"Cannot remove user access from Insight"}"#
         ));

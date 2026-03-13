@@ -1,7 +1,7 @@
 //! Scenario: --dry-run guarantees no write API calls are made for any operation.
 
-use raps_admin::{BulkConfig, bulk_add_user, bulk_remove_user};
 use raps_admin::filter::ProjectFilter;
+use raps_admin::{BulkConfig, bulk_add_user, bulk_remove_user};
 use raps_mock::TestServer;
 
 use crate::test_utils::{inject_token, make_clients};
@@ -19,8 +19,12 @@ async fn test_dry_run_add_makes_zero_write_calls() {
         "dryrun@example.com",
         Some("role-admin"),
         vec![],
+        None,
         &ProjectFilter::new(),
-        BulkConfig { dry_run: true, ..Default::default() },
+        BulkConfig {
+            dry_run: true,
+            ..Default::default()
+        },
         |_| {},
     )
     .await
@@ -41,7 +45,10 @@ async fn test_dry_run_remove_makes_zero_write_calls() {
         "mock-account-001",
         "alice@example.com",
         &ProjectFilter::new(),
-        BulkConfig { dry_run: true, ..Default::default() },
+        BulkConfig {
+            dry_run: true,
+            ..Default::default()
+        },
         |_| {},
     )
     .await

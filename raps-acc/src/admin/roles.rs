@@ -7,22 +7,48 @@ use anyhow::{Context, Result};
 
 use raps_kernel::http;
 
-use crate::types::ProductAccess;
 use super::types::{AccountRole, Bim360Role, ResolvedRole};
 use super::{AccountAdminClient, normalize_account_id};
+use crate::types::ProductAccess;
 
 impl AccountAdminClient {
     /// List all roles available in an account.
     ///
     /// Tries the ACC Construction Admin v1 endpoint first; falls back to
-    /// BIM 360 HQ v2 on HTTP 400.
+    /// BIM 360 HQ v2 project-level industry_roles on HTTP 400/404.
+    /// For BIM 360 hubs, fetches from the first active project if no
+    /// project_id is given (industry roles are typically shared across projects).
     pub async fn list_roles(&self, account_id: &str) -> Result<Vec<AccountRole>> {
+        self.list_roles_with_project(account_id, None).await
+    }
+
+    /// List roles, optionally scoped to a specific project for BIM 360.
+    pub async fn list_roles_with_project(
+        &self,
+        account_id: &str,
+        project_id: Option<&str>,
+    ) -> Result<Vec<AccountRole>> {
         let account_id = normalize_account_id(account_id);
 
         match self.list_roles_acc(&account_id).await {
             Ok(roles) => Ok(roles),
             Err(e) if e.to_string().contains("400") || e.to_string().contains("404") => {
-                self.list_roles_bim360(&account_id).await
+                // BIM 360: roles are per-project (industry_roles endpoint)
+                let pid = if let Some(p) = project_id {
+                    p.to_string()
+                } else {
+                    // Fetch just the first page (1 API call) to find an active project
+                    let page = self.list_projects(&account_id, Some(100), Some(0)).await?;
+                    page.results
+                        .into_iter()
+                        .find(|p| p.status.as_deref() == Some("active"))
+                        .map(|p| p.id)
+                        .ok_or_else(|| anyhow::anyhow!(
+                            "No active projects found in account to fetch BIM 360 industry roles. \
+                             Use --project to specify a project ID."
+                        ))?
+                };
+                self.list_roles_bim360(&account_id, &pid).await
             }
             Err(e) => Err(e),
         }
@@ -34,16 +60,37 @@ impl AccountAdminClient {
     /// - BIM 360 hub (roles endpoint returns data) → `ResolvedRole::Uuid` from name lookup
     /// - ACC hub (roles endpoint returns 404/empty) → `ResolvedRole::Products` from known mapping
     pub async fn resolve_role(&self, account_id: &str, role: &str) -> Result<ResolvedRole> {
+        self.resolve_role_with_project(account_id, role, None).await
+    }
+
+    /// Resolve a role name, using a project_id hint to avoid extra API calls
+    /// when fetching BIM 360 industry roles.
+    pub async fn resolve_role_with_project(
+        &self,
+        account_id: &str,
+        role: &str,
+        project_id: Option<&str>,
+    ) -> Result<ResolvedRole> {
         if is_uuid(role) {
             return Ok(ResolvedRole::Uuid(role.to_string()));
         }
 
-        match self.list_roles(account_id).await {
+        match self.list_roles_with_project(account_id, project_id).await {
             Ok(roles) if !roles.is_empty() => {
                 // BIM 360 hub — resolve by name to UUID
-                let matched = roles.iter().find(|r| r.name == role)
-                    .or_else(|| roles.iter().find(|r| r.name.to_lowercase() == role.to_lowercase()))
-                    .or_else(|| roles.iter().find(|r| r.name.to_lowercase().contains(&role.to_lowercase())));
+                let matched = roles
+                    .iter()
+                    .find(|r| r.name == role)
+                    .or_else(|| {
+                        roles
+                            .iter()
+                            .find(|r| r.name.to_lowercase() == role.to_lowercase())
+                    })
+                    .or_else(|| {
+                        roles
+                            .iter()
+                            .find(|r| r.name.to_lowercase().contains(&role.to_lowercase()))
+                    });
 
                 if let Some(r) = matched {
                     return Ok(ResolvedRole::Uuid(r.id.clone()));
@@ -54,7 +101,8 @@ impl AccountAdminClient {
                     return Ok(ResolvedRole::Products(products));
                 }
 
-                let available: Vec<String> = roles.iter().map(|r| format!("\"{}\"", r.name)).collect();
+                let available: Vec<String> =
+                    roles.iter().map(|r| format!("\"{}\"", r.name)).collect();
                 anyhow::bail!(
                     "Role {:?} not found. Available roles: {}",
                     role,
@@ -137,9 +185,19 @@ impl AccountAdminClient {
         parse_roles_response(&body)
     }
 
-    async fn list_roles_bim360(&self, account_id: &str) -> Result<Vec<AccountRole>> {
+    async fn list_roles_bim360(
+        &self,
+        account_id: &str,
+        project_id: &str,
+    ) -> Result<Vec<AccountRole>> {
         let token = self.auth.get_3leg_token().await?;
-        let url = format!("{}/roles", self.hq_v2_url(account_id));
+        // BIM 360 industry roles are project-level:
+        // GET /hq/v2/accounts/:account_id/projects/:project_id/industry_roles
+        let url = format!(
+            "{}/projects/{}/industry_roles",
+            self.hq_v2_url(account_id),
+            project_id
+        );
 
         let response = http::send_with_retry(&self.config.http_config, || {
             self.http_client.get(&url).bearer_auth(&token)
@@ -149,18 +207,21 @@ impl AccountAdminClient {
         if !response.status().is_success() {
             let status = response.status().as_u16();
             let body = response.text().await.unwrap_or_default();
-            anyhow::bail!("Failed to list BIM 360 roles (HTTP {status}): {body}");
+            anyhow::bail!("Failed to list BIM 360 industry roles (HTTP {status}): {body}");
         }
 
-        // BIM 360 v2 roles returns plain array with snake_case fields
+        // BIM 360 v2 industry_roles returns plain array of role objects
         let roles: Vec<Bim360Role> = response
             .json()
             .await
-            .context("Failed to parse BIM 360 roles response")?;
+            .context("Failed to parse BIM 360 industry roles response")?;
 
         Ok(roles
             .into_iter()
-            .map(|r| AccountRole { id: r.id, name: r.name })
+            .map(|r| AccountRole {
+                id: r.id,
+                name: r.name,
+            })
             .collect())
     }
 }
@@ -186,7 +247,10 @@ fn parse_roles_response(body: &str) -> Result<Vec<AccountRole>> {
 /// ACC does not have a `role_id` concept — access is controlled via product keys.
 /// Returns `None` for unrecognized role names.
 fn role_name_to_acc_products(role: &str) -> Option<Vec<ProductAccess>> {
-    let key = |k: &str, a: &str| ProductAccess { key: k.to_string(), access: a.to_string() };
+    let key = |k: &str, a: &str| ProductAccess {
+        key: k.to_string(),
+        access: a.to_string(),
+    };
     match role.to_lowercase().trim() {
         "project admin" | "admin" | "administrator" => Some(vec![
             key("projectAdministration", "administrator"),

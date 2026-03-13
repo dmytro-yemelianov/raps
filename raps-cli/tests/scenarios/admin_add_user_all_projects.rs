@@ -4,8 +4,8 @@
 //!   1. POST /projects/proj-001/users
 //!   2. POST /projects/proj-002/users
 
-use raps_admin::{BulkConfig, bulk_add_user};
 use raps_admin::filter::ProjectFilter;
+use raps_admin::{BulkConfig, bulk_add_user};
 use raps_mock::TestServer;
 
 use crate::test_utils::{inject_token, make_clients};
@@ -23,8 +23,12 @@ async fn test_add_user_to_all_projects_trace_matches_snapshot() {
         "scenario@example.com",
         Some("role-project-admin"),
         vec![],
+        None,
         &ProjectFilter::new(),
-        BulkConfig { concurrency: 1, ..Default::default() },
+        BulkConfig {
+            concurrency: 1,
+            ..Default::default()
+        },
         |_| {},
     )
     .await
@@ -52,6 +56,7 @@ async fn test_add_user_all_projects_result_counts() {
         "counts@example.com",
         None,
         vec![],
+        None,
         &ProjectFilter::new(),
         BulkConfig::default(),
         |_| {},

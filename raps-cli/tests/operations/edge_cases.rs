@@ -24,9 +24,11 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
                 email: "dup@example.com".into(),
                 role_ids: vec![],
                 products: vec![],
-        suppress_administrative_emails: false,
+                company_id: None,
+                suppress_administrative_emails: false,
                 project_product_keys: None,
                 platform: None,
+                company_name: None,
             },
         )
         .await
@@ -40,6 +42,7 @@ async fn test_add_user_already_member_is_not_counted_as_failed() {
         "dup@example.com",
         None,
         vec![],
+        None,
         &ProjectFilter::new(),
         BulkConfig::default(),
         |_| {},
@@ -70,6 +73,7 @@ async fn test_filter_excludes_all_projects_returns_zero_total() {
         "empty@example.com",
         None,
         vec![],
+        None,
         &filter,
         BulkConfig::default(),
         |_| {},

@@ -41,6 +41,9 @@ pub struct AddProjectUserRequest {
     pub role_ids: Vec<String>,
     /// Product access configurations (ACC requires this field even when empty)
     pub products: Vec<ProductAccess>,
+    /// Company ID to assign (ACC uses companyId UUID; serialized as camelCase)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub company_id: Option<String>,
     /// Suppress project invite email to the user (default: false)
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub suppress_administrative_emails: bool,
@@ -53,6 +56,10 @@ pub struct AddProjectUserRequest {
     /// When set, skips the ACC probe and goes directly to the correct endpoint.
     #[serde(skip)]
     pub platform: Option<String>,
+    /// Company name for BIM 360 import (BIM 360 uses company name, not UUID).
+    /// If set, used in the BIM 360 HQ v2 import path.
+    #[serde(skip)]
+    pub company_name: Option<String>,
 }
 
 // ── BIM 360 HQ v2 /users/import types ────────────────────────────────────────
@@ -62,6 +69,8 @@ pub struct AddProjectUserRequest {
 #[derive(Debug, Clone, Serialize)]
 struct Bim360ImportEntry {
     email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    company: Option<String>,
     services: Bim360ImportServices,
     industry_roles: Vec<String>,
 }
@@ -165,6 +174,7 @@ impl Bim360ImportEntry {
 
         Bim360ImportEntry {
             email: req.email.clone(),
+            company: req.company_name.clone(),
             services,
             industry_roles: req.role_ids.clone(),
         }
@@ -781,14 +791,29 @@ impl ProjectUsersClient {
             .await
             .context("Failed to send ACC update-user request")?;
 
-        if response.status().is_success() {
-            return response
-                .json()
-                .await
-                .context("Failed to parse update user response");
-        }
-
         let status = response.status().as_u16();
+
+        if response.status().is_success() {
+            match response.json::<ProjectUser>().await {
+                Ok(user) => return Ok(user),
+                Err(_) if self.account_id.is_some() => {
+                    // ACC endpoint returned 200 but response doesn't match ProjectUser —
+                    // likely a BIM 360 project routed through ACC. Fall through to BIM 360.
+                    self.acc_probe_failed.store(true, Ordering::Relaxed);
+                    return self
+                        .update_user_bim360(
+                            self.account_id.as_ref().unwrap(),
+                            project_id,
+                            user_id,
+                            &request,
+                        )
+                        .await;
+                }
+                Err(e) => {
+                    return Err(e).context("Failed to parse update user response");
+                }
+            }
+        }
 
         // On 400/500 try BIM 360 HQ v2 if we have an account_id.
         if (status == 400 || status == 500)
@@ -1190,9 +1215,11 @@ impl ProjectUsersClient {
                     email: user.email.clone(),
                     role_ids: user.role_ids,
                     products: user.products.unwrap_or_default(),
+                    company_id: None,
                     suppress_administrative_emails: false,
                     project_product_keys: None,
                     platform: None,
+                    company_name: None,
                 };
                 let result = client.add_user(&pid, request).await;
                 (email, result)
@@ -1250,9 +1277,11 @@ mod tests {
             email: "user@example.com".to_string(),
             role_ids: vec![],
             products: vec![],
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("\"email\":\"user@example.com\""));
@@ -1271,9 +1300,11 @@ mod tests {
                 key: "docs".to_string(),
                 access: "member".to_string(),
             }],
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
 
         let json = serde_json::to_string(&request).unwrap();
@@ -1316,9 +1347,11 @@ mod tests {
                     access: "administrator".to_string(),
                 },
             ],
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
 
         // Project without Document Management (only projectAdministration + insight)
@@ -1350,9 +1383,11 @@ mod tests {
                     access: "administrator".to_string(),
                 },
             ],
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
 
         // Project WITH Document Management
@@ -1379,9 +1414,11 @@ mod tests {
             email: "user@example.com".to_string(),
             role_ids: vec![],
             products: vec![],
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
 
         // Empty product keys = unknown → safe default: include document_management

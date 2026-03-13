@@ -23,8 +23,13 @@ async fn test_bulk_add_user_calls_post_for_each_active_project() {
         "bulk@example.com",
         None,
         vec![],
+        None,
         &ProjectFilter::new(),
-        BulkConfig { concurrency: 2, dry_run: false, ..Default::default() },
+        BulkConfig {
+            concurrency: 2,
+            dry_run: false,
+            ..Default::default()
+        },
         |_| {},
     )
     .await
@@ -51,8 +56,13 @@ async fn test_bulk_add_user_with_role_id_sends_role_to_each_project() {
         "roletest@example.com",
         Some("role-project-admin"),
         vec![],
+        None,
         &ProjectFilter::new(),
-        BulkConfig { concurrency: 2, dry_run: false, ..Default::default() },
+        BulkConfig {
+            concurrency: 2,
+            dry_run: false,
+            ..Default::default()
+        },
         |_| {},
     )
     .await
@@ -61,8 +71,12 @@ async fn test_bulk_add_user_with_role_id_sends_role_to_each_project() {
     assert_eq!(result.total, 2);
 
     // Both proj-001 and proj-002 should have received a POST to their /users endpoint
-    server.trace.assert_called_with("POST", "/projects/proj-001/users");
-    server.trace.assert_called_with("POST", "/projects/proj-002/users");
+    server
+        .trace
+        .assert_called_with("POST", "/projects/proj-001/users");
+    server
+        .trace
+        .assert_called_with("POST", "/projects/proj-002/users");
 }
 
 #[tokio::test]
@@ -78,8 +92,12 @@ async fn test_bulk_add_user_dry_run_makes_no_post_calls() {
         "dryrun@example.com",
         None,
         vec![],
+        None,
         &ProjectFilter::new(),
-        BulkConfig { dry_run: true, ..Default::default() },
+        BulkConfig {
+            dry_run: true,
+            ..Default::default()
+        },
         |_| {},
     )
     .await

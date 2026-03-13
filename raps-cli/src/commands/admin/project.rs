@@ -149,6 +149,114 @@ pub(crate) async fn execute_company_list(
     Ok(())
 }
 
+#[derive(Serialize, schemars::JsonSchema)]
+pub(crate) struct RoleListOutput {
+    id: String,
+    name: String,
+}
+
+/// Execute role listing for an account
+pub(crate) async fn execute_role_list(
+    config: &Config,
+    auth_client: &AuthClient,
+    dm_client: &DataManagementClient,
+    account: Option<String>,
+    project: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let account_id = resolve_account_id(account, dm_client).await?;
+
+    if output_format.supports_colors() {
+        println!(
+            "\n{} List roles in account {}",
+            "→".cyan(),
+            account_id.cyan()
+        );
+        println!();
+    }
+
+    let http_config = HttpClientConfig::default();
+    let admin_client =
+        AccountAdminClient::new_with_http_config(config.clone(), auth_client.clone(), http_config)?;
+
+    let roles = admin_client
+        .list_roles_with_project(&account_id, project.as_deref())
+        .await?;
+
+    if roles.is_empty() {
+        // ACC hub — show built-in product-based roles
+        let outputs = vec![
+            RoleListOutput {
+                id: "(product-based)".to_string(),
+                name: "Project Admin".to_string(),
+            },
+            RoleListOutput {
+                id: "(product-based)".to_string(),
+                name: "Project Member".to_string(),
+            },
+            RoleListOutput {
+                id: "(product-based)".to_string(),
+                name: "Project Editor".to_string(),
+            },
+            RoleListOutput {
+                id: "(product-based)".to_string(),
+                name: "Project Viewer".to_string(),
+            },
+        ];
+
+        match output_format {
+            OutputFormat::Table => {
+                println!(
+                    "{} ACC hub detected — roles are product-based, not UUID-based:",
+                    "ℹ".cyan()
+                );
+                println!("{}", "─".repeat(50));
+                for r in &outputs {
+                    println!("  {}", r.name.green());
+                }
+                println!("{}", "─".repeat(50));
+                println!(
+                    "Use these names with {}: e.g. {}",
+                    "--role".bold(),
+                    "--role admin".cyan()
+                );
+            }
+            _ => {
+                output_format.write(&outputs)?;
+            }
+        }
+    } else {
+        let outputs: Vec<RoleListOutput> = roles
+            .iter()
+            .map(|r| RoleListOutput {
+                id: r.id.clone(),
+                name: r.name.clone(),
+            })
+            .collect();
+
+        match output_format {
+            OutputFormat::Table => {
+                println!("{}", "Roles:".bold());
+                println!("{}", "─".repeat(75));
+                println!("{:<38} {}", "ID".bold(), "Name".bold(),);
+                println!("{}", "─".repeat(75));
+
+                for r in &outputs {
+                    println!("{:<38} {}", r.id.cyan(), r.name);
+                }
+
+                println!("{}", "─".repeat(75));
+                println!("{} {} role(s) found", "→".cyan(), outputs.len());
+            }
+            _ => {
+                output_format.write(&outputs)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl AdminProjectCommands {
     pub async fn execute(
         self,
@@ -223,15 +331,20 @@ impl AdminProjectCommands {
                         hubs.iter()
                             .find(|h| h.id == hub_id)
                             .and_then(|h| {
-                                h.attributes.extension.as_ref()?.extension_type.as_deref().map(|ext| {
-                                    if ext.contains("bim360") {
-                                        "bim360"
-                                    } else if ext.contains("accproject") {
-                                        "acc"
-                                    } else {
-                                        "acc"
-                                    }
-                                })
+                                h.attributes
+                                    .extension
+                                    .as_ref()?
+                                    .extension_type
+                                    .as_deref()
+                                    .map(|ext| {
+                                        if ext.contains("bim360") {
+                                            "bim360"
+                                        } else if ext.contains("accproject") {
+                                            "acc"
+                                        } else {
+                                            "acc"
+                                        }
+                                    })
                             })
                             .unwrap_or("acc")
                     }
@@ -504,11 +617,8 @@ impl AdminProjectCommands {
 
                         match client.create_project(&acct, request).await {
                             Ok(job) => {
-                                let project_id = job
-                                    .project_id
-                                    .as_deref()
-                                    .unwrap_or("unknown")
-                                    .to_string();
+                                let project_id =
+                                    job.project_id.as_deref().unwrap_or("unknown").to_string();
 
                                 if wait {
                                     // Wait for activation (up to 60s)
@@ -612,10 +722,7 @@ impl AdminProjectCommands {
                         account_id.cyan()
                     );
                     if let Some(ref dir) = export_dir {
-                        println!(
-                            "  Export directory: {}",
-                            dir.display().to_string().cyan()
-                        );
+                        println!("  Export directory: {}", dir.display().to_string().cyan());
                     }
                 }
 
@@ -898,10 +1005,7 @@ fn collect_files_recursive<'a>(
 }
 
 /// Download a URL to a local file using reqwest.
-async fn download_url_to_file(
-    url: &str,
-    path: &std::path::Path,
-) -> Result<()> {
+async fn download_url_to_file(url: &str, path: &std::path::Path) -> Result<()> {
     let client = reqwest::Client::new();
     let response = client.get(url).send().await?;
 

@@ -290,6 +290,7 @@ impl UserCommands {
                 email,
                 account,
                 role,
+                company,
                 filter,
                 project_ids,
                 concurrency,
@@ -351,7 +352,10 @@ impl UserCommands {
                 let users_client = Arc::new(users_client);
 
                 // Resolve role name to either a BIM 360 UUID or ACC product access list
-                let (resolved_role_id, resolved_products): (Option<String>, Vec<raps_acc::types::ProductAccess>) = if let Some(ref role_name) = role {
+                let (resolved_role_id, resolved_products): (
+                    Option<String>,
+                    Vec<raps_acc::types::ProductAccess>,
+                ) = if let Some(ref role_name) = role {
                     match admin_client.resolve_role(&account_id, role_name).await? {
                         ResolvedRole::Uuid(id) => (Some(id), vec![]),
                         ResolvedRole::Products(products) => (None, products),
@@ -370,6 +374,7 @@ impl UserCommands {
                     &email,
                     resolved_role_id.as_deref(),
                     resolved_products,
+                    company.as_deref(),
                     &project_filter,
                     bulk_config,
                     on_progress,
@@ -653,6 +658,7 @@ impl UserCommands {
                 project,
                 email,
                 role,
+                company,
                 account,
             } => {
                 let account_id = account.or_else(|| std::env::var("APS_ACCOUNT_ID").ok());
@@ -702,13 +708,21 @@ impl UserCommands {
                     }
                 };
 
+                let (company_id, company_name) = match &company {
+                    Some(c) if uuid::Uuid::parse_str(c).is_ok() => (Some(c.clone()), None),
+                    Some(c) => (None, Some(c.clone())),
+                    None => (None, None),
+                };
+
                 let request = raps_acc::users::AddProjectUserRequest {
                     email: email.clone(),
                     role_ids: resolved_role_ids,
                     products: resolved_products,
+                    company_id,
                     suppress_administrative_emails: false,
                     project_product_keys: None,
                     platform: None,
+                    company_name,
                 };
 
                 let user = users_client.add_user(&project, request).await?;
@@ -1033,9 +1047,11 @@ impl UserCommands {
                                 email: email.clone(),
                                 role_ids: role.clone().map(|s| vec![s]).unwrap_or_default(),
                                 products: vec![],
+                                company_id: None,
                                 suppress_administrative_emails: false,
                                 project_product_keys: None,
                                 platform: None,
+                                company_name: None,
                             };
                             match users_client.add_user(&project.id, request).await {
                                 Ok(_) => {
@@ -1183,10 +1199,7 @@ async fn export_permissions(
     let total = all_projects.len();
 
     if output_format.supports_colors() {
-        eprintln!(
-            "Scanning {} projects for user {}...",
-            total, email
-        );
+        eprintln!("Scanning {} projects for user {}...", total, email);
     }
 
     // For each project, check if user is a member (using filter[email])
@@ -1271,10 +1284,9 @@ async fn export_permissions(
                     let perms_client = &perms_client;
                     async move {
                         let perms = match perms_client.get_project_files_folder_id(&pid).await {
-                            Ok(folder_id) => perms_client
-                                .get_permissions(&pid, &folder_id)
-                                .await
-                                .ok(),
+                            Ok(folder_id) => {
+                                perms_client.get_permissions(&pid, &folder_id).await.ok()
+                            }
                             Err(_) => None,
                         };
                         (pid, perms)
@@ -1399,10 +1411,7 @@ async fn clone_permissions(
                         project_id: project.id,
                         project_name: project.name,
                         role_ids: pu.role_ids.clone(),
-                        products: pu
-                            .products
-                            .clone()
-                            .unwrap_or_default(),
+                        products: pu.products.clone().unwrap_or_default(),
                     }),
                     _ => None,
                 }
@@ -1536,9 +1545,11 @@ async fn clone_permissions(
                     email: target_email.to_string(),
                     role_ids: membership.role_ids.clone(),
                     products: membership.products.clone(),
+                    company_id: None,
                     suppress_administrative_emails: false,
                     project_product_keys: None,
                     platform: None,
+                    company_name: None,
                 };
                 match users_client.add_user(&membership.project_id, request).await {
                     Ok(_) => {
@@ -1558,10 +1569,7 @@ async fn clone_permissions(
                             || err_str.to_lowercase().contains("exists")
                         {
                             match users_client
-                                .find_project_user_by_email(
-                                    &membership.project_id,
-                                    target_email,
-                                )
+                                .find_project_user_by_email(&membership.project_id, target_email)
                                 .await
                             {
                                 Ok(Some(existing)) => {
@@ -1576,11 +1584,10 @@ async fn clone_permissions(
                                         };
                                     }
                                     // Update role
-                                    let update_req =
-                                        raps_acc::users::UpdateProjectUserRequest {
-                                            role_ids: membership.role_ids.clone(),
-                                            products: Some(membership.products.clone()),
-                                        };
+                                    let update_req = raps_acc::users::UpdateProjectUserRequest {
+                                        role_ids: membership.role_ids.clone(),
+                                        products: Some(membership.products.clone()),
+                                    };
                                     match users_client
                                         .update_user(
                                             &membership.project_id,
@@ -1654,7 +1661,9 @@ async fn clone_permissions(
         // Only clone folders for projects where the target was successfully added/updated
         let ok_project_ids: Vec<String> = results
             .iter()
-            .filter(|r| r.status == "added" || r.status == "updated" || r.status == "already_matching")
+            .filter(|r| {
+                r.status == "added" || r.status == "updated" || r.status == "already_matching"
+            })
             .map(|r| r.project_id.clone())
             .collect();
 
@@ -1677,9 +1686,9 @@ async fn clone_permissions(
                     };
 
                     // Find source user's permissions
-                    let source_perm = perms.iter().find(|p| {
-                        p.subject_id == *source_id && p.subject_type == "USER"
-                    });
+                    let source_perm = perms
+                        .iter()
+                        .find(|p| p.subject_id == *source_id && p.subject_type == "USER");
 
                     let Some(source_perm) = source_perm else {
                         return true; // No folder perms to clone
@@ -1779,8 +1788,16 @@ async fn clone_permissions(
                 cloned: ok,
                 already_matched: skip,
                 failed: fail,
-                folder_cloned: if include_folders { Some(folder_cloned) } else { None },
-                folder_failed: if include_folders { Some(folder_failed) } else { None },
+                folder_cloned: if include_folders {
+                    Some(folder_cloned)
+                } else {
+                    None
+                },
+                folder_failed: if include_folders {
+                    Some(folder_failed)
+                } else {
+                    None
+                },
                 results,
             })?;
         }

@@ -66,13 +66,18 @@ async fn test_add_user_with_role_id_propagates_to_api() {
         email: "newuser@example.com".to_string(),
         role_ids: vec!["role-project-admin".to_string()],
         products: vec![],
+        company_id: None,
         suppress_administrative_emails: false,
         project_product_keys: None,
         platform: None,
+        company_name: None,
     };
 
     let result = client.add_user("proj-001", request).await.unwrap();
-    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-project-admin"));
+    assert_eq!(
+        result.role_ids.first().map(String::as_str),
+        Some("role-project-admin")
+    );
 }
 
 /// When role_ids=[] is passed, the POST body must NOT contain "roleIds" and the
@@ -87,14 +92,19 @@ async fn test_add_user_without_role_id_omits_role_from_body() {
         email: "newuser2@example.com".to_string(),
         role_ids: vec![],
         products: vec![],
+        company_id: None,
         suppress_administrative_emails: false,
         project_product_keys: None,
         platform: None,
+        company_name: None,
     };
 
     // Server default when roleIds absent from body is "role-default"
     let result = client.add_user("proj-001", request).await.unwrap();
-    assert_eq!(result.role_ids.first().map(String::as_str), Some("role-default"));
+    assert_eq!(
+        result.role_ids.first().map(String::as_str),
+        Some("role-default")
+    );
 }
 
 /// User already present (same email+project) should return a recognisable error
@@ -110,9 +120,11 @@ async fn test_add_duplicate_user_returns_error() {
         email: "alice@example.com".to_string(),
         role_ids: vec!["role-project-admin".to_string()],
         products: vec![],
+        company_id: None,
         suppress_administrative_emails: false,
         project_product_keys: None,
         platform: None,
+        company_name: None,
     };
 
     // First add should succeed (mock allows re-insert via OR REPLACE)

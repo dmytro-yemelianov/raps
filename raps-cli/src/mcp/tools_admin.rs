@@ -108,6 +108,7 @@ impl RapsServer {
             &email,
             resolved_role_id.as_deref(),
             resolved_products,
+            None,
             &project_filter,
             bulk_config,
             on_progress,

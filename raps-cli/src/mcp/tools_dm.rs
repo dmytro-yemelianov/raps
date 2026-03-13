@@ -458,9 +458,11 @@ impl RapsServer {
             email: email.clone(),
             role_ids,
             products,
+            company_id: None,
             suppress_administrative_emails: false,
             project_product_keys: None,
             platform: None,
+            company_name: None,
         };
 
         match client.add_user(&project_id, request).await {
@@ -468,8 +470,11 @@ impl RapsServer {
                 "Added user to project:\n* Email: {}\n* Name: {}\n* Role: {}",
                 email,
                 user.name.unwrap_or_else(|| "-".to_string()),
-                user.role_name
-                    .unwrap_or_else(|| user.role_ids.into_iter().next().unwrap_or_else(|| "-".to_string()))
+                user.role_name.unwrap_or_else(|| user
+                    .role_ids
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| "-".to_string()))
             ),
             Err(e) => format!("Failed to add user to project: {}", e),
         }
@@ -491,7 +496,11 @@ impl RapsServer {
                 let email = v.get("email")?.as_str()?.to_string();
                 Some(ImportUserRequest {
                     email,
-                    role_ids: v.get("role").and_then(|r| r.as_str()).map(|s| vec![s.to_string()]).unwrap_or_default(),
+                    role_ids: v
+                        .get("role")
+                        .and_then(|r| r.as_str())
+                        .map(|s| vec![s.to_string()])
+                        .unwrap_or_default(),
                     products: None,
                 })
             })
@@ -602,7 +611,8 @@ impl RapsServer {
         let client = self.get_users_client().await;
 
         if role.is_none() {
-            return "Error: role must be provided (e.g. admin, member, editor, viewer, or a UUID).".to_string();
+            return "Error: role must be provided (e.g. admin, member, editor, viewer, or a UUID)."
+                .to_string();
         }
         let role_name = role.as_deref().unwrap();
 
@@ -614,18 +624,18 @@ impl RapsServer {
             Err(_) => (vec![role_name.to_string()], None),
         };
 
-        let request = UpdateProjectUserRequest {
-            role_ids,
-            products,
-        };
+        let request = UpdateProjectUserRequest { role_ids, products };
 
         match client.update_user(&project_id, &user_id, request).await {
             Ok(user) => format!(
                 "Updated user in project:\n* User ID: {}\n* Name: {}\n* Role: {}",
                 user.id,
                 user.name.unwrap_or_else(|| "-".to_string()),
-                user.role_name
-                    .unwrap_or_else(|| user.role_ids.into_iter().next().unwrap_or_else(|| "-".to_string()))
+                user.role_name.unwrap_or_else(|| user
+                    .role_ids
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| "-".to_string()))
             ),
             Err(e) => format!("Failed to update user in project: {}", e),
         }

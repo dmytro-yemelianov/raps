@@ -55,12 +55,38 @@ pub enum AdminCommands {
     #[command(subcommand)]
     Operation(OperationCommands),
 
+    /// Company management
+    #[command(subcommand)]
+    Company(CompanyCommands),
+
+    /// Role management
+    #[command(subcommand)]
+    Role(RoleCommands),
+}
+
+/// Company management subcommands
+#[derive(Debug, Subcommand)]
+pub enum CompanyCommands {
     /// List companies in an account
-    #[command(name = "company-list")]
-    CompanyList {
+    List {
         /// Account ID (defaults to APS_ACCOUNT_ID env var)
         #[arg(short, long)]
         account: Option<String>,
+    },
+}
+
+/// Role management subcommands
+#[derive(Debug, Subcommand)]
+pub enum RoleCommands {
+    /// List roles in an account (industry roles for BIM 360, product-based for ACC)
+    List {
+        /// Account ID (defaults to APS_ACCOUNT_ID env var)
+        #[arg(short, long)]
+        account: Option<String>,
+
+        /// Project ID (BIM 360 only — roles are per-project; defaults to first active project)
+        #[arg(short, long)]
+        project: Option<String>,
     },
 }
 
@@ -102,6 +128,10 @@ pub enum UserCommands {
         /// Role to assign (e.g., "Project Admin", "Document Manager")
         #[arg(short, long)]
         role: Option<String>,
+
+        /// Company name to assign (BIM 360) or company ID (ACC UUID)
+        #[arg(long)]
+        company: Option<String>,
 
         /// Project filter expression (e.g., "name:*Hospital*,status:active")
         #[arg(short, long)]
@@ -226,6 +256,10 @@ pub enum UserCommands {
         /// Role to assign: "admin", "member", "editor", "viewer" (ACC) or a UUID (BIM 360 industry role)
         #[arg(short, long)]
         role: Option<String>,
+
+        /// Company name to assign (BIM 360) or company ID (ACC UUID)
+        #[arg(long)]
+        company: Option<String>,
 
         /// Account ID (required for BIM 360 hubs; defaults to APS_ACCOUNT_ID env var)
         #[arg(short, long)]
@@ -618,10 +652,9 @@ pub(crate) async fn resolve_account_id(
     }
 
     // Auto-discover via hub list (requires 3-legged auth)
-    let all_hubs = dm_client
-        .list_hubs()
-        .await
-        .context("Failed to list hubs for account auto-discovery. Use --account or set APS_ACCOUNT_ID.")?;
+    let all_hubs = dm_client.list_hubs().await.context(
+        "Failed to list hubs for account auto-discovery. Use --account or set APS_ACCOUNT_ID.",
+    )?;
 
     // Filter to enterprise ACC/BIM360 hubs only — personal hubs
     // (extension_type = "hubs:autodesk.core:Hub") do not have Admin API access.
@@ -732,12 +765,35 @@ impl AdminCommands {
                     .await
             }
             AdminCommands::Project(cmd) => {
-                cmd.execute(config, auth_client, dm_client, output_format).await
+                cmd.execute(config, auth_client, dm_client, output_format)
+                    .await
             }
             AdminCommands::Operation(cmd) => cmd.execute(output_format).await,
-            AdminCommands::CompanyList { account } => {
-                project::execute_company_list(config, auth_client, dm_client, account, output_format).await
-            }
+            AdminCommands::Company(cmd) => match cmd {
+                CompanyCommands::List { account } => {
+                    project::execute_company_list(
+                        config,
+                        auth_client,
+                        dm_client,
+                        account,
+                        output_format,
+                    )
+                    .await
+                }
+            },
+            AdminCommands::Role(cmd) => match cmd {
+                RoleCommands::List { account, project } => {
+                    project::execute_role_list(
+                        config,
+                        auth_client,
+                        dm_client,
+                        account,
+                        project,
+                        output_format,
+                    )
+                    .await
+                }
+            },
         }
     }
 }

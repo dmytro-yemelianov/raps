@@ -33,9 +33,7 @@ pub async fn execute_add(
     job: &crate::db::jobs::Job,
 ) -> Result<serde_json::Value> {
     let input = &job.input;
-    let account_id = input["account_id"]
-        .as_str()
-        .context("Missing account_id")?;
+    let account_id = input["account_id"].as_str().context("Missing account_id")?;
     let email = input["email"].as_str().context("Missing email")?;
     let role_id = input["role_id"].as_str();
     let concurrency = input["concurrency"].as_u64().unwrap_or(10) as usize;
@@ -74,6 +72,7 @@ pub async fn execute_add(
         email,
         role_id,
         products,
+        None,
         &project_filter,
         config,
         move |progress| {
@@ -107,9 +106,7 @@ pub async fn execute_remove(
     job: &crate::db::jobs::Job,
 ) -> Result<serde_json::Value> {
     let input = &job.input;
-    let account_id = input["account_id"]
-        .as_str()
-        .context("Missing account_id")?;
+    let account_id = input["account_id"].as_str().context("Missing account_id")?;
     let email = input["email"].as_str().context("Missing email")?;
     let concurrency = input["concurrency"].as_u64().unwrap_or(10) as usize;
     let dry_run = input["dry_run"].as_bool().unwrap_or(false);
