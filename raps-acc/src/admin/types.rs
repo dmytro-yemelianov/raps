@@ -167,6 +167,51 @@ pub struct UpdateAccountUserRequest {
     pub company_name: Option<String>,
 }
 
+/// Request to create a new company in an account
+#[derive(Debug, Clone, Serialize)]
+pub struct CreateCompanyRequest {
+    /// Company name (required)
+    pub name: String,
+    /// Trade or discipline
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trade: Option<String>,
+    /// Address line 1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address_line_1: Option<String>,
+    /// City
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    /// State or province
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_or_province: Option<String>,
+    /// Country
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
+/// Request to update an existing company
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct UpdateCompanyRequest {
+    /// Company name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Trade or discipline
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trade: Option<String>,
+    /// Address line 1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address_line_1: Option<String>,
+    /// City
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    /// State or province
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub state_or_province: Option<String>,
+    /// Country
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
 /// A role available in an account (ACC or BIM 360)
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
