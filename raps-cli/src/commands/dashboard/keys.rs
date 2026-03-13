@@ -115,8 +115,7 @@ pub(super) fn handle_key(
             app.input_mode = InputMode::Normal;
             return;
         }
-        InputMode::Normal => {
-}
+        InputMode::Normal => {}
     }
 
     // Guard: tabs with empty nav stacks (e.g. F5 before :urn) only allow
@@ -552,8 +551,15 @@ fn handle_enter(app: &mut App, clients: &Arc<Clients>, tx: &mpsc::UnboundedSende
             }
         }
         ResourceData::IssueDetail(_) => {
-            if let ViewKind::IssueDetail { project_id, issue_id } = app.current_view().clone() {
-                app.push_view(ViewKind::IssueCommentList { project_id, issue_id });
+            if let ViewKind::IssueDetail {
+                project_id,
+                issue_id,
+            } = app.current_view().clone()
+            {
+                app.push_view(ViewKind::IssueCommentList {
+                    project_id,
+                    issue_id,
+                });
                 fetch::load_view(app, clients, tx, false);
             }
         }

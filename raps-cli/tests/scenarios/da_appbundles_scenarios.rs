@@ -22,9 +22,7 @@ async fn test_da_appbundles_list_json_empty() {
 async fn test_da_appbundles_list_table_empty_succeeds() {
     let (_server, mut cmd) = start_cli_test().await;
 
-    cmd.args(["da", "appbundles"])
-        .assert()
-        .success();
+    cmd.args(["da", "appbundles"]).assert().success();
 }
 
 /// `da appbundle-create` with explicit id and engine creates a bundle successfully.
@@ -33,9 +31,12 @@ async fn test_da_appbundle_create_with_id_and_engine() {
     let (_server, mut cmd) = start_cli_test().await;
 
     cmd.args([
-        "da", "appbundle-create",
-        "--id", "MyBundle",
-        "--engine", "Autodesk.AutoCAD+24",
+        "da",
+        "appbundle-create",
+        "--id",
+        "MyBundle",
+        "--engine",
+        "Autodesk.AutoCAD+24",
     ])
     .assert()
     .success()
@@ -48,10 +49,14 @@ async fn test_da_appbundle_create_shows_bundle_id() {
     let (_server, mut cmd) = start_cli_test().await;
 
     cmd.args([
-        "da", "appbundle-create",
-        "--id", "RevitBundle",
-        "--engine", "Autodesk.Revit+2025",
-        "--description", "Test bundle",
+        "da",
+        "appbundle-create",
+        "--id",
+        "RevitBundle",
+        "--engine",
+        "Autodesk.Revit+2025",
+        "--description",
+        "Test bundle",
     ])
     .assert()
     .success()
@@ -64,9 +69,12 @@ async fn test_da_appbundle_create_shows_engine() {
     let (_server, mut cmd) = start_cli_test().await;
 
     cmd.args([
-        "da", "appbundle-create",
-        "--id", "AcadBundle",
-        "--engine", "Autodesk.AutoCAD+24",
+        "da",
+        "appbundle-create",
+        "--id",
+        "AcadBundle",
+        "--engine",
+        "Autodesk.AutoCAD+24",
     ])
     .assert()
     .success()
@@ -79,20 +87,25 @@ async fn test_da_appbundles_list_shows_created_bundle() {
     let (server, mut create_cmd) = start_cli_test().await;
 
     // Create a bundle
-    create_cmd.args([
-        "da", "appbundle-create",
-        "--id", "ListedBundle",
-        "--engine", "Autodesk.Revit+2025",
-    ])
-    .assert()
-    .success();
+    create_cmd
+        .args([
+            "da",
+            "appbundle-create",
+            "--id",
+            "ListedBundle",
+            "--engine",
+            "Autodesk.Revit+2025",
+        ])
+        .assert()
+        .success();
 
     // List bundles using the same server
     let mut list_cmd = assert_cmd::Command::cargo_bin("raps").unwrap();
     list_cmd.env("APS_BASE_URL", &server.url);
     list_cmd.env("APS_CLIENT_ID", "test-client");
     list_cmd.env("APS_CLIENT_SECRET", "test-secret");
-    list_cmd.args(["da", "appbundles", "--output", "json"])
+    list_cmd
+        .args(["da", "appbundles", "--output", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("ListedBundle"));
@@ -104,20 +117,25 @@ async fn test_da_appbundle_delete_succeeds() {
     let (server, mut create_cmd) = start_cli_test().await;
 
     // First create a bundle
-    create_cmd.args([
-        "da", "appbundle-create",
-        "--id", "DeleteMe",
-        "--engine", "Autodesk.AutoCAD+24",
-    ])
-    .assert()
-    .success();
+    create_cmd
+        .args([
+            "da",
+            "appbundle-create",
+            "--id",
+            "DeleteMe",
+            "--engine",
+            "Autodesk.AutoCAD+24",
+        ])
+        .assert()
+        .success();
 
     // Then delete it using the same server
     let mut del_cmd = assert_cmd::Command::cargo_bin("raps").unwrap();
     del_cmd.env("APS_BASE_URL", &server.url);
     del_cmd.env("APS_CLIENT_ID", "test-client");
     del_cmd.env("APS_CLIENT_SECRET", "test-secret");
-    del_cmd.args(["da", "appbundle-delete", "DeleteMe"])
+    del_cmd
+        .args(["da", "appbundle-delete", "DeleteMe"])
         .assert()
         .success()
         .stdout(predicate::str::contains("deleted"));
@@ -149,9 +167,12 @@ async fn test_da_appbundle_create_shows_upload_url() {
     let (_server, mut cmd) = start_cli_test().await;
 
     cmd.args([
-        "da", "appbundle-create",
-        "--id", "UploadBundle",
-        "--engine", "Autodesk.AutoCAD+24",
+        "da",
+        "appbundle-create",
+        "--id",
+        "UploadBundle",
+        "--engine",
+        "Autodesk.AutoCAD+24",
     ])
     .assert()
     .success()
@@ -164,9 +185,12 @@ async fn test_da_appbundle_create_creates_default_alias() {
     let (_server, mut cmd) = start_cli_test().await;
 
     cmd.args([
-        "da", "appbundle-create",
-        "--id", "AliasBundle",
-        "--engine", "Autodesk.Revit+2025",
+        "da",
+        "appbundle-create",
+        "--id",
+        "AliasBundle",
+        "--engine",
+        "Autodesk.Revit+2025",
     ])
     .assert()
     .success()

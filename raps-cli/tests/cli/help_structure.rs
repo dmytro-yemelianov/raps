@@ -9,20 +9,14 @@ fn raps() -> Command {
 
 #[test]
 fn test_admin_help_snapshot() {
-    let output = raps()
-        .args(["admin", "--help"])
-        .output()
-        .unwrap();
+    let output = raps().args(["admin", "--help"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     insta::assert_snapshot!("admin_help", stdout);
 }
 
 #[test]
 fn test_admin_user_help_snapshot() {
-    let output = raps()
-        .args(["admin", "user", "--help"])
-        .output()
-        .unwrap();
+    let output = raps().args(["admin", "user", "--help"]).output().unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     insta::assert_snapshot!("admin_user_help", stdout);
 }

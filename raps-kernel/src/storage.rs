@@ -136,7 +136,9 @@ impl TokenStorage {
     /// at most once per CLI invocation. The sub-microsecond I/O cost is far less
     /// than the overhead of `spawn_blocking` thread-pool scheduling.
     fn save_file(&self, token: &StoredToken) -> Result<()> {
-        tracing::warn!("Storing token in plaintext file. Use keychain for better security. Run 'raps config migrate-tokens' to move existing tokens to the OS keychain.");
+        tracing::warn!(
+            "Storing token in plaintext file. Use keychain for better security. Run 'raps config migrate-tokens' to move existing tokens to the OS keychain."
+        );
         let path = Self::token_file_path()?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;

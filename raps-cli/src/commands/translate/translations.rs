@@ -10,9 +10,9 @@ use anyhow::{Context, Result};
 use colored::Colorize;
 use serde::Serialize;
 
-use base64::Engine as _;
 use crate::commands::cost::CostEstimate;
 use crate::output::OutputFormat;
+use base64::Engine as _;
 use raps_derivative::{DerivativeClient, OutputFormat as DerivativeOutputFormat, TranslationCache};
 use raps_kernel::{progress, prompts};
 
@@ -173,8 +173,8 @@ pub(super) async fn start_translation(
         },
         None => {
             // Try to auto-detect from URN (base64-decode to get filename/extension)
-            let auto_detected = filename_from_urn(&source_urn)
-                .map(|filename| detect_output_format(&filename));
+            let auto_detected =
+                filename_from_urn(&source_urn).map(|filename| detect_output_format(&filename));
 
             if let Some((fmt, ext)) = auto_detected.filter(|(_, ext)| !ext.is_empty()) {
                 if output_format.supports_colors() {
@@ -185,7 +185,10 @@ pub(super) async fn start_translation(
                         ext
                     );
                 } else {
-                    println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                    println!(
+                        "Auto-detected output format: {} (from .{} extension)",
+                        fmt, ext
+                    );
                 }
                 match fmt {
                     "svf2" => DerivativeOutputFormat::Svf2,
@@ -227,9 +230,7 @@ pub(super) async fn start_translation(
                         "\u{2713}".green().bold()
                     );
                 } else {
-                    println!(
-                        "Translation already complete (cached). Use --force to re-translate."
-                    );
+                    println!("Translation already complete (cached). Use --force to re-translate.");
                 }
                 return Ok(());
             }
@@ -367,7 +368,12 @@ pub(super) async fn start_translation(
         .await?;
 
         // Persist success to the deduplication cache.
-        cache.insert(&source_urn, &format_key, response.urn.clone(), "success".to_string());
+        cache.insert(
+            &source_urn,
+            &format_key,
+            response.urn.clone(),
+            "success".to_string(),
+        );
         cache.save();
     }
 
@@ -802,7 +808,10 @@ pub(super) async fn start_serverless(
                 .filter(|(_, ext)| !ext.is_empty());
 
             if let Some((fmt, ext)) = auto {
-                println!("Auto-detected output format: {} (from .{} extension)", fmt, ext);
+                println!(
+                    "Auto-detected output format: {} (from .{} extension)",
+                    fmt, ext
+                );
                 fmt.to_string()
             } else {
                 prompts::input("Output format", Some("svf2"))?

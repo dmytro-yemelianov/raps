@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::super::*;
 use crate::commands::dashboard::traits::DashboardResource;
-use ratatui::{layout::Constraint, widgets::{Cell, Row}};
+use ratatui::{
+    layout::Constraint,
+    widgets::{Cell, Row},
+};
 
 #[derive(Debug, Clone)]
 pub struct BucketList {
@@ -37,15 +40,20 @@ impl DashboardResource for BucketList {
             return self.rows.len();
         }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.key.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.key.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&BucketRow> = self.rows.iter()
+        let filtered: Vec<&BucketRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.key.as_str()),
@@ -57,13 +65,22 @@ impl DashboardResource for BucketList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&BucketRow> = self.rows.iter()
+        let filtered: Vec<&BucketRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.key.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.key.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::BucketDetail { bucket_key: id });
             fetch::load_view(app, clients, tx, false);

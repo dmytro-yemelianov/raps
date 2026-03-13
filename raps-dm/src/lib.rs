@@ -624,7 +624,10 @@ mod integration_tests {
         assert!(!hubs.is_empty(), "hubs list should not be empty");
         let first = &hubs[0];
         assert!(!first.id.is_empty(), "hub id should not be empty");
-        assert!(!first.attributes.name.is_empty(), "hub name should not be empty");
+        assert!(
+            !first.attributes.name.is_empty(),
+            "hub name should not be empty"
+        );
     }
 
     #[tokio::test]
@@ -641,7 +644,10 @@ mod integration_tests {
         assert!(result.is_ok(), "get_hub failed: {:?}", result.err());
         let hub = result.unwrap();
         assert_eq!(hub.id, *hub_id);
-        assert!(!hub.attributes.name.is_empty(), "hub name should not be empty");
+        assert!(
+            !hub.attributes.name.is_empty(),
+            "hub name should not be empty"
+        );
     }
 
     #[tokio::test]
@@ -660,7 +666,10 @@ mod integration_tests {
         assert!(!projects.is_empty(), "projects list should not be empty");
         let first = &projects[0];
         assert!(!first.id.is_empty(), "project id should not be empty");
-        assert!(!first.attributes.name.is_empty(), "project name should not be empty");
+        assert!(
+            !first.attributes.name.is_empty(),
+            "project name should not be empty"
+        );
     }
 
     #[tokio::test]
@@ -672,7 +681,10 @@ mod integration_tests {
         let hubs = client.list_hubs().await.expect("list_hubs failed");
         assert!(!hubs.is_empty());
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         assert!(!projects.is_empty());
         let project_id = &projects[0].id;
 
@@ -706,7 +718,10 @@ mod integration_tests {
         let hubs = client.list_hubs().await.expect("list_hubs failed");
         assert!(!hubs.is_empty());
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         assert!(!projects.is_empty());
         let project_id = &projects[0].id;
 
@@ -738,7 +753,10 @@ mod integration_tests {
         let hubs = client.list_hubs().await.expect("list_hubs failed");
         assert!(!hubs.is_empty());
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         assert!(!projects.is_empty());
         let project_id = &projects[0].id;
 
@@ -785,7 +803,10 @@ mod integration_tests {
 
         let hubs = client.list_hubs().await.expect("list_hubs failed");
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         let project_id = &projects[0].id;
 
         let http = reqwest::Client::new();
@@ -826,7 +847,10 @@ mod integration_tests {
             resp.status()
         );
         let body: serde_json::Value = resp.json().await.unwrap();
-        assert!(body["data"]["id"].is_string(), "created folder should have an id");
+        assert!(
+            body["data"]["id"].is_string(),
+            "created folder should have an id"
+        );
     }
 
     #[tokio::test]
@@ -838,7 +862,10 @@ mod integration_tests {
         // Navigate to get a real folder from mock seeded data
         let hubs = client.list_hubs().await.expect("list_hubs failed");
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         let project_id = &projects[0].id;
 
         // First create a folder so we have one to rename
@@ -943,7 +970,10 @@ mod integration_tests {
         }
 
         let hub_id = &hubs[0].id;
-        let projects = client.list_projects(hub_id).await.expect("list_projects failed");
+        let projects = client
+            .list_projects(hub_id)
+            .await
+            .expect("list_projects failed");
         assert!(!projects.is_empty(), "should have projects");
 
         for project in &projects {

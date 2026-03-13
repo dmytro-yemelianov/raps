@@ -24,7 +24,14 @@ pub(super) trait DashboardResource: std::fmt::Debug + Send + Sync {
     fn get_id(&self, index: usize, filter: &str) -> Option<String>;
 
     /// Action to perform when Enter is pressed on this item
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>);
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    );
 
     /// Optional interval for automatic refresh
     fn auto_refresh_interval(&self) -> Option<std::time::Duration> {

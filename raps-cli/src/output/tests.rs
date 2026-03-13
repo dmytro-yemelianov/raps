@@ -244,15 +244,24 @@ fn test_snapshot_csv_with_special_chars() {
 
 #[test]
 fn test_ndjson_writes_one_line_per_item() {
-    use serde::Serialize;
     use crate::output::{OutputFormat, formatter::OutputFormatter};
+    use serde::Serialize;
 
     #[derive(Serialize, schemars::JsonSchema)]
-    struct Row { id: u32, name: String }
+    struct Row {
+        id: u32,
+        name: String,
+    }
 
     let data = vec![
-        Row { id: 1, name: "alpha".into() },
-        Row { id: 2, name: "beta".into() },
+        Row {
+            id: 1,
+            name: "alpha".into(),
+        },
+        Row {
+            id: 2,
+            name: "beta".into(),
+        },
     ];
     let mut buf = Vec::new();
     OutputFormatter::print_output(&data, OutputFormat::Ndjson, &mut buf).unwrap();
@@ -268,11 +277,13 @@ fn test_ndjson_writes_one_line_per_item() {
 
 #[test]
 fn test_ndjson_single_object_one_line() {
-    use serde::Serialize;
     use crate::output::{OutputFormat, formatter::OutputFormatter};
+    use serde::Serialize;
 
     #[derive(Serialize, schemars::JsonSchema)]
-    struct Single { value: i32 }
+    struct Single {
+        value: i32,
+    }
 
     let mut buf = Vec::new();
     OutputFormatter::print_output(&Single { value: 42 }, OutputFormat::Ndjson, &mut buf).unwrap();
@@ -284,6 +295,9 @@ fn test_ndjson_single_object_one_line() {
 #[test]
 fn test_ndjson_from_str_roundtrip() {
     use crate::output::OutputFormat;
-    assert_eq!(<OutputFormat as std::str::FromStr>::from_str("ndjson").unwrap(), OutputFormat::Ndjson);
+    assert_eq!(
+        <OutputFormat as std::str::FromStr>::from_str("ndjson").unwrap(),
+        OutputFormat::Ndjson
+    );
     assert_eq!(OutputFormat::Ndjson.to_string(), "ndjson");
 }

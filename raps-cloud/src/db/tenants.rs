@@ -17,13 +17,12 @@ pub struct Tenant {
 }
 
 pub async fn create(pool: &PgPool, name: &str, slug: &str) -> anyhow::Result<Tenant> {
-    let tenant = sqlx::query_as::<_, Tenant>(
-        "INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING *",
-    )
-    .bind(name)
-    .bind(slug)
-    .fetch_one(pool)
-    .await?;
+    let tenant =
+        sqlx::query_as::<_, Tenant>("INSERT INTO tenants (name, slug) VALUES ($1, $2) RETURNING *")
+            .bind(name)
+            .bind(slug)
+            .fetch_one(pool)
+            .await?;
     Ok(tenant)
 }
 

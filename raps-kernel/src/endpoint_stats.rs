@@ -98,10 +98,7 @@ impl EndpointStats {
     /// the same key.
     pub fn endpoint_key(url: &str) -> String {
         if let Ok(u) = url::Url::parse(url) {
-            let segments: Vec<&str> = u
-                .path_segments()
-                .map(|s| s.collect())
-                .unwrap_or_default();
+            let segments: Vec<&str> = u.path_segments().map(|s| s.collect()).unwrap_or_default();
             let prefix = segments
                 .iter()
                 .take(3)
@@ -221,9 +218,6 @@ mod tests {
     #[test]
     fn test_backoff_multiplier_unknown_endpoint() {
         let stats = EndpointStats::default();
-        assert_eq!(
-            stats.backoff_multiplier("https://unknown.example.com/x"),
-            1
-        );
+        assert_eq!(stats.backoff_multiplier("https://unknown.example.com/x"), 1);
     }
 }

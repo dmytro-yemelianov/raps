@@ -356,7 +356,9 @@ impl PipelineCommands {
                 file2,
                 output,
             } => {
-                let fmt = output.parse::<OutputFormat>().unwrap_or(OutputFormat::Table);
+                let fmt = output
+                    .parse::<OutputFormat>()
+                    .unwrap_or(OutputFormat::Table);
                 diff_pipelines(&file1, &file2, fmt).await
             }
         }
@@ -730,11 +732,7 @@ fn topological_sort(steps: &[Step]) -> Result<Vec<usize>> {
     for step in steps {
         for dep in &step.depends_on {
             if !name_to_idx.contains_key(dep.as_str()) {
-                anyhow::bail!(
-                    "Step '{}' depends on unknown step '{}'",
-                    step.name,
-                    dep
-                );
+                anyhow::bail!("Step '{}' depends on unknown step '{}'", step.name, dep);
             }
         }
     }
@@ -849,14 +847,13 @@ async fn run_pipeline(
         }
     } else if let Some(ref from_step) = reset_from {
         // Load existing state, mark `from_step` and everything after it as Pending
-        let mut s = PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
-            PipelineRunState {
+        let mut s =
+            PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| PipelineRunState {
                 pipeline_hash: hash.clone(),
                 pipeline_file: canonical_file.display().to_string(),
                 started_at: chrono::Utc::now().to_rfc3339(),
                 steps: Vec::new(),
-            }
-        });
+            });
         // Find the index of the reset-from step and clear from there
         let reset_idx = s.steps.iter().position(|r| &r.name == from_step);
         if let Some(idx) = reset_idx {
@@ -869,13 +866,11 @@ async fn run_pipeline(
         s.save(&canonical_file);
         s
     } else if resume {
-        PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| {
-            PipelineRunState {
-                pipeline_hash: hash.clone(),
-                pipeline_file: canonical_file.display().to_string(),
-                started_at: chrono::Utc::now().to_rfc3339(),
-                steps: Vec::new(),
-            }
+        PipelineRunState::load(&canonical_file, &hash).unwrap_or_else(|| PipelineRunState {
+            pipeline_hash: hash.clone(),
+            pipeline_file: canonical_file.display().to_string(),
+            started_at: chrono::Utc::now().to_rfc3339(),
+            steps: Vec::new(),
         })
     } else {
         PipelineRunState {
@@ -1138,10 +1133,7 @@ fn parse_var_assignment(s: &str) -> Result<(String, String), String> {
     Ok((key.to_string(), parts[1].to_string()))
 }
 
-fn apply_variable_overrides(
-    base: &mut HashMap<String, String>,
-    overrides: &[(String, String)],
-) {
+fn apply_variable_overrides(base: &mut HashMap<String, String>, overrides: &[(String, String)]) {
     for (key, value) in overrides {
         base.insert(key.clone(), value.clone());
     }
@@ -1389,7 +1381,11 @@ async fn validate_pipeline(file: &PathBuf, output_format: OutputFormat) -> Resul
                         .iter()
                         .map(|&i| pipeline.steps[i].name.as_str())
                         .collect();
-                    println!("  {} {}", "Execution order:".bold(), order_names.join(" → "));
+                    println!(
+                        "  {} {}",
+                        "Execution order:".bold(),
+                        order_names.join(" → ")
+                    );
                 }
             } else {
                 if !errors.is_empty() {
@@ -1899,8 +1895,7 @@ steps:
         let mut vars = HashMap::new();
         vars.insert("BUCKET".to_string(), "my-bucket".to_string());
         vars.insert("FILE".to_string(), "model.rvt".to_string());
-        let result =
-            substitute_variables("object upload ${BUCKET} ${FILE}", &vars).unwrap();
+        let result = substitute_variables("object upload ${BUCKET} ${FILE}", &vars).unwrap();
         assert_eq!(result, "object upload my-bucket model.rvt");
     }
 
@@ -1917,9 +1912,7 @@ steps:
         vars.insert("BAD".to_string(), "value; rm -rf /".to_string());
         let result = substitute_variables("echo ${BAD}", &vars);
         assert!(result.is_err());
-        assert!(
-            result.unwrap_err().to_string().contains("metacharacters")
-        );
+        assert!(result.unwrap_err().to_string().contains("metacharacters"));
     }
 
     #[test]
@@ -2015,7 +2008,11 @@ steps:
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
         validate_steps(&steps, &mut errors, &mut warnings, "");
-        assert!(errors.iter().any(|e| e.contains("max_attempts must be >= 1")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("max_attempts must be >= 1"))
+        );
     }
 
     #[test]
@@ -2040,10 +2037,13 @@ steps:
         ctx.insert("a".to_string(), StepResult { exit_code: 0 });
         ctx.insert("b".to_string(), StepResult { exit_code: 0 });
         let ctx = Arc::new(Mutex::new(ctx));
-        assert!(eval_expression(
-            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
-            &ctx
-        ).unwrap());
+        assert!(
+            eval_expression(
+                "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+                &ctx
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -2052,10 +2052,13 @@ steps:
         ctx.insert("a".to_string(), StepResult { exit_code: 0 });
         ctx.insert("b".to_string(), StepResult { exit_code: 1 });
         let ctx = Arc::new(Mutex::new(ctx));
-        assert!(!eval_expression(
-            "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
-            &ctx
-        ).unwrap());
+        assert!(
+            !eval_expression(
+                "${{ steps.a.exit_code == 0 && steps.b.exit_code == 0 }}",
+                &ctx
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -2064,10 +2067,13 @@ steps:
         ctx.insert("a".to_string(), StepResult { exit_code: 1 });
         ctx.insert("b".to_string(), StepResult { exit_code: 0 });
         let ctx = Arc::new(Mutex::new(ctx));
-        assert!(eval_expression(
-            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 }}",
-            &ctx
-        ).unwrap());
+        assert!(
+            eval_expression(
+                "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 }}",
+                &ctx
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -2075,18 +2081,27 @@ steps:
         let mut ctx = HashMap::new();
         ctx.insert("step1".to_string(), StepResult { exit_code: 1 });
         let ctx = Arc::new(Mutex::new(ctx));
-        assert!(eval_expression(
-            "${{ !steps.step1.exit_code == 0 }}",
-            &ctx
-        ).unwrap());
+        assert!(eval_expression("${{ !steps.step1.exit_code == 0 }}", &ctx).unwrap());
     }
 
     #[test]
     fn test_parse_duration_edge_cases() {
-        assert_eq!(parse_duration("0s").unwrap(), std::time::Duration::from_secs(0));
-        assert_eq!(parse_duration("1s").unwrap(), std::time::Duration::from_secs(1));
-        assert_eq!(parse_duration("1m").unwrap(), std::time::Duration::from_secs(60));
-        assert_eq!(parse_duration("1h").unwrap(), std::time::Duration::from_secs(3600));
+        assert_eq!(
+            parse_duration("0s").unwrap(),
+            std::time::Duration::from_secs(0)
+        );
+        assert_eq!(
+            parse_duration("1s").unwrap(),
+            std::time::Duration::from_secs(1)
+        );
+        assert_eq!(
+            parse_duration("1m").unwrap(),
+            std::time::Duration::from_secs(60)
+        );
+        assert_eq!(
+            parse_duration("1h").unwrap(),
+            std::time::Duration::from_secs(3600)
+        );
         assert!(parse_duration("5d").is_err());
         assert!(parse_duration("  ").is_err());
     }
@@ -2100,11 +2115,13 @@ steps:
         let ctx = Arc::new(Mutex::new(ctx));
 
         // Should evaluate as: true || (false && false) == true
-        assert!(eval_expression(
-            "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 && steps.c.exit_code == 0 }}",
-            &ctx
-        )
-        .unwrap());
+        assert!(
+            eval_expression(
+                "${{ steps.a.exit_code == 0 || steps.b.exit_code == 0 && steps.c.exit_code == 0 }}",
+                &ctx
+            )
+            .unwrap()
+        );
     }
 
     #[test]
@@ -2290,7 +2307,11 @@ struct PipelineDiffOutput {
     identical: bool,
 }
 
-async fn diff_pipelines(file1: &PathBuf, file2: &PathBuf, output_format: OutputFormat) -> Result<()> {
+async fn diff_pipelines(
+    file1: &PathBuf,
+    file2: &PathBuf,
+    output_format: OutputFormat,
+) -> Result<()> {
     let p1 = load_pipeline(file1).await?;
     let p2 = load_pipeline(file2).await?;
 
@@ -2338,8 +2359,7 @@ async fn diff_pipelines(file1: &PathBuf, file2: &PathBuf, output_format: OutputF
         if s1.depends_on != s2.depends_on {
             diffs.push(format!(
                 "depends_on: {:?} -> {:?}",
-                s1.depends_on,
-                s2.depends_on
+                s1.depends_on, s2.depends_on
             ));
         }
         if s1.if_expr != s2.if_expr {
@@ -2360,8 +2380,16 @@ async fn diff_pipelines(file1: &PathBuf, file2: &PathBuf, output_format: OutputF
     changed.sort_by(|a, b| a.name.cmp(&b.name));
 
     // Check for reordering among common steps
-    let common_order1: Vec<&str> = names1.iter().copied().filter(|n| set2.contains(n)).collect();
-    let common_order2: Vec<&str> = names2.iter().copied().filter(|n| set1.contains(n)).collect();
+    let common_order1: Vec<&str> = names1
+        .iter()
+        .copied()
+        .filter(|n| set2.contains(n))
+        .collect();
+    let common_order2: Vec<&str> = names2
+        .iter()
+        .copied()
+        .filter(|n| set1.contains(n))
+        .collect();
     let reordered = common_order1 != common_order2;
 
     let identical = added.is_empty() && removed.is_empty() && changed.is_empty() && !reordered;

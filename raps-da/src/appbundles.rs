@@ -203,16 +203,15 @@ impl DesignAutomationClient {
             .post(endpoint_url)
             .multipart(form)
             .send()
-                    .await
-                    .context("Failed to upload app bundle archive")?;
-            
-                tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(endpoint_url), "HTTP response");
-            
-                if !response.status().is_success() {
-                    return Err(RapsError::from_response(response).await.into());
-                }
-            
-                Ok(())
-            
+            .await
+            .context("Failed to upload app bundle archive")?;
+
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(endpoint_url), "HTTP response");
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        Ok(())
     }
 }

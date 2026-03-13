@@ -369,7 +369,9 @@ impl TranslateCommands {
                 verbose,
                 output,
             } => {
-                let fmt = output.parse::<OutputFormat>().unwrap_or(OutputFormat::Table);
+                let fmt = output
+                    .parse::<OutputFormat>()
+                    .unwrap_or(OutputFormat::Table);
                 timeline::show_timeline(client, &urn, verbose, fmt).await
             }
         }

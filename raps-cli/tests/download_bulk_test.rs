@@ -169,13 +169,8 @@ fn test_flat_dest_replaces_slashes_when_no_filename() {
 fn test_object_command_requires_subcommand() {
     // Invoking `raps object` without a sub-command should fail with a usage
     // error listing available sub-commands.
-    raps()
-        .args(["object"])
-        .assert()
-        .failure()
-        .stderr(
-            predicate::str::contains("Usage").or(
-                predicate::str::contains("subcommand").or(predicate::str::contains("COMMAND")),
-            ),
-        );
+    raps().args(["object"]).assert().failure().stderr(
+        predicate::str::contains("Usage")
+            .or(predicate::str::contains("subcommand").or(predicate::str::contains("COMMAND"))),
+    );
 }

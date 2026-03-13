@@ -17,7 +17,11 @@ impl RapsServer {
         // Bundled skills (with install status)
         for s in &registry.skills {
             let is_installed = installed.contains(&s.name);
-            let status = if is_installed { "installed" } else { "available" };
+            let status = if is_installed {
+                "installed"
+            } else {
+                "available"
+            };
 
             match filter.as_deref() {
                 Some("installed") if !is_installed => continue,
@@ -65,7 +69,11 @@ impl RapsServer {
         match registry.get(&name) {
             Some(entry) => {
                 let is_installed = installed.contains(&entry.name);
-                let status = if is_installed { "installed" } else { "available" };
+                let status = if is_installed {
+                    "installed"
+                } else {
+                    "available"
+                };
                 let install_path = if is_installed {
                     installer::skills_dir()
                         .join(&entry.name)

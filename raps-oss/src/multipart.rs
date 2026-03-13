@@ -48,7 +48,11 @@ impl ThroughputTracker {
             return 0.0;
         }
         let window_bytes: u64 = self.recent_bytes.iter().map(|(_, b)| b).sum();
-        let oldest = self.recent_bytes.front().map(|(t, _)| *t).unwrap_or(self.started);
+        let oldest = self
+            .recent_bytes
+            .front()
+            .map(|(t, _)| *t)
+            .unwrap_or(self.started);
         let window_secs = oldest.elapsed().as_secs_f64().max(0.001);
         window_bytes as f64 / window_secs
     }

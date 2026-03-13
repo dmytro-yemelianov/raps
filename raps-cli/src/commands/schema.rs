@@ -128,12 +128,7 @@ fn schema_registry() -> Vec<SchemaEntry> {
         ),
         schema_entry!("object.info", "object", "Object details", ObjectInfoOutput),
         // Data Management
-        schema_entry!(
-            "hub.list",
-            "dm",
-            "Hub list item",
-            Vec<HubListOutput>
-        ),
+        schema_entry!("hub.list", "dm", "Hub list item", Vec<HubListOutput>),
         schema_entry!(
             "project.list",
             "dm",
@@ -148,28 +143,13 @@ fn schema_registry() -> Vec<SchemaEntry> {
         ),
         schema_entry!("item.info", "dm", "Item details", ItemInfoOutput),
         // ACC — Issues
-        schema_entry!(
-            "issue.list",
-            "acc",
-            "Issue list item",
-            Vec<IssueOutput>
-        ),
+        schema_entry!("issue.list", "acc", "Issue list item", Vec<IssueOutput>),
         schema_entry!("issue.get", "acc", "Issue details", IssueOutput),
         // ACC — RFIs
-        schema_entry!(
-            "rfi.list",
-            "acc",
-            "RFI list item",
-            Vec<RfiOutput>
-        ),
+        schema_entry!("rfi.list", "acc", "RFI list item", Vec<RfiOutput>),
         schema_entry!("rfi.get", "acc", "RFI details", RfiOutput),
         // ACC — Assets
-        schema_entry!(
-            "asset.list",
-            "acc",
-            "Asset list item",
-            Vec<AssetOutput>
-        ),
+        schema_entry!("asset.list", "acc", "Asset list item", Vec<AssetOutput>),
         // ACC — Submittals
         schema_entry!(
             "submittal.list",

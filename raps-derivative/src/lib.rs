@@ -181,7 +181,10 @@ mod integration_tests {
             .send()
             .await
             .unwrap();
-        assert!(resp.status().is_success(), "translation request should succeed");
+        assert!(
+            resp.status().is_success(),
+            "translation request should succeed"
+        );
         let body: serde_json::Value = resp.json().await.unwrap();
         assert_eq!(body["result"], "success");
     }
@@ -211,7 +214,10 @@ mod integration_tests {
         assert!(resp.status().is_success());
         let body: serde_json::Value = resp.json().await.unwrap();
         assert!(body["urn"].is_string(), "response should contain urn");
-        assert!(body["acceptedJobs"].is_object(), "response should contain acceptedJobs");
+        assert!(
+            body["acceptedJobs"].is_object(),
+            "response should contain acceptedJobs"
+        );
     }
 
     #[tokio::test]
@@ -290,7 +296,12 @@ mod integration_tests {
         );
 
         // First poll
-        let resp1 = http.get(&manifest_url).bearer_auth(&token).send().await.unwrap();
+        let resp1 = http
+            .get(&manifest_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
         let body1: serde_json::Value = resp1.json().await.unwrap();
         let progress1 = body1["progress"].as_str().unwrap().to_string();
 
@@ -299,7 +310,12 @@ mod integration_tests {
             let _ = http.get(&manifest_url).bearer_auth(&token).send().await;
         }
 
-        let resp2 = http.get(&manifest_url).bearer_auth(&token).send().await.unwrap();
+        let resp2 = http
+            .get(&manifest_url)
+            .bearer_auth(&token)
+            .send()
+            .await
+            .unwrap();
         let body2: serde_json::Value = resp2.json().await.unwrap();
         let progress2 = body2["progress"].as_str().unwrap().to_string();
         let status2 = body2["status"].as_str().unwrap();
@@ -307,7 +323,9 @@ mod integration_tests {
         assert!(
             progress1 != progress2 || status2 == "success",
             "manifest should progress: start={}, end={}/{}",
-            progress1, status2, progress2
+            progress1,
+            status2,
+            progress2
         );
     }
 
@@ -382,7 +400,10 @@ mod integration_tests {
             resp.status()
         );
         let body: serde_json::Value = resp.json().await.unwrap();
-        assert!(body["data"]["objects"].is_array(), "should contain objects array");
+        assert!(
+            body["data"]["objects"].is_array(),
+            "should contain objects array"
+        );
     }
 
     #[tokio::test]
@@ -500,7 +521,10 @@ mod integration_tests {
             .send()
             .await
             .unwrap();
-        assert!(resp.status().is_success(), "OBJ translate request should succeed");
+        assert!(
+            resp.status().is_success(),
+            "OBJ translate request should succeed"
+        );
     }
 
     #[tokio::test]
@@ -525,7 +549,10 @@ mod integration_tests {
             .send()
             .await
             .unwrap();
-        assert!(resp.status().is_success(), "STL translate request should succeed");
+        assert!(
+            resp.status().is_success(),
+            "STL translate request should succeed"
+        );
     }
 
     #[tokio::test]
@@ -581,7 +608,12 @@ mod integration_tests {
         );
         let mut final_status = String::new();
         for _ in 0..10 {
-            let resp = http.get(&manifest_url).bearer_auth(&token).send().await.unwrap();
+            let resp = http
+                .get(&manifest_url)
+                .bearer_auth(&token)
+                .send()
+                .await
+                .unwrap();
             let body: serde_json::Value = resp.json().await.unwrap();
             final_status = body["status"].as_str().unwrap_or("").to_string();
             if final_status == "success" {
@@ -600,6 +632,9 @@ mod integration_tests {
             .send()
             .await
             .unwrap();
-        assert!(meta_resp.status().is_success(), "metadata should be available after success");
+        assert!(
+            meta_resp.status().is_success(),
+            "metadata should be available after success"
+        );
     }
 }

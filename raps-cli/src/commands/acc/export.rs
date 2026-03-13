@@ -45,9 +45,8 @@ pub(super) async fn export_project(
 ) -> Result<()> {
     // Build output directory path
     let timestamp = chrono::Utc::now().format("%Y%m%d%H%M%S");
-    let dir = output_dir.unwrap_or_else(|| {
-        PathBuf::from(format!("acc-export-{}-{}", project_id, timestamp))
-    });
+    let dir = output_dir
+        .unwrap_or_else(|| PathBuf::from(format!("acc-export-{}-{}", project_id, timestamp)));
 
     tokio::fs::create_dir_all(&dir)
         .await
@@ -69,8 +68,8 @@ pub(super) async fn export_project(
         .await
         .unwrap_or_default();
     let issues_count = issues.len();
-    let issues_json = serde_json::to_string_pretty(&issues)
-        .context("Failed to serialize issues")?;
+    let issues_json =
+        serde_json::to_string_pretty(&issues).context("Failed to serialize issues")?;
     let issues_path = dir.join("issues.json");
     tokio::fs::write(&issues_path, issues_json)
         .await
@@ -84,13 +83,9 @@ pub(super) async fn export_project(
 
     // Export RFIs
     let pb = make_progress_bar("RFIs");
-    let rfis = rfi_client
-        .list_rfis(project_id)
-        .await
-        .unwrap_or_default();
+    let rfis = rfi_client.list_rfis(project_id).await.unwrap_or_default();
     let rfis_count = rfis.len();
-    let rfis_json = serde_json::to_string_pretty(&rfis)
-        .context("Failed to serialize RFIs")?;
+    let rfis_json = serde_json::to_string_pretty(&rfis).context("Failed to serialize RFIs")?;
     let rfis_path = dir.join("rfis.json");
     tokio::fs::write(&rfis_path, rfis_json)
         .await
@@ -109,8 +104,8 @@ pub(super) async fn export_project(
         .await
         .unwrap_or_default();
     let submittals_count = submittals.len();
-    let submittals_json = serde_json::to_string_pretty(&submittals)
-        .context("Failed to serialize submittals")?;
+    let submittals_json =
+        serde_json::to_string_pretty(&submittals).context("Failed to serialize submittals")?;
     let submittals_path = dir.join("submittals.json");
     tokio::fs::write(&submittals_path, submittals_json)
         .await
@@ -129,8 +124,8 @@ pub(super) async fn export_project(
         .await
         .unwrap_or_default();
     let checklists_count = checklists.len();
-    let checklists_json = serde_json::to_string_pretty(&checklists)
-        .context("Failed to serialize checklists")?;
+    let checklists_json =
+        serde_json::to_string_pretty(&checklists).context("Failed to serialize checklists")?;
     let checklists_path = dir.join("checklists.json");
     tokio::fs::write(&checklists_path, checklists_json)
         .await
@@ -157,7 +152,11 @@ pub(super) async fn export_project(
             println!("{}", "─".repeat(50));
             println!("  {} {}", "Project:".bold(), project_id.cyan());
             println!("  {} {}", "Output dir:".bold(), dir.display());
-            println!("  {} {}", "Issues:".bold(), issues_count.to_string().green());
+            println!(
+                "  {} {}",
+                "Issues:".bold(),
+                issues_count.to_string().green()
+            );
             println!("  {} {}", "RFIs:".bold(), rfis_count.to_string().green());
             println!(
                 "  {} {}",

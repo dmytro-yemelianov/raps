@@ -60,8 +60,12 @@ async fn test_object_batch_copy_with_keys_path_exercises_handler() {
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
     cmd.args([
-        "object", "batch-copy", "bck-src", "bck-dst",
-        "--keys", "nonexistent.txt",
+        "object",
+        "batch-copy",
+        "bck-src",
+        "bck-dst",
+        "--keys",
+        "nonexistent.txt",
     ])
     .assert()
     .code(predicate::ne(101));
@@ -87,10 +91,13 @@ async fn test_object_batch_rename_no_matches_in_empty_bucket() {
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
     cmd.args([
-        "object", "batch-rename",
+        "object",
+        "batch-rename",
         "bren-empty",
-        "--from", "old-",
-        "--to", "new-",
+        "--from",
+        "old-",
+        "--to",
+        "new-",
     ])
     .assert()
     .success()
@@ -104,9 +111,12 @@ async fn test_object_batch_rename_no_matches_in_empty_bucket() {
 async fn test_object_copy_missing_source_bucket_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "object", "copy",
-        "--source-object", "file.txt",
-        "--dest-bucket", "dst",
+        "object",
+        "copy",
+        "--source-object",
+        "file.txt",
+        "--dest-bucket",
+        "dst",
     ])
     .assert()
     .failure()
@@ -118,9 +128,12 @@ async fn test_object_copy_missing_source_bucket_fails() {
 async fn test_object_copy_missing_source_object_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "object", "copy",
-        "--source-bucket", "src",
-        "--dest-bucket", "dst",
+        "object",
+        "copy",
+        "--source-bucket",
+        "src",
+        "--dest-bucket",
+        "dst",
     ])
     .assert()
     .failure()
@@ -132,9 +145,12 @@ async fn test_object_copy_missing_source_object_fails() {
 async fn test_object_copy_missing_dest_bucket_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "object", "copy",
-        "--source-bucket", "src",
-        "--source-object", "file.txt",
+        "object",
+        "copy",
+        "--source-bucket",
+        "src",
+        "--source-object",
+        "file.txt",
     ])
     .assert()
     .failure()
@@ -169,10 +185,14 @@ async fn test_object_copy_nonexistent_source_fails_gracefully() {
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
     cmd.args([
-        "object", "copy",
-        "--source-bucket", "nonexistent-bucket",
-        "--source-object", "missing.txt",
-        "--dest-bucket", "cp-dst-err",
+        "object",
+        "copy",
+        "--source-bucket",
+        "nonexistent-bucket",
+        "--source-object",
+        "missing.txt",
+        "--dest-bucket",
+        "cp-dst-err",
     ])
     .assert()
     .failure()
@@ -197,9 +217,12 @@ async fn test_object_rename_nonexistent_source_fails_gracefully() {
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
     cmd.args([
-        "object", "rename",
-        "ren-err", "missing.txt",
-        "--new-key", "renamed.txt",
+        "object",
+        "rename",
+        "ren-err",
+        "missing.txt",
+        "--new-key",
+        "renamed.txt",
     ])
     .assert()
     .failure()

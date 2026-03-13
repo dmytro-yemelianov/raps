@@ -39,15 +39,12 @@ fn generate_mcp_docs(check: bool, write: bool) -> Result<()> {
     }
 
     if check {
-        let existing = std::fs::read_to_string("AGENTS.md")
-            .unwrap_or_default();
+        let existing = std::fs::read_to_string("AGENTS.md").unwrap_or_default();
         if existing == content {
             println!("AGENTS.md is up to date.");
             return Ok(());
         } else {
-            anyhow::bail!(
-                "AGENTS.md is stale. Run from repo root: raps docs mcp --write"
-            );
+            anyhow::bail!("AGENTS.md is stale. Run from repo root: raps docs mcp --write");
         }
     }
 
@@ -71,7 +68,9 @@ fn build_agents_md() -> String {
     md.push_str("| Type | When Required |\n");
     md.push_str("|---|---|\n");
     md.push_str("| 2-legged (client credentials) | OSS, Model Derivative, Admin bulk ops |\n");
-    md.push_str("| 3-legged (user authorization) | Data Management, ACC (issues, RFIs, assets) |\n\n");
+    md.push_str(
+        "| 3-legged (user authorization) | Data Management, ACC (issues, RFIs, assets) |\n\n",
+    );
     md.push_str("Set `APS_CLIENT_ID` and `APS_CLIENT_SECRET` before starting the MCP server.\n");
     md.push_str("For 3-legged auth in headless environments: `raps auth login --device`\n\n");
 
@@ -86,7 +85,10 @@ fn build_agents_md() -> String {
             AuthRequirement::Either => "either",
         };
         let desc = tool.description.as_deref().unwrap_or("");
-        md.push_str(&format!("| `{}` | {} | {} |\n", tool.name, auth_label, desc));
+        md.push_str(&format!(
+            "| `{}` | {} | {} |\n",
+            tool.name, auth_label, desc
+        ));
     }
 
     md.push('\n');
@@ -103,11 +105,15 @@ fn build_agents_md() -> String {
     md.push_str("Things that are true of RAPS CLI that agents cannot discover from `--help`:\n\n");
     md.push_str("- Non-interactive output defaults to JSON automatically (piped stdout → JSON, TTY → table)\n");
     md.push_str("- `RAPS_OUTPUT_FORMAT=json` forces JSON regardless of TTY\n");
-    md.push_str("- `--dry-run` is supported by all `admin` bulk operations and `pipeline` commands\n");
+    md.push_str(
+        "- `--dry-run` is supported by all `admin` bulk operations and `pipeline` commands\n",
+    );
     md.push_str("- All bucket keys must be globally unique, 3–128 chars, lowercase alphanumeric + hyphens\n");
     md.push_str("- Object URNs for translation must be Base64-encoded; get them via `raps object urn` or the `object_urn` MCP tool\n");
     md.push_str("- 3-legged tokens expire; use `auth_status` to check before long workflows\n");
-    md.push_str("- Admin bulk operations are resumable — if interrupted, use `admin_operation_resume`\n");
+    md.push_str(
+        "- Admin bulk operations are resumable — if interrupted, use `admin_operation_resume`\n",
+    );
     md.push_str("- `raps api` is a raw HTTP passthrough for API endpoints not yet covered by dedicated commands\n");
 
     md

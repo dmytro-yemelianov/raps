@@ -14,7 +14,10 @@ pub mod ws;
 
 use std::time::Duration;
 
-use axum::{middleware as axum_mw, routing::{get, post}, Json, Router};
+use axum::{
+    Json, Router, middleware as axum_mw,
+    routing::{get, post},
+};
 use config::CloudConfig;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -58,7 +61,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Protected routes (JWT auth required)
     let protected_routes = Router::new()
-        .route("/api/v1/jobs", get(routes::jobs::list_jobs).post(routes::jobs::create_job))
+        .route(
+            "/api/v1/jobs",
+            get(routes::jobs::list_jobs).post(routes::jobs::create_job),
+        )
         .route("/api/v1/jobs/{id}", get(routes::jobs::get_job))
         .route("/api/v1/jobs/{id}/cancel", post(routes::jobs::cancel_job))
         .route("/api/v1/jobs/{id}/retry", post(routes::jobs::retry_job))
@@ -101,9 +107,9 @@ async fn main() -> anyhow::Result<()> {
             // Wait for SIGTERM or SIGINT (Ctrl-C)
             #[cfg(unix)]
             {
-                use tokio::signal::unix::{signal, SignalKind};
-                let mut sigterm = signal(SignalKind::terminate())
-                    .expect("failed to install SIGTERM handler");
+                use tokio::signal::unix::{SignalKind, signal};
+                let mut sigterm =
+                    signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
                 tokio::select! {
                     _ = tokio::signal::ctrl_c() => {}
                     _ = sigterm.recv() => {}

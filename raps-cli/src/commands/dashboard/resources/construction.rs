@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::super::*;
 use crate::commands::dashboard::traits::DashboardResource;
-use ratatui::{layout::Constraint, widgets::{Cell, Row}};
+use ratatui::{
+    layout::Constraint,
+    widgets::{Cell, Row},
+};
 
 // --- Issues ---
 
@@ -39,17 +42,24 @@ impl DashboardResource for IssueList {
     }
 
     fn filtered_count(&self, filter: &str) -> usize {
-        if filter.is_empty() { return self.rows.len(); }
+        if filter.is_empty() {
+            return self.rows.len();
+        }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.title.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&IssueRow> = self.rows.iter()
+        let filtered: Vec<&IssueRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.title.as_str()),
@@ -65,13 +75,22 @@ impl DashboardResource for IssueList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&IssueRow> = self.rows.iter()
+        let filtered: Vec<&IssueRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::IssueDetail {
                 project_id: self.project_id.clone(),
@@ -118,17 +137,24 @@ impl DashboardResource for RfiList {
     }
 
     fn filtered_count(&self, filter: &str) -> usize {
-        if filter.is_empty() { return self.rows.len(); }
+        if filter.is_empty() {
+            return self.rows.len();
+        }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.title.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&RfiRow> = self.rows.iter()
+        let filtered: Vec<&RfiRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.title.as_str()),
@@ -144,13 +170,22 @@ impl DashboardResource for RfiList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&RfiRow> = self.rows.iter()
+        let filtered: Vec<&RfiRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::RfiDetail {
                 project_id: self.project_id.clone(),
@@ -196,17 +231,31 @@ impl DashboardResource for AssetList {
     }
 
     fn filtered_count(&self, filter: &str) -> usize {
-        if filter.is_empty() { return self.rows.len(); }
+        if filter.is_empty() {
+            return self.rows.len();
+        }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| {
+                r.id.to_lowercase().contains(&filter)
+                    || r.description.to_lowercase().contains(&filter)
+            })
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&AssetRow> = self.rows.iter()
-            .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter))
+        let filtered: Vec<&AssetRow> = self
+            .rows
+            .iter()
+            .filter(|r| {
+                filter.is_empty()
+                    || r.id.to_lowercase().contains(&filter)
+                    || r.description.to_lowercase().contains(&filter)
+            })
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.id.as_str()),
@@ -219,13 +268,26 @@ impl DashboardResource for AssetList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&AssetRow> = self.rows.iter()
-            .filter(|r| filter.is_empty() || r.id.to_lowercase().contains(&filter) || r.description.to_lowercase().contains(&filter))
+        let filtered: Vec<&AssetRow> = self
+            .rows
+            .iter()
+            .filter(|r| {
+                filter.is_empty()
+                    || r.id.to_lowercase().contains(&filter)
+                    || r.description.to_lowercase().contains(&filter)
+            })
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::AssetDetail {
                 project_id: self.project_id.clone(),
@@ -272,17 +334,24 @@ impl DashboardResource for SubmittalList {
     }
 
     fn filtered_count(&self, filter: &str) -> usize {
-        if filter.is_empty() { return self.rows.len(); }
+        if filter.is_empty() {
+            return self.rows.len();
+        }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.title.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&SubmittalRow> = self.rows.iter()
+        let filtered: Vec<&SubmittalRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.title.as_str()),
@@ -298,13 +367,22 @@ impl DashboardResource for SubmittalList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&SubmittalRow> = self.rows.iter()
+        let filtered: Vec<&SubmittalRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::SubmittalDetail {
                 project_id: self.project_id.clone(),
@@ -351,17 +429,24 @@ impl DashboardResource for ChecklistList {
     }
 
     fn filtered_count(&self, filter: &str) -> usize {
-        if filter.is_empty() { return self.rows.len(); }
+        if filter.is_empty() {
+            return self.rows.len();
+        }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.title.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&ChecklistRow> = self.rows.iter()
+        let filtered: Vec<&ChecklistRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.title.as_str()),
@@ -377,13 +462,22 @@ impl DashboardResource for ChecklistList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&ChecklistRow> = self.rows.iter()
+        let filtered: Vec<&ChecklistRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.title.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.push_view(ViewKind::ChecklistDetail {
                 project_id: self.project_id.clone(),

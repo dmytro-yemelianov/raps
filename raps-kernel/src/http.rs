@@ -332,9 +332,7 @@ where
         .as_ref()
         .map(|r| r.url().to_string())
         .unwrap_or_default();
-    if is_get
-        && let Some(ttl_secs) = crate::response_cache::cache_ttl(&cache_url)
-    {
+    if is_get && let Some(ttl_secs) = crate::response_cache::cache_ttl(&cache_url) {
         let disk = crate::response_cache::disk_cache();
         if let Some(body) = disk.get(&cache_url) {
             tracing::debug!(url = %cache_url, "response cache hit (disk)");
@@ -377,11 +375,7 @@ where
                 total_network_time += elapsed;
                 let status = response.status().as_u16();
                 let elapsed_ms = elapsed.as_millis() as u64;
-                tracing::debug!(
-                    status,
-                    elapsed_ms,
-                    "response"
-                );
+                tracing::debug!(status, elapsed_ms, "response");
 
                 // Record per-endpoint stats
                 let failed = status >= 400;
@@ -396,8 +390,7 @@ where
                 // limit, sleep until the window resets (capped at 30 s) so
                 // we do not slam the next request straight into a 429.
                 {
-                    let rl =
-                        crate::rate_limit::RateLimitState::from_headers(response.headers());
+                    let rl = crate::rate_limit::RateLimitState::from_headers(response.headers());
                     if let Some(delay) = rl.throttle_delay() {
                         let sleep_ms = delay.as_millis() as u64;
                         tracing::info!(
@@ -408,13 +401,7 @@ where
                         );
                         sleep(delay).await;
                     } else if let (Some(remaining), Some(limit)) = (rl.remaining, rl.limit) {
-                        tracing::debug!(
-                            remaining,
-                            limit,
-                            "rate limit: {}/{}",
-                            remaining,
-                            limit,
-                        );
+                        tracing::debug!(remaining, limit, "rate limit: {}/{}", remaining, limit,);
                     }
                 }
 
@@ -450,7 +437,8 @@ where
                 crate::api_health::record_latency(total_network_time);
 
                 // --- Disk cache store for cacheable GET 200 responses ---
-                if is_get && status == 200
+                if is_get
+                    && status == 200
                     && let Some(ttl_secs) = crate::response_cache::cache_ttl(&cache_url)
                 {
                     let response_url = response.url().to_string();
@@ -622,11 +610,7 @@ where
                 total_network_time += elapsed;
                 let status = response.status().as_u16();
                 let elapsed_ms = elapsed.as_millis() as u64;
-                tracing::debug!(
-                    status,
-                    elapsed_ms,
-                    "response"
-                );
+                tracing::debug!(status, elapsed_ms, "response");
 
                 ep_stats.record_request(response.url().as_str(), elapsed_ms, status >= 400);
                 ep_stats.save();
@@ -817,7 +801,10 @@ mod tests {
             std::env::remove_var("RAPS_HTTP2");
         }
         let config = HttpClientConfig::from_cli_and_env(None).unwrap();
-        assert!(config.http2, "HTTP/2 should be enabled when RAPS_HTTP2 is unset");
+        assert!(
+            config.http2,
+            "HTTP/2 should be enabled when RAPS_HTTP2 is unset"
+        );
     }
 
     #[test]
@@ -932,8 +919,7 @@ mod tests {
             std::env::set_var("RAPS_BASE_DELAY", "3");
             std::env::set_var("RAPS_MAX_WAIT", "90");
         }
-        let config =
-            HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
+        let config = HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
         assert_eq!(config.max_retries, 7);
         assert_eq!(config.base_delay, 3);
         assert_eq!(config.max_wait, 90);
@@ -959,9 +945,14 @@ mod tests {
 
     #[test]
     fn test_http_config_proxy_url_valid() {
-        let config =
-            HttpClientConfig::from_cli_and_env_full(None, None, None, None, Some("http://proxy.example.com:8080".to_string()))
-                .unwrap();
+        let config = HttpClientConfig::from_cli_and_env_full(
+            None,
+            None,
+            None,
+            None,
+            Some("http://proxy.example.com:8080".to_string()),
+        )
+        .unwrap();
         assert_eq!(
             config.proxy_url.as_deref(),
             Some("http://proxy.example.com:8080")
@@ -989,8 +980,7 @@ mod tests {
         unsafe {
             std::env::set_var("RAPS_PROXY", "http://proxy.corp.example.com:3128");
         }
-        let config =
-            HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
+        let config = HttpClientConfig::from_cli_and_env_full(None, None, None, None, None).unwrap();
         assert_eq!(
             config.proxy_url.as_deref(),
             Some("http://proxy.corp.example.com:3128")

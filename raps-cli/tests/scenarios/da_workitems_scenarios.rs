@@ -28,13 +28,13 @@ async fn test_da_workitems_list_table_succeeds() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_da_run_qualified_activity_succeeds() {
     let (_server, mut cmd) = start_cli_test().await;
-    cmd.args([
-        "da", "run",
-        "test-client.MyActivity+default",
-    ])
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Work item submitted").or(predicate::str::contains("workitem")));
+    cmd.args(["da", "run", "test-client.MyActivity+default"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("Work item submitted")
+                .or(predicate::str::contains("workitem")),
+        );
 }
 
 /// `da run` with JSON output succeeds.
@@ -42,9 +42,11 @@ async fn test_da_run_qualified_activity_succeeds() {
 async fn test_da_run_json_output() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "run",
+        "da",
+        "run",
         "test-client.MyActivity+default",
-        "--output", "json",
+        "--output",
+        "json",
     ])
     .assert()
     .success()
@@ -56,9 +58,11 @@ async fn test_da_run_json_output() {
 async fn test_da_run_with_input_url() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "run",
+        "da",
+        "run",
         "test-client.MyActivity+default",
-        "--input", "InputFile=https://example.com/input.dwg",
+        "--input",
+        "InputFile=https://example.com/input.dwg",
     ])
     .assert()
     .success();
@@ -69,9 +73,11 @@ async fn test_da_run_with_input_url() {
 async fn test_da_run_local_file_input_rejected() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "run",
+        "da",
+        "run",
         "test-client.MyActivity+default",
-        "--input", "InputFile=@/tmp/file.dwg",
+        "--input",
+        "InputFile=@/tmp/file.dwg",
     ])
     .assert()
     .failure()
@@ -105,13 +111,16 @@ async fn test_da_run_unqualified_activity_with_nickname() {
 async fn test_da_status_shows_workitem_status() {
     let (server, mut run_cmd) = start_cli_test().await;
     // First create a workitem
-    run_cmd.args([
-        "da", "run",
-        "test-client.MyActivity+default",
-        "--output", "json",
-    ])
-    .assert()
-    .success();
+    run_cmd
+        .args([
+            "da",
+            "run",
+            "test-client.MyActivity+default",
+            "--output",
+            "json",
+        ])
+        .assert()
+        .success();
 
     // Now check status (mock returns default status for any workitem ID)
     let mut status_cmd = assert_cmd::Command::cargo_bin("raps").unwrap();
@@ -142,7 +151,8 @@ async fn test_da_status_missing_id_fails() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_da_workitems_list_shows_item_after_run() {
     let (server, mut run_cmd) = start_cli_test().await;
-    run_cmd.args(["da", "run", "test-client.MyActivity+default"])
+    run_cmd
+        .args(["da", "run", "test-client.MyActivity+default"])
         .assert()
         .success();
 
@@ -151,7 +161,8 @@ async fn test_da_workitems_list_shows_item_after_run() {
         .env("APS_BASE_URL", &server.url)
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
-    list_cmd.args(["da", "workitems", "--output", "json"])
+    list_cmd
+        .args(["da", "workitems", "--output", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("workitem").or(predicate::str::contains("id")));
@@ -161,7 +172,8 @@ async fn test_da_workitems_list_shows_item_after_run() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_da_workitems_list_table_with_items() {
     let (server, mut run_cmd) = start_cli_test().await;
-    run_cmd.args(["da", "run", "test-client.MyActivity+default"])
+    run_cmd
+        .args(["da", "run", "test-client.MyActivity+default"])
         .assert()
         .success();
 
@@ -170,7 +182,8 @@ async fn test_da_workitems_list_table_with_items() {
         .env("APS_BASE_URL", &server.url)
         .env("APS_CLIENT_ID", "test-client")
         .env("APS_CLIENT_SECRET", "test-secret");
-    list_cmd.args(["da", "workitems"])
+    list_cmd
+        .args(["da", "workitems"])
         .assert()
         .success()
         .code(predicate::ne(101));
@@ -181,9 +194,11 @@ async fn test_da_workitems_list_table_with_items() {
 async fn test_da_run_with_output_arg() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "run",
+        "da",
+        "run",
         "test-client.MyActivity+default",
-        "--out-arg", "ResultFile=https://example.com/output.txt",
+        "--out-arg",
+        "ResultFile=https://example.com/output.txt",
     ])
     .assert()
     .success();

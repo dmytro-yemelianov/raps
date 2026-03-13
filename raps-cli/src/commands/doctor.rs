@@ -206,7 +206,13 @@ async fn check_three_leg_auth() -> CheckResult {
 async fn check_token_expiry_headroom() -> CheckResult {
     let config = match raps_kernel::config::Config::from_env_lenient() {
         Ok(c) => c,
-        Err(_) => return check("Token Expiry Headroom", Status::Pass, "No config — skipping"),
+        Err(_) => {
+            return check(
+                "Token Expiry Headroom",
+                Status::Pass,
+                "No config — skipping",
+            );
+        }
     };
 
     let auth = raps_kernel::auth::AuthClient::new(config);
@@ -365,7 +371,13 @@ async fn check_network_reachability() -> CheckResult {
         .build()
     {
         Ok(c) => c,
-        Err(e) => return check("Network [network]", Status::Fail, &format!("Client build failed: {e}")),
+        Err(e) => {
+            return check(
+                "Network [network]",
+                Status::Fail,
+                &format!("Client build failed: {e}"),
+            );
+        }
     };
 
     match client.head(NETWORK_PROBE_URL).send().await {
@@ -375,7 +387,10 @@ async fn check_network_reachability() -> CheckResult {
                 check(
                     "Network [network]",
                     Status::Pass,
-                    &format!("developer.api.autodesk.com reachable (HTTP {})", status.as_u16()),
+                    &format!(
+                        "developer.api.autodesk.com reachable (HTTP {})",
+                        status.as_u16()
+                    ),
                 )
             } else {
                 check(
@@ -387,11 +402,23 @@ async fn check_network_reachability() -> CheckResult {
         }
         Err(e) => {
             if e.is_timeout() {
-                check("Network [network]", Status::Fail, "Connection timed out (5s) — check firewall/proxy")
+                check(
+                    "Network [network]",
+                    Status::Fail,
+                    "Connection timed out (5s) — check firewall/proxy",
+                )
             } else if e.is_connect() {
-                check("Network [network]", Status::Fail, "Cannot connect to developer.api.autodesk.com — check network")
+                check(
+                    "Network [network]",
+                    Status::Fail,
+                    "Cannot connect to developer.api.autodesk.com — check network",
+                )
             } else {
-                check("Network [network]", Status::Fail, &format!("Network error: {e}"))
+                check(
+                    "Network [network]",
+                    Status::Fail,
+                    &format!("Network error: {e}"),
+                )
             }
         }
     }
@@ -417,16 +444,28 @@ fn check_config_file_permissions(path: &std::path::Path) -> CheckResult {
                         ),
                     )
                 } else {
-                    check("Config Permissions", Status::Pass, "Config file is owner-only readable")
+                    check(
+                        "Config Permissions",
+                        Status::Pass,
+                        "Config file is owner-only readable",
+                    )
                 }
             }
-            Err(e) => check("Config Permissions", Status::Warn, &format!("Cannot stat config: {e}")),
+            Err(e) => check(
+                "Config Permissions",
+                Status::Warn,
+                &format!("Cannot stat config: {e}"),
+            ),
         }
     }
     #[cfg(not(unix))]
     {
         let _ = path;
-        check("Config Permissions", Status::Pass, "Permission check not applicable on this OS")
+        check(
+            "Config Permissions",
+            Status::Pass,
+            "Permission check not applicable on this OS",
+        )
     }
 }
 
@@ -437,10 +476,18 @@ fn check_config_permissions() -> CheckResult {
             if profiles_path.exists() {
                 check_config_file_permissions(&profiles_path)
             } else {
-                check("Config Permissions", Status::Pass, "No config file found (not yet configured)")
+                check(
+                    "Config Permissions",
+                    Status::Pass,
+                    "No config file found (not yet configured)",
+                )
             }
         }
-        None => check("Config Permissions", Status::Warn, "Cannot determine config directory"),
+        None => check(
+            "Config Permissions",
+            Status::Warn,
+            "Cannot determine config directory",
+        ),
     }
 }
 
@@ -448,9 +495,8 @@ fn is_valid_uuid(s: &str) -> bool {
     use std::sync::OnceLock;
     static UUID_RE: OnceLock<regex::Regex> = OnceLock::new();
     let re = UUID_RE.get_or_init(|| {
-        regex::Regex::new(
-            r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-        ).expect("valid UUID regex")
+        regex::Regex::new(r"(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+            .expect("valid UUID regex")
     });
     re.is_match(s)
 }
@@ -473,7 +519,10 @@ fn validate_context_vars(
         // Hub IDs may have a "b." prefix followed by a UUID, or be a plain UUID
         let bare = id.strip_prefix("b.").unwrap_or(id);
         if bare.is_empty() || (!is_valid_uuid(bare) && !is_valid_uuid(id)) {
-            issues.push(format!("APS_HUB_ID '{}' does not look like a valid hub ID (expected UUID or b.<uuid>)", id));
+            issues.push(format!(
+                "APS_HUB_ID '{}' does not look like a valid hub ID (expected UUID or b.<uuid>)",
+                id
+            ));
         }
     }
 
@@ -481,7 +530,10 @@ fn validate_context_vars(
         // Project IDs may have "b." prefix
         let bare = id.strip_prefix("b.").unwrap_or(id);
         if !is_valid_uuid(bare) {
-            issues.push(format!("APS_PROJECT_ID '{}' is not a valid project ID (expected UUID or b.<uuid>)", id));
+            issues.push(format!(
+                "APS_PROJECT_ID '{}' is not a valid project ID (expected UUID or b.<uuid>)",
+                id
+            ));
         }
     }
 
@@ -512,18 +564,21 @@ fn check_context_var_formats() -> CheckResult {
         .into_iter()
         .flatten()
         .collect();
-        check("Context Vars", Status::Pass, &format!("{} set and valid", set.join(", ")))
+        check(
+            "Context Vars",
+            Status::Pass,
+            &format!("{} set and valid", set.join(", ")),
+        )
     } else {
         check("Context Vars", Status::Fail, &issues.join("; "))
     }
 }
 
-const DISK_FAIL_THRESHOLD_BYTES: u64 = 100 * 1024 * 1024;  // 100 MB
-const DISK_WARN_THRESHOLD_BYTES: u64 = 500 * 1024 * 1024;  // 500 MB
+const DISK_FAIL_THRESHOLD_BYTES: u64 = 100 * 1024 * 1024; // 100 MB
+const DISK_WARN_THRESHOLD_BYTES: u64 = 500 * 1024 * 1024; // 500 MB
 
 fn check_disk_space() -> CheckResult {
-    let check_path = raps_kernel::cache::cache_dir()
-        .unwrap_or_else(|_| std::env::temp_dir());
+    let check_path = raps_kernel::cache::cache_dir().unwrap_or_else(|_| std::env::temp_dir());
 
     // Walk up to find an existing ancestor to query
     let query_path = {
@@ -558,7 +613,11 @@ fn check_disk_space() -> CheckResult {
                 check("Disk Space", Status::Pass, &format!("{human} available"))
             }
         }
-        Err(e) => check("Disk Space", Status::Warn, &format!("Cannot determine disk space: {e}")),
+        Err(e) => check(
+            "Disk Space",
+            Status::Warn,
+            &format!("Cannot determine disk space: {e}"),
+        ),
     }
 }
 
@@ -585,7 +644,11 @@ fn classify_keyring_error(err: &keyring::Error) -> CheckResult {
 fn check_keyring() -> CheckResult {
     match keyring::Entry::new("raps", "aps_token") {
         Ok(entry) => match entry.get_password() {
-            Ok(_) => check("Keyring", Status::Pass, "Keyring accessible and token present"),
+            Ok(_) => check(
+                "Keyring",
+                Status::Pass,
+                "Keyring accessible and token present",
+            ),
             Err(keyring::Error::NoEntry) => check(
                 "Keyring",
                 Status::Warn,
@@ -613,8 +676,8 @@ fn detect_credential_conflicts(env_creds_set: bool, profile_active: bool) -> Vec
 }
 
 fn check_env_conflicts() -> CheckResult {
-    let env_creds_set = std::env::var("APS_CLIENT_ID").is_ok()
-        || std::env::var("APS_CLIENT_SECRET").is_ok();
+    let env_creds_set =
+        std::env::var("APS_CLIENT_ID").is_ok() || std::env::var("APS_CLIENT_SECRET").is_ok();
 
     let profile_active = raps_kernel::config::load_profiles()
         .ok()
@@ -625,11 +688,23 @@ fn check_env_conflicts() -> CheckResult {
 
     if conflicts.is_empty() {
         if env_creds_set {
-            check("Env Conflicts", Status::Pass, "Using env var credentials (no profile active)")
+            check(
+                "Env Conflicts",
+                Status::Pass,
+                "Using env var credentials (no profile active)",
+            )
         } else if profile_active {
-            check("Env Conflicts", Status::Pass, "Using active profile credentials (no env override)")
+            check(
+                "Env Conflicts",
+                Status::Pass,
+                "Using active profile credentials (no env override)",
+            )
         } else {
-            check("Env Conflicts", Status::Pass, "No credential sources active")
+            check(
+                "Env Conflicts",
+                Status::Pass,
+                "No credential sources active",
+            )
         }
     } else {
         check("Env Conflicts", Status::Warn, &conflicts.join("; "))
@@ -676,7 +751,13 @@ async fn check_version_staleness() -> CheckResult {
         .build()
     {
         Ok(c) => c,
-        Err(e) => return check("Version [network]", Status::Warn, &format!("Cannot check version: {e}")),
+        Err(e) => {
+            return check(
+                "Version [network]",
+                Status::Warn,
+                &format!("Cannot check version: {e}"),
+            );
+        }
     };
 
     let resp = match client.get(GITHUB_RELEASES_URL).send().await {
@@ -694,18 +775,33 @@ async fn check_version_staleness() -> CheckResult {
         return check(
             "Version [network]",
             Status::Warn,
-            &format!("GitHub API returned HTTP {} — skipping version check", resp.status().as_u16()),
+            &format!(
+                "GitHub API returned HTTP {} — skipping version check",
+                resp.status().as_u16()
+            ),
         );
     }
 
     let json: serde_json::Value = match resp.json().await {
         Ok(v) => v,
-        Err(e) => return check("Version [network]", Status::Warn, &format!("Cannot parse GitHub response: {e}")),
+        Err(e) => {
+            return check(
+                "Version [network]",
+                Status::Warn,
+                &format!("Cannot parse GitHub response: {e}"),
+            );
+        }
     };
 
     let tag = match json["tag_name"].as_str() {
         Some(t) => t,
-        None => return check("Version [network]", Status::Warn, "No tag_name in GitHub release response"),
+        None => {
+            return check(
+                "Version [network]",
+                Status::Warn,
+                "No tag_name in GitHub release response",
+            );
+        }
     };
 
     let latest = strip_v_prefix(tag);
@@ -719,7 +815,9 @@ async fn check_version_staleness() -> CheckResult {
         VersionCompare::UpdateAvailable => check(
             "Version [network]",
             Status::Warn,
-            &format!("Update available: v{current} → v{latest} (run: npm i -g @dmytro-yemelianov/raps-cli@latest)"),
+            &format!(
+                "Update available: v{current} → v{latest} (run: npm i -g @dmytro-yemelianov/raps-cli@latest)"
+            ),
         ),
         VersionCompare::Ahead => check(
             "Version [network]",
@@ -752,9 +850,12 @@ fn mask_proxy_url(raw: &str) -> String {
 /// Accepts a list of (name, value) pairs (testable without touching real env).
 fn find_proxy_from_vars(vars: &[(String, String)]) -> Option<String> {
     const PROXY_VARS: &[&str] = &[
-        "HTTPS_PROXY", "https_proxy",
-        "HTTP_PROXY",  "http_proxy",
-        "ALL_PROXY",   "all_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "ALL_PROXY",
+        "all_proxy",
     ];
     for name in PROXY_VARS {
         if let Some((_, val)) = vars.iter().find(|(k, _)| k == name) {
@@ -769,7 +870,12 @@ fn check_proxy_environment() -> CheckResult {
         .filter(|(k, _)| {
             matches!(
                 k.as_str(),
-                "HTTPS_PROXY" | "https_proxy" | "HTTP_PROXY" | "http_proxy" | "ALL_PROXY" | "all_proxy"
+                "HTTPS_PROXY"
+                    | "https_proxy"
+                    | "HTTP_PROXY"
+                    | "http_proxy"
+                    | "ALL_PROXY"
+                    | "all_proxy"
             )
         })
         .collect();
@@ -783,7 +889,11 @@ fn check_proxy_environment() -> CheckResult {
                  if cert errors occur, check corporate CA bundle"
             ),
         ),
-        None => check("Proxy/TLS Env", Status::Pass, "No proxy environment variables detected"),
+        None => check(
+            "Proxy/TLS Env",
+            Status::Pass,
+            "No proxy environment variables detected",
+        ),
     }
 }
 
@@ -796,7 +906,13 @@ fn looks_like_valid_client_id(id: &str) -> bool {
 fn check_credential_validity() -> CheckResult {
     let config = match raps_kernel::config::Config::from_env_lenient() {
         Ok(c) => c,
-        Err(e) => return check("Credential Validity", Status::Fail, &format!("Config load error: {e}")),
+        Err(e) => {
+            return check(
+                "Credential Validity",
+                Status::Fail,
+                &format!("Config load error: {e}"),
+            );
+        }
     };
 
     if config.client_id.is_empty() && config.client_secret.is_empty() {
@@ -812,7 +928,11 @@ fn check_credential_validity() -> CheckResult {
     }
 
     if config.client_secret.is_empty() {
-        return check("Credential Validity", Status::Fail, "client_secret is empty");
+        return check(
+            "Credential Validity",
+            Status::Fail,
+            "client_secret is empty",
+        );
     }
 
     if !looks_like_valid_client_id(&config.client_id) {
@@ -827,8 +947,8 @@ fn check_credential_validity() -> CheckResult {
     }
 
     // Warn if both env vars AND a profile are active (credentials in two places)
-    let env_creds_set = std::env::var("APS_CLIENT_ID").is_ok()
-        || std::env::var("APS_CLIENT_SECRET").is_ok();
+    let env_creds_set =
+        std::env::var("APS_CLIENT_ID").is_ok() || std::env::var("APS_CLIENT_SECRET").is_ok();
     let profile_active = raps_kernel::config::load_profiles()
         .ok()
         .and_then(|pd| pd.active_profile)
@@ -855,11 +975,11 @@ fn check_credential_validity() -> CheckResult {
 
 /// Required scopes for common RAPS operations.
 const REQUIRED_SCOPES: &[(&str, &str)] = &[
-    ("bucket:read",    "raps bucket list"),
-    ("bucket:create",  "raps bucket create"),
-    ("data:read",      "raps object download"),
-    ("data:write",     "raps object upload"),
-    ("data:create",    "raps object upload"),
+    ("bucket:read", "raps bucket list"),
+    ("bucket:create", "raps bucket create"),
+    ("data:read", "raps object download"),
+    ("data:write", "raps object upload"),
+    ("data:create", "raps object upload"),
     ("viewables:read", "raps translate"),
 ];
 
@@ -881,7 +1001,11 @@ async fn check_token_scope_coverage() -> CheckResult {
     };
 
     if config.require_credentials().is_err() {
-        return check("Token Scopes", Status::Warn, "No credentials — cannot check scopes");
+        return check(
+            "Token Scopes",
+            Status::Warn,
+            "No credentials — cannot check scopes",
+        );
     }
 
     // Build the scope string we want
@@ -896,7 +1020,13 @@ async fn check_token_scope_coverage() -> CheckResult {
         .build()
     {
         Ok(c) => c,
-        Err(e) => return check("Token Scopes", Status::Fail, &format!("HTTP client error: {e}")),
+        Err(e) => {
+            return check(
+                "Token Scopes",
+                Status::Fail,
+                &format!("HTTP client error: {e}"),
+            );
+        }
     };
 
     let auth_url = config.auth_url();
@@ -908,7 +1038,13 @@ async fn check_token_scope_coverage() -> CheckResult {
         .await
     {
         Ok(r) => r,
-        Err(e) => return check("Token Scopes", Status::Fail, &format!("Token request failed: {e}")),
+        Err(e) => {
+            return check(
+                "Token Scopes",
+                Status::Fail,
+                &format!("Token request failed: {e}"),
+            );
+        }
     };
 
     if !resp.status().is_success() {
@@ -922,7 +1058,13 @@ async fn check_token_scope_coverage() -> CheckResult {
 
     let token_resp: ScopeTokenResponse = match resp.json().await {
         Ok(t) => t,
-        Err(e) => return check("Token Scopes", Status::Fail, &format!("Cannot parse token response: {e}")),
+        Err(e) => {
+            return check(
+                "Token Scopes",
+                Status::Fail,
+                &format!("Cannot parse token response: {e}"),
+            );
+        }
     };
 
     let granted_scopes: Vec<&str> = match &token_resp.scope {
@@ -947,7 +1089,10 @@ async fn check_token_scope_coverage() -> CheckResult {
         check(
             "Token Scopes",
             Status::Pass,
-            &format!("All required scopes granted ({})", granted_scopes.join(", ")),
+            &format!(
+                "All required scopes granted ({})",
+                granted_scopes.join(", ")
+            ),
         )
     } else {
         check(
@@ -1003,7 +1148,10 @@ mod tests {
         // Verify the check() helper produces a result whose name contains the [network] tag
         // when given the network check's name constant
         let c = check("Network [network]", Status::Pass, "reachable");
-        assert!(c.name.contains("[network]"), "Network check name must contain [network] tag to signal network requirement");
+        assert!(
+            c.name.contains("[network]"),
+            "Network check name must contain [network] tag to signal network requirement"
+        );
     }
 
     #[test]
@@ -1019,7 +1167,11 @@ mod tests {
         std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(0o644)).unwrap();
         let result = check_config_file_permissions(tmp.path());
         assert_eq!(result.status, "warn", "world-readable config should warn");
-        assert!(result.message.contains("non-owner") || result.message.contains("permissions") || result.message.contains("chmod"));
+        assert!(
+            result.message.contains("non-owner")
+                || result.message.contains("permissions")
+                || result.message.contains("chmod")
+        );
     }
 
     #[cfg(unix)]
@@ -1060,11 +1212,8 @@ mod tests {
 
     #[test]
     fn test_context_var_check_valid_uuid_passes() {
-        let issues = validate_context_vars(
-            Some("01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"),
-            None,
-            None,
-        );
+        let issues =
+            validate_context_vars(Some("01fb1602-2ec0-4b05-bf6e-39dc70b3ae05"), None, None);
         assert!(issues.is_empty());
     }
 
@@ -1091,7 +1240,9 @@ mod tests {
     fn test_classify_keyring_no_entry_means_not_logged_in() {
         let result = classify_keyring_error(&keyring::Error::NoEntry);
         assert_eq!(result.status, "warn");
-        assert!(result.message.contains("Not logged in") || result.message.contains("raps auth login"));
+        assert!(
+            result.message.contains("Not logged in") || result.message.contains("raps auth login")
+        );
     }
 
     #[test]
@@ -1102,7 +1253,11 @@ mod tests {
         )));
         let result = classify_keyring_error(&err);
         assert_eq!(result.status, "fail");
-        assert!(result.message.contains("may prompt") || result.message.contains("unlock") || result.message.contains("access"));
+        assert!(
+            result.message.contains("may prompt")
+                || result.message.contains("unlock")
+                || result.message.contains("access")
+        );
     }
 
     #[test]
@@ -1174,9 +1329,7 @@ mod tests {
 
     #[test]
     fn test_find_proxy_env_vars_detects_https_proxy() {
-        let vars = vec![
-            ("HTTPS_PROXY".to_string(), "http://proxy:8080".to_string()),
-        ];
+        let vars = vec![("HTTPS_PROXY".to_string(), "http://proxy:8080".to_string())];
         let found = find_proxy_from_vars(&vars);
         assert!(found.is_some());
         assert!(found.unwrap().contains("HTTPS_PROXY"));

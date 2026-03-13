@@ -84,23 +84,14 @@ pub(super) async fn show_timeline(
         OutputFormat::Table => {
             println!("\n{}", "Translation Timeline".bold());
             println!("{}", "─".repeat(75));
-            println!(
-                "  {} {}",
-                "URN:".bold(),
-                truncate_str(urn, 60).dimmed()
-            );
+            println!("  {} {}", "URN:".bold(), truncate_str(urn, 60).dimmed());
             let status_icon = match manifest.status.as_str() {
                 "success" => "\u{2713}".green().bold().to_string(),
                 "failed" | "timeout" => "X".red().bold().to_string(),
                 "inprogress" | "pending" => "...".yellow().bold().to_string(),
                 _ => "?".dimmed().to_string(),
             };
-            println!(
-                "  {} {} {}",
-                "Status:".bold(),
-                status_icon,
-                manifest.status
-            );
+            println!("  {} {} {}", "Status:".bold(), status_icon, manifest.status);
             println!("  {} {}", "Progress:".bold(), manifest.progress);
             println!("  {} {}", "Region:".bold(), manifest.region);
 

@@ -7,8 +7,8 @@ use anyhow::Result;
 use colored::Colorize;
 use serde::Serialize;
 
-use crate::output::OutputFormat;
 use super::SearchArgs;
+use crate::output::OutputFormat;
 
 #[derive(Serialize, schemars::JsonSchema)]
 struct PluginDiscovery {
@@ -29,7 +29,8 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
             slug: "dashboard".into(),
             tier: "pro".into(),
             category: "Observability".into(),
-            description: "Full-featured keyboard-driven terminal dashboard for APS resources.".into(),
+            description: "Full-featured keyboard-driven terminal dashboard for APS resources."
+                .into(),
             price: "$10/mo".into(),
         },
         PluginDiscovery {
@@ -37,7 +38,8 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
             slug: "acc-bulk".into(),
             tier: "pro".into(),
             category: "Automation".into(),
-            description: "Bulk operations for Autodesk Construction Cloud (users, projects, assets).".into(),
+            description:
+                "Bulk operations for Autodesk Construction Cloud (users, projects, assets).".into(),
             price: "$15/mo".into(),
         },
     ];
@@ -45,7 +47,9 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
     // Simple filtering for demonstration
     if !args.query.is_empty() {
         let q = args.query.to_lowercase();
-        plugins.retain(|p| p.name.to_lowercase().contains(&q) || p.description.to_lowercase().contains(&q));
+        plugins.retain(|p| {
+            p.name.to_lowercase().contains(&q) || p.description.to_lowercase().contains(&q)
+        });
     }
     if let Some(ref tier) = args.tier {
         plugins.retain(|p| p.tier == *tier);
@@ -54,7 +58,10 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
     match output_format {
         OutputFormat::Table => {
             if plugins.is_empty() {
-                println!("{}", "No plugins matching your criteria were found.".yellow());
+                println!(
+                    "{}",
+                    "No plugins matching your criteria were found.".yellow()
+                );
             } else {
                 println!("\n{}", "Marketplace Search Results:".bold());
                 println!("{}", "─".repeat(90));
@@ -69,7 +76,11 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
                 println!("{}", "─".repeat(90));
 
                 for p in &plugins {
-                    let tier_color = if p.tier == "pro" { p.tier.magenta() } else { p.tier.green() };
+                    let tier_color = if p.tier == "pro" {
+                        p.tier.magenta()
+                    } else {
+                        p.tier.green()
+                    };
                     println!(
                         "  {:<20} {:<15} {:<10} {:<10} {}",
                         p.name.cyan(),
@@ -80,7 +91,10 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
                     );
                 }
                 println!("{}", "─".repeat(90));
-                println!("Run {} to install a plugin.", "raps marketplace install <slug>".cyan());
+                println!(
+                    "Run {} to install a plugin.",
+                    "raps marketplace install <slug>".cyan()
+                );
             }
         }
         _ => {
@@ -93,7 +107,7 @@ pub(super) async fn search(args: SearchArgs, output_format: OutputFormat) -> Res
 
 pub(super) async fn clear_cache(output_format: OutputFormat) -> Result<()> {
     crate::marketplace::SubscriptionManager::clear_cache();
-    
+
     match output_format {
         OutputFormat::Table => {
             println!("{} Marketplace cache cleared.", "✓".green().bold());

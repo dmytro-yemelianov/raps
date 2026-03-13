@@ -21,12 +21,12 @@ pub async fn start_cli_test() -> (TestServer, Command) {
     let _ = tracing_subscriber::fmt::try_init();
     let server = TestServer::start_default().await.unwrap();
     let mut cmd = Command::cargo_bin("raps").unwrap();
-    
+
     // Configure CLI to use mock server
     cmd.env("APS_BASE_URL", &server.url);
     cmd.env("APS_CLIENT_ID", "test-client");
     cmd.env("APS_CLIENT_SECRET", "test-secret");
-    
+
     (server, cmd)
 }
 

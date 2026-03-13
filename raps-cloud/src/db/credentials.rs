@@ -54,10 +54,12 @@ pub async fn create(
     is_default: bool,
 ) -> anyhow::Result<Credential> {
     if is_default {
-        sqlx::query("UPDATE credentials SET is_default = false WHERE tenant_id = $1 AND is_default = true")
-            .bind(tenant_id)
-            .execute(pool)
-            .await?;
+        sqlx::query(
+            "UPDATE credentials SET is_default = false WHERE tenant_id = $1 AND is_default = true",
+        )
+        .bind(tenant_id)
+        .execute(pool)
+        .await?;
     }
 
     let cred = sqlx::query_as::<_, Credential>(

@@ -87,8 +87,7 @@ pub async fn run_init() -> Result<()> {
     println!("{}", "═".repeat(BOX_WIDTH));
     println!(
         "  {}",
-        "Setup complete. Run `raps status` anytime to check your configuration."
-            .bold()
+        "Setup complete. Run `raps status` anytime to check your configuration.".bold()
     );
     println!("{}", "═".repeat(BOX_WIDTH));
 
@@ -101,7 +100,11 @@ async fn step_credentials() -> Result<(String, String, String)> {
     step_header(1, 6, "APS Credentials");
     println!();
     println!("  Create an APS app (if you haven't yet):");
-    println!("    {} {}", "→".cyan(), "https://aps.autodesk.com/myapps".underline());
+    println!(
+        "    {} {}",
+        "→".cyan(),
+        "https://aps.autodesk.com/myapps".underline()
+    );
     println!();
 
     let profile_name = raps_kernel::prompts::spawn_prompt(|| {
@@ -110,32 +113,24 @@ async fn step_credentials() -> Result<(String, String, String)> {
     .await?;
 
     let client_id = raps_kernel::prompts::spawn_prompt(|| {
-        raps_kernel::prompts::input_validated(
-            "  Client ID",
-            None,
-            |s: &String| {
-                if s.trim().is_empty() {
-                    Err("Client ID cannot be empty")
-                } else {
-                    Ok(())
-                }
-            },
-        )
+        raps_kernel::prompts::input_validated("  Client ID", None, |s: &String| {
+            if s.trim().is_empty() {
+                Err("Client ID cannot be empty")
+            } else {
+                Ok(())
+            }
+        })
     })
     .await?;
 
     let client_secret = raps_kernel::prompts::spawn_prompt(|| {
-        raps_kernel::prompts::input_validated(
-            "  Client Secret",
-            None,
-            |s: &String| {
-                if s.trim().is_empty() {
-                    Err("Client Secret cannot be empty")
-                } else {
-                    Ok(())
-                }
-            },
-        )
+        raps_kernel::prompts::input_validated("  Client Secret", None, |s: &String| {
+            if s.trim().is_empty() {
+                Err("Client Secret cannot be empty")
+            } else {
+                Ok(())
+            }
+        })
     })
     .await?;
 
@@ -232,8 +227,13 @@ async fn step_login(
     let auth = raps_kernel::auth::AuthClient::new(config);
 
     let scopes = &[
-        "data:read", "data:write", "data:create", "data:search",
-        "bucket:read", "account:read", "user:read",
+        "data:read",
+        "data:write",
+        "data:create",
+        "data:search",
+        "bucket:read",
+        "account:read",
+        "user:read",
     ];
 
     let use_device = raps_kernel::interactive::is_headless();
@@ -314,7 +314,10 @@ async fn step_discover_hubs(
             hubs
         }
         Ok(_) => {
-            println!("  {}", "(no hubs found — check your account access)".dimmed());
+            println!(
+                "  {}",
+                "(no hubs found — check your account access)".dimmed()
+            );
             vec![]
         }
         Err(e) => {
@@ -340,7 +343,10 @@ async fn step_enterprise_context(
     let enterprise_hubs: Vec<&raps_dm::types::Hub> = hubs
         .iter()
         .filter(|h| {
-            let ext = h.attributes.extension.as_ref()
+            let ext = h
+                .attributes
+                .extension
+                .as_ref()
                 .and_then(|e| e.extension_type.as_deref());
             tier_from_extension(ext) == HubTier::Enterprise
         })
@@ -354,18 +360,34 @@ async fn step_enterprise_context(
         println!("  as a Custom Integration in your ACC account. This grants the app");
         println!("  permission to call account-level APIs on behalf of your organization.");
         println!();
-        println!("  {} Action required — do this in ACC (Account Administrator role needed):", "→".cyan());
+        println!(
+            "  {} Action required — do this in ACC (Account Administrator role needed):",
+            "→".cyan()
+        );
         println!();
         println!("  1. Open Custom Integrations in your ACC account:");
-        println!("       {} {}", "→".cyan(), "https://acc.autodesk.com/account-admin/custom-integrations/".underline());
+        println!(
+            "       {} {}",
+            "→".cyan(),
+            "https://acc.autodesk.com/account-admin/custom-integrations/".underline()
+        );
         println!("  2. Click {}.", "\"Add custom integration\"".bold());
         println!("  3. Paste your Client ID when prompted:");
         println!("       {}", client_id.cyan().bold());
-        println!("  4. Set access level to {}.", "\"Full Account Access\"".bold());
+        println!(
+            "  4. Set access level to {}.",
+            "\"Full Account Access\"".bold()
+        );
         println!("  5. Save. Your app now has permission to manage this account via API.");
         println!();
-        println!("  Once done, re-run {} — the enterprise hub should appear.", "`raps init`".bold());
-        println!("  Docs: {}", "rapscli.xyz/docs/custom-integrations".underline());
+        println!(
+            "  Once done, re-run {} — the enterprise hub should appear.",
+            "`raps init`".bold()
+        );
+        println!(
+            "  Docs: {}",
+            "rapscli.xyz/docs/custom-integrations".underline()
+        );
         return Ok(());
     }
 
@@ -379,39 +401,47 @@ async fn step_enterprise_context(
     banner.print_box();
 
     println!();
-    println!("  For RAPS to work with {} admin commands — adding and removing", hub.attributes.name.cyan().bold());
+    println!(
+        "  For RAPS to work with {} admin commands — adding and removing",
+        hub.attributes.name.cyan().bold()
+    );
     println!("  project members, updating roles, managing folder permissions, and");
     println!("  running bulk operations across projects — your APS app must be");
     println!("  registered as a Custom Integration in this ACC account.");
     println!();
-    println!("  {} Action required — do this in ACC (Account Administrator role needed):", "→".cyan());
+    println!(
+        "  {} Action required — do this in ACC (Account Administrator role needed):",
+        "→".cyan()
+    );
     println!();
     println!("  1. Open Custom Integrations for this account:");
-    println!("       {} {}", "→".cyan(), "https://acc.autodesk.com/account-admin/custom-integrations/".underline());
+    println!(
+        "       {} {}",
+        "→".cyan(),
+        "https://acc.autodesk.com/account-admin/custom-integrations/".underline()
+    );
     println!("  2. Click {}.", "\"Add custom integration\"".bold());
     println!("  3. Paste your Client ID when prompted:");
     println!("       {}", client_id.cyan().bold());
-    println!("  4. Set access level to {}.", "\"Full Account Access\"".bold());
+    println!(
+        "  4. Set access level to {}.",
+        "\"Full Account Access\"".bold()
+    );
     println!("  5. Save. Your app now has permission to manage this account via API.");
     println!();
-    println!("  Docs: {}", "rapscli.xyz/docs/custom-integrations".underline());
-    println!();
     println!(
-        "  Save {} = {}",
-        "APS_ACCOUNT_ID".bold(),
-        account_id.cyan()
+        "  Docs: {}",
+        "rapscli.xyz/docs/custom-integrations".underline()
     );
+    println!();
+    println!("  Save {} = {}", "APS_ACCOUNT_ID".bold(), account_id.cyan());
     println!();
 
     // Prompt save choice (default: option 0 = profile only)
     let options = save_choice_options(profile_name);
     let profile_name_owned = profile_name.to_string();
     let choice = raps_kernel::prompts::spawn_prompt(move || {
-        raps_kernel::prompts::select_with_default(
-            "  How would you like to save it?",
-            &options,
-            0,
-        )
+        raps_kernel::prompts::select_with_default("  How would you like to save it?", &options, 0)
     })
     .await
     .unwrap_or(0);
@@ -439,7 +469,11 @@ async fn step_enterprise_context(
             let home = std::env::var("HOME").unwrap_or_else(|_| "~".to_string());
             let rc_path = std::path::PathBuf::from(&home).join(rc_file);
             let line = format!("\n{}\n", export_line(account_id));
-            match std::fs::OpenOptions::new().create(true).append(true).open(&rc_path) {
+            match std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&rc_path)
+            {
                 Ok(mut f) => {
                     use std::io::Write;
                     f.write_all(line.as_bytes())?;
@@ -508,7 +542,7 @@ async fn save_account_to_profile(profile_name: &str, account_id: &str) -> Result
 }
 
 async fn save_profile(name: &str, client_id: &str, client_secret: &str) -> Result<()> {
-    use crate::commands::config::{load_profiles, save_profiles, ProfileConfig};
+    use crate::commands::config::{ProfileConfig, load_profiles, save_profiles};
 
     let mut data = load_profiles().await?;
 
@@ -568,9 +602,9 @@ mod tests {
         // Option labels used in the select prompt
         let opts = save_choice_options("myprofile");
         assert_eq!(opts.len(), 3);
-        assert!(opts[0].contains("myprofile"));   // option 1 mentions profile name
-        assert!(opts[1].contains("export"));      // option 2 mentions export
-        assert!(opts[2].contains("auto"));        // option 3 mentions auto-append
+        assert!(opts[0].contains("myprofile")); // option 1 mentions profile name
+        assert!(opts[1].contains("export")); // option 2 mentions export
+        assert!(opts[2].contains("auto")); // option 3 mentions auto-append
     }
 
     #[test]

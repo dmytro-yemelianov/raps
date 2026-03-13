@@ -44,11 +44,7 @@ pub struct WatchArgs {
 }
 
 /// Check whether a file path matches the given filter/exclude rules.
-fn matches_rules(
-    path: &std::path::Path,
-    filter: &Option<Pattern>,
-    excludes: &[Pattern],
-) -> bool {
+fn matches_rules(path: &std::path::Path, filter: &Option<Pattern>, excludes: &[Pattern]) -> bool {
     let file_name = match path.file_name().and_then(|n| n.to_str()) {
         Some(n) => n,
         None => return false,
@@ -129,10 +125,8 @@ pub async fn execute(
         loop {
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(Ok(event)) => {
-                    let is_relevant = matches!(
-                        event.kind,
-                        EventKind::Create(_) | EventKind::Modify(_)
-                    );
+                    let is_relevant =
+                        matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_));
                     if is_relevant {
                         for path in event.paths {
                             if path.is_file() {

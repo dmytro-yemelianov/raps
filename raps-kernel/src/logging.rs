@@ -60,18 +60,13 @@ pub fn init(no_color: bool, quiet: bool, verbose: bool, debug: bool, log_file: O
     let clicolor_force = std::env::var("CLICOLOR_FORCE")
         .ok()
         .is_some_and(|v| v != "0");
-    let clicolor_off = std::env::var("CLICOLOR")
-        .ok()
-        .is_some_and(|v| v == "0");
+    let clicolor_off = std::env::var("CLICOLOR").ok().is_some_and(|v| v == "0");
     let no_color_env = std::env::var("NO_COLOR").is_ok();
     let dumb_term = std::env::var("TERM").as_deref() == Ok("dumb");
     let is_tty = std::io::stdout().is_terminal();
 
-    let should_color = !no_color
-        && !no_color_env
-        && !dumb_term
-        && !clicolor_off
-        && (clicolor_force || is_tty);
+    let should_color =
+        !no_color && !no_color_env && !dumb_term && !clicolor_off && (clicolor_force || is_tty);
 
     NO_COLOR.store(!should_color, Ordering::Relaxed);
     QUIET.store(quiet, Ordering::Relaxed);

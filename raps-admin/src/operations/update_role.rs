@@ -195,7 +195,11 @@ async fn update_user_role(
 
     // Check from-role filter if specified
     if let Some(from_role) = from_role_id {
-        let current_role = current_user.role_ids.first().map(String::as_str).unwrap_or("");
+        let current_role = current_user
+            .role_ids
+            .first()
+            .map(String::as_str)
+            .unwrap_or("");
         if current_role != from_role {
             return ItemResult::Skipped {
                 reason: format!("role_mismatch: current={}", current_role),
@@ -238,7 +242,9 @@ fn is_insight_restriction_error(error: &str) -> bool {
     let lower = error.to_lowercase();
     lower.contains("cannot remove user access from insight")
         || lower.contains("insight")
-            && (lower.contains("cannot") || lower.contains("not allowed") || lower.contains("restricted"))
+            && (lower.contains("cannot")
+                || lower.contains("not allowed")
+                || lower.contains("restricted"))
 }
 
 /// Check if an error is retryable
@@ -385,8 +391,12 @@ mod tests {
 
     #[test]
     fn test_is_insight_restriction_error() {
-        assert!(is_insight_restriction_error("Cannot remove user access from Insight"));
-        assert!(is_insight_restriction_error("400 Bad Request: Cannot remove user access from Insight"));
+        assert!(is_insight_restriction_error(
+            "Cannot remove user access from Insight"
+        ));
+        assert!(is_insight_restriction_error(
+            "400 Bad Request: Cannot remove user access from Insight"
+        ));
         assert!(!is_insight_restriction_error("404 Not Found"));
         assert!(!is_insight_restriction_error("400 Bad Request"));
     }

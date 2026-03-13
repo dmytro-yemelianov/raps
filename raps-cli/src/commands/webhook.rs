@@ -1011,7 +1011,11 @@ async fn webhook_status(
             println!("\n{}", "Webhook Health Status:".bold());
             println!("{}", "-".repeat(col_width));
 
-            let reach_header = if check_reachability { "  Reachable" } else { "" };
+            let reach_header = if check_reachability {
+                "  Reachable"
+            } else {
+                ""
+            };
             println!(
                 "{:<12} {:<25} {:<10} {:<35} {:<20}{}",
                 "APS Status".bold(),
@@ -1068,8 +1072,7 @@ async fn webhook_status(
             );
 
             if check_reachability {
-                let reachable_count =
-                    outputs.iter().filter(|o| o.reachable == Some(true)).count();
+                let reachable_count = outputs.iter().filter(|o| o.reachable == Some(true)).count();
                 println!(
                     "         {} of {} callback URL(s) reachable.",
                     reachable_count, total

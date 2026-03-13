@@ -229,7 +229,11 @@ impl DiskCache {
     pub fn new() -> Self {
         let cache_dir = directories::ProjectDirs::from("com", "autodesk", "raps")
             .map(|dirs| dirs.cache_dir().join("response_cache"))
-            .unwrap_or_else(|| std::env::temp_dir().join("raps-cache").join("response_cache"));
+            .unwrap_or_else(|| {
+                std::env::temp_dir()
+                    .join("raps-cache")
+                    .join("response_cache")
+            });
         let _ = std::fs::create_dir_all(&cache_dir);
         Self { cache_dir }
     }

@@ -3,7 +3,8 @@ use predicates::str;
 
 #[test]
 fn test_docs_mcp_exits_zero() {
-    Command::cargo_bin("raps").unwrap()
+    Command::cargo_bin("raps")
+        .unwrap()
         .args(["docs", "mcp"])
         .assert()
         .success();
@@ -11,7 +12,8 @@ fn test_docs_mcp_exits_zero() {
 
 #[test]
 fn test_docs_mcp_output_contains_tool_table() {
-    let output = Command::cargo_bin("raps").unwrap()
+    let output = Command::cargo_bin("raps")
+        .unwrap()
         .args(["docs", "mcp"])
         .output()
         .unwrap();
@@ -23,19 +25,24 @@ fn test_docs_mcp_output_contains_tool_table() {
         "missing auth type info"
     );
     assert!(stdout.contains("## Tools"), "missing Tools section header");
-    assert!(stdout.contains("## Agent Invariants"), "missing Agent Invariants section");
+    assert!(
+        stdout.contains("## Agent Invariants"),
+        "missing Agent Invariants section"
+    );
 }
 
 #[test]
 fn test_docs_mcp_check_flag_passes_when_agents_md_matches() {
     // Generate AGENTS.md first, then verify --check passes
-    Command::cargo_bin("raps").unwrap()
+    Command::cargo_bin("raps")
+        .unwrap()
         .args(["docs", "mcp", "--write"])
         .current_dir("/root/github/raps/raps/.worktrees/agent-first-cli")
         .assert()
         .success();
 
-    Command::cargo_bin("raps").unwrap()
+    Command::cargo_bin("raps")
+        .unwrap()
         .args(["docs", "mcp", "--check"])
         .current_dir("/root/github/raps/raps/.worktrees/agent-first-cli")
         .assert()

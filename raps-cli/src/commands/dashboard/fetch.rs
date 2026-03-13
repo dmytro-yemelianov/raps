@@ -250,7 +250,9 @@ async fn fetch_data(
                     created: util::format_timestamp(b.created_date),
                 })
                 .collect();
-            Ok(ResourceData::Buckets(resources::buckets::BucketList { rows }))
+            Ok(ResourceData::Buckets(resources::buckets::BucketList {
+                rows,
+            }))
         }
         ViewKind::BucketDetail { bucket_key } => {
             let detail = clients.oss.get_bucket_details(bucket_key).await?;
@@ -388,10 +390,12 @@ async fn fetch_data(
                         modified: f.attributes.last_modified_time.unwrap_or_default(),
                     })
                     .collect();
-                Ok(ResourceData::FolderContents(resources::folders::FolderList {
-                    project_id: project_id.to_string(),
-                    rows,
-                }))
+                Ok(ResourceData::FolderContents(
+                    resources::folders::FolderList {
+                        project_id: project_id.to_string(),
+                        rows,
+                    },
+                ))
             } else {
                 let contents = clients
                     .dm
@@ -429,10 +433,12 @@ async fn fetch_data(
                         })
                     })
                     .collect();
-                Ok(ResourceData::FolderContents(resources::folders::FolderList {
-                    project_id: project_id.to_string(),
-                    rows,
-                }))
+                Ok(ResourceData::FolderContents(
+                    resources::folders::FolderList {
+                        project_id: project_id.to_string(),
+                        rows,
+                    },
+                ))
             }
         }
         ViewKind::ItemDetail {
@@ -754,10 +760,12 @@ async fn fetch_data(
                     due_date: s.due_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Submittals(resources::construction::SubmittalList {
-                project_id: project_id.to_string(),
-                rows,
-            }))
+            Ok(ResourceData::Submittals(
+                resources::construction::SubmittalList {
+                    project_id: project_id.to_string(),
+                    rows,
+                },
+            ))
         }
         ViewKind::SubmittalDetail {
             project_id,
@@ -819,10 +827,12 @@ async fn fetch_data(
                     due_date: c.due_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Checklists(resources::construction::ChecklistList {
-                project_id: project_id.to_string(),
-                rows,
-            }))
+            Ok(ResourceData::Checklists(
+                resources::construction::ChecklistList {
+                    project_id: project_id.to_string(),
+                    rows,
+                },
+            ))
         }
         ViewKind::ChecklistDetail {
             project_id,
@@ -884,7 +894,9 @@ async fn fetch_data(
                     description: e.description.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Engines(resources::design_automation::EngineList { rows }))
+            Ok(ResourceData::Engines(
+                resources::design_automation::EngineList { rows },
+            ))
         }
         ViewKind::ActivityList => {
             let activities = clients.da.list_activities().await?;
@@ -892,7 +904,9 @@ async fn fetch_data(
                 .into_iter()
                 .map(|id| resources::design_automation::ActivityRow { id })
                 .collect();
-            Ok(ResourceData::Activities(resources::design_automation::ActivityList { rows }))
+            Ok(ResourceData::Activities(
+                resources::design_automation::ActivityList { rows },
+            ))
         }
         ViewKind::WorkItemList => {
             let items = clients.da.list_workitems().await?;
@@ -904,7 +918,9 @@ async fn fetch_data(
                     progress: w.progress.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::WorkItems(resources::design_automation::WorkItemList { rows }))
+            Ok(ResourceData::WorkItems(
+                resources::design_automation::WorkItemList { rows },
+            ))
         }
         ViewKind::WorkItemDetail { id } => {
             let wi = clients.da.get_workitem_status(id).await?;
@@ -952,9 +968,13 @@ async fn fetch_data(
         }
         ViewKind::AppBundleList => {
             let bundles = clients.da.list_appbundles().await?;
-            let rows: Vec<resources::design_automation::AppBundleRow> =
-                bundles.into_iter().map(|id| resources::design_automation::AppBundleRow { id }).collect();
-            Ok(ResourceData::AppBundles(resources::design_automation::AppBundleList { rows }))
+            let rows: Vec<resources::design_automation::AppBundleRow> = bundles
+                .into_iter()
+                .map(|id| resources::design_automation::AppBundleRow { id })
+                .collect();
+            Ok(ResourceData::AppBundles(
+                resources::design_automation::AppBundleList { rows },
+            ))
         }
         ViewKind::ManifestView { urn } => {
             let manifest = clients.derivative.get_manifest(urn).await?;
@@ -1010,10 +1030,12 @@ async fn fetch_data(
                     urn: d.urn,
                 })
                 .collect();
-            Ok(ResourceData::Derivatives(resources::others::DerivativeList {
-                urn: urn.to_string(),
-                rows,
-            }))
+            Ok(ResourceData::Derivatives(
+                resources::others::DerivativeList {
+                    urn: urn.to_string(),
+                    rows,
+                },
+            ))
         }
         ViewKind::DerivativeDetail {
             urn: _,
@@ -1046,7 +1068,9 @@ async fn fetch_data(
                     created: h.created_date.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Webhooks(resources::others::WebhookList { rows }))
+            Ok(ResourceData::Webhooks(resources::others::WebhookList {
+                rows,
+            }))
         }
         ViewKind::WebhookDetail {
             system,
@@ -1121,7 +1145,9 @@ async fn fetch_data(
                     status: s.status.unwrap_or_default(),
                 })
                 .collect();
-            Ok(ResourceData::Photoscenes(resources::others::PhotosceneList { rows }))
+            Ok(ResourceData::Photoscenes(
+                resources::others::PhotosceneList { rows },
+            ))
         }
         ViewKind::PhotosceneDetail { id } => {
             let progress = clients.reality.get_progress(id).await?;
@@ -1151,7 +1177,9 @@ async fn fetch_data(
             // We'll return an empty list here and let handle_bg_msg or load_view fill it?
             // Actually, better to just return the logs if we passed them in.
             // For now, I'll return an empty one and fix load_view.
-            Ok(ResourceData::Logs(resources::others::LogList { rows: vec![] }))
+            Ok(ResourceData::Logs(resources::others::LogList {
+                rows: vec![],
+            }))
         }
         ViewKind::SwarmOverview => {
             let mut fields = Vec::new();

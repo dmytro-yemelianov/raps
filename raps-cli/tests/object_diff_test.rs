@@ -30,14 +30,20 @@ fn test_binary_detection_null_byte() {
     let mut data = b"some normal text".to_vec();
     data.push(0u8); // embed a NUL byte
     data.extend_from_slice(b" more text");
-    assert!(!is_text(&data), "data with NUL byte should be detected as binary");
+    assert!(
+        !is_text(&data),
+        "data with NUL byte should be detected as binary"
+    );
 }
 
 #[test]
 fn test_binary_detection_pdf_header() {
     // PDF files start with %PDF- and contain binary bytes
     let data: Vec<u8> = b"%PDF-1.4\x00\x01\x02\x03".to_vec();
-    assert!(!is_text(&data), "PDF-like binary should be detected as binary");
+    assert!(
+        !is_text(&data),
+        "PDF-like binary should be detected as binary"
+    );
 }
 
 #[test]
@@ -67,14 +73,20 @@ fn test_binary_detection_zip_magic() {
     // The NUL-byte check catches typical zip interiors even if the magic alone
     // passes; let's embed a NUL to simulate real zip body:
     data.push(0x00);
-    assert!(!is_text(&data), "ZIP data with NUL byte should be detected as binary");
+    assert!(
+        !is_text(&data),
+        "ZIP data with NUL byte should be detected as binary"
+    );
 }
 
 #[test]
 fn test_binary_detection_gzip_magic() {
     // gzip magic: \x1f\x8b — \x8b is not valid UTF-8
     let data = vec![0x1fu8, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00];
-    assert!(!is_text(&data), "gzip magic bytes should be detected as binary (invalid UTF-8)");
+    assert!(
+        !is_text(&data),
+        "gzip magic bytes should be detected as binary (invalid UTF-8)"
+    );
 }
 
 #[test]
@@ -121,10 +133,7 @@ fn temp_file_with(content: &[u8]) -> (tempfile::NamedTempFile, String) {
 
 #[test]
 fn test_diff_help_exits_zero() {
-    raps()
-        .args(["object", "diff", "--help"])
-        .assert()
-        .success();
+    raps().args(["object", "diff", "--help"]).assert().success();
 }
 
 #[test]
@@ -133,7 +142,9 @@ fn test_diff_help_lists_checksum_only_flag() {
         .args(["object", "diff", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("--checksum-only").or(predicate::str::contains("checksum")));
+        .stdout(
+            predicate::str::contains("--checksum-only").or(predicate::str::contains("checksum")),
+        );
 }
 
 #[test]
@@ -142,10 +153,7 @@ fn test_diff_identical_local_files_exits_zero() {
     let (_fb, pb) = temp_file_with(b"identical content\n");
 
     // Identical files → diff exits 0
-    raps()
-        .args(["object", "diff", &pa, &pb])
-        .assert()
-        .success();
+    raps().args(["object", "diff", &pa, &pb]).assert().success();
 }
 
 #[test]
@@ -154,10 +162,7 @@ fn test_diff_different_local_files_exits_nonzero() {
     let (_fb, pb) = temp_file_with(b"version B\n");
 
     // Different files → diff exits 1 (like POSIX diff)
-    raps()
-        .args(["object", "diff", &pa, &pb])
-        .assert()
-        .failure();
+    raps().args(["object", "diff", &pa, &pb]).assert().failure();
 }
 
 #[test]

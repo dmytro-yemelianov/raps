@@ -198,75 +198,73 @@ fn info(args: InfoArgs, output_format: OutputFormat) -> Result<()> {
     let is_installed = installed.contains(&args.name);
 
     match entry {
-        Some(entry) => {
-            match output_format {
-                OutputFormat::Table => {
-                    println!();
-                    println!("  {:<14} {}", "Name:".bold(), entry.name.cyan());
-                    println!("  {:<14} {}", "Version:".bold(), entry.version);
-                    println!("  {:<14} {}", "Description:".bold(), entry.description);
-                    if is_installed {
-                        println!("  {:<14} {}", "Status:".bold(), "installed".green());
-                        println!(
-                            "  {:<14} {}",
-                            "Location:".bold(),
-                            skills_path.join(&entry.name).join("SKILL.md").display()
-                        );
-                    } else {
-                        println!(
-                            "  {:<14} {}",
-                            "Status:".bold(),
-                            "available (not installed)".yellow()
-                        );
-                    }
-                    println!("  {:<14} bundled", "Source:".bold());
+        Some(entry) => match output_format {
+            OutputFormat::Table => {
+                println!();
+                println!("  {:<14} {}", "Name:".bold(), entry.name.cyan());
+                println!("  {:<14} {}", "Version:".bold(), entry.version);
+                println!("  {:<14} {}", "Description:".bold(), entry.description);
+                if is_installed {
+                    println!("  {:<14} {}", "Status:".bold(), "installed".green());
+                    println!(
+                        "  {:<14} {}",
+                        "Location:".bold(),
+                        skills_path.join(&entry.name).join("SKILL.md").display()
+                    );
+                } else {
+                    println!(
+                        "  {:<14} {}",
+                        "Status:".bold(),
+                        "available (not installed)".yellow()
+                    );
+                }
+                println!("  {:<14} bundled", "Source:".bold());
 
-                    if let Some(content) = registry.get_content(&args.name) {
-                        println!();
-                        println!("  {}", "Preview:".bold());
-                        for line in content.lines().take(20) {
-                            println!("  {}", line.dimmed());
-                        }
-                        println!("  {}", "...".dimmed());
-                    }
+                if let Some(content) = registry.get_content(&args.name) {
                     println!();
-                }
-                _ => {
-                    #[derive(Serialize)]
-                    struct SkillInfo {
-                        name: String,
-                        version: String,
-                        description: String,
-                        status: String,
-                        source: String,
-                        installed_path: Option<String>,
+                    println!("  {}", "Preview:".bold());
+                    for line in content.lines().take(20) {
+                        println!("  {}", line.dimmed());
                     }
-                    let info = SkillInfo {
-                        name: entry.name.clone(),
-                        version: entry.version.clone(),
-                        description: entry.description.clone(),
-                        status: if is_installed {
-                            "installed".to_string()
-                        } else {
-                            "available".to_string()
-                        },
-                        source: "bundled".to_string(),
-                        installed_path: if is_installed {
-                            Some(
-                                skills_path
-                                    .join(&entry.name)
-                                    .join("SKILL.md")
-                                    .to_string_lossy()
-                                    .to_string(),
-                            )
-                        } else {
-                            None
-                        },
-                    };
-                    output_format.write(&info)?;
+                    println!("  {}", "...".dimmed());
                 }
+                println!();
             }
-        }
+            _ => {
+                #[derive(Serialize)]
+                struct SkillInfo {
+                    name: String,
+                    version: String,
+                    description: String,
+                    status: String,
+                    source: String,
+                    installed_path: Option<String>,
+                }
+                let info = SkillInfo {
+                    name: entry.name.clone(),
+                    version: entry.version.clone(),
+                    description: entry.description.clone(),
+                    status: if is_installed {
+                        "installed".to_string()
+                    } else {
+                        "available".to_string()
+                    },
+                    source: "bundled".to_string(),
+                    installed_path: if is_installed {
+                        Some(
+                            skills_path
+                                .join(&entry.name)
+                                .join("SKILL.md")
+                                .to_string_lossy()
+                                .to_string(),
+                        )
+                    } else {
+                        None
+                    },
+                };
+                output_format.write(&info)?;
+            }
+        },
         None => {
             eprintln!(
                 "{} Unknown skill '{}'. Run 'raps skill list' to see available skills.",

@@ -42,17 +42,27 @@ pub fn list_installed() -> Vec<String> {
 pub fn install_skill_to(name: &str, force: bool, skills_path: &Path) -> Result<String, String> {
     let registry = BundledRegistry::load();
     let entry = registry.get(name).ok_or_else(|| {
-        format!("Unknown skill '{}'. Run 'raps skill list' to see available skills.", name)
+        format!(
+            "Unknown skill '{}'. Run 'raps skill list' to see available skills.",
+            name
+        )
     })?;
     let content = registry.get_content(name).ok_or_else(|| {
-        format!("Skill '{}' is in registry but content is not bundled.", name)
+        format!(
+            "Skill '{}' is in registry but content is not bundled.",
+            name
+        )
     })?;
 
     let skill_dir = skills_path.join(name);
     let skill_file = skill_dir.join("SKILL.md");
 
     if skill_file.exists() && !force {
-        return Ok(format!("Skill '{}' is already installed at {}. Use --force to overwrite.", name, skill_file.display()));
+        return Ok(format!(
+            "Skill '{}' is already installed at {}. Use --force to overwrite.",
+            name,
+            skill_file.display()
+        ));
     }
 
     fs::create_dir_all(&skill_dir)
@@ -60,7 +70,12 @@ pub fn install_skill_to(name: &str, force: bool, skills_path: &Path) -> Result<S
     fs::write(&skill_file, content)
         .map_err(|e| format!("Failed to write {}: {}", skill_file.display(), e))?;
 
-    Ok(format!("Installed skill '{}' v{} to {}", name, entry.version, skill_file.display()))
+    Ok(format!(
+        "Installed skill '{}' v{} to {}",
+        name,
+        entry.version,
+        skill_file.display()
+    ))
 }
 
 /// Install a bundled skill to the default directory.
@@ -76,7 +91,11 @@ pub fn uninstall_skill_from(name: &str, skills_path: &Path) -> Result<String, St
     }
     fs::remove_dir_all(&skill_dir)
         .map_err(|e| format!("Failed to remove {}: {}", skill_dir.display(), e))?;
-    Ok(format!("Removed skill '{}' from {}", name, skills_path.display()))
+    Ok(format!(
+        "Removed skill '{}' from {}",
+        name,
+        skills_path.display()
+    ))
 }
 
 /// Uninstall a skill from the default directory.
@@ -114,7 +133,10 @@ mod tests {
         let result = install_skill_to("using-raps-mcp", false, &skills_path);
         assert!(result.is_ok());
         let msg = result.unwrap();
-        assert!(msg.contains("already installed"), "should report already installed: {msg}");
+        assert!(
+            msg.contains("already installed"),
+            "should report already installed: {msg}"
+        );
 
         // Install with force should overwrite
         let result = install_skill_to("using-raps-mcp", true, &skills_path);

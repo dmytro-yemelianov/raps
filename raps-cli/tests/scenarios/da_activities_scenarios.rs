@@ -5,8 +5,8 @@
 
 use crate::test_utils::start_cli_test;
 use predicates::prelude::*;
-use tempfile::NamedTempFile;
 use std::io::Write;
+use tempfile::NamedTempFile;
 
 // ==================== activities list ====================
 
@@ -43,10 +43,14 @@ async fn test_da_activities_list_shows_created_activity() {
     create_cmd
         .env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "ListedActivity",
-            "--engine", "Autodesk.AutoCAD+24",
-            "--command", "$(engine.path)/accoreconsole.exe",
+            "da",
+            "activity-create",
+            "--id",
+            "ListedActivity",
+            "--engine",
+            "Autodesk.AutoCAD+24",
+            "--command",
+            "$(engine.path)/accoreconsole.exe",
         ])
         .assert()
         .success();
@@ -71,10 +75,14 @@ async fn test_da_activity_create_from_args_succeeds() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "MyActivity",
-            "--engine", "Autodesk.Revit+2025",
-            "--command", "$(engine.path)/revitcoreconsole.exe /i $(args.InputFile.path)",
+            "da",
+            "activity-create",
+            "--id",
+            "MyActivity",
+            "--engine",
+            "Autodesk.Revit+2025",
+            "--command",
+            "$(engine.path)/revitcoreconsole.exe /i $(args.InputFile.path)",
         ])
         .assert()
         .success()
@@ -87,10 +95,14 @@ async fn test_da_activity_create_output_contains_engine() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "EngineActivity",
-            "--engine", "Autodesk.AutoCAD+24",
-            "--command", "$(engine.path)/accoreconsole.exe",
+            "da",
+            "activity-create",
+            "--id",
+            "EngineActivity",
+            "--engine",
+            "Autodesk.AutoCAD+24",
+            "--command",
+            "$(engine.path)/accoreconsole.exe",
         ])
         .assert()
         .success()
@@ -103,11 +115,16 @@ async fn test_da_activity_create_with_description() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "DescActivity",
-            "--engine", "Autodesk.Revit+2025",
-            "--command", "$(engine.path)/revitcoreconsole.exe",
-            "--description", "Test activity",
+            "da",
+            "activity-create",
+            "--id",
+            "DescActivity",
+            "--engine",
+            "Autodesk.Revit+2025",
+            "--command",
+            "$(engine.path)/revitcoreconsole.exe",
+            "--description",
+            "Test activity",
         ])
         .assert()
         .success();
@@ -119,11 +136,16 @@ async fn test_da_activity_create_with_appbundle() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "BundleActivity",
-            "--engine", "Autodesk.AutoCAD+24",
-            "--command", "$(engine.path)/accoreconsole.exe",
-            "--appbundle", "MyBundle",
+            "da",
+            "activity-create",
+            "--id",
+            "BundleActivity",
+            "--engine",
+            "Autodesk.AutoCAD+24",
+            "--command",
+            "$(engine.path)/accoreconsole.exe",
+            "--appbundle",
+            "MyBundle",
         ])
         .assert()
         .success();
@@ -134,9 +156,12 @@ async fn test_da_activity_create_with_appbundle() {
 async fn test_da_activity_create_missing_id_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "activity-create",
-        "--engine", "Autodesk.AutoCAD+24",
-        "--command", "$(engine.path)/accoreconsole.exe",
+        "da",
+        "activity-create",
+        "--engine",
+        "Autodesk.AutoCAD+24",
+        "--command",
+        "$(engine.path)/accoreconsole.exe",
     ])
     .assert()
     .failure()
@@ -148,9 +173,12 @@ async fn test_da_activity_create_missing_id_fails() {
 async fn test_da_activity_create_missing_engine_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "activity-create",
-        "--id", "MyActivity",
-        "--command", "$(engine.path)/accoreconsole.exe",
+        "da",
+        "activity-create",
+        "--id",
+        "MyActivity",
+        "--command",
+        "$(engine.path)/accoreconsole.exe",
     ])
     .assert()
     .failure()
@@ -162,9 +190,12 @@ async fn test_da_activity_create_missing_engine_fails() {
 async fn test_da_activity_create_missing_command_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "activity-create",
-        "--id", "MyActivity",
-        "--engine", "Autodesk.AutoCAD+24",
+        "da",
+        "activity-create",
+        "--id",
+        "MyActivity",
+        "--engine",
+        "Autodesk.AutoCAD+24",
     ])
     .assert()
     .failure()
@@ -177,18 +208,26 @@ async fn test_da_activity_create_missing_command_fails() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_da_activity_create_from_json_file() {
     let mut f = NamedTempFile::with_suffix(".json").unwrap();
-    write!(f, r#"{{
+    write!(
+        f,
+        r#"{{
         "id": "FileActivity",
         "engine": "Autodesk.AutoCAD+24",
         "commandLine": ["$(engine.path)/accoreconsole.exe"],
         "appBundles": [],
         "parameters": {{}}
-    }}"#)
+    }}"#
+    )
     .unwrap();
 
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("APS_DA_NICKNAME", "test-nickname")
-        .args(["da", "activity-create", "--file", f.path().to_str().unwrap()])
+        .args([
+            "da",
+            "activity-create",
+            "--file",
+            f.path().to_str().unwrap(),
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("FileActivity").or(predicate::str::contains("created")));
@@ -198,20 +237,28 @@ async fn test_da_activity_create_from_json_file() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_da_activity_create_from_file_missing_id_fails() {
     let mut f = NamedTempFile::with_suffix(".json").unwrap();
-    write!(f, r#"{{
+    write!(
+        f,
+        r#"{{
         "id": "",
         "engine": "Autodesk.AutoCAD+24",
         "commandLine": ["$(engine.path)/accoreconsole.exe"],
         "appBundles": [],
         "parameters": {{}}
-    }}"#)
+    }}"#
+    )
     .unwrap();
 
     let (_server, mut cmd) = start_cli_test().await;
-    cmd.args(["da", "activity-create", "--file", f.path().to_str().unwrap()])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("id"));
+    cmd.args([
+        "da",
+        "activity-create",
+        "--file",
+        f.path().to_str().unwrap(),
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("id"));
 }
 
 /// `da activity-create --file` with non-existent file fails gracefully.
@@ -219,8 +266,10 @@ async fn test_da_activity_create_from_file_missing_id_fails() {
 async fn test_da_activity_create_from_nonexistent_file_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.args([
-        "da", "activity-create",
-        "--file", "/tmp/nonexistent-activity-file-99999.json",
+        "da",
+        "activity-create",
+        "--file",
+        "/tmp/nonexistent-activity-file-99999.json",
     ])
     .assert()
     .failure()
@@ -236,10 +285,14 @@ async fn test_da_activity_delete_succeeds() {
     create_cmd
         .env("APS_DA_NICKNAME", "test-nickname")
         .args([
-            "da", "activity-create",
-            "--id", "DeleteMe",
-            "--engine", "Autodesk.AutoCAD+24",
-            "--command", "$(engine.path)/accoreconsole.exe",
+            "da",
+            "activity-create",
+            "--id",
+            "DeleteMe",
+            "--engine",
+            "Autodesk.AutoCAD+24",
+            "--command",
+            "$(engine.path)/accoreconsole.exe",
         ])
         .assert()
         .success();

@@ -11,7 +11,11 @@ async fn test_remove_existing_user_sends_delete() {
     inject_token(&clients.auth, &server.url).await;
 
     // user-001 / alice@example.com is seeded in proj-001 by the mock
-    clients.users.remove_user("proj-001", "user-001").await.unwrap();
+    clients
+        .users
+        .remove_user("proj-001", "user-001")
+        .await
+        .unwrap();
 
     server
         .trace

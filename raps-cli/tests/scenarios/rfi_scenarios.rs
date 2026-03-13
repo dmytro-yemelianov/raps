@@ -41,7 +41,9 @@ async fn test_rfi_list_table_succeeds() {
 async fn test_rfi_list_status_filter_empty_result() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
-        .args(["rfi", "list", PROJECT, "--status", "void", "--output", "json"])
+        .args([
+            "rfi", "list", PROJECT, "--status", "void", "--output", "json",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("[]"));
@@ -53,9 +55,13 @@ async fn test_rfi_list_since_filter_returns_empty() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "list", PROJECT,
-            "--since", "9999-01-01",
-            "--output", "json",
+            "rfi",
+            "list",
+            PROJECT,
+            "--since",
+            "9999-01-01",
+            "--output",
+            "json",
         ])
         .assert()
         .success()
@@ -105,13 +111,19 @@ async fn test_rfi_create_with_title_succeeds() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--title", "Test RFI from scenario",
-            "--output", "json",
+            "rfi",
+            "create",
+            PROJECT,
+            "--title",
+            "Test RFI from scenario",
+            "--output",
+            "json",
         ])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Test RFI from scenario").or(predicate::str::contains("id")));
+        .stdout(
+            predicate::str::contains("Test RFI from scenario").or(predicate::str::contains("id")),
+        );
 }
 
 /// `rfi create <project> --title "..." --output table` shows table success output.
@@ -120,9 +132,13 @@ async fn test_rfi_create_table_output() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--title", "Table RFI",
-            "--output", "table",
+            "rfi",
+            "create",
+            PROJECT,
+            "--title",
+            "Table RFI",
+            "--output",
+            "table",
         ])
         .assert()
         .success()
@@ -155,9 +171,13 @@ async fn test_rfi_create_from_csv_succeeds() {
 
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--from-csv", csv_path.to_str().unwrap(),
-            "--output", "json",
+            "rfi",
+            "create",
+            PROJECT,
+            "--from-csv",
+            csv_path.to_str().unwrap(),
+            "--output",
+            "json",
         ])
         .assert()
         .success()
@@ -179,8 +199,11 @@ async fn test_rfi_create_from_csv_empty_title_fails() {
 
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--from-csv", csv_path.to_str().unwrap(),
+            "rfi",
+            "create",
+            PROJECT,
+            "--from-csv",
+            csv_path.to_str().unwrap(),
         ])
         .assert()
         .failure()
@@ -193,8 +216,11 @@ async fn test_rfi_create_from_csv_missing_file_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--from-csv", "/tmp/nonexistent-rfi-file-xyz.csv",
+            "rfi",
+            "create",
+            PROJECT,
+            "--from-csv",
+            "/tmp/nonexistent-rfi-file-xyz.csv",
         ])
         .assert()
         .failure()
@@ -209,9 +235,14 @@ async fn test_rfi_update_title_succeeds() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "update", PROJECT, RFI_ID,
-            "--title", "Updated RFI title",
-            "--output", "json",
+            "rfi",
+            "update",
+            PROJECT,
+            RFI_ID,
+            "--title",
+            "Updated RFI title",
+            "--output",
+            "json",
         ])
         .assert()
         .success();
@@ -223,9 +254,7 @@ async fn test_rfi_update_table_output() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "update", PROJECT, RFI_ID,
-            "--status", "open",
-            "--output", "table",
+            "rfi", "update", PROJECT, RFI_ID, "--status", "open", "--output", "table",
         ])
         .assert()
         .success()
@@ -247,9 +276,13 @@ async fn test_rfi_delete_succeeds() {
         .env("APS_CLIENT_SECRET", "test-secret")
         .env("RAPS_FORCE_TOKEN", "mock-3leg-token")
         .args([
-            "rfi", "create", PROJECT,
-            "--title", "To Be Deleted",
-            "--output", "json",
+            "rfi",
+            "create",
+            PROJECT,
+            "--title",
+            "To Be Deleted",
+            "--output",
+            "json",
         ])
         .assert()
         .success();

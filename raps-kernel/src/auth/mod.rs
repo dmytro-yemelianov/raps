@@ -19,9 +19,9 @@ pub use types::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use anyhow::Context;
 use crate::config::Config;
 use crate::http::HttpClientConfig;
+use anyhow::Context;
 use types::{CachedToken, TokenCache};
 
 /// Authentication client for APS

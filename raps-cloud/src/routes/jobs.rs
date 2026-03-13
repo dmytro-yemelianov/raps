@@ -4,14 +4,14 @@
 //! Jobs API routes
 
 use axum::{
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Extension, Json,
 };
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::{db, error::ApiError, middleware::auth_mw::AuthUser, response::ApiResponse, AppState};
+use crate::{AppState, db, error::ApiError, middleware::auth_mw::AuthUser, response::ApiResponse};
 use sqlx;
 
 #[derive(Deserialize)]
@@ -37,11 +37,19 @@ pub async fn create_job(
 ) -> Result<(StatusCode, Json<ApiResponse<db::jobs::Job>>), ApiError> {
     // Validate job kind
     let valid_kinds = [
-        "bulk_user_add", "bulk_user_remove", "export_permissions",
-        "clone_permissions", "archive_project", "bulk_translate", "pipeline_run",
+        "bulk_user_add",
+        "bulk_user_remove",
+        "export_permissions",
+        "clone_permissions",
+        "archive_project",
+        "bulk_translate",
+        "pipeline_run",
     ];
     if !valid_kinds.contains(&req.kind.as_str()) {
-        return Err(ApiError::BadRequest(format!("Invalid job kind: {}", req.kind)));
+        return Err(ApiError::BadRequest(format!(
+            "Invalid job kind: {}",
+            req.kind
+        )));
     }
 
     let timeout_seconds = req.timeout_seconds.unwrap_or(3600);
@@ -74,8 +82,12 @@ pub async fn list_jobs(
         .map(|c| c.with_timezone(&chrono::Utc));
 
     let jobs = db::jobs::list_by_tenant(
-        &state.db, auth_user.tenant_id, limit + 1, cursor,
-        query.status.as_deref(), query.kind.as_deref(),
+        &state.db,
+        auth_user.tenant_id,
+        limit + 1,
+        cursor,
+        query.status.as_deref(),
+        query.kind.as_deref(),
     )
     .await
     .map_err(|e| ApiError::Internal(e))?;
@@ -164,7 +176,9 @@ pub async fn retry_job(
                 Some(job) if job.tenant_id != auth_user.tenant_id => {
                     Err(ApiError::NotFound("Job not found".to_string()))
                 }
-                Some(_) => Err(ApiError::BadRequest("Only failed or cancelled jobs can be retried".to_string())),
+                Some(_) => Err(ApiError::BadRequest(
+                    "Only failed or cancelled jobs can be retried".to_string(),
+                )),
                 None => Err(ApiError::NotFound("Job not found".to_string())),
             };
         }

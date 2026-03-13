@@ -194,9 +194,15 @@ mod tests {
     #[test]
     fn test_count_status_matches() {
         let items = vec![
-            MockStatusItem { status: "open".to_string() },
-            MockStatusItem { status: "closed".to_string() },
-            MockStatusItem { status: "open".to_string() },
+            MockStatusItem {
+                status: "open".to_string(),
+            },
+            MockStatusItem {
+                status: "closed".to_string(),
+            },
+            MockStatusItem {
+                status: "open".to_string(),
+            },
         ];
         assert_eq!(count_status(&items, "open"), 2);
     }
@@ -204,17 +210,21 @@ mod tests {
     #[test]
     fn test_count_status_case_insensitive() {
         let items = vec![
-            MockStatusItem { status: "Open".to_string() },
-            MockStatusItem { status: "OPEN".to_string() },
+            MockStatusItem {
+                status: "Open".to_string(),
+            },
+            MockStatusItem {
+                status: "OPEN".to_string(),
+            },
         ];
         assert_eq!(count_status(&items, "open"), 2);
     }
 
     #[test]
     fn test_count_status_no_matches() {
-        let items = vec![
-            MockStatusItem { status: "closed".to_string() },
-        ];
+        let items = vec![MockStatusItem {
+            status: "closed".to_string(),
+        }];
         assert_eq!(count_status(&items, "open"), 0);
     }
 

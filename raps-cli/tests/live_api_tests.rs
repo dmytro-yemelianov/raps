@@ -441,7 +441,9 @@ fn test_live_hub_workflow() {
     }
 
     // Step 2: hub info for the first hub
-    let hub_id = hub_array[0]["id"].as_str().expect("hub id must be a string");
+    let hub_id = hub_array[0]["id"]
+        .as_str()
+        .expect("hub id must be a string");
     let info_out = raps()
         .args(["hub", "info", hub_id, "--output", "json"])
         .output()

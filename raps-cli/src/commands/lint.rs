@@ -131,10 +131,7 @@ fn collect_recursive(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
         let path = entry.path();
         if path.is_dir() {
             // Skip hidden directories and common build/deps dirs
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             if name.starts_with('.') || name == "target" || name == "node_modules" {
                 continue;
             }
@@ -161,10 +158,41 @@ fn is_text_candidate(p: &Path) -> bool {
         .to_lowercase();
     !matches!(
         ext.as_str(),
-        "png" | "jpg" | "jpeg" | "gif" | "bmp" | "ico" | "pdf" | "zip" | "tar" | "gz"
-            | "tgz" | "rvt" | "dwg" | "nwd" | "nwc" | "ifc" | "fbx" | "obj" | "bin"
-            | "exe" | "dll" | "so" | "a" | "lib" | "pdb" | "mp4" | "mp3" | "mov"
-            | "avi" | "wav" | "flac" | "ttf" | "otf" | "woff" | "woff2"
+        "png"
+            | "jpg"
+            | "jpeg"
+            | "gif"
+            | "bmp"
+            | "ico"
+            | "pdf"
+            | "zip"
+            | "tar"
+            | "gz"
+            | "tgz"
+            | "rvt"
+            | "dwg"
+            | "nwd"
+            | "nwc"
+            | "ifc"
+            | "fbx"
+            | "obj"
+            | "bin"
+            | "exe"
+            | "dll"
+            | "so"
+            | "a"
+            | "lib"
+            | "pdb"
+            | "mp4"
+            | "mp3"
+            | "mov"
+            | "avi"
+            | "wav"
+            | "flac"
+            | "ttf"
+            | "otf"
+            | "woff"
+            | "woff2"
     )
 }
 
@@ -467,7 +495,10 @@ fn profile_exists(name: &str) -> bool {
     // raps stores profiles in ~/.config/raps/profiles/<name>.toml or similar
     let dirs = directories::ProjectDirs::from("com", "autodesk", "raps");
     let Some(dirs) = dirs else { return false };
-    let profile_file = dirs.config_dir().join("profiles").join(format!("{}.toml", name));
+    let profile_file = dirs
+        .config_dir()
+        .join("profiles")
+        .join(format!("{}.toml", name));
     profile_file.exists()
 }
 

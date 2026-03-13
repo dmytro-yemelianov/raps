@@ -56,39 +56,35 @@ pub(super) async fn status(output_format: OutputFormat) -> Result<()> {
     }
 
     match SubscriptionManager::get_subscription() {
-        Some(subscription) => {
-            match output_format {
-                OutputFormat::Table => {
-                    println!("\n{}", "Subscription Status:".bold());
-                    println!("{}", "─".repeat(40));
-                    println!(
-                        "{}",
-                        SubscriptionManager::format_subscription_status(&subscription)
-                    );
-                    println!("{}", "─".repeat(40));
-                }
-                _ => {
-                    output_format.write(&subscription)?;
-                }
+        Some(subscription) => match output_format {
+            OutputFormat::Table => {
+                println!("\n{}", "Subscription Status:".bold());
+                println!("{}", "─".repeat(40));
+                println!(
+                    "{}",
+                    SubscriptionManager::format_subscription_status(&subscription)
+                );
+                println!("{}", "─".repeat(40));
             }
-        }
-        None => {
-            match output_format {
-                OutputFormat::Table => {
-                    println!("{}", "License key stored but not yet validated.".yellow());
-                    println!(
-                        "Run {} to validate.",
-                        "raps marketplace license <key>".cyan()
-                    );
-                }
-                _ => {
-                    output_format.write(&serde_json::json!({
-                        "authenticated": true,
-                        "validated": false
-                    }))?;
-                }
+            _ => {
+                output_format.write(&subscription)?;
             }
-        }
+        },
+        None => match output_format {
+            OutputFormat::Table => {
+                println!("{}", "License key stored but not yet validated.".yellow());
+                println!(
+                    "Run {} to validate.",
+                    "raps marketplace license <key>".cyan()
+                );
+            }
+            _ => {
+                output_format.write(&serde_json::json!({
+                    "authenticated": true,
+                    "validated": false
+                }))?;
+            }
+        },
     }
 
     Ok(())

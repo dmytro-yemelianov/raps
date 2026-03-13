@@ -7,13 +7,13 @@
 //! plus the standard `/health`, `/ready`, `/metrics` endpoints. All services
 //! communicate via Redis and are feature-gated behind `kubernetes`.
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
 use axum::{
-    body::Bytes,
     Json, Router,
+    body::Bytes,
     extract::{Path, State},
     http::{HeaderMap, Method, StatusCode, Uri},
     response::{Html, IntoResponse},
@@ -102,9 +102,7 @@ impl ServeCommands {
                 start_coordinator(port, &redis_url).await
             }
             ServeCommands::Webhook { port, redis_url } => start_webhook(port, &redis_url).await,
-            ServeCommands::Dashboard { port, redis_url } => {
-                start_dashboard(port, &redis_url).await
-            }
+            ServeCommands::Dashboard { port, redis_url } => start_dashboard(port, &redis_url).await,
         }
     }
 }
@@ -131,12 +129,7 @@ async fn start_server(name: &str, port: u16, app: Router) -> Result<()> {
         .with_context(|| format!("Failed to bind {name} on port {port}"))?;
 
     tracing::info!("{name} listening on 0.0.0.0:{port}");
-    println!(
-        "{} {} listening on 0.0.0.0:{}",
-        "✓".green(),
-        name,
-        port
-    );
+    println!("{} {} listening on 0.0.0.0:{}", "✓".green(), name, port);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -191,18 +184,12 @@ struct ServiceState {
 // Health/ready/metrics handlers (shared across all services)
 
 async fn health_handler() -> impl IntoResponse {
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({"status": "ok"})),
-    )
+    (StatusCode::OK, Json(serde_json::json!({"status": "ok"})))
 }
 
 async fn ready_handler(State(state): State<ServiceState>) -> impl IntoResponse {
     if state.ready.load(Ordering::Relaxed) {
-        (
-            StatusCode::OK,
-            Json(serde_json::json!({"status": "ready"})),
-        )
+        (StatusCode::OK, Json(serde_json::json!({"status": "ready"})))
     } else {
         (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -462,7 +449,9 @@ async fn create_job(
             tracing::error!(error = %e, "Failed to enqueue job");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": "failed to enqueue job", "detail": e.to_string()})),
+                Json(
+                    serde_json::json!({"error": "failed to enqueue job", "detail": e.to_string()}),
+                ),
             )
                 .into_response()
         }
@@ -483,15 +472,14 @@ async fn list_jobs(State(state): State<ServiceState>) -> impl IntoResponse {
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<StreamEntries, redis::RedisError> =
-            redis::cmd("XREVRANGE")
-                .arg(stream)
-                .arg("+")
-                .arg("-")
-                .arg("COUNT")
-                .arg(50)
-                .query_async(&mut *conn)
-                .await;
+        let result: Result<StreamEntries, redis::RedisError> = redis::cmd("XREVRANGE")
+            .arg(stream)
+            .arg("+")
+            .arg("-")
+            .arg("COUNT")
+            .arg(50)
+            .query_async(&mut *conn)
+            .await;
 
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
@@ -515,10 +503,7 @@ async fn list_jobs(State(state): State<ServiceState>) -> impl IntoResponse {
     (StatusCode::OK, Json(serde_json::json!({"jobs": all_jobs}))).into_response()
 }
 
-async fn get_job(
-    State(state): State<ServiceState>,
-    Path(id): Path<String>,
-) -> impl IntoResponse {
+async fn get_job(State(state): State<ServiceState>, Path(id): Path<String>) -> impl IntoResponse {
     // Search all priority streams for the job ID
     let Ok(mut conn) = state.pool.get().await else {
         return (
@@ -530,15 +515,14 @@ async fn get_job(
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<StreamEntries, redis::RedisError> =
-            redis::cmd("XREVRANGE")
-                .arg(stream)
-                .arg("+")
-                .arg("-")
-                .arg("COUNT")
-                .arg(200)
-                .query_async(&mut *conn)
-                .await;
+        let result: Result<StreamEntries, redis::RedisError> = redis::cmd("XREVRANGE")
+            .arg(stream)
+            .arg("+")
+            .arg("-")
+            .arg("COUNT")
+            .arg(200)
+            .query_async(&mut *conn)
+            .await;
 
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
@@ -699,10 +683,7 @@ async fn webhook_callback(
     };
 
     // Publish event to Redis Stream
-    let event_type = event
-        .event_type
-        .as_deref()
-        .unwrap_or("unknown");
+    let event_type = event.event_type.as_deref().unwrap_or("unknown");
     let stream_key = format!("raps:events:{event_type}");
 
     let event_data = serde_json::to_string(&event.payload).unwrap_or_default();
@@ -805,9 +786,7 @@ async fn webhook_list(State(state): State<ServiceState>) -> impl IntoResponse {
                         .await
                         .unwrap_or(0);
 
-                    let event_type = key
-                        .strip_prefix("raps:events:")
-                        .unwrap_or(&key);
+                    let event_type = key.strip_prefix("raps:events:").unwrap_or(&key);
                     streams.push(serde_json::json!({
                         "event_type": event_type,
                         "stream": key,
@@ -895,9 +874,7 @@ async fn dashboard_workers(State(state): State<ServiceState>) -> impl IntoRespon
                         .await
                         .unwrap_or_default();
 
-                    let worker_id = key
-                        .strip_prefix("raps:worker:heartbeat:")
-                        .unwrap_or(&key);
+                    let worker_id = key.strip_prefix("raps:worker:heartbeat:").unwrap_or(&key);
                     workers.push(serde_json::json!({
                         "worker_id": worker_id,
                         "status": if ttl > 0 { "alive" } else { "stale" },
@@ -960,11 +937,7 @@ async fn dashboard_queues(State(state): State<ServiceState>) -> impl IntoRespons
         "depth": dlq_len,
     }));
 
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({"queues": queues})),
-    )
-        .into_response()
+    (StatusCode::OK, Json(serde_json::json!({"queues": queues}))).into_response()
 }
 
 async fn dashboard_metrics(State(_state): State<ServiceState>) -> impl IntoResponse {
@@ -1004,15 +977,14 @@ async fn dashboard_recent_jobs(State(state): State<ServiceState>) -> impl IntoRe
 
     for priority in JobPriority::all() {
         let stream = priority.stream_key();
-        let result: Result<StreamEntries, redis::RedisError> =
-            redis::cmd("XREVRANGE")
-                .arg(stream)
-                .arg("+")
-                .arg("-")
-                .arg("COUNT")
-                .arg(20)
-                .query_async(&mut *conn)
-                .await;
+        let result: Result<StreamEntries, redis::RedisError> = redis::cmd("XREVRANGE")
+            .arg(stream)
+            .arg("+")
+            .arg("-")
+            .arg("COUNT")
+            .arg(20)
+            .query_async(&mut *conn)
+            .await;
 
         if let Ok(entries) = result {
             for (entry_id, fields) in entries {
@@ -1033,11 +1005,7 @@ async fn dashboard_recent_jobs(State(state): State<ServiceState>) -> impl IntoRe
         }
     }
 
-    (
-        StatusCode::OK,
-        Json(serde_json::json!({"jobs": jobs})),
-    )
-        .into_response()
+    (StatusCode::OK, Json(serde_json::json!({"jobs": jobs}))).into_response()
 }
 
 // Minimal embedded dashboard HTML
@@ -1160,8 +1128,8 @@ mod tests {
 
     #[test]
     fn test_verify_webhook_signature_valid() {
-        use sha2::Sha256;
         use hmac::{Hmac, Mac};
+        use sha2::Sha256;
 
         let secret = "test-secret";
         let body = b"hello world";
@@ -1176,7 +1144,11 @@ mod tests {
 
     #[test]
     fn test_verify_webhook_signature_invalid() {
-        assert!(!verify_webhook_signature("secret", b"body", "0000000000000000000000000000000000000000000000000000000000000000"));
+        assert!(!verify_webhook_signature(
+            "secret",
+            b"body",
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        ));
     }
 
     #[test]

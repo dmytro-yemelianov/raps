@@ -259,9 +259,7 @@ pub(super) async fn tag_search(
         OutputFormat::Json => {
             let out: Vec<serde_json::Value> = matches
                 .iter()
-                .map(|(k, v)| {
-                    serde_json::json!({"object_key": k, attr: v})
-                })
+                .map(|(k, v)| serde_json::json!({"object_key": k, attr: v}))
                 .collect();
             println!("{}", serde_json::to_string_pretty(&out)?);
         }

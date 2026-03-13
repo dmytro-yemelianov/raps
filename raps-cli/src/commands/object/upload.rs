@@ -140,7 +140,10 @@ pub(super) async fn upload_object(
             };
             match output_format {
                 OutputFormat::Table => {
-                    println!("{} Object already exists (skipped upload)", "✓".green().bold());
+                    println!(
+                        "{} Object already exists (skipped upload)",
+                        "✓".green().bold()
+                    );
                     println!("  {} {}", "Object ID:".bold(), output.object_id);
                     println!("  {} {}", "Size:".bold(), output.size_human);
                     if let Some(ref sha1) = output.sha1 {
@@ -336,7 +339,14 @@ pub(super) async fn upload_batch(
                 );
             }
 
-            return resume_batch_upload(client, saved_state, parallel, skip_if_exists, output_format).await;
+            return resume_batch_upload(
+                client,
+                saved_state,
+                parallel,
+                skip_if_exists,
+                output_format,
+            )
+            .await;
         } else {
             anyhow::bail!(
                 "No previous batch upload state found. Start a new upload without --resume."
@@ -403,7 +413,10 @@ pub(super) async fn upload_batch(
                 .to_string();
 
             let result = if skip_if_exists {
-                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                match client
+                    .check_duplicate(&bucket, &object_key, &file_path)
+                    .await
+                {
                     Ok(Some(existing)) => Ok(existing),
                     Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
                     Err(e) => Err(e),
@@ -602,7 +615,10 @@ async fn resume_batch_upload(
                 .to_string();
 
             let result = if skip_if_exists {
-                match client.check_duplicate(&bucket, &object_key, &file_path).await {
+                match client
+                    .check_duplicate(&bucket, &object_key, &file_path)
+                    .await
+                {
                     Ok(Some(existing)) => Ok(existing),
                     Ok(None) => client.upload_object(&bucket, &object_key, &file_path).await,
                     Err(e) => Err(e),

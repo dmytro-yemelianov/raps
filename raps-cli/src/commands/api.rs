@@ -754,10 +754,7 @@ mod tests {
     #[test]
     fn test_parse_header_value_with_colon() {
         let result = parse_header("Auth: Bearer:token").unwrap();
-        assert_eq!(
-            result,
-            ("Auth".to_string(), "Bearer:token".to_string())
-        );
+        assert_eq!(result, ("Auth".to_string(), "Bearer:token".to_string()));
     }
 
     #[test]
@@ -783,8 +780,7 @@ mod tests {
             ("key1".to_string(), "val1".to_string()),
             ("key2".to_string(), "val2".to_string()),
         ];
-        let url =
-            build_url("https://developer.api.autodesk.com", "/endpoint", &params).unwrap();
+        let url = build_url("https://developer.api.autodesk.com", "/endpoint", &params).unwrap();
         assert!(url.contains('?'));
         assert!(url.contains("key1=val1"));
         assert!(url.contains("key2=val2"));
@@ -793,8 +789,7 @@ mod tests {
 
     #[test]
     fn test_build_url_no_query_params() {
-        let url =
-            build_url("https://developer.api.autodesk.com", "/endpoint", &[]).unwrap();
+        let url = build_url("https://developer.api.autodesk.com", "/endpoint", &[]).unwrap();
         assert!(!url.contains('?'));
     }
 

@@ -140,8 +140,16 @@ mod integration_tests {
         let engines: Vec<&str> = data.iter().filter_map(|v| v.as_str()).collect();
         let has_revit = engines.iter().any(|e| e.contains("Revit"));
         let has_autocad = engines.iter().any(|e| e.contains("AutoCAD"));
-        assert!(has_revit, "engines should contain Revit, got: {:?}", engines);
-        assert!(has_autocad, "engines should contain AutoCAD, got: {:?}", engines);
+        assert!(
+            has_revit,
+            "engines should contain Revit, got: {:?}",
+            engines
+        );
+        assert!(
+            has_autocad,
+            "engines should contain AutoCAD, got: {:?}",
+            engines
+        );
     }
 
     #[tokio::test]
@@ -208,7 +216,10 @@ mod integration_tests {
         );
         let body: serde_json::Value = resp.json().await.unwrap();
         let data = body["data"].as_array().expect("data should be an array");
-        assert!(!data.is_empty(), "appbundle list should not be empty after create");
+        assert!(
+            !data.is_empty(),
+            "appbundle list should not be empty after create"
+        );
     }
 
     #[tokio::test]
@@ -231,7 +242,10 @@ mod integration_tests {
             .unwrap();
 
         let resp = http
-            .delete(format!("{}/da/us-east/v3/appbundles/DeleteBundle", server.url))
+            .delete(format!(
+                "{}/da/us-east/v3/appbundles/DeleteBundle",
+                server.url
+            ))
             .bearer_auth(&token)
             .send()
             .await
@@ -308,7 +322,10 @@ mod integration_tests {
         );
         let body: serde_json::Value = resp.json().await.unwrap();
         let data = body["data"].as_array().expect("data should be an array");
-        assert!(!data.is_empty(), "activities list should not be empty after create");
+        assert!(
+            !data.is_empty(),
+            "activities list should not be empty after create"
+        );
     }
 
     #[tokio::test]
@@ -333,7 +350,10 @@ mod integration_tests {
             .unwrap();
 
         let resp = http
-            .delete(format!("{}/da/us-east/v3/activities/DeleteActivity", server.url))
+            .delete(format!(
+                "{}/da/us-east/v3/activities/DeleteActivity",
+                server.url
+            ))
             .bearer_auth(&token)
             .send()
             .await
@@ -420,7 +440,10 @@ mod integration_tests {
         );
         let body: serde_json::Value = resp.json().await.unwrap();
         assert_eq!(body["id"], workitem_id);
-        assert!(body["status"].is_string(), "workitem status should be present");
+        assert!(
+            body["status"].is_string(),
+            "workitem status should be present"
+        );
     }
 
     #[tokio::test]
@@ -530,9 +553,10 @@ mod integration_tests {
             .unwrap();
         let list_body: serde_json::Value = list_resp.json().await.unwrap();
         let activities = list_body["data"].as_array().unwrap();
-        let has_lifecycle = activities
-            .iter()
-            .any(|a| a.as_str().map_or(false, |s| s.contains("LifecycleActivity")));
+        let has_lifecycle = activities.iter().any(|a| {
+            a.as_str()
+                .map_or(false, |s| s.contains("LifecycleActivity"))
+        });
         assert!(has_lifecycle, "created activity should appear in list");
 
         // Delete

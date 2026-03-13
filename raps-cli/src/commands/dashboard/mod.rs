@@ -367,8 +367,16 @@ impl ResourceData {
         }
         if filter.is_empty() {
             return match self {
-                ResourceData::Buckets(_) | ResourceData::Objects(_) | ResourceData::Hubs(_) | ResourceData::Projects(_) | ResourceData::FolderContents(_)
-                | ResourceData::Issues(_) | ResourceData::Rfis(_) | ResourceData::Assets(_) | ResourceData::Submittals(_) | ResourceData::Checklists(_) => unreachable!(),
+                ResourceData::Buckets(_)
+                | ResourceData::Objects(_)
+                | ResourceData::Hubs(_)
+                | ResourceData::Projects(_)
+                | ResourceData::FolderContents(_)
+                | ResourceData::Issues(_)
+                | ResourceData::Rfis(_)
+                | ResourceData::Assets(_)
+                | ResourceData::Submittals(_)
+                | ResourceData::Checklists(_) => unreachable!(),
                 ResourceData::IssueComments(v) => v.len(),
                 ResourceData::IssueAttachments(v) => v.len(),
                 ResourceData::IssueTypes(v) => v.len(),
@@ -385,13 +393,36 @@ impl ResourceData {
         }
         let filter = filter.to_lowercase();
         match self {
-            ResourceData::Buckets(_) | ResourceData::Objects(_) | ResourceData::Hubs(_) | ResourceData::Projects(_) | ResourceData::FolderContents(_)
-            | ResourceData::Issues(_) | ResourceData::Rfis(_) | ResourceData::Assets(_) | ResourceData::Submittals(_) | ResourceData::Checklists(_)
-            | ResourceData::Engines(_) | ResourceData::Activities(_) | ResourceData::WorkItems(_) | ResourceData::AppBundles(_)
-            | ResourceData::Derivatives(_) | ResourceData::Webhooks(_) | ResourceData::Photoscenes(_) | ResourceData::Logs(_) => unreachable!(),
-            ResourceData::IssueComments(v) => v.iter().filter(|r| r.body.to_lowercase().contains(&filter)).count(),
-            ResourceData::IssueAttachments(v) => v.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count(),
-            ResourceData::IssueTypes(v) => v.iter().filter(|r| r.title.to_lowercase().contains(&filter)).count(),
+            ResourceData::Buckets(_)
+            | ResourceData::Objects(_)
+            | ResourceData::Hubs(_)
+            | ResourceData::Projects(_)
+            | ResourceData::FolderContents(_)
+            | ResourceData::Issues(_)
+            | ResourceData::Rfis(_)
+            | ResourceData::Assets(_)
+            | ResourceData::Submittals(_)
+            | ResourceData::Checklists(_)
+            | ResourceData::Engines(_)
+            | ResourceData::Activities(_)
+            | ResourceData::WorkItems(_)
+            | ResourceData::AppBundles(_)
+            | ResourceData::Derivatives(_)
+            | ResourceData::Webhooks(_)
+            | ResourceData::Photoscenes(_)
+            | ResourceData::Logs(_) => unreachable!(),
+            ResourceData::IssueComments(v) => v
+                .iter()
+                .filter(|r| r.body.to_lowercase().contains(&filter))
+                .count(),
+            ResourceData::IssueAttachments(v) => v
+                .iter()
+                .filter(|r| r.name.to_lowercase().contains(&filter))
+                .count(),
+            ResourceData::IssueTypes(v) => v
+                .iter()
+                .filter(|r| r.title.to_lowercase().contains(&filter))
+                .count(),
             // Detail views (also filterable now for better UX)
             ResourceData::BucketDetail(v)
             | ResourceData::ObjectDetail(v)
@@ -406,7 +437,13 @@ impl ResourceData {
             | ResourceData::DerivativeDetail(v)
             | ResourceData::WebhookDetail(v)
             | ResourceData::PhotosceneDetail(v)
-            | ResourceData::SwarmStatus(v) => v.iter().filter(|f| f.label.to_lowercase().contains(&filter) || f.value.to_lowercase().contains(&filter)).count(),
+            | ResourceData::SwarmStatus(v) => v
+                .iter()
+                .filter(|f| {
+                    f.label.to_lowercase().contains(&filter)
+                        || f.value.to_lowercase().contains(&filter)
+                })
+                .count(),
         }
     }
 
@@ -595,15 +632,15 @@ impl App {
         Self {
             tab: ResourceTab::Buckets,
             nav_stacks: [
-                vec![ViewKind::BucketList],     // Tab 0: Buckets
-                vec![ViewKind::HubList],        // Tab 1: Data Mgmt
-                vec![ViewKind::HubList],        // Tab 2: ACC (navigate Hub > Project > Issues)
-                vec![ViewKind::EngineList],     // Tab 3: Design Automation
+                vec![ViewKind::BucketList],                          // Tab 0: Buckets
+                vec![ViewKind::HubList],                             // Tab 1: Data Mgmt
+                vec![ViewKind::HubList], // Tab 2: ACC (navigate Hub > Project > Issues)
+                vec![ViewKind::EngineList], // Tab 3: Design Automation
                 vec![ViewKind::ManifestView { urn: String::new() }], // Tab 4: Model Derivative (avoid empty stack)
-                vec![ViewKind::WebhookList],    // Tab 5: Webhooks
-                vec![ViewKind::PhotosceneList], // Tab 6: Reality Capture
-                vec![ViewKind::SwarmOverview],  // Tab 7: Swarm
-                vec![ViewKind::LogList],        // Tab 8: Logs
+                vec![ViewKind::WebhookList],                         // Tab 5: Webhooks
+                vec![ViewKind::PhotosceneList],                      // Tab 6: Reality Capture
+                vec![ViewKind::SwarmOverview],                       // Tab 7: Swarm
+                vec![ViewKind::LogList],                             // Tab 8: Logs
             ],
             table_state: TableState::default(),
             data: None,
@@ -720,7 +757,10 @@ impl App {
     }
 
     fn row_count(&self) -> usize {
-        self.data.as_ref().map(|d| d.filtered_count(&self.filter_text)).unwrap_or(0)
+        self.data
+            .as_ref()
+            .map(|d| d.filtered_count(&self.filter_text))
+            .unwrap_or(0)
     }
 }
 

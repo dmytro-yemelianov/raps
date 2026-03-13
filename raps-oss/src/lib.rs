@@ -240,7 +240,10 @@ mod integration_tests {
 
         let http = reqwest::Client::new();
         let resp = http
-            .get(format!("{}/oss/v2/buckets/details-bucket/details", server.url))
+            .get(format!(
+                "{}/oss/v2/buckets/details-bucket/details",
+                server.url
+            ))
             .bearer_auth(&token)
             .send()
             .await
@@ -300,7 +303,10 @@ mod integration_tests {
         );
         let sign_body: serde_json::Value = sign_resp.json().await.unwrap();
         assert!(sign_body["urls"].is_array(), "should contain upload URLs");
-        assert!(sign_body["uploadKey"].is_string(), "should contain uploadKey");
+        assert!(
+            sign_body["uploadKey"].is_string(),
+            "should contain uploadKey"
+        );
     }
 
     #[tokio::test]
@@ -321,7 +327,9 @@ mod integration_tests {
             .await
             .unwrap();
         assert!(
-            resp.status().is_success() || resp.status().as_u16() == 204 || resp.status().as_u16() == 404,
+            resp.status().is_success()
+                || resp.status().as_u16() == 204
+                || resp.status().as_u16() == 404,
             "delete object returned {}",
             resp.status()
         );
@@ -412,7 +420,10 @@ mod integration_tests {
             .send()
             .await
             .unwrap();
-        assert!(del_resp.status().is_success(), "delete bucket should succeed");
+        assert!(
+            del_resp.status().is_success(),
+            "delete bucket should succeed"
+        );
     }
 
     #[tokio::test]

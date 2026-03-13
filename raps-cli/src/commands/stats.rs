@@ -102,7 +102,12 @@ pub fn execute(output_format: OutputFormat) -> Result<()> {
 
     match output_format {
         OutputFormat::Table => print_table(&endpoint_stats, &history, throughput.as_ref()),
-        _ => print_structured(&endpoint_stats, &history, throughput.as_ref(), output_format),
+        _ => print_structured(
+            &endpoint_stats,
+            &history,
+            throughput.as_ref(),
+            output_format,
+        ),
     }
 }
 
@@ -130,7 +135,13 @@ fn print_table(
         // Group by first two args (e.g. "raps bucket")
         let mut counts: HashMap<String, usize> = HashMap::new();
         for entry in history {
-            let key = entry.args.iter().take(2).cloned().collect::<Vec<_>>().join(" ");
+            let key = entry
+                .args
+                .iter()
+                .take(2)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
             *counts.entry(key).or_default() += 1;
         }
         let mut sorted: Vec<(String, usize)> = counts.into_iter().collect();
@@ -154,7 +165,11 @@ fn print_table(
         let total_requests: u64 = records.values().map(|r| r.requests).sum();
         let total_failures: u64 = records.values().map(|r| r.failures).sum();
         let total_ms: u64 = records.values().map(|r| r.total_ms).sum();
-        let avg_ms = if total_requests > 0 { total_ms / total_requests } else { 0 };
+        let avg_ms = if total_requests > 0 {
+            total_ms / total_requests
+        } else {
+            0
+        };
 
         let failure_pct = if total_requests > 0 {
             total_failures as f64 / total_requests as f64 * 100.0
@@ -162,22 +177,14 @@ fn print_table(
             0.0
         };
 
-        println!(
-            "  {:<20} {}",
-            "Total requests:".bold(),
-            total_requests
-        );
+        println!("  {:<20} {}", "Total requests:".bold(), total_requests);
         println!(
             "  {:<20} {} ({:.1}%)",
             "Total failures:".bold(),
             total_failures,
             failure_pct
         );
-        println!(
-            "  {:<20} {}",
-            "Avg response:".bold(),
-            fmt_ms(avg_ms)
-        );
+        println!("  {:<20} {}", "Avg response:".bold(), fmt_ms(avg_ms));
 
         println!();
         println!("  {}", "Top 5 by call count:".bold());
@@ -207,7 +214,9 @@ fn print_table(
     match throughput {
         Some(t) if t.bytes_per_second > 0.0 => {
             let measured = chrono::DateTime::from_timestamp(t.measured_at, 0)
-                .map(|dt: chrono::DateTime<chrono::Utc>| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+                .map(|dt: chrono::DateTime<chrono::Utc>| {
+                    dt.format("%Y-%m-%d %H:%M UTC").to_string()
+                })
                 .unwrap_or_else(|| "unknown".to_string());
             let chunk = suggested_chunk(t.bytes_per_second);
             println!(
@@ -216,11 +225,7 @@ fn print_table(
                 fmt_bytes_per_sec(t.bytes_per_second)
             );
             println!("  {:<20} {}", "Measured at:".bold(), measured);
-            println!(
-                "  {:<20} {}",
-                "Recommended chunk:".bold(),
-                fmt_chunk(chunk)
-            );
+            println!("  {:<20} {}", "Recommended chunk:".bold(), fmt_chunk(chunk));
         }
         _ => {
             println!("  {}", "No throughput data recorded yet.".dimmed());
@@ -246,7 +251,13 @@ fn print_structured(
     // Build command frequency map
     let mut cmd_counts: HashMap<String, usize> = HashMap::new();
     for entry in history {
-        let key = entry.args.iter().take(2).cloned().collect::<Vec<_>>().join(" ");
+        let key = entry
+            .args
+            .iter()
+            .take(2)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" ");
         *cmd_counts.entry(key).or_default() += 1;
     }
     let mut cmd_sorted: Vec<(String, usize)> = cmd_counts.into_iter().collect();
@@ -261,7 +272,11 @@ fn print_structured(
     let total_requests: u64 = records.values().map(|r| r.requests).sum();
     let total_failures: u64 = records.values().map(|r| r.failures).sum();
     let total_ms: u64 = records.values().map(|r| r.total_ms).sum();
-    let avg_ms = if total_requests > 0 { total_ms / total_requests } else { 0 };
+    let avg_ms = if total_requests > 0 {
+        total_ms / total_requests
+    } else {
+        0
+    };
 
     let mut endpoints_sorted: Vec<(&String, &raps_kernel::endpoint_stats::EndpointRecord)> =
         records.iter().collect();

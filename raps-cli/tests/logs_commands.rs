@@ -18,23 +18,16 @@ fn raps() -> Command {
 
 #[test]
 fn test_logs_help_exits_zero() {
-    raps()
-        .args(["logs", "--help"])
-        .assert()
-        .success();
+    raps().args(["logs", "--help"]).assert().success();
 }
 
 #[test]
 fn test_logs_help_lists_subcommands() {
-    raps()
-        .args(["logs", "--help"])
-        .assert()
-        .success()
-        .stdout(
-            predicate::str::contains("show")
-                .and(predicate::str::contains("path"))
-                .and(predicate::str::contains("clear")),
-        );
+    raps().args(["logs", "--help"]).assert().success().stdout(
+        predicate::str::contains("show")
+            .and(predicate::str::contains("path"))
+            .and(predicate::str::contains("clear")),
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -43,18 +36,12 @@ fn test_logs_help_lists_subcommands() {
 
 #[test]
 fn test_logs_path_exits_zero() {
-    raps()
-        .args(["logs", "path"])
-        .assert()
-        .success();
+    raps().args(["logs", "path"]).assert().success();
 }
 
 #[test]
 fn test_logs_path_prints_nonempty_line() {
-    let out = raps()
-        .args(["logs", "path"])
-        .output()
-        .unwrap();
+    let out = raps().args(["logs", "path"]).output().unwrap();
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     // The path line must be non-empty (it's a filesystem path, not just a newline).
@@ -127,10 +114,7 @@ fn test_logs_show_lines_zero_prints_nothing_or_no_log_found() {
 #[test]
 fn test_logs_clear_yes_flag_is_accepted() {
     // --yes is a valid flag; clap must not reject it.
-    let out = raps()
-        .args(["logs", "clear", "--yes"])
-        .output()
-        .unwrap();
+    let out = raps().args(["logs", "clear", "--yes"]).output().unwrap();
 
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
@@ -142,10 +126,7 @@ fn test_logs_clear_yes_flag_is_accepted() {
 #[test]
 fn test_logs_clear_yes_exits_zero() {
     // Whether or not log files exist, --yes must exit 0.
-    raps()
-        .args(["logs", "clear", "--yes"])
-        .assert()
-        .success();
+    raps().args(["logs", "clear", "--yes"]).assert().success();
 }
 
 #[test]

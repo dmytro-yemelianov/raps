@@ -39,12 +39,18 @@ fn detect_archive_type(object_key: &str) -> Result<ArchiveType, String> {
 
 #[test]
 fn test_detect_zip_extension() {
-    assert_eq!(detect_archive_type("archive.zip").unwrap(), ArchiveType::Zip);
+    assert_eq!(
+        detect_archive_type("archive.zip").unwrap(),
+        ArchiveType::Zip
+    );
 }
 
 #[test]
 fn test_detect_zip_extension_uppercase() {
-    assert_eq!(detect_archive_type("ARCHIVE.ZIP").unwrap(), ArchiveType::Zip);
+    assert_eq!(
+        detect_archive_type("ARCHIVE.ZIP").unwrap(),
+        ArchiveType::Zip
+    );
 }
 
 #[test]
@@ -126,7 +132,10 @@ fn has_gzip_magic(data: &[u8]) -> bool {
 #[test]
 fn test_zip_magic_bytes_detected() {
     let data = vec![0x50u8, 0x4b, 0x03, 0x04, 0x14, 0x00];
-    assert!(has_zip_magic(&data), "PK\\x03\\x04 should be detected as ZIP");
+    assert!(
+        has_zip_magic(&data),
+        "PK\\x03\\x04 should be detected as ZIP"
+    );
 }
 
 #[test]
@@ -141,7 +150,10 @@ fn test_zip_magic_bytes_not_false_positive() {
 #[test]
 fn test_gzip_magic_bytes_detected() {
     let data = vec![0x1fu8, 0x8b, 0x08, 0x00, 0x00];
-    assert!(has_gzip_magic(&data), "\\x1f\\x8b should be detected as gzip");
+    assert!(
+        has_gzip_magic(&data),
+        "\\x1f\\x8b should be detected as gzip"
+    );
 }
 
 #[test]
@@ -160,7 +172,10 @@ fn test_empty_slice_has_no_zip_magic() {
 
 #[test]
 fn test_empty_slice_has_no_gzip_magic() {
-    assert!(!has_gzip_magic(b""), "empty slice should not have gzip magic");
+    assert!(
+        !has_gzip_magic(b""),
+        "empty slice should not have gzip magic"
+    );
 }
 
 #[test]
@@ -211,13 +226,19 @@ fn test_find_eocd_finds_signature_at_end() {
 #[test]
 fn test_find_eocd_returns_none_when_no_signature() {
     let tail = vec![0xaau8; 100];
-    assert!(find_eocd(&tail).is_none(), "should return None with no EOCD signature");
+    assert!(
+        find_eocd(&tail).is_none(),
+        "should return None with no EOCD signature"
+    );
 }
 
 #[test]
 fn test_find_eocd_returns_none_when_too_short() {
     let tail = vec![0u8; 10]; // less than EOCD_SIZE
-    assert!(find_eocd(&tail).is_none(), "should return None for too-short slice");
+    assert!(
+        find_eocd(&tail).is_none(),
+        "should return None for too-short slice"
+    );
 }
 
 #[test]

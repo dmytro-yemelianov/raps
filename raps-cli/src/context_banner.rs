@@ -61,8 +61,15 @@ impl HubEntry {
             self.id.clone()
         } else {
             let prefix: String = self.id.chars().take(8).collect();
-            let suffix: String = self.id.chars().rev().take(4).collect::<String>()
-                .chars().rev().collect();
+            let suffix: String = self
+                .id
+                .chars()
+                .rev()
+                .take(4)
+                .collect::<String>()
+                .chars()
+                .rev()
+                .collect();
             format!("{}…{}", prefix, suffix)
         }
     }
@@ -70,10 +77,10 @@ impl HubEntry {
     /// Glyph + label string for this tier (fixed 12 chars wide).
     pub fn tier_label(&self) -> &'static str {
         match self.tier {
-            HubTier::Personal   => "○ PERSONAL  ",
-            HubTier::Team       => "◇ TEAM      ",
+            HubTier::Personal => "○ PERSONAL  ",
+            HubTier::Team => "◇ TEAM      ",
             HubTier::Enterprise => "◆ ENTERPRISE",
-            HubTier::Unknown    => "? UNKNOWN   ",
+            HubTier::Unknown => "? UNKNOWN   ",
         }
     }
 }
@@ -126,10 +133,10 @@ impl ContextBanner {
             return;
         };
         let region = entry.region.as_deref().unwrap_or("--");
-        let top    = box_top("Account Context");
-        let line1  = box_line(&format!("◆ ENTERPRISE  {}", entry.name));
-        let line2  = box_line(&format!("Account ID:   {}", entry.id));
-        let line3  = box_line(&format!("Region:       {}", region));
+        let top = box_top("Account Context");
+        let line1 = box_line(&format!("◆ ENTERPRISE  {}", entry.name));
+        let line2 = box_line(&format!("Account ID:   {}", entry.id));
+        let line3 = box_line(&format!("Region:       {}", region));
         let bottom = box_bottom();
 
         eprintln!("{}", top.cyan());
@@ -149,7 +156,7 @@ impl ContextBanner {
         for entry in &self.hubs {
             let region = entry.region.as_deref().unwrap_or("--");
             let name_col = format!("{:<28}", truncate(&entry.name, 28));
-            let id_col   = format!("{:<14}", entry.short_id());
+            let id_col = format!("{:<14}", entry.short_id());
             let line = format!(
                 "  {}  {}  {}  [{}]",
                 entry.tier_label(),
@@ -158,10 +165,10 @@ impl ContextBanner {
                 region
             );
             match entry.tier {
-                HubTier::Personal   => eprintln!("{}", line.dimmed()),
-                HubTier::Team       => eprintln!("{}", line),
+                HubTier::Personal => eprintln!("{}", line.dimmed()),
+                HubTier::Team => eprintln!("{}", line),
                 HubTier::Enterprise => eprintln!("{}", line.cyan().bold()),
-                HubTier::Unknown    => eprintln!("{}", line.dimmed()),
+                HubTier::Unknown => eprintln!("{}", line.dimmed()),
             }
         }
     }
@@ -223,11 +230,11 @@ pub(crate) fn strip_ansi(s: &str) -> String {
 /// Print a yellow bordered warning box to stderr when no enterprise hub is found.
 /// Called by resolve_account_id when 0 enterprise hubs are available.
 pub fn print_warning_no_enterprise() {
-    let top    = box_top("⚠  Enterprise Account Required");
-    let line1  = box_line("Admin API is not available for personal hubs.");
-    let line2  = box_line("Register your app in ACC Custom Integrations to");
-    let line3  = box_line("enable admin commands for your enterprise account.");
-    let line4  = box_line("Docs: rapscli.xyz/docs/custom-integrations");
+    let top = box_top("⚠  Enterprise Account Required");
+    let line1 = box_line("Admin API is not available for personal hubs.");
+    let line2 = box_line("Register your app in ACC Custom Integrations to");
+    let line3 = box_line("enable admin commands for your enterprise account.");
+    let line4 = box_line("Docs: rapscli.xyz/docs/custom-integrations");
     let bottom = box_bottom();
 
     eprintln!("{}", top.yellow().bold());

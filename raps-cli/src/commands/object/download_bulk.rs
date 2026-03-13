@@ -237,7 +237,9 @@ pub(super) async fn download_bulk(
             };
 
             // Perform the download using the OSS client
-            let result = download_with_progress(&client, &bucket, &object_key, &dest, file_pb.as_ref()).await;
+            let result =
+                download_with_progress(&client, &bucket, &object_key, &dest, file_pb.as_ref())
+                    .await;
 
             if let Some(pb) = file_pb {
                 pb.finish_and_clear();
@@ -288,7 +290,10 @@ pub(super) async fn download_bulk(
     let elapsed = start.elapsed();
 
     // Compute summary
-    let downloaded = file_results.iter().filter(|r| r.success && !r.skipped).count();
+    let downloaded = file_results
+        .iter()
+        .filter(|r| r.success && !r.skipped)
+        .count();
     let skipped = file_results.iter().filter(|r| r.skipped).count();
     let failed = file_results.iter().filter(|r| !r.success).count();
     let total_bytes: u64 = file_results
@@ -438,19 +443,18 @@ async fn download_streaming(
         pb.set_length(len);
     }
 
-    let mut file = tokio::fs::File::create(dest).await.map_err(|e| {
-        anyhow::anyhow!("Failed to create '{}': {}", dest.display(), e)
-    })?;
+    let mut file = tokio::fs::File::create(dest)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to create '{}': {}", dest.display(), e))?;
 
     let mut stream = response.bytes_stream();
     let mut written: u64 = 0;
 
     while let Some(chunk) = stream.next().await {
-        let chunk =
-            chunk.map_err(|e| anyhow::anyhow!("Download error for '{object_key}': {e}"))?;
-        file.write_all(&chunk).await.map_err(|e| {
-            anyhow::anyhow!("Write error for '{}': {}", dest.display(), e)
-        })?;
+        let chunk = chunk.map_err(|e| anyhow::anyhow!("Download error for '{object_key}': {e}"))?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| anyhow::anyhow!("Write error for '{}': {}", dest.display(), e))?;
         written += chunk.len() as u64;
         pb.set_position(written);
     }

@@ -85,11 +85,7 @@ pub(crate) struct DiffOutput {
 // ── main entry point ──────────────────────────────────────────────────────────
 
 /// Download an OSS object into a temp file and return (label, bytes).
-async fn fetch_oss(
-    client: &OssClient,
-    bucket_key: &str,
-    object_key: &str,
-) -> Result<Side> {
+async fn fetch_oss(client: &OssClient, bucket_key: &str, object_key: &str) -> Result<Side> {
     let tmp = NamedTempFile::new().context("Failed to create temp file")?;
     client
         .download_object(bucket_key, object_key, tmp.path())
@@ -103,7 +99,10 @@ async fn fetch_oss(
     let data = tokio::fs::read(tmp.path())
         .await
         .context("Failed to read downloaded object")?;
-    Ok(Side::new(format!("oss:{}/{}", bucket_key, object_key), data))
+    Ok(Side::new(
+        format!("oss:{}/{}", bucket_key, object_key),
+        data,
+    ))
 }
 
 /// Read a local file.
@@ -111,10 +110,7 @@ async fn fetch_local(path: &Path) -> Result<Side> {
     let data = tokio::fs::read(path)
         .await
         .with_context(|| format!("Failed to read local file '{}'", path.display()))?;
-    Ok(Side::new(
-        format!("local:{}", path.display()),
-        data,
-    ))
+    Ok(Side::new(format!("local:{}", path.display()), data))
 }
 
 /// Return true when the string looks like an OSS object key, i.e. it contains
@@ -229,17 +225,17 @@ pub(super) async fn diff_objects(
     let text = is_text(&left_side.data) && is_text(&right_side.data);
 
     // Build diff output struct
-    let (diff_text, changed_lines, unchanged_lines) = if !checksum_only && !stat && !identical && text
-    {
-        let (d, c, u) = build_unified_diff(&left_side, &right_side);
-        (Some(d), Some(c), Some(u))
-    } else if (stat) && !identical && text {
-        // Stat mode: compute counts but don't emit full diff
-        let (_, c, u) = build_unified_diff(&left_side, &right_side);
-        (None, Some(c), Some(u))
-    } else {
-        (None, None, None)
-    };
+    let (diff_text, changed_lines, unchanged_lines) =
+        if !checksum_only && !stat && !identical && text {
+            let (d, c, u) = build_unified_diff(&left_side, &right_side);
+            (Some(d), Some(c), Some(u))
+        } else if (stat) && !identical && text {
+            // Stat mode: compute counts but don't emit full diff
+            let (_, c, u) = build_unified_diff(&left_side, &right_side);
+            (None, Some(c), Some(u))
+        } else {
+            (None, None, None)
+        };
 
     let output = DiffOutput {
         left_label: left_side.label.clone(),
@@ -338,9 +334,17 @@ fn render_table(output: &DiffOutput, stat: bool, checksum_only: bool) {
     // Summary
     println!("\n{}", "Summary".bold());
     if output.identical {
-        println!("  {} Files are {}", "=".green().bold(), "identical".green().bold());
+        println!(
+            "  {} Files are {}",
+            "=".green().bold(),
+            "identical".green().bold()
+        );
     } else {
-        println!("  {} Files are {}", "!".red().bold(), "different".red().bold());
+        println!(
+            "  {} Files are {}",
+            "!".red().bold(),
+            "different".red().bold()
+        );
 
         if !checksum_only {
             if output.is_text {
@@ -358,7 +362,10 @@ fn render_table(output: &DiffOutput, stat: bool, checksum_only: bool) {
                     }
                 }
             } else {
-                println!("  {} Binary files — content diff not shown", "~".yellow().bold());
+                println!(
+                    "  {} Binary files — content diff not shown",
+                    "~".yellow().bold()
+                );
             }
         }
     }

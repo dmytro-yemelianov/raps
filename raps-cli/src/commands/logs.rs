@@ -56,9 +56,7 @@ fn latest_log_file(dir: &std::path::Path) -> Option<std::path::PathBuf> {
         .filter(|e| e.file_name().to_string_lossy().starts_with("raps.log"))
         .collect();
     // Most recently modified first
-    files.sort_by_key(|e| {
-        std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).ok())
-    });
+    files.sort_by_key(|e| std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).ok()));
     files.into_iter().next().map(|e| e.path())
 }
 
@@ -82,7 +80,10 @@ fn logs_show(lines: usize, output_format: OutputFormat) -> Result<()> {
         all_lines
     };
 
-    if matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson) {
+    if matches!(
+        output_format,
+        OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+    ) {
         eprintln!("{}", format!("==> {} <==", path.display()).dimmed());
         for line in &tail {
             println!("{}", line);
@@ -104,7 +105,10 @@ fn logs_show(lines: usize, output_format: OutputFormat) -> Result<()> {
 fn logs_path(output_format: OutputFormat) -> Result<()> {
     let dir = raps_kernel::logging::log_dir();
 
-    if matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson) {
+    if matches!(
+        output_format,
+        OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+    ) {
         println!("{}", dir.display());
     } else {
         output_format.write(&serde_json::json!({
@@ -123,8 +127,14 @@ fn logs_clear(yes: bool, output_format: OutputFormat) -> Result<()> {
     let dir = raps_kernel::logging::log_dir();
 
     if !dir.exists() {
-        if matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson) {
-            println!("{}", "Log directory does not exist — nothing to clear.".yellow());
+        if matches!(
+            output_format,
+            OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+        ) {
+            println!(
+                "{}",
+                "Log directory does not exist — nothing to clear.".yellow()
+            );
         } else {
             output_format.write(&serde_json::json!({"removed": 0}))?;
         }
@@ -139,7 +149,10 @@ fn logs_clear(yes: bool, output_format: OutputFormat) -> Result<()> {
         .collect();
 
     if entries.is_empty() {
-        if matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson) {
+        if matches!(
+            output_format,
+            OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+        ) {
             println!("{}", "No log files to clear.".yellow());
         } else {
             output_format.write(&serde_json::json!({"removed": 0}))?;
@@ -148,9 +161,11 @@ fn logs_clear(yes: bool, output_format: OutputFormat) -> Result<()> {
     }
 
     // Confirmation prompt (unless --yes or machine-readable output).
-    let confirmed = yes
-        || !matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson)
-        || {
+    let confirmed =
+        yes || !matches!(
+            output_format,
+            OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+        ) || {
             eprint!(
                 "Delete {} log file(s) in {}? [y/N] ",
                 entries.len(),
@@ -173,7 +188,10 @@ fn logs_clear(yes: bool, output_format: OutputFormat) -> Result<()> {
         }
     }
 
-    if matches!(output_format, OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson) {
+    if matches!(
+        output_format,
+        OutputFormat::Table | OutputFormat::Plain | OutputFormat::Ndjson
+    ) {
         println!(
             "{} Removed {} log file(s) from {}",
             "✓".green().bold(),
@@ -196,10 +214,13 @@ fn logs_follow() -> Result<()> {
     let path = latest_log_file(&dir)
         .with_context(|| format!("No log files found in {}", dir.display()))?;
 
-    eprintln!("{}", format!("Following {} (Ctrl+C to stop)", path.display()).dimmed());
+    eprintln!(
+        "{}",
+        format!("Following {} (Ctrl+C to stop)", path.display()).dimmed()
+    );
 
-    let mut file = std::fs::File::open(&path)
-        .with_context(|| format!("Failed to open {}", path.display()))?;
+    let mut file =
+        std::fs::File::open(&path).with_context(|| format!("Failed to open {}", path.display()))?;
 
     // Seek to end so we only show new lines.
     use std::io::{Read, Seek, SeekFrom};

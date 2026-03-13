@@ -17,8 +17,14 @@ async fn test_webhook_list_returns_json_from_mock() {
 async fn test_webhook_create_missing_url_exits_with_usage_error() {
     let (_server, mut cmd) = start_cli_test().await;
 
-    cmd.args(["webhook", "create", "--event", "dm.version.added", "--non-interactive"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("url").or(predicate::str::contains("required")));
+    cmd.args([
+        "webhook",
+        "create",
+        "--event",
+        "dm.version.added",
+        "--non-interactive",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("url").or(predicate::str::contains("required")));
 }

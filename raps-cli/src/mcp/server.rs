@@ -13,11 +13,11 @@
 //! - `dispatch`    – Tool dispatch (routes tool name → handler)
 //! - `definitions` – Tool schema definitions (`get_tools`)
 
-use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
 #[cfg(feature = "mcp-http")]
 use rmcp::transport::streamable_http_server::{
     StreamableHttpService, session::local::LocalSessionManager,
 };
+use rmcp::{ServerHandler, ServiceExt, model::*, transport::stdio};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -105,11 +105,8 @@ impl RapsServer {
         let mut guard = self.auth_client.write().await;
         if guard.is_none() {
             *guard = Some(
-                AuthClient::new_with_http_config(
-                    (*self.config).clone(),
-                    self.http_config.clone(),
-                )
-                .expect("HTTP client configuration was validated at startup"),
+                AuthClient::new_with_http_config((*self.config).clone(), self.http_config.clone())
+                    .expect("HTTP client configuration was validated at startup"),
             );
         }
         guard
@@ -379,8 +376,8 @@ pub(crate) fn validate_file_path(path: &std::path::Path) -> Result<(), String> {
 
 impl ServerHandler for RapsServer {
     fn get_info(&self) -> ServerInfo {
-        ServerInfo::new(ServerCapabilities::builder().enable_tools().build())
-            .with_instructions(format!(
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+            format!(
                 "RAPS MCP Server v{version} - Autodesk Platform Services CLI\n\n\
                     Provides direct access to APS APIs:\n\
                     * auth_* - Authentication (2-legged and 3-legged OAuth)\n\
@@ -401,7 +398,8 @@ impl ServerHandler for RapsServer {
                     Set APS_CLIENT_ID and APS_CLIENT_SECRET env vars.\n\
                     For 3-legged auth, run 'raps auth login' first.",
                 version = env!("CARGO_PKG_VERSION"),
-            ))
+            ),
+        )
     }
 
     async fn list_tools(
@@ -547,7 +545,8 @@ pub async fn run_server(transport: &str, port: u16) -> Result<(), Box<dyn std::e
         }
         #[cfg(feature = "mcp-http")]
         "http" => {
-            let config = rmcp::transport::streamable_http_server::StreamableHttpServerConfig::default();
+            let config =
+                rmcp::transport::streamable_http_server::StreamableHttpServerConfig::default();
             let service = StreamableHttpService::new(
                 || RapsServer::new().map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
                 LocalSessionManager::default().into(),

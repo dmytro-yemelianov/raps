@@ -209,9 +209,7 @@ async fn test_context_clear_succeeds() {
 
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("HOME", &home).env("XDG_CONFIG_HOME", &xdg);
-    cmd.args(["config", "context", "clear"])
-        .assert()
-        .success();
+    cmd.args(["config", "context", "clear"]).assert().success();
 }
 
 /// `config context clear` JSON output contains success field.
@@ -264,9 +262,7 @@ async fn test_context_full_roundtrip() {
     // Clear
     let (_s4, mut c4) = start_cli_test().await;
     c4.env("HOME", &home).env("XDG_CONFIG_HOME", &xdg);
-    c4.args(["config", "context", "clear"])
-        .assert()
-        .success();
+    c4.args(["config", "context", "clear"]).assert().success();
 
     // Show again — values should be gone
     let (_s5, mut c5) = start_cli_test().await;

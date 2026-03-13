@@ -15,9 +15,15 @@ pub(super) async fn install(args: InstallArgs, output_format: OutputFormat) -> R
     if args.name == "dashboard" {
         match output_format {
             OutputFormat::Table => {
-                println!("{} The TUI Dashboard is already included in your RAPS binary.", "i".cyan().bold());
+                println!(
+                    "{} The TUI Dashboard is already included in your RAPS binary.",
+                    "i".cyan().bold()
+                );
                 println!("  To use it, you just need a valid Pro license.");
-                println!("  Run {} to authenticate.", "raps marketplace license <key>".cyan());
+                println!(
+                    "  Run {} to authenticate.",
+                    "raps marketplace license <key>".cyan()
+                );
             }
             _ => {
                 output_format.write(&serde_json::json!({
@@ -137,12 +143,7 @@ pub(super) async fn update(args: UpdateArgs, output_format: OutputFormat) -> Res
             }
             Err(e) => {
                 if let OutputFormat::Table = output_format {
-                    println!(
-                        "{} Failed to update {}: {}",
-                        "✗".red().bold(),
-                        slug,
-                        e
-                    );
+                    println!("{} Failed to update {}: {}", "✗".red().bold(), slug, e);
                 }
                 fail_count += 1;
             }

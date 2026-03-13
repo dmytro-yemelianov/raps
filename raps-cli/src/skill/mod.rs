@@ -3,5 +3,5 @@
 
 //! Skill system — discovery, installation, and management of Claude Code skills.
 
-pub mod registry;
 pub mod installer;
+pub mod registry;

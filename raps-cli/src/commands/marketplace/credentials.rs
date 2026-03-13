@@ -7,8 +7,8 @@ use anyhow::Result;
 use clap::Subcommand;
 use colored::Colorize;
 
-use crate::marketplace::client::MarketplaceClient;
 use crate::marketplace::MarketplaceAuth;
+use crate::marketplace::client::MarketplaceClient;
 use crate::output::OutputFormat;
 
 #[derive(Debug, Subcommand)]
@@ -35,12 +35,9 @@ pub enum CredentialCommands {
 }
 
 pub(super) async fn execute(cmd: CredentialCommands, output_format: OutputFormat) -> Result<()> {
-    let key = MarketplaceAuth::get_license_key()?
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "No license key found. Run `raps marketplace license <key>` first."
-            )
-        })?;
+    let key = MarketplaceAuth::get_license_key()?.ok_or_else(|| {
+        anyhow::anyhow!("No license key found. Run `raps marketplace license <key>` first.")
+    })?;
 
     let client = MarketplaceClient::new()?;
     match cmd {

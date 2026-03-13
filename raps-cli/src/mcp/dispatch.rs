@@ -3,8 +3,8 @@
 
 //! Tool dispatch implementation for the MCP server.
 
-use rmcp::model::*;
 use raps_kernel::security::strip_prompt_injection;
+use rmcp::model::*;
 use serde_json::{Map, Value};
 
 use super::server::RapsServer;
@@ -1365,10 +1365,7 @@ impl RapsServer {
                     Ok(val) => val,
                     Err(err) => return CallToolResult::success(vec![Content::text(err)]),
                 };
-                let force = args
-                    .get("force")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
+                let force = args.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
                 self.skill_install(name, force).await
             }
             "skill_info" => {

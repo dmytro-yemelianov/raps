@@ -159,12 +159,7 @@ async fn setup_two_legged() -> Result<()> {
     }
 
     // Save to default profile
-    save_credentials_to_profile(
-        "default",
-        client_id.trim(),
-        client_secret.trim(),
-    )
-    .await?;
+    save_credentials_to_profile("default", client_id.trim(), client_secret.trim()).await?;
 
     println!(
         "{} Credentials saved to profile '{}'.",

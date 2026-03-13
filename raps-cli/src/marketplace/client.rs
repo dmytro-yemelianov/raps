@@ -4,8 +4,8 @@
 //! HTTP client for the RAPS marketplace API.
 
 use anyhow::{Context, Result};
-use reqwest::Client;
 use raps_kernel::marketplace::{Plugin, ValidateResponse, VersionInfo};
+use reqwest::Client;
 
 const API_BASE: &str = "https://api.rapscli.xyz";
 const USER_AGENT: &str = concat!("raps-cli/", env!("CARGO_PKG_VERSION"));
@@ -55,7 +55,9 @@ impl MarketplaceClient {
         if !resp.status().is_success() {
             anyhow::bail!("Plugin '{}' not found (HTTP {})", slug, resp.status());
         }
-        resp.json::<Plugin>().await.context("Failed to parse plugin response")
+        resp.json::<Plugin>()
+            .await
+            .context("Failed to parse plugin response")
     }
 
     /// List all published plugins from the public catalog.
@@ -71,7 +73,9 @@ impl MarketplaceClient {
         if !resp.status().is_success() {
             anyhow::bail!("Failed to list plugins (HTTP {})", resp.status());
         }
-        resp.json::<Vec<Plugin>>().await.context("Failed to parse plugins response")
+        resp.json::<Vec<Plugin>>()
+            .await
+            .context("Failed to parse plugins response")
     }
 
     /// Get version history for a plugin.
@@ -97,7 +101,9 @@ impl MarketplaceClient {
         if !resp.status().is_success() {
             anyhow::bail!("License validation failed (HTTP {})", resp.status());
         }
-        resp.json::<ValidateResponse>().await.context("Failed to parse validation response")
+        resp.json::<ValidateResponse>()
+            .await
+            .context("Failed to parse validation response")
     }
 
     /// Download a plugin binary for the given platform.
@@ -150,7 +156,11 @@ impl MarketplaceClient {
             .unwrap_or("unknown")
             .to_string();
 
-        let bytes = resp.bytes().await.context("Failed to read response body")?.to_vec();
+        let bytes = resp
+            .bytes()
+            .await
+            .context("Failed to read response body")?
+            .to_vec();
         Ok((bytes, sha256, signature, version))
     }
 

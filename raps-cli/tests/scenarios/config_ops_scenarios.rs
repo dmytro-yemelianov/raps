@@ -73,10 +73,17 @@ async fn test_config_set_no_active_profile_fails() {
     let (_server, mut cmd) = start_cli_test().await;
     cmd.env("HOME", tmp.path());
     cmd.env("XDG_CONFIG_HOME", tmp.path().join("config"));
-    cmd.args(["config", "set", "client_id", "my-client", "--output", "json"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("No active profile"));
+    cmd.args([
+        "config",
+        "set",
+        "client_id",
+        "my-client",
+        "--output",
+        "json",
+    ])
+    .assert()
+    .failure()
+    .stderr(predicate::str::contains("No active profile"));
 }
 
 /// `config get use_keychain` with RAPS_USE_KEYCHAIN=1 succeeds.
@@ -179,7 +186,12 @@ async fn test_config_set_and_get_with_active_profile_json() {
     let (_server3, mut cmd3) = start_cli_test().await;
     cmd3.env("HOME", &home).env("XDG_CONFIG_HOME", &xdg);
     cmd3.args([
-        "config", "set", "client_id", "my-test-client-id", "--output", "json",
+        "config",
+        "set",
+        "client_id",
+        "my-test-client-id",
+        "--output",
+        "json",
     ])
     .assert()
     .success()
@@ -278,12 +290,10 @@ async fn test_config_set_use_keychain_false_warns() {
 
     let (_s3, mut c3) = start_cli_test().await;
     c3.env("HOME", &home).env("XDG_CONFIG_HOME", &xdg);
-    c3.args([
-        "config", "set", "use_keychain", "false", "--output", "json",
-    ])
-    .assert()
-    .success()
-    .stderr(predicate::str::contains("WARNING"));
+    c3.args(["config", "set", "use_keychain", "false", "--output", "json"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("WARNING"));
 }
 
 /// Set da_nickname and retrieve it (table format).

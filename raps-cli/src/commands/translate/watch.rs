@@ -66,11 +66,7 @@ pub async fn watch_translation(
                 return Ok(());
             }
             "failed" | "timeout" => {
-                spinner.finish_with_message(format!(
-                    "{} Translation {}",
-                    "X".red().bold(),
-                    status
-                ));
+                spinner.finish_with_message(format!("{} Translation {}", "X".red().bold(), status));
                 anyhow::bail!("Translation failed with status: {}", status);
             }
             _ => {

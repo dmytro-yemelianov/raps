@@ -113,11 +113,7 @@ impl AuthClient {
             "To complete login, open the following URL in your browser:".dimmed()
         );
         println!();
-        println!(
-            "  {} {}",
-            "→".cyan(),
-            verify_url_with_code.cyan().bold()
-        );
+        println!("  {} {}", "→".cyan(), verify_url_with_code.cyan().bold());
         println!();
         println!(
             "  {}",
@@ -130,7 +126,10 @@ impl AuthClient {
             session.user_code.yellow().bold()
         );
         println!("{}", "─".repeat(56));
-        println!("{}", "  Waiting for you to authorize in the browser...".dimmed());
+        println!(
+            "{}",
+            "  Waiting for you to authorize in the browser...".dimmed()
+        );
 
         // --- Poll for authorization ---
         let auth_code = self
@@ -153,12 +152,9 @@ impl AuthClient {
         let session_id_clone = session.session_id.clone();
         let http_clone = self.http_client.clone();
         tokio::spawn(async move {
-            let _ = consume_device_session_static(
-                &http_clone,
-                &proxy_base_clone,
-                &session_id_clone,
-            )
-            .await;
+            let _ =
+                consume_device_session_static(&http_clone, &proxy_base_clone, &session_id_clone)
+                    .await;
         });
 
         // --- Store token ---
@@ -216,11 +212,7 @@ impl AuthClient {
     }
 
     /// Poll the proxy for the authorization code.
-    async fn poll_device_token(
-        &self,
-        proxy_base: &str,
-        session_id: &str,
-    ) -> Result<String> {
+    async fn poll_device_token(&self, proxy_base: &str, session_id: &str) -> Result<String> {
         let url = format!(
             "{}/device/token?session_id={}",
             proxy_base,

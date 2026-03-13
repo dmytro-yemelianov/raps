@@ -2,9 +2,9 @@
 // Copyright 2024-2025 Dmytro Yemelianov
 
 use axum::{
+    Json,
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
 };
 use serde_json::json;
 
@@ -37,11 +37,18 @@ impl IntoResponse for ApiError {
             }
             ApiError::Internal(err) => {
                 tracing::error!("Internal error: {err:#}");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
         };
 
-        (status, Json(json!({"error": status.as_str(), "message": message}))).into_response()
+        (
+            status,
+            Json(json!({"error": status.as_str(), "message": message})),
+        )
+            .into_response()
     }
 }
 

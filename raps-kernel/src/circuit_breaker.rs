@@ -463,7 +463,9 @@ mod tests {
             "authentication"
         );
         assert_eq!(
-            endpoint_group("https://developer.api.autodesk.com/construction/admin/v1/projects/abc/users"),
+            endpoint_group(
+                "https://developer.api.autodesk.com/construction/admin/v1/projects/abc/users"
+            ),
             "account-admin"
         );
     }

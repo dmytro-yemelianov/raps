@@ -58,11 +58,10 @@ pub async fn get_by_id(pool: &PgPool, id: Uuid) -> anyhow::Result<Option<User>> 
 }
 
 pub async fn list_by_tenant(pool: &PgPool, tenant_id: Uuid) -> anyhow::Result<Vec<User>> {
-    let users = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE tenant_id = $1 ORDER BY created_at",
-    )
-    .bind(tenant_id)
-    .fetch_all(pool)
-    .await?;
+    let users =
+        sqlx::query_as::<_, User>("SELECT * FROM users WHERE tenant_id = $1 ORDER BY created_at")
+            .bind(tenant_id)
+            .fetch_all(pool)
+            .await?;
     Ok(users)
 }

@@ -103,10 +103,9 @@ pub async fn run_status(
     let config = raps_kernel::config::Config::from_env_lenient()
         .unwrap_or_else(|_| auth_client.config().clone());
 
-    let profile_name: Option<String> =
-        raps_kernel::config::load_profiles()
-            .ok()
-            .and_then(|pd| pd.active_profile);
+    let profile_name: Option<String> = raps_kernel::config::load_profiles()
+        .ok()
+        .and_then(|pd| pd.active_profile);
 
     let client_id_masked = if config.client_id.is_empty() {
         "(not set)".to_string()
@@ -125,12 +124,19 @@ pub async fn run_status(
 
     // ── 5. Render ───────────────────────────────────────────────────────────
     match output_format {
-        OutputFormat::Json | OutputFormat::Yaml | OutputFormat::Csv | OutputFormat::Plain | OutputFormat::Ndjson => {
+        OutputFormat::Json
+        | OutputFormat::Yaml
+        | OutputFormat::Csv
+        | OutputFormat::Plain
+        | OutputFormat::Ndjson => {
             // Structured output — build a JSON-serialisable struct.
             let hub_outputs: Vec<HubStatusOutput> = hubs
                 .iter()
                 .map(|h| {
-                    let ext = h.attributes.extension.as_ref()
+                    let ext = h
+                        .attributes
+                        .extension
+                        .as_ref()
                         .and_then(|e| e.extension_type.as_deref());
                     let tier = tier_from_extension(ext);
                     let admin_api_ready = tier == HubTier::Enterprise;
@@ -170,9 +176,15 @@ pub async fn run_status(
 
             // 2-legged row
             let two_leg_str = if two_leg_ok {
-                format!("{}  Available      (client credentials)", "✓".green().bold())
+                format!(
+                    "{}  Available      (client credentials)",
+                    "✓".green().bold()
+                )
             } else {
-                format!("{}  Not available  (check APS_CLIENT_ID / APS_CLIENT_SECRET)", "✗".red().bold())
+                format!(
+                    "{}  Not available  (check APS_CLIENT_ID / APS_CLIENT_SECRET)",
+                    "✗".red().bold()
+                )
             };
             println!("  {:<12}  {}", "2-legged".bold(), two_leg_str);
 
@@ -183,7 +195,10 @@ pub async fn run_status(
                     .unwrap_or_default();
                 format!("{}  Logged in{}", "✓".green().bold(), expiry_suffix)
             } else {
-                format!("{}  Not logged in  (run: raps auth login)", "✗".red().bold())
+                format!(
+                    "{}  Not logged in  (run: raps auth login)",
+                    "✗".red().bold()
+                )
             };
             println!("  {:<12}  {}", "3-legged".bold(), three_leg_str);
 
@@ -202,10 +217,7 @@ pub async fn run_status(
 
             if hubs.is_empty() {
                 if three_leg_ok {
-                    println!(
-                        "  {}",
-                        "(no hubs found)".dimmed()
-                    );
+                    println!("  {}", "(no hubs found)".dimmed());
                 } else {
                     println!(
                         "  {}",
@@ -214,17 +226,20 @@ pub async fn run_status(
                 }
             } else {
                 for hub in &hubs {
-                    let ext = hub.attributes.extension.as_ref()
+                    let ext = hub
+                        .attributes
+                        .extension
+                        .as_ref()
                         .and_then(|e| e.extension_type.as_deref());
                     let tier = tier_from_extension(ext);
                     let region = hub.attributes.region.as_deref().unwrap_or("--");
 
                     // Tier glyph + label
                     let (glyph, tier_label) = match tier {
-                        HubTier::Personal   => ("○", "PERSONAL   "),
-                        HubTier::Team       => ("◇", "TEAM       "),
+                        HubTier::Personal => ("○", "PERSONAL   "),
+                        HubTier::Team => ("◇", "TEAM       "),
                         HubTier::Enterprise => ("◆", "ENTERPRISE "),
-                        HubTier::Unknown    => ("?", "UNKNOWN    "),
+                        HubTier::Unknown => ("?", "UNKNOWN    "),
                     };
 
                     let name_col = format!("{:<24}", truncate(&hub.attributes.name, 24));
@@ -248,16 +263,17 @@ pub async fn run_status(
                     );
 
                     match tier {
-                        HubTier::Personal   => println!("{}", hub_line.dimmed()),
-                        HubTier::Team       => println!("{}", hub_line),
+                        HubTier::Personal => println!("{}", hub_line.dimmed()),
+                        HubTier::Team => println!("{}", hub_line),
                         HubTier::Enterprise => println!("{}", hub_line.cyan().bold()),
-                        HubTier::Unknown    => println!("{}", hub_line.dimmed()),
+                        HubTier::Unknown => println!("{}", hub_line.dimmed()),
                     }
 
                     // For enterprise hubs, print sub-info
                     if tier == HubTier::Enterprise {
                         let account_id = bare_account_id(&hub.id);
-                        println!("                └─ Admin API: {}  Account ID: {}",
+                        println!(
+                            "                └─ Admin API: {}  Account ID: {}",
                             "✓ ready".green(),
                             account_id
                         );
@@ -272,7 +288,7 @@ pub async fn run_status(
             let fmt_ctx = |val: &Option<String>, env_name: &str| -> String {
                 match val {
                     Some(v) => format!("{:<42}  env:{}", truncate(v, 42), env_name),
-                    None    => format!("{:<42}  env:{}", "(not set)", env_name),
+                    None => format!("{:<42}  env:{}", "(not set)", env_name),
                 }
             };
 

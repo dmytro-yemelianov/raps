@@ -130,18 +130,18 @@ impl OssClient {
             .header("Content-Length", file_size.to_string())
             .body(body)
             .send()
-                    .await
-                    .context("Failed to upload to S3")?;
-                raps_kernel::profiler::record_http_request(_upload_start.elapsed());
-            
-                tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(s3_url), "HTTP response");
-            
-                if !response.status().is_success() {
-                    return Err(RapsError::from_response(response).await.into());
-                }
-            
-                pb.set_position(file_size);
-                    // Step 3: Complete the upload
+            .await
+            .context("Failed to upload to S3")?;
+        raps_kernel::profiler::record_http_request(_upload_start.elapsed());
+
+        tracing::info!(status = response.status().as_u16(), url = %raps_kernel::logging::redact_secrets(s3_url), "HTTP response");
+
+        if !response.status().is_success() {
+            return Err(RapsError::from_response(response).await.into());
+        }
+
+        pb.set_position(file_size);
+        // Step 3: Complete the upload
         pb.set_message(format!("Completing upload for {}", object_key));
         let object_info = self
             .complete_signed_upload(bucket_key, object_key, &signed.upload_key)
@@ -237,7 +237,11 @@ impl OssClient {
         object_key: &str,
         writer: &mut (impl tokio::io::AsyncWrite + Unpin),
     ) -> Result<()> {
-        tracing::debug!(bucket = bucket_key, key = object_key, "download_object_to_writer");
+        tracing::debug!(
+            bucket = bucket_key,
+            key = object_key,
+            "download_object_to_writer"
+        );
         let signed = self
             .get_signed_download_url(bucket_key, object_key, None)
             .await?;
@@ -434,9 +438,7 @@ impl OssClient {
         let local_sha1 = hex::encode(hasher.finalize());
 
         // Fetch remote SHA-1
-        let remote_sha1 = self
-            .get_object_details_sha1(bucket_key, object_key)
-            .await?;
+        let remote_sha1 = self.get_object_details_sha1(bucket_key, object_key).await?;
 
         match remote_sha1 {
             Some(remote) if remote.to_lowercase() == local_sha1.to_lowercase() => {

@@ -124,9 +124,8 @@ async fn create_snapshot(
     };
 
     // Choose output file
-    let out_file = output_path.unwrap_or_else(|| {
-        PathBuf::from(format!("snapshot-{}-{}.json", bucket, timestamp))
-    });
+    let out_file = output_path
+        .unwrap_or_else(|| PathBuf::from(format!("snapshot-{}-{}.json", bucket, timestamp)));
 
     let json = serde_json::to_string_pretty(&manifest)?;
     tokio::fs::write(&out_file, &json)
@@ -139,7 +138,11 @@ async fn create_snapshot(
             println!("  {} {}", "Bucket:".bold(), bucket.cyan());
             println!("  {} {}", "Objects:".bold(), manifest.object_count);
             println!("  {} {}", "File:".bold(), out_file.display());
-            println!("  {} {}", "Captured at:".bold(), manifest.captured_at.dimmed());
+            println!(
+                "  {} {}",
+                "Captured at:".bold(),
+                manifest.captured_at.dimmed()
+            );
         }
         _ => {
             output_format.write(&manifest)?;
@@ -312,7 +315,10 @@ fn list_snapshots() -> Result<()> {
     files.sort();
 
     if files.is_empty() {
-        println!("{}", "No snapshot files found in current directory.".yellow());
+        println!(
+            "{}",
+            "No snapshot files found in current directory.".yellow()
+        );
         return Ok(());
     }
 
@@ -353,7 +359,12 @@ fn peek_manifest_summary(path: &PathBuf) -> String {
             let bucket = v["bucket"].as_str().unwrap_or("?");
             let count = v["object_count"].as_u64().unwrap_or(0);
             let captured = v["captured_at"].as_str().unwrap_or("?");
-            format!("bucket={} objects={} at={}", bucket, count, &captured[..captured.len().min(19)])
+            format!(
+                "bucket={} objects={} at={}",
+                bucket,
+                count,
+                &captured[..captured.len().min(19)]
+            )
         })
         .unwrap_or_default()
 }

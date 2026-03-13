@@ -141,8 +141,7 @@ async fn hub_info(
     hub_id: &str,
     output_format: OutputFormat,
 ) -> Result<()> {
-    validate_resource_id(hub_id)
-        .with_context(|| format!("Invalid hub ID: {:?}", hub_id))?;
+    validate_resource_id(hub_id).with_context(|| format!("Invalid hub ID: {:?}", hub_id))?;
 
     let hub = tracked_op("Fetching hub details", output_format, || {
         client.get_hub(hub_id)

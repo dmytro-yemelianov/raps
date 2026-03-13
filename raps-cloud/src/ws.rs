@@ -5,8 +5,8 @@
 
 use axum::{
     extract::{
-        ws::{Message, WebSocket},
         Query, State, WebSocketUpgrade,
+        ws::{Message, WebSocket},
     },
     response::Response,
 };
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::{auth, AppState};
+use crate::{AppState, auth};
 
 /// Progress update broadcast to WebSocket clients.
 #[derive(Debug, Clone, Serialize, Deserialize)]

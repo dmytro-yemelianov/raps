@@ -17,7 +17,12 @@ pub(super) async fn init(args: InitArgs, output_format: OutputFormat) -> Result<
 
     match output_format {
         OutputFormat::Table => {
-            println!("{} Plugin init for '{}' by '{}' — not yet implemented.", "!".yellow().bold(), name, author);
+            println!(
+                "{} Plugin init for '{}' by '{}' — not yet implemented.",
+                "!".yellow().bold(),
+                name,
+                author
+            );
             println!("  Plugin publishing will be available in a future release.");
         }
         _ => {
@@ -36,7 +41,11 @@ pub(super) async fn package(args: PackageArgs, output_format: OutputFormat) -> R
     // Plugin packaging — not yet implemented.
     match output_format {
         OutputFormat::Table => {
-            println!("{} Plugin packaging for '{}' — not yet implemented.", "!".yellow().bold(), args.dir);
+            println!(
+                "{} Plugin packaging for '{}' — not yet implemented.",
+                "!".yellow().bold(),
+                args.dir
+            );
             println!("  Plugin publishing will be available in a future release.");
         }
         _ => {
@@ -54,7 +63,11 @@ pub(super) async fn publish(args: PublishArgs, output_format: OutputFormat) -> R
     // Plugin publishing — not yet implemented.
     match output_format {
         OutputFormat::Table => {
-            println!("{} Plugin publishing for '{}' — not yet implemented.", "!".yellow().bold(), args.path);
+            println!(
+                "{} Plugin publishing for '{}' — not yet implemented.",
+                "!".yellow().bold(),
+                args.path
+            );
             println!("  Plugin publishing will be available in a future release.");
         }
         _ => {
@@ -72,7 +85,11 @@ pub(super) async fn review(args: ReviewArgs, output_format: OutputFormat) -> Res
     // Plugin review submission — not yet implemented.
     match output_format {
         OutputFormat::Table => {
-            println!("{} Review submission for '{}' — not yet implemented.", "!".yellow().bold(), args.name);
+            println!(
+                "{} Review submission for '{}' — not yet implemented.",
+                "!".yellow().bold(),
+                args.name
+            );
             println!("  Plugin reviews will be available in a future release.");
         }
         _ => {

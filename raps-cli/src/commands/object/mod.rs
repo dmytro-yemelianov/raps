@@ -365,7 +365,21 @@ impl ObjectCommands {
                 cost_estimate,
                 skip_secret_scan,
                 allow_secrets,
-            } => upload_object(client, bucket, file, key, resume, skip_if_exists, cost_estimate, skip_secret_scan, allow_secrets, output_format).await,
+            } => {
+                upload_object(
+                    client,
+                    bucket,
+                    file,
+                    key,
+                    resume,
+                    skip_if_exists,
+                    cost_estimate,
+                    skip_secret_scan,
+                    allow_secrets,
+                    output_format,
+                )
+                .await
+            }
             ObjectCommands::UploadBatch {
                 bucket,
                 files,

@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::super::*;
 use crate::commands::dashboard::traits::DashboardResource;
-use ratatui::{layout::Constraint, widgets::{Cell, Row}, style::{Style, Color}, text::Span};
+use ratatui::{
+    layout::Constraint,
+    style::{Color, Style},
+    text::Span,
+    widgets::{Cell, Row},
+};
 
 #[derive(Debug, Clone)]
 pub struct FolderList {
@@ -39,15 +44,20 @@ impl DashboardResource for FolderList {
             return self.rows.len();
         }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.name.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&FolderContentRow> = self.rows.iter()
+        let filtered: Vec<&FolderContentRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             let type_style = if r.content_type == "folder" {
                 Style::default().fg(Color::Cyan)
@@ -65,15 +75,26 @@ impl DashboardResource for FolderList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&FolderContentRow> = self.rows.iter()
+        let filtered: Vec<&FolderContentRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&FolderContentRow> = self.rows.iter()
+        let filtered: Vec<&FolderContentRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
             .collect();
 

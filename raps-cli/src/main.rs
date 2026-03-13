@@ -54,9 +54,9 @@ use std::io::{self, BufRead, IsTerminal};
 use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
-    ItemCommands, JobCommands, MarketplaceCommands, ObjectCommands, PipelineCommands, PluginCommands,
-    ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SkillCommands, SnapshotCommands, TemplateCommands,
-    TranslateCommands, WebhookCommands, WorkflowCommands,
+    ItemCommands, JobCommands, MarketplaceCommands, ObjectCommands, PipelineCommands,
+    PluginCommands, ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SkillCommands,
+    SnapshotCommands, TemplateCommands, TranslateCommands, WebhookCommands, WorkflowCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -451,11 +451,52 @@ enum Commands {
 
 /// Known top-level subcommand names for fuzzy correction suggestions.
 const KNOWN_SUBCOMMANDS: &[&str] = &[
-    "auth", "bucket", "object", "translate", "workflow", "sync", "watch", "stats", "init",
-    "status", "hub", "project", "folder", "item", "webhook", "da", "issue", "acc", "admin",
-    "api", "rfi", "report", "template", "reality", "inspect", "plugin", "marketplace", "generate",
-    "demo", "config", "pipeline", "job", "completions", "shell", "mcp", "doctor", "cache",
-    "swarm", "schema", "history", "replay", "man", "logs", "lint", "snapshot", "skill",
+    "auth",
+    "bucket",
+    "object",
+    "translate",
+    "workflow",
+    "sync",
+    "watch",
+    "stats",
+    "init",
+    "status",
+    "hub",
+    "project",
+    "folder",
+    "item",
+    "webhook",
+    "da",
+    "issue",
+    "acc",
+    "admin",
+    "api",
+    "rfi",
+    "report",
+    "template",
+    "reality",
+    "inspect",
+    "plugin",
+    "marketplace",
+    "generate",
+    "demo",
+    "config",
+    "pipeline",
+    "job",
+    "completions",
+    "shell",
+    "mcp",
+    "doctor",
+    "cache",
+    "swarm",
+    "schema",
+    "history",
+    "replay",
+    "man",
+    "logs",
+    "lint",
+    "snapshot",
+    "skill",
 ];
 
 /// Compute the Levenshtein edit distance between two strings.
@@ -555,7 +596,10 @@ mod help_transform_tests {
 
     #[test]
     fn no_help_passthrough() {
-        assert_eq!(t(&["raps", "auth", "status"]), vec!["raps", "auth", "status"]);
+        assert_eq!(
+            t(&["raps", "auth", "status"]),
+            vec!["raps", "auth", "status"]
+        );
     }
 
     #[test]
@@ -790,7 +834,12 @@ async fn run(cli: Cli) -> Result<()> {
     if let Commands::Dashboard = &command {
         // Pro check: dashboard is a pro-only feature
         if !marketplace::SubscriptionManager::can_use_pro() {
-            println!("{}", "Error: The TUI Dashboard is a Pro-only feature.".red().bold());
+            println!(
+                "{}",
+                "Error: The TUI Dashboard is a Pro-only feature."
+                    .red()
+                    .bold()
+            );
             println!(
                 "To use the dashboard, you need a RAPS Pro license.\n\
                  Run {} to authenticate, or visit {} to purchase a license.",
@@ -1014,8 +1063,7 @@ async fn run(cli: Cli) -> Result<()> {
                     // Expand aliases: if the first word matches a configured alias,
                     // replace the line with the aliased command before parsing.
                     let line = {
-                        let plugin_cfg = crate::plugins::PluginConfig::load()
-                            .unwrap_or_default();
+                        let plugin_cfg = crate::plugins::PluginConfig::load().unwrap_or_default();
                         let first_word = line.split_whitespace().next().unwrap_or("");
                         if let Some(alias_cmd) = plugin_cfg.get_alias(first_word) {
                             let rest = line[first_word.len()..].trim_start();
@@ -1250,8 +1298,10 @@ fn record_history(args: &[String]) {
 
         let next_index = entries.len() + 1;
         let timestamp = chrono::Utc::now().to_rfc3339();
-        let args_json: Vec<serde_json::Value> =
-            args.iter().map(|s| serde_json::Value::String(s.clone())).collect();
+        let args_json: Vec<serde_json::Value> = args
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect();
 
         entries.push(serde_json::json!({
             "index": next_index,
@@ -1534,12 +1584,8 @@ async fn execute_command(
         }
 
         Commands::Status => {
-            commands::status::run_status(
-                &get_auth_client(),
-                &get_dm_client(),
-                output_format,
-            )
-            .await?;
+            commands::status::run_status(&get_auth_client(), &get_dm_client(), output_format)
+                .await?;
         }
 
         Commands::Hub(cmd) => {
@@ -1577,16 +1623,31 @@ async fn execute_command(
             let auth_client = get_auth_client();
             let acc_client = AccClient::new(config.clone(), auth_client);
             let issues_client_for_acc = get_issues_client();
-            let rfi_client_for_acc =
-                RfiClient::new_with_http_config(config.clone(), get_auth_client(), http_config.clone())
-                    .expect("HTTP client configuration was validated at startup");
-            cmd.execute(&acc_client, &issues_client_for_acc, &rfi_client_for_acc, output_format).await?;
+            let rfi_client_for_acc = RfiClient::new_with_http_config(
+                config.clone(),
+                get_auth_client(),
+                http_config.clone(),
+            )
+            .expect("HTTP client configuration was validated at startup");
+            cmd.execute(
+                &acc_client,
+                &issues_client_for_acc,
+                &rfi_client_for_acc,
+                output_format,
+            )
+            .await?;
         }
 
         Commands::Admin(cmd) => {
             let auth_client = get_auth_client();
-            cmd.execute(config, &auth_client, &get_dm_client(), output_format, concurrency)
-                .await?;
+            cmd.execute(
+                config,
+                &auth_client,
+                &get_dm_client(),
+                output_format,
+                concurrency,
+            )
+            .await?;
         }
 
         Commands::Api(cmd) => {

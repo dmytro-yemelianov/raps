@@ -85,21 +85,31 @@ fn parse_zip_central_directory(cd_data: &[u8]) -> Vec<ArchiveEntry> {
             break;
         }
 
-        let compressed_size =
-            u32::from_le_bytes(cd_data[offset + 20..offset + 24].try_into().unwrap_or([0; 4]))
-                as u64;
-        let uncompressed_size =
-            u32::from_le_bytes(cd_data[offset + 24..offset + 28].try_into().unwrap_or([0; 4]))
-                as u64;
-        let fname_len =
-            u16::from_le_bytes(cd_data[offset + 28..offset + 30].try_into().unwrap_or([0; 2]))
-                as usize;
-        let extra_len =
-            u16::from_le_bytes(cd_data[offset + 30..offset + 32].try_into().unwrap_or([0; 2]))
-                as usize;
-        let comment_len =
-            u16::from_le_bytes(cd_data[offset + 32..offset + 34].try_into().unwrap_or([0; 2]))
-                as usize;
+        let compressed_size = u32::from_le_bytes(
+            cd_data[offset + 20..offset + 24]
+                .try_into()
+                .unwrap_or([0; 4]),
+        ) as u64;
+        let uncompressed_size = u32::from_le_bytes(
+            cd_data[offset + 24..offset + 28]
+                .try_into()
+                .unwrap_or([0; 4]),
+        ) as u64;
+        let fname_len = u16::from_le_bytes(
+            cd_data[offset + 28..offset + 30]
+                .try_into()
+                .unwrap_or([0; 2]),
+        ) as usize;
+        let extra_len = u16::from_le_bytes(
+            cd_data[offset + 30..offset + 32]
+                .try_into()
+                .unwrap_or([0; 2]),
+        ) as usize;
+        let comment_len = u16::from_le_bytes(
+            cd_data[offset + 32..offset + 34]
+                .try_into()
+                .unwrap_or([0; 2]),
+        ) as usize;
 
         let name_start = offset + 46;
         let name_end = name_start + fname_len;
@@ -156,10 +166,8 @@ async fn inspect_zip(
 
     let cd_entry_count =
         u16::from_le_bytes(eocd[10..12].try_into().context("EOCD parse error")?) as u64;
-    let cd_size =
-        u32::from_le_bytes(eocd[12..16].try_into().context("EOCD parse error")?) as u64;
-    let cd_offset =
-        u32::from_le_bytes(eocd[16..20].try_into().context("EOCD parse error")?) as u64;
+    let cd_size = u32::from_le_bytes(eocd[12..16].try_into().context("EOCD parse error")?) as u64;
+    let cd_offset = u32::from_le_bytes(eocd[16..20].try_into().context("EOCD parse error")?) as u64;
 
     if cd_entry_count == 0 || cd_size == 0 {
         return Ok(Vec::new());
@@ -258,14 +266,11 @@ async fn extract_from_zip(
         .await
         .context("Failed to fetch ZIP tail")?;
 
-    let eocd_offset =
-        find_eocd(&tail).context("Could not find ZIP End-of-Central-Directory")?;
+    let eocd_offset = find_eocd(&tail).context("Could not find ZIP End-of-Central-Directory")?;
 
     let eocd = &tail[eocd_offset..];
-    let cd_size =
-        u32::from_le_bytes(eocd[12..16].try_into().context("EOCD parse error")?) as u64;
-    let cd_offset =
-        u32::from_le_bytes(eocd[16..20].try_into().context("EOCD parse error")?) as u64;
+    let cd_size = u32::from_le_bytes(eocd[12..16].try_into().context("EOCD parse error")?) as u64;
+    let cd_offset = u32::from_le_bytes(eocd[16..20].try_into().context("EOCD parse error")?) as u64;
 
     let cd_data = client
         .fetch_range(bucket_key, object_key, cd_offset, cd_offset + cd_size - 1)
@@ -316,8 +321,7 @@ async fn extract_from_zip(
                 .await
                 .context("Failed to fetch local file header")?;
 
-            let lh_sig =
-                u32::from_le_bytes(lh_data[0..4].try_into().context("Local header sig")?);
+            let lh_sig = u32::from_le_bytes(lh_data[0..4].try_into().context("Local header sig")?);
             if lh_sig != LOCAL_FILE_SIG {
                 anyhow::bail!("Invalid local file header signature");
             }
@@ -437,9 +441,7 @@ fn detect_archive_type(object_key: &str) -> Result<ArchiveType> {
     } else if lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
         Ok(ArchiveType::TarGz)
     } else {
-        anyhow::bail!(
-            "Unsupported archive format. Object key must end with .zip, .tar.gz, or .tgz"
-        )
+        anyhow::bail!("Unsupported archive format. Object key must end with .zip, .tar.gz, or .tgz")
     }
 }
 

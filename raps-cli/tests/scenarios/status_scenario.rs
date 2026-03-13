@@ -18,8 +18,8 @@ async fn test_status_json_shows_auth_and_hubs() {
 async fn test_status_no_credentials_does_not_panic() {
     let (server, mut cmd) = start_cli_test().await;
     cmd.env_remove("APS_CLIENT_ID")
-       .env_remove("APS_CLIENT_SECRET")
-       .env("APS_BASE_URL", &server.url);
+        .env_remove("APS_CLIENT_SECRET")
+        .env("APS_BASE_URL", &server.url);
 
     cmd.args(["status", "--output", "json", "--non-interactive"])
         .assert()

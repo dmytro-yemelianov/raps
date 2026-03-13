@@ -5,9 +5,9 @@
 
 use anyhow::{Context, Result};
 
-use raps_kernel::error::RapsError;
 use crate::types::*;
 use crate::{DataManagementClient, MAX_PAGINATION_PAGES};
+use raps_kernel::error::RapsError;
 
 impl DataManagementClient {
     // ── AEC Data Model GraphQL methods ──

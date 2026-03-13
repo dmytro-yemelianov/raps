@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::super::*;
 use crate::commands::dashboard::traits::DashboardResource;
-use ratatui::{layout::Constraint, widgets::{Cell, Row}};
+use ratatui::{
+    layout::Constraint,
+    widgets::{Cell, Row},
+};
 
 #[derive(Debug, Clone)]
 pub struct HubList {
@@ -37,15 +40,20 @@ impl DashboardResource for HubList {
             return self.rows.len();
         }
         let filter = filter.to_lowercase();
-        self.rows.iter().filter(|r| r.name.to_lowercase().contains(&filter)).count()
+        self.rows
+            .iter()
+            .filter(|r| r.name.to_lowercase().contains(&filter))
+            .count()
     }
 
     fn get_row(&self, index: usize, filter: &str) -> Option<Row<'_>> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&HubRow> = self.rows.iter()
+        let filtered: Vec<&HubRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
             .collect();
-        
+
         filtered.get(index).map(|r| {
             Row::new(vec![
                 Cell::from(r.name.as_str()),
@@ -57,13 +65,22 @@ impl DashboardResource for HubList {
 
     fn get_id(&self, index: usize, filter: &str) -> Option<String> {
         let filter = filter.to_lowercase();
-        let filtered: Vec<&HubRow> = self.rows.iter()
+        let filtered: Vec<&HubRow> = self
+            .rows
+            .iter()
             .filter(|r| filter.is_empty() || r.name.to_lowercase().contains(&filter))
             .collect();
         filtered.get(index).map(|r| r.id.clone())
     }
 
-    fn handle_enter(&self, index: usize, filter: &str, app: &mut App, clients: &Arc<Clients>, tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>) {
+    fn handle_enter(
+        &self,
+        index: usize,
+        filter: &str,
+        app: &mut App,
+        clients: &Arc<Clients>,
+        tx: &tokio::sync::mpsc::UnboundedSender<BackgroundMsg>,
+    ) {
         if let Some(id) = self.get_id(index, filter) {
             app.hub_context = Some(id.clone());
             app.push_view(ViewKind::ProjectList { hub_id: id });

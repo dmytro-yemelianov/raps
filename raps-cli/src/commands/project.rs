@@ -81,8 +81,7 @@ async fn list_projects(
     // Get hub ID interactively if not provided
     let hub = match hub_id {
         Some(h) => {
-            validate_resource_id(&h)
-                .with_context(|| format!("Invalid hub ID: {:?}", h))?;
+            validate_resource_id(&h).with_context(|| format!("Invalid hub ID: {:?}", h))?;
             h
         }
         None => interactive::prompt_for_hub(client).await?,
@@ -90,8 +89,13 @@ async fn list_projects(
 
     // BIM 360 hub → use Admin API
     if let Some(account_id) = bim360_account_id(&hub) {
-        return list_projects_admin(config.clone(), auth_client.clone(), &account_id, output_format)
-            .await;
+        return list_projects_admin(
+            config.clone(),
+            auth_client.clone(),
+            &account_id,
+            output_format,
+        )
+        .await;
     }
 
     let projects = tracked_op("Fetching projects", output_format, || async {
@@ -234,8 +238,7 @@ async fn project_info(
 ) -> Result<()> {
     let hub_id = match opt_hub_id {
         Some(h) => {
-            validate_resource_id(h)
-                .with_context(|| format!("Invalid hub ID: {:?}", h))?;
+            validate_resource_id(h).with_context(|| format!("Invalid hub ID: {:?}", h))?;
             h.clone()
         }
         None => interactive::prompt_for_hub(client).await?,
@@ -243,8 +246,7 @@ async fn project_info(
 
     let project_id = match opt_project_id {
         Some(p) => {
-            validate_resource_id(p)
-                .with_context(|| format!("Invalid project ID: {:?}", p))?;
+            validate_resource_id(p).with_context(|| format!("Invalid project ID: {:?}", p))?;
             p.clone()
         }
         None => interactive::prompt_for_project(client, &hub_id).await?,

@@ -30,12 +30,24 @@ pub fn scan_file(path: &Path) -> Result<Vec<SecretMatch>> {
     let content: String = content.chars().take(100 * 1024).collect();
 
     let patterns: &[(&str, &str)] = &[
-        ("APS Client Secret", r"(?i)aps[_-]?client[_-]?secret\s*[=:]\s*\S{8,}"),
-        ("Generic API Key",   r"(?i)api[_-]?key\s*[=:]\s*[A-Za-z0-9_\-]{16,}"),
-        ("AWS Access Key",    r"AKIA[0-9A-Z]{16}"),
-        ("Private Key",       r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-        ("Password in env",   r"(?i)(password|passwd|secret|token)\s*[=:]\s*\S{6,}"),
-        ("GitHub Token",      r"gh[pousr]_[A-Za-z0-9]{36,}"),
+        (
+            "APS Client Secret",
+            r"(?i)aps[_-]?client[_-]?secret\s*[=:]\s*\S{8,}",
+        ),
+        (
+            "Generic API Key",
+            r"(?i)api[_-]?key\s*[=:]\s*[A-Za-z0-9_\-]{16,}",
+        ),
+        ("AWS Access Key", r"AKIA[0-9A-Z]{16}"),
+        (
+            "Private Key",
+            r"-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----",
+        ),
+        (
+            "Password in env",
+            r"(?i)(password|passwd|secret|token)\s*[=:]\s*\S{6,}",
+        ),
+        ("GitHub Token", r"gh[pousr]_[A-Za-z0-9]{36,}"),
     ];
 
     let mut matches = Vec::new();

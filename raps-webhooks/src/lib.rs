@@ -647,11 +647,7 @@ mod integration_tests {
                 Some("urn:adsk.wipprod:fs.folder:test-folder"),
             )
             .await;
-        assert!(
-            result.is_ok(),
-            "create_webhook failed: {:?}",
-            result.err()
-        );
+        assert!(result.is_ok(), "create_webhook failed: {:?}", result.err());
         let webhook = result.unwrap();
         assert!(!webhook.hook_id.is_empty());
         assert_eq!(webhook.status, "active");
@@ -709,8 +705,14 @@ mod integration_tests {
         );
         let body: serde_json::Value = resp.json().await.unwrap();
         let data = body["data"].as_array().expect("data should be an array");
-        assert!(!data.is_empty(), "webhook list should not be empty after create");
-        assert!(data[0]["hookId"].is_string(), "each webhook should have hookId");
+        assert!(
+            !data.is_empty(),
+            "webhook list should not be empty after create"
+        );
+        assert!(
+            data[0]["hookId"].is_string(),
+            "each webhook should have hookId"
+        );
     }
 
     #[tokio::test]
@@ -801,9 +803,7 @@ mod integration_tests {
             .unwrap();
         let list_body: serde_json::Value = list_resp.json().await.unwrap();
         let hooks = list_body["data"].as_array().unwrap();
-        let has_hook = hooks
-            .iter()
-            .any(|h| h["hookId"].as_str() == Some(&hook_id));
+        let has_hook = hooks.iter().any(|h| h["hookId"].as_str() == Some(&hook_id));
         assert!(has_hook, "created hook should appear in list");
 
         // Delete
@@ -858,8 +858,15 @@ mod integration_tests {
         .await;
 
         let result = client.list_all_webhooks().await;
-        assert!(result.is_ok(), "list_all_webhooks failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "list_all_webhooks failed: {:?}",
+            result.err()
+        );
         let webhooks = result.unwrap();
-        assert!(!webhooks.is_empty(), "all-webhooks list should not be empty");
+        assert!(
+            !webhooks.is_empty(),
+            "all-webhooks list should not be empty"
+        );
     }
 }

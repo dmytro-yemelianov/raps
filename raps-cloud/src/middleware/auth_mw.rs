@@ -9,7 +9,7 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::{auth, error::ApiError, AppState};
+use crate::{AppState, auth, error::ApiError};
 
 /// Authenticated user info attached to request extensions.
 #[derive(Debug, Clone)]

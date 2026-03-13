@@ -4,8 +4,8 @@
 //!   1. DELETE /projects/proj-001/users/user-001
 //!   (proj-002 skipped: alice is not a member there)
 
-use raps_admin::{BulkConfig, bulk_remove_user};
 use raps_admin::filter::ProjectFilter;
+use raps_admin::{BulkConfig, bulk_remove_user};
 use raps_mock::TestServer;
 
 use crate::test_utils::{inject_token, make_clients};
@@ -50,7 +50,10 @@ async fn test_remove_user_dry_run_sends_no_delete() {
         "mock-account-001",
         "alice@example.com",
         &ProjectFilter::new(),
-        BulkConfig { dry_run: true, ..Default::default() },
+        BulkConfig {
+            dry_run: true,
+            ..Default::default()
+        },
         |_| {},
     )
     .await

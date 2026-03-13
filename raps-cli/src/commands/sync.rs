@@ -52,8 +52,8 @@ fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut stack = vec![dir.to_path_buf()];
 
     while let Some(current) = stack.pop() {
-        let entries =
-            std::fs::read_dir(&current).with_context(|| format!("Cannot read dir: {}", current.display()))?;
+        let entries = std::fs::read_dir(&current)
+            .with_context(|| format!("Cannot read dir: {}", current.display()))?;
         for entry in entries {
             let entry = entry.context("Failed to read directory entry")?;
             let path = entry.path();
@@ -70,7 +70,8 @@ fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>> {
 
 /// Compute SHA-1 of a local file.
 fn sha1_of_file(path: &Path) -> Result<String> {
-    let bytes = std::fs::read(path).with_context(|| format!("Cannot read file: {}", path.display()))?;
+    let bytes =
+        std::fs::read(path).with_context(|| format!("Cannot read file: {}", path.display()))?;
     let mut hasher = Sha1::new();
     hasher.update(&bytes);
     Ok(hex::encode(hasher.finalize()))
@@ -183,10 +184,7 @@ pub async fn execute(client: &OssClient, args: SyncArgs) -> Result<()> {
             if args.checksum {
                 // Compare SHA-1
                 let local_sha1 = sha1_of_file(abs_path)?;
-                let remote_sha1_lower = remote_sha1
-                    .as_deref()
-                    .unwrap_or("")
-                    .to_lowercase();
+                let remote_sha1_lower = remote_sha1.as_deref().unwrap_or("").to_lowercase();
                 if local_sha1.to_lowercase() == remote_sha1_lower && !remote_sha1_lower.is_empty() {
                     FileAction::Skip
                 } else {
@@ -220,20 +218,11 @@ pub async fn execute(client: &OssClient, args: SyncArgs) -> Result<()> {
 
         match action {
             FileAction::Upload { ref reason } => {
-                println!(
-                    "{} {:<40} ({})",
-                    "↑".green().bold(),
-                    display_name,
-                    reason
-                );
+                println!("{} {:<40} ({})", "↑".green().bold(), display_name, reason);
                 to_upload.push((remote_key, abs_path.clone(), reason.clone()));
             }
             FileAction::Skip => {
-                println!(
-                    "{} {:<40} (unchanged, skipped)",
-                    "=".dimmed(),
-                    display_name
-                );
+                println!("{} {:<40} (unchanged, skipped)", "=".dimmed(), display_name);
                 skipped += 1;
             }
         }
@@ -262,11 +251,7 @@ pub async fn execute(client: &OssClient, args: SyncArgs) -> Result<()> {
 
     for key in &to_delete {
         let name = key.rsplit('/').next().unwrap_or(key);
-        println!(
-            "{} {:<40} (deleted)",
-            "x".red().bold(),
-            name
-        );
+        println!("{} {:<40} (deleted)", "x".red().bold(), name);
     }
 
     // Summary line before executing
@@ -298,9 +283,7 @@ pub async fn execute(client: &OssClient, args: SyncArgs) -> Result<()> {
             let bucket = bucket.clone();
 
             let handle = tokio::spawn(async move {
-                let result = client
-                    .upload_object(&bucket, &remote_key, &abs_path)
-                    .await;
+                let result = client.upload_object(&bucket, &remote_key, &abs_path).await;
                 drop(permit);
                 (remote_key, result)
             });

@@ -460,7 +460,11 @@ mod tests {
         let err = anyhow::Error::new(RapsError::AuthFailure("Expired".to_string()));
         assert_eq!(ExitCode::from_error(&err), ExitCode::AuthFailure);
 
-        let err = anyhow::Error::new(RapsError::ApiError(500, "Internal Server Error".to_string(), None));
+        let err = anyhow::Error::new(RapsError::ApiError(
+            500,
+            "Internal Server Error".to_string(),
+            None,
+        ));
         assert_eq!(ExitCode::from_error(&err), ExitCode::RemoteError);
 
         let err = anyhow::Error::new(RapsError::ApiError(403, "Forbidden".to_string(), None));

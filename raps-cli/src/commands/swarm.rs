@@ -917,7 +917,14 @@ mod tests {
     #[test]
     fn test_swarm_reset_target_matching() {
         // Test the pattern matching logic from swarm_reset
-        let valid_targets = ["circuit-breakers", "cb", "cache", "rate-budgets", "rb", "all"];
+        let valid_targets = [
+            "circuit-breakers",
+            "cb",
+            "cache",
+            "rate-budgets",
+            "rb",
+            "all",
+        ];
         for target in valid_targets {
             let is_valid = matches!(
                 target,
@@ -925,7 +932,10 @@ mod tests {
             );
             assert!(is_valid, "target '{}' should be valid", target);
         }
-        assert!(!matches!("invalid", "circuit-breakers" | "cb" | "cache" | "rate-budgets" | "rb" | "all"));
+        assert!(!matches!(
+            "invalid",
+            "circuit-breakers" | "cb" | "cache" | "rate-budgets" | "rb" | "all"
+        ));
     }
 }
 

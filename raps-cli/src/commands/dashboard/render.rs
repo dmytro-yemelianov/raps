@@ -102,34 +102,104 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
 
     match data {
         ResourceData::Buckets(b) => {
-            render_resource_table(f, inner, b, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                b,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Objects(o) => {
-            render_resource_table(f, inner, o, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                o,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Hubs(h) => {
-            render_resource_table(f, inner, h, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                h,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Projects(p) => {
-            render_resource_table(f, inner, p, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                p,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::FolderContents(folders) => {
-            render_resource_table(f, inner, folders, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                folders,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Issues(i) => {
-            render_resource_table(f, inner, i, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                i,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Rfis(r) => {
-            render_resource_table(f, inner, r, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                r,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Assets(a) => {
-            render_resource_table(f, inner, a, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                a,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Submittals(s) => {
-            render_resource_table(f, inner, s, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                s,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Checklists(c) => {
-            render_resource_table(f, inner, c, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                c,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::IssueComments(rows) => {
             let filtered: Vec<&IssueCommentRow> = rows
@@ -201,28 +271,84 @@ fn render_main_content(f: &mut Frame, app: &mut App, area: Rect) {
             );
         }
         ResourceData::Engines(e) => {
-            render_resource_table(f, inner, e, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                e,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Activities(a) => {
-            render_resource_table(f, inner, a, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                a,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::WorkItems(w) => {
-            render_resource_table(f, inner, w, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                w,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::AppBundles(b) => {
-            render_resource_table(f, inner, b, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                b,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Derivatives(d) => {
-            render_resource_table(f, inner, d, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                d,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Webhooks(w) => {
-            render_resource_table(f, inner, w, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                w,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Photoscenes(p) => {
-            render_resource_table(f, inner, p, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                p,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         ResourceData::Logs(l) => {
-            render_resource_table(f, inner, l, &filter, &mut app.table_state, &app.selected_ids);
+            render_resource_table(
+                f,
+                inner,
+                l,
+                &filter,
+                &mut app.table_state,
+                &app.selected_ids,
+            );
         }
         // Detail views (key-value)
         ResourceData::BucketDetail(fields)
@@ -291,7 +417,11 @@ fn render_resource_table(
             let mut row = res.get_row(i, filter)?;
             if let Some(id) = res.get_id(i, filter) {
                 if selected_ids.contains(&id) {
-                    row = row.style(Style::default().fg(Color::Green).add_modifier(Modifier::BOLD));
+                    row = row.style(
+                        Style::default()
+                            .fg(Color::Green)
+                            .add_modifier(Modifier::BOLD),
+                    );
                 }
             }
             Some(row)
@@ -548,5 +678,7 @@ fn shortcut_hints(app: &App) -> String {
         _ => "",
     };
 
-    format!("{tab_hint}Enter:Open  Space:Select  Esc:Back  /:Filter  m:Mark  ':Jump  y:Copy  ?:Help")
+    format!(
+        "{tab_hint}Enter:Open  Space:Select  Esc:Back  /:Filter  m:Mark  ':Jump  y:Copy  ?:Help"
+    )
 }

@@ -46,9 +46,13 @@ fn test_admin_operation_list_empty_json() {
 fn test_admin_operation_list_filter_status_empty() {
     let (mut cmd, _tmp) = raps_with_isolated_home();
     cmd.args([
-        "admin", "operation", "list",
-        "--status", "completed",
-        "--output", "json",
+        "admin",
+        "operation",
+        "list",
+        "--status",
+        "completed",
+        "--output",
+        "json",
     ])
     .assert()
     .success()
@@ -60,9 +64,13 @@ fn test_admin_operation_list_filter_status_empty() {
 fn test_admin_operation_list_with_limit_yaml() {
     let (mut cmd, _tmp) = raps_with_isolated_home();
     cmd.args([
-        "admin", "operation", "list",
-        "--limit", "5",
-        "--output", "yaml",
+        "admin",
+        "operation",
+        "list",
+        "--limit",
+        "5",
+        "--output",
+        "yaml",
     ])
     .assert()
     .success();
@@ -85,8 +93,11 @@ fn test_admin_operation_status_no_ops_fails() {
 fn test_admin_operation_status_unknown_id_fails() {
     let (mut cmd, _tmp) = raps_with_isolated_home();
     cmd.args([
-        "admin", "operation", "status",
-        "--operation-id", "00000000-0000-0000-0000-000000000000",
+        "admin",
+        "operation",
+        "status",
+        "--operation-id",
+        "00000000-0000-0000-0000-000000000000",
     ])
     .assert()
     .failure()
@@ -110,8 +121,11 @@ fn test_admin_operation_resume_no_ops_fails() {
 fn test_admin_operation_resume_unknown_id_fails() {
     let (mut cmd, _tmp) = raps_with_isolated_home();
     cmd.args([
-        "admin", "operation", "resume",
-        "--operation-id", "00000000-0000-0000-0000-000000000001",
+        "admin",
+        "operation",
+        "resume",
+        "--operation-id",
+        "00000000-0000-0000-0000-000000000001",
     ])
     .assert()
     .failure()
@@ -135,8 +149,11 @@ fn test_admin_operation_cancel_no_ops_fails() {
 fn test_admin_operation_cancel_unknown_id_fails() {
     let (mut cmd, _tmp) = raps_with_isolated_home();
     cmd.args([
-        "admin", "operation", "cancel",
-        "--operation-id", "00000000-0000-0000-0000-000000000002",
+        "admin",
+        "operation",
+        "cancel",
+        "--operation-id",
+        "00000000-0000-0000-0000-000000000002",
         "--yes",
     ])
     .assert()

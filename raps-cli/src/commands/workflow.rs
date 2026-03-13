@@ -54,11 +54,7 @@ pub enum WorkflowCommands {
 }
 
 impl WorkflowCommands {
-    pub async fn execute(
-        self,
-        config: &Config,
-        output_format: OutputFormat,
-    ) -> Result<()> {
+    pub async fn execute(self, config: &Config, output_format: OutputFormat) -> Result<()> {
         match self {
             WorkflowCommands::Run {
                 file,
@@ -124,12 +120,18 @@ async fn run_workflow(
                 .unwrap_or_default()
         );
         if skip_existing {
-            println!("     {} skip if identical object already exists", "->".dimmed());
+            println!(
+                "     {} skip if identical object already exists",
+                "->".dimmed()
+            );
         }
         println!(
             "  {} Start translation (format: {})",
             "2.".bold(),
-            translation_format.as_deref().unwrap_or("auto-detect").cyan()
+            translation_format
+                .as_deref()
+                .unwrap_or("auto-detect")
+                .cyan()
         );
         println!(
             "     {} poll every {}s, timeout {}s",
@@ -170,9 +172,7 @@ async fn run_workflow(
         None => {
             let buckets = oss_client.list_buckets().await?;
             if buckets.is_empty() {
-                anyhow::bail!(
-                    "No buckets found. Create a bucket first using 'raps bucket create'"
-                );
+                anyhow::bail!("No buckets found. Create a bucket first using 'raps bucket create'");
             }
             // Use first bucket when non-interactive; raps_kernel::prompts would block in CI
             let keys: Vec<String> = buckets.iter().map(|b| b.bucket_key.clone()).collect();
@@ -267,10 +267,10 @@ async fn run_workflow(
                 .unwrap_or("")
                 .to_lowercase();
             let fmt = match ext.as_str() {
-                "rvt" | "rfa" | "rte" | "rft" | "dwg" | "dxf" | "dwf" | "dwfx"
-                | "ipt" | "iam" | "ipn" | "ide" | "nwd" | "nwc" | "nwf" | "max"
-                | "3ds" | "ifc" | "ifczip" | "stp" | "step" | "ste" | "sat" | "sab"
-                | "obj" | "stl" | "fbx" | "gltf" | "glb" => "svf2",
+                "rvt" | "rfa" | "rte" | "rft" | "dwg" | "dxf" | "dwf" | "dwfx" | "ipt" | "iam"
+                | "ipn" | "ide" | "nwd" | "nwc" | "nwf" | "max" | "3ds" | "ifc" | "ifczip"
+                | "stp" | "step" | "ste" | "sat" | "sab" | "obj" | "stl" | "fbx" | "gltf"
+                | "glb" => "svf2",
                 _ => "svf2",
             };
             if output_format.supports_colors() {
@@ -338,11 +338,7 @@ async fn run_workflow(
                 break;
             }
             "failed" | "timeout" => {
-                spinner.finish_with_message(format!(
-                    "{} Translation {}",
-                    "X".red().bold(),
-                    status
-                ));
+                spinner.finish_with_message(format!("{} Translation {}", "X".red().bold(), status));
                 anyhow::bail!("Translation failed with status: {}", status);
             }
             _ => {
@@ -388,8 +384,7 @@ async fn run_workflow(
             let mut downloaded_count = 0usize;
 
             for derivative in &derivatives {
-                let file_path =
-                    raps_kernel::security::safe_join(out_dir, &derivative.name)?;
+                let file_path = raps_kernel::security::safe_join(out_dir, &derivative.name)?;
                 match derivative_client
                     .download_derivative(&response.urn, &derivative.urn, &file_path)
                     .await

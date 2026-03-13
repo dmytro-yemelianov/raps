@@ -24,9 +24,7 @@ pub struct RateLimitState {
 impl RateLimitState {
     /// Parse rate-limit headers from a response header map.
     pub fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
-        let get = |name: &str| -> Option<u64> {
-            headers.get(name)?.to_str().ok()?.parse().ok()
-        };
+        let get = |name: &str| -> Option<u64> { headers.get(name)?.to_str().ok()?.parse().ok() };
         Self {
             limit: get("x-ratelimit-limit"),
             remaining: get("x-ratelimit-remaining"),
@@ -77,10 +75,7 @@ mod tests {
             "x-ratelimit-remaining",
             HeaderValue::from_str(remaining).unwrap(),
         );
-        h.insert(
-            "x-ratelimit-limit",
-            HeaderValue::from_str(limit).unwrap(),
-        );
+        h.insert("x-ratelimit-limit", HeaderValue::from_str(limit).unwrap());
         h.insert(
             "x-ratelimit-reset",
             HeaderValue::from_str(reset_at).unwrap(),

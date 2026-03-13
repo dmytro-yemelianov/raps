@@ -475,8 +475,7 @@ async fn delete_bucket(
     // Get bucket key interactively if not provided
     let key = match bucket_key {
         Some(k) => {
-            validate_resource_id(&k)
-                .with_context(|| format!("Invalid bucket key: {:?}", k))?;
+            validate_resource_id(&k).with_context(|| format!("Invalid bucket key: {:?}", k))?;
             k
         }
         None => {

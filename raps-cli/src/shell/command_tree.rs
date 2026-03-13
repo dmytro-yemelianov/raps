@@ -804,7 +804,10 @@ mod tests {
         assert!(names.contains(&"auth"), "should have auth command");
         assert!(names.contains(&"bucket"), "should have bucket command");
         assert!(names.contains(&"object"), "should have object command");
-        assert!(names.contains(&"translate"), "should have translate command");
+        assert!(
+            names.contains(&"translate"),
+            "should have translate command"
+        );
         assert!(names.contains(&"help"), "should have help command");
         assert!(names.contains(&"exit"), "should have exit command");
     }
@@ -823,8 +826,15 @@ mod tests {
     fn test_build_command_tree_bucket_has_params() {
         let tree = build_command_tree();
         let bucket = tree.iter().find(|c| c.name == "bucket").unwrap();
-        let create = bucket.subcommands.iter().find(|c| c.name == "create").unwrap();
-        assert!(!create.params.is_empty(), "bucket create should have params");
+        let create = bucket
+            .subcommands
+            .iter()
+            .find(|c| c.name == "create")
+            .unwrap();
+        assert!(
+            !create.params.is_empty(),
+            "bucket create should have params"
+        );
     }
 
     #[test]
@@ -851,7 +861,11 @@ mod tests {
         let tree = build_command_tree();
         let mut seen = std::collections::HashSet::new();
         for cmd in &tree {
-            assert!(seen.insert(cmd.name), "duplicate top-level command: {}", cmd.name);
+            assert!(
+                seen.insert(cmd.name),
+                "duplicate top-level command: {}",
+                cmd.name
+            );
             let mut sub_seen = std::collections::HashSet::new();
             for sub in cmd.subcommands {
                 assert!(

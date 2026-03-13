@@ -3,10 +3,10 @@
 
 //! Auth routes (signup + login)
 
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
-use crate::{auth, db, error::ApiError, response::ApiResponse, AppState};
+use crate::{AppState, auth, db, error::ApiError, response::ApiResponse};
 
 #[derive(Deserialize)]
 pub struct SignupRequest {
@@ -36,21 +36,35 @@ pub async fn signup(
         return Err(ApiError::BadRequest("Invalid email address".to_string()));
     }
     if req.password.len() < 8 {
-        return Err(ApiError::BadRequest("Password must be at least 8 characters".to_string()));
+        return Err(ApiError::BadRequest(
+            "Password must be at least 8 characters".to_string(),
+        ));
     }
     if req.org_name.is_empty() || req.org_name.len() > 100 {
-        return Err(ApiError::BadRequest("Organization name must be 1-100 characters".to_string()));
+        return Err(ApiError::BadRequest(
+            "Organization name must be 1-100 characters".to_string(),
+        ));
     }
 
     // Create slug from org name
-    let slug: String = req.org_name.to_lowercase()
+    let slug: String = req
+        .org_name
+        .to_lowercase()
         .chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' { c } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .to_string();
     if slug.is_empty() {
-        return Err(ApiError::BadRequest("Organization name must contain alphanumeric characters".to_string()));
+        return Err(ApiError::BadRequest(
+            "Organization name must contain alphanumeric characters".to_string(),
+        ));
     }
 
     // Create tenant
@@ -65,27 +79,38 @@ pub async fn signup(
         })?;
 
     // Hash password and create user
-    let password_hash = auth::hash_password(&req.password)
-        .map_err(|e| ApiError::Internal(e))?;
-    let user = db::users::create(&state.db, tenant.id, &req.email, &password_hash, None, "owner")
-        .await
-        .map_err(|e| ApiError::Internal(e))?;
+    let password_hash = auth::hash_password(&req.password).map_err(|e| ApiError::Internal(e))?;
+    let user = db::users::create(
+        &state.db,
+        tenant.id,
+        &req.email,
+        &password_hash,
+        None,
+        "owner",
+    )
+    .await
+    .map_err(|e| ApiError::Internal(e))?;
 
     // Generate JWT
     let claims = auth::Claims {
         sub: user.id,
         tenant_id: tenant.id,
         role: user.role.clone(),
-        exp: (chrono::Utc::now() + chrono::Duration::seconds(state.config.jwt_expiry_seconds as i64)).timestamp() as usize,
+        exp: (chrono::Utc::now()
+            + chrono::Duration::seconds(state.config.jwt_expiry_seconds as i64))
+        .timestamp() as usize,
     };
-    let token = auth::encode_jwt(&state.config.jwt_secret, &claims)
-        .map_err(|e| ApiError::Internal(e))?;
+    let token =
+        auth::encode_jwt(&state.config.jwt_secret, &claims).map_err(|e| ApiError::Internal(e))?;
 
-    Ok((StatusCode::CREATED, ApiResponse::ok(AuthResponse {
-        token,
-        user_id: user.id,
-        tenant_id: tenant.id,
-    })))
+    Ok((
+        StatusCode::CREATED,
+        ApiResponse::ok(AuthResponse {
+            token,
+            user_id: user.id,
+            tenant_id: tenant.id,
+        }),
+    ))
 }
 
 pub async fn login(
@@ -107,10 +132,12 @@ pub async fn login(
         sub: user.id,
         tenant_id: user.tenant_id,
         role: user.role.clone(),
-        exp: (chrono::Utc::now() + chrono::Duration::seconds(state.config.jwt_expiry_seconds as i64)).timestamp() as usize,
+        exp: (chrono::Utc::now()
+            + chrono::Duration::seconds(state.config.jwt_expiry_seconds as i64))
+        .timestamp() as usize,
     };
-    let token = auth::encode_jwt(&state.config.jwt_secret, &claims)
-        .map_err(|e| ApiError::Internal(e))?;
+    let token =
+        auth::encode_jwt(&state.config.jwt_secret, &claims).map_err(|e| ApiError::Internal(e))?;
 
     Ok(ApiResponse::ok(AuthResponse {
         token,

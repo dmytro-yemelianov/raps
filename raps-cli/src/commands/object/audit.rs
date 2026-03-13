@@ -184,12 +184,14 @@ pub(super) async fn audit_bucket(
     }
 
     // Sort stale candidates: known-age first (oldest first), then unknowns
-    stale_candidates.sort_by(|a, b| match (a.days_since_modified, b.days_since_modified) {
-        (Some(da), Some(db)) => db.cmp(&da),
-        (Some(_), None) => std::cmp::Ordering::Less,
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-        (None, None) => a.object_key.cmp(&b.object_key),
-    });
+    stale_candidates.sort_by(
+        |a, b| match (a.days_since_modified, b.days_since_modified) {
+            (Some(da), Some(db)) => db.cmp(&da),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.object_key.cmp(&b.object_key),
+        },
+    );
 
     let report = AuditReport {
         bucket: bucket.clone(),
@@ -318,10 +320,7 @@ fn print_table(r: &AuditReport) {
             .bold()
             .yellow()
         );
-        println!(
-            "  {:<12}  {:>8}  {}",
-            "Days Old", "Size", "Key"
-        );
+        println!("  {:<12}  {:>8}  {}", "Days Old", "Size", "Key");
         println!("  {}", "-".repeat(60));
         for obj in r.stale_candidates.iter().take(20) {
             let days_str = obj
@@ -349,14 +348,18 @@ fn print_csv(r: &AuditReport) -> Result<()> {
     let mut wtr = csv::Writer::from_writer(std::io::stdout());
     wtr.write_record(["section", "key", "value"])?;
     wtr.write_record(["summary", "total_objects", &r.total_objects.to_string()])?;
-    wtr.write_record(["summary", "total_size_bytes", &r.total_size_bytes.to_string()])?;
-    wtr.write_record(["summary", "average_size_bytes", &r.average_size_bytes.to_string()])?;
+    wtr.write_record([
+        "summary",
+        "total_size_bytes",
+        &r.total_size_bytes.to_string(),
+    ])?;
+    wtr.write_record([
+        "summary",
+        "average_size_bytes",
+        &r.average_size_bytes.to_string(),
+    ])?;
     for obj in &r.largest_objects {
-        wtr.write_record([
-            "largest",
-            &obj.object_key,
-            &obj.size_bytes.to_string(),
-        ])?;
+        wtr.write_record(["largest", &obj.object_key, &obj.size_bytes.to_string()])?;
     }
     for g in &r.by_extension {
         wtr.write_record([
@@ -389,8 +392,7 @@ fn extract_date_from_key(key: &str) -> Option<DateTime<Utc>> {
         let y: i32 = cap[1].parse().ok()?;
         let m: u32 = cap[2].parse().ok()?;
         let d: u32 = cap[3].parse().ok()?;
-        let naive = chrono::NaiveDate::from_ymd_opt(y, m, d)?
-            .and_hms_opt(0, 0, 0)?;
+        let naive = chrono::NaiveDate::from_ymd_opt(y, m, d)?.and_hms_opt(0, 0, 0)?;
         return Some(DateTime::from_naive_utc_and_offset(naive, Utc));
     }
 
@@ -402,8 +404,7 @@ fn extract_date_from_key(key: &str) -> Option<DateTime<Utc>> {
         let d: u32 = cap[3].parse().ok()?;
         // Guard against false positives (e.g. UUIDs)
         if m >= 1 && m <= 12 && d >= 1 && d <= 31 {
-            let naive = chrono::NaiveDate::from_ymd_opt(y, m, d)?
-                .and_hms_opt(0, 0, 0)?;
+            let naive = chrono::NaiveDate::from_ymd_opt(y, m, d)?.and_hms_opt(0, 0, 0)?;
             return Some(DateTime::from_naive_utc_and_offset(naive, Utc));
         }
     }

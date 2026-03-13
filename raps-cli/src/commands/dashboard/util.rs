@@ -117,36 +117,16 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
     let filter = app.filter_text.to_lowercase();
 
     match data {
-        ResourceData::Buckets(b) => {
-            b.get_id(sel, &filter)
-        }
-        ResourceData::Objects(o) => {
-            o.get_id(sel, &filter)
-        }
-        ResourceData::Hubs(h) => {
-            h.get_id(sel, &filter)
-        }
-        ResourceData::Projects(p) => {
-            p.get_id(sel, &filter)
-        }
-        ResourceData::FolderContents(f) => {
-            f.get_id(sel, &filter)
-        }
-        ResourceData::Issues(i) => {
-            i.get_id(sel, &filter)
-        }
-        ResourceData::Rfis(r) => {
-            r.get_id(sel, &filter)
-        }
-        ResourceData::Assets(a) => {
-            a.get_id(sel, &filter)
-        }
-        ResourceData::Submittals(s) => {
-            s.get_id(sel, &filter)
-        }
-        ResourceData::Checklists(c) => {
-            c.get_id(sel, &filter)
-        }
+        ResourceData::Buckets(b) => b.get_id(sel, &filter),
+        ResourceData::Objects(o) => o.get_id(sel, &filter),
+        ResourceData::Hubs(h) => h.get_id(sel, &filter),
+        ResourceData::Projects(p) => p.get_id(sel, &filter),
+        ResourceData::FolderContents(f) => f.get_id(sel, &filter),
+        ResourceData::Issues(i) => i.get_id(sel, &filter),
+        ResourceData::Rfis(r) => r.get_id(sel, &filter),
+        ResourceData::Assets(a) => a.get_id(sel, &filter),
+        ResourceData::Submittals(s) => s.get_id(sel, &filter),
+        ResourceData::Checklists(c) => c.get_id(sel, &filter),
         ResourceData::IssueComments(rows) => {
             let filtered: Vec<_> = rows
                 .iter()
@@ -168,30 +148,14 @@ pub(super) fn selected_id(app: &App) -> Option<String> {
                 .collect();
             filtered.get(sel).map(|r| r.id.clone())
         }
-        ResourceData::Engines(e) => {
-            e.get_id(sel, &filter)
-        }
-        ResourceData::Activities(a) => {
-            a.get_id(sel, &filter)
-        }
-        ResourceData::WorkItems(w) => {
-            w.get_id(sel, &filter)
-        }
-        ResourceData::AppBundles(b) => {
-            b.get_id(sel, &filter)
-        }
-        ResourceData::Derivatives(d) => {
-            d.get_id(sel, &filter)
-        }
-        ResourceData::Webhooks(w) => {
-            w.get_id(sel, &filter)
-        }
-        ResourceData::Photoscenes(p) => {
-            p.get_id(sel, &filter)
-        }
-        ResourceData::Logs(l) => {
-            l.get_id(sel, &filter)
-        }
+        ResourceData::Engines(e) => e.get_id(sel, &filter),
+        ResourceData::Activities(a) => a.get_id(sel, &filter),
+        ResourceData::WorkItems(w) => w.get_id(sel, &filter),
+        ResourceData::AppBundles(b) => b.get_id(sel, &filter),
+        ResourceData::Derivatives(d) => d.get_id(sel, &filter),
+        ResourceData::Webhooks(w) => w.get_id(sel, &filter),
+        ResourceData::Photoscenes(p) => p.get_id(sel, &filter),
+        ResourceData::Logs(l) => l.get_id(sel, &filter),
         // Detail views — copy the value of the selected field
         ResourceData::BucketDetail(fields)
         | ResourceData::ObjectDetail(fields)

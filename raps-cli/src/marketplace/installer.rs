@@ -115,9 +115,7 @@ impl PluginInstaller {
     pub async fn install(&self, slug: &str) -> Result<Installation> {
         // Get license key
         let key = MarketplaceAuth::get_license_key()?.ok_or_else(|| {
-            anyhow::anyhow!(
-                "No license key found. Run `raps marketplace license <key>` first."
-            )
+            anyhow::anyhow!("No license key found. Run `raps marketplace license <key>` first.")
         })?;
 
         // Validate license and check entitlement
@@ -131,7 +129,9 @@ impl PluginInstaller {
 
         let platform = detect_platform();
         if platform == "unknown" {
-            anyhow::bail!("Unsupported platform — marketplace plugins are available for linux-x64, darwin-arm64, and win-x64");
+            anyhow::bail!(
+                "Unsupported platform — marketplace plugins are available for linux-x64, darwin-arm64, and win-x64"
+            );
         }
 
         // Download
@@ -157,8 +157,10 @@ impl PluginInstaller {
             if sig_header.is_empty() {
                 anyhow::bail!("Plugin '{}' has no Ed25519 signature", slug);
             }
-            verify_ed25519(ED25519_PUBLIC_KEY_HEX, &bytes, &sig_header)
-                .context(format!("Signature verification failed for plugin '{}'", slug))?;
+            verify_ed25519(ED25519_PUBLIC_KEY_HEX, &bytes, &sig_header).context(format!(
+                "Signature verification failed for plugin '{}'",
+                slug
+            ))?;
         }
 
         // Atomic install

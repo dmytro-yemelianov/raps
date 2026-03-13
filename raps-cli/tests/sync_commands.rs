@@ -20,10 +20,7 @@ fn raps() -> Command {
 
 #[test]
 fn test_sync_help_exits_zero() {
-    raps()
-        .args(["sync", "--help"])
-        .assert()
-        .success();
+    raps().args(["sync", "--help"]).assert().success();
 }
 
 #[test]
@@ -42,7 +39,12 @@ fn test_sync_delete_flag_is_accepted_by_clap() {
     // Passing --delete with a nonexistent dir fails at runtime, not at argument
     // parsing — so the error message must NOT say "unexpected argument".
     let out = raps()
-        .args(["sync", "/nonexistent-dir-raps-test", "my-bucket", "--delete"])
+        .args([
+            "sync",
+            "/nonexistent-dir-raps-test",
+            "my-bucket",
+            "--delete",
+        ])
         .output()
         .unwrap();
 
@@ -60,7 +62,12 @@ fn test_sync_delete_flag_is_accepted_by_clap() {
 #[test]
 fn test_sync_dry_run_flag_is_accepted_by_clap() {
     let out = raps()
-        .args(["sync", "/nonexistent-dir-raps-test", "my-bucket", "--dry-run"])
+        .args([
+            "sync",
+            "/nonexistent-dir-raps-test",
+            "my-bucket",
+            "--dry-run",
+        ])
         .output()
         .unwrap();
 
@@ -74,7 +81,12 @@ fn test_sync_dry_run_flag_is_accepted_by_clap() {
 #[test]
 fn test_sync_checksum_flag_is_accepted_by_clap() {
     let out = raps()
-        .args(["sync", "/nonexistent-dir-raps-test", "my-bucket", "--checksum"])
+        .args([
+            "sync",
+            "/nonexistent-dir-raps-test",
+            "my-bucket",
+            "--checksum",
+        ])
         .output()
         .unwrap();
 
