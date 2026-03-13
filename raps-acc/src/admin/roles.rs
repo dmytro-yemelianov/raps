@@ -32,7 +32,11 @@ impl AccountAdminClient {
 
         match self.list_roles_acc(&account_id).await {
             Ok(roles) => Ok(roles),
-            Err(e) if e.to_string().contains("400") || e.to_string().contains("404") => {
+            Err(e)
+                if e.to_string().contains("400")
+                    || e.to_string().contains("404")
+                    || e.to_string().contains("Not logged in") =>
+            {
                 // BIM 360: roles are per-project (industry_roles endpoint)
                 let pid = if let Some(p) = project_id {
                     p.to_string()
@@ -190,7 +194,11 @@ impl AccountAdminClient {
         account_id: &str,
         project_id: &str,
     ) -> Result<Vec<AccountRole>> {
-        let token = self.auth.get_3leg_token().await?;
+        // BIM 360 HQ v2 works with either 3-legged or 2-legged auth
+        let token = match self.auth.get_3leg_token().await {
+            Ok(t) => t,
+            Err(_) => self.auth.get_token().await?,
+        };
         // BIM 360 industry roles are project-level:
         // GET /hq/v2/accounts/:account_id/projects/:project_id/industry_roles
         let url = format!(

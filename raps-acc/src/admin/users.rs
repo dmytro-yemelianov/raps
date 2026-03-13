@@ -45,29 +45,30 @@ impl AccountAdminClient {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<PaginatedResponse<AccountUser>> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
         let query = Self::build_user_query_params(limit, offset);
 
-        // Try ACC v1 first (3-legged)
-        let url = format!("{}/users{}", self.admin_url(&account_id), query);
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/users{}", self.admin_url(&account_id), query);
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
 
-        if response.status().is_success() {
-            let users_response: PaginatedResponse<AccountUser> = response
-                .json()
-                .await
-                .context("Failed to parse users response")?;
-            return Ok(users_response);
-        }
+            if response.status().is_success() {
+                let users_response: PaginatedResponse<AccountUser> = response
+                    .json()
+                    .await
+                    .context("Failed to parse users response")?;
+                return Ok(users_response);
+            }
 
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (2-legged auth)
@@ -143,40 +144,38 @@ impl AccountAdminClient {
         account_id: &str,
         email: &str,
     ) -> Result<Option<AccountUser>> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
-        // Try ACC v1 first (POST /users/search with JSON body)
-        let url = format!("{}/users/search", self.admin_url(&account_id));
+        // Try ACC v1 first (POST /users/search with JSON body) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/users/search", self.admin_url(&account_id));
 
-        let request_body = serde_json::json!({
-            "email": email
-        });
+            let request_body = serde_json::json!({
+                "email": email
+            });
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client
-                .post(&url)
-                .bearer_auth(&token)
-                .header("Content-Type", "application/json")
-                .json(&request_body)
-        })
-        .await?;
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client
+                    .post(&url)
+                    .bearer_auth(&token)
+                    .header("Content-Type", "application/json")
+                    .json(&request_body)
+            })
+            .await?;
 
-        let status_code = response.status().as_u16();
+            let status_code = response.status().as_u16();
 
-        if response.status().is_success() {
-            let user: AccountUser = response
-                .json()
-                .await
-                .context("Failed to parse user search response")?;
-            return Ok(Some(user));
-        }
+            if response.status().is_success() {
+                let user: AccountUser = response
+                    .json()
+                    .await
+                    .context("Failed to parse user search response")?;
+                return Ok(Some(user));
+            }
 
-        if status_code == 404 {
-            // Could be user-not-found OR endpoint-not-found (BIM 360 hub).
-            // Try BIM 360 fallback before returning None.
-        } else if status_code != 400 {
-            return Err(RapsError::from_response(response).await.into());
+            if status_code != 400 && status_code != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (GET /users/search?email=... with 2-legged auth)
@@ -249,32 +248,33 @@ impl AccountAdminClient {
         user_id: &str,
         request: UpdateAccountUserRequest,
     ) -> Result<AccountUser> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
-        // Try ACC v1 first (3-legged)
-        let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client
-                .patch(&url)
-                .bearer_auth(&token)
-                .header("Content-Type", "application/json")
-                .json(&request)
-        })
-        .await?;
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client
+                    .patch(&url)
+                    .bearer_auth(&token)
+                    .header("Content-Type", "application/json")
+                    .json(&request)
+            })
+            .await?;
 
-        if response.status().is_success() {
-            let user: AccountUser = response
-                .json()
-                .await
-                .context("Failed to parse user update response")?;
-            return Ok(user);
-        }
+            if response.status().is_success() {
+                let user: AccountUser = response
+                    .json()
+                    .await
+                    .context("Failed to parse user update response")?;
+                return Ok(user);
+            }
 
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (2-legged auth)
@@ -336,25 +336,28 @@ impl AccountAdminClient {
     ///
     /// Tries ACC v1 (3-legged) first, falls back to BIM 360 HQ v1 (2-legged).
     pub async fn get_user(&self, account_id: &str, user_id: &str) -> Result<AccountUser> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
-        let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/users/{}", self.admin_url(&account_id), user_id);
 
-        if response.status().is_success() {
-            return response
-                .json()
-                .await
-                .context("Failed to parse user response");
-        }
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
 
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
+            if response.status().is_success() {
+                return response
+                    .json()
+                    .await
+                    .context("Failed to parse user response");
+            }
+
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (2-legged)

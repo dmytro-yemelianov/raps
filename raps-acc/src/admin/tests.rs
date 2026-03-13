@@ -63,6 +63,7 @@ fn test_update_account_user_request_serialization() {
     let request = UpdateAccountUserRequest {
         company_id: Some("comp-123".to_string()),
         company_name: Some("Acme".to_string()),
+        status: None,
     };
     let json = serde_json::to_string(&request).unwrap();
     assert!(json.contains("comp-123"));

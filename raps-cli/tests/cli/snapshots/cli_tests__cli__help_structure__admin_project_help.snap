@@ -15,6 +15,7 @@ Usage: raps admin project [OPTIONS] <COMMAND>
 
 Commands:
   list          List projects with filtering
+  get           Get a project's details
   create        Create a new project
   update        Update an existing project
   archive       Archive a project (sets status to archived)

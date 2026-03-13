@@ -15,6 +15,9 @@ Usage: raps admin user [OPTIONS] <COMMAND>
 
 Commands:
   list                 List users in an account or project
+  create               Create (invite) a user at account level
+  get                  Get a user's details by ID
+  update-account       Update a user at account level (company, status)
   add                  [bulk] Add a user to multiple projects (use add-to-project for a single project)
   remove               [bulk] Remove a user from multiple projects (use remove-from-project for a single project)
   update               [bulk] Update user roles and/or company across multiple projects (use update-in-project for a single project)

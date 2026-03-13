@@ -53,42 +53,50 @@ impl AccountAdminClient {
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> Result<PaginatedResponse<AccountProject>> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
 
-        let mut url = format!("{}/projects", self.admin_url(&account_id));
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let mut url = format!("{}/projects", self.admin_url(&account_id));
 
-        // Build query parameters
-        let mut params = Vec::new();
-        if let Some(l) = limit {
-            params.push(format!("limit={}", l.min(100)));
-        }
-        if let Some(o) = offset {
-            params.push(format!("offset={}", o));
-        }
-        if !params.is_empty() {
-            url = format!("{}?{}", url, params.join("&"));
+            // Build query parameters
+            let mut params = Vec::new();
+            if let Some(l) = limit {
+                params.push(format!("limit={}", l.min(100)));
+            }
+            if let Some(o) = offset {
+                params.push(format!("offset={}", o));
+            }
+            if !params.is_empty() {
+                url = format!("{}?{}", url, params.join("&"));
+            }
+
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
+
+            if response.status().is_success() {
+                let projects_response: PaginatedResponse<AccountProject> = response
+                    .json()
+                    .await
+                    .context("Failed to parse projects response")?;
+                return Ok(projects_response);
+            }
+
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
+
+            // Fall back to BIM 360 HQ v2 (still 3-legged since we have the token)
+            return self
+                .list_projects_bim360(&account_id, &token, limit, offset)
+                .await;
         }
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
-
-        if response.status().is_success() {
-            let projects_response: PaginatedResponse<AccountProject> = response
-                .json()
-                .await
-                .context("Failed to parse projects response")?;
-            return Ok(projects_response);
-        }
-
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
-        }
-
-        // Fall back to BIM 360 HQ v2 (3-legged)
+        // No 3-legged token — try BIM 360 HQ v2 with 2-legged auth
+        let token = self.auth.get_token().await?;
         self.list_projects_bim360(&account_id, &token, limit, offset)
             .await
     }
@@ -157,29 +165,30 @@ impl AccountAdminClient {
     /// * `account_id` - The account ID
     /// * `project_id` - The project ID
     pub async fn get_project(&self, account_id: &str, project_id: &str) -> Result<AccountProject> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
         let project_id = crate::strip_project_prefix(project_id);
 
-        // Try ACC v1 first
-        let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client.get(&url).bearer_auth(&token)
-        })
-        .await?;
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client.get(&url).bearer_auth(&token)
+            })
+            .await?;
 
-        if response.status().is_success() {
-            let project: AccountProject = response
-                .json()
-                .await
-                .context("Failed to parse project response")?;
-            return Ok(project);
-        }
+            if response.status().is_success() {
+                let project: AccountProject = response
+                    .json()
+                    .await
+                    .context("Failed to parse project response")?;
+                return Ok(project);
+            }
 
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (requires 2-legged auth)
@@ -506,33 +515,34 @@ impl AccountAdminClient {
         project_id: &str,
         request: UpdateProjectRequest,
     ) -> Result<AccountProject> {
-        let token = self.auth.get_3leg_token().await?;
         let account_id = normalize_account_id(account_id);
         let project_id = crate::strip_project_prefix(project_id);
 
-        // Try ACC v1 first (3-legged)
-        let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
+        // Try ACC v1 first (3-legged) — skip if not logged in
+        if let Ok(token) = self.auth.get_3leg_token().await {
+            let url = format!("{}/projects/{}", self.admin_url(&account_id), project_id);
 
-        let response = http::send_with_retry(&self.config.http_config, || {
-            self.http_client
-                .patch(&url)
-                .bearer_auth(&token)
-                .header("Content-Type", "application/json")
-                .json(&request)
-        })
-        .await?;
+            let response = http::send_with_retry(&self.config.http_config, || {
+                self.http_client
+                    .patch(&url)
+                    .bearer_auth(&token)
+                    .header("Content-Type", "application/json")
+                    .json(&request)
+            })
+            .await?;
 
-        if response.status().is_success() {
-            let project: AccountProject = response
-                .json()
-                .await
-                .context("Failed to parse project update response")?;
-            return Ok(project);
-        }
+            if response.status().is_success() {
+                let project: AccountProject = response
+                    .json()
+                    .await
+                    .context("Failed to parse project update response")?;
+                return Ok(project);
+            }
 
-        let status = response.status().as_u16();
-        if status != 400 && status != 404 {
-            return Err(RapsError::from_response(response).await.into());
+            let status = response.status().as_u16();
+            if status != 400 && status != 404 {
+                return Err(RapsError::from_response(response).await.into());
+            }
         }
 
         // Fall back to BIM 360 HQ v1 (requires 2-legged auth)

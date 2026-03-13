@@ -118,19 +118,19 @@ pub struct AccountUser {
     #[serde(default)]
     pub name: Option<String>,
     /// User's first name
-    #[serde(default)]
+    #[serde(default, alias = "first_name")]
     pub first_name: Option<String>,
     /// User's last name
-    #[serde(default)]
+    #[serde(default, alias = "last_name")]
     pub last_name: Option<String>,
     /// Company ID if associated
-    #[serde(default)]
+    #[serde(default, alias = "company_id")]
     pub company_id: Option<String>,
     /// User status in the account
     #[serde(default)]
     pub status: Option<String>,
     /// When the user was added to the account
-    #[serde(default)]
+    #[serde(default, alias = "added_on")]
     pub added_on: Option<DateTime<Utc>>,
 }
 

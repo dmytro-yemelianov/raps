@@ -24,7 +24,7 @@ fn test_admin_help() {
         .stdout(predicate::str::contains("folder"))
         .stdout(predicate::str::contains("project"))
         .stdout(predicate::str::contains("operation"))
-        .stdout(predicate::str::contains("company-list"));
+        .stdout(predicate::str::contains("company"));
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn test_admin_operation_help() {
 #[test]
 fn test_admin_company_list_help() {
     raps()
-        .args(["admin", "company-list", "--help"])
+        .args(["admin", "company", "list", "--help"])
         .assert()
         .success()
         .stdout(predicate::str::contains("--account"));
