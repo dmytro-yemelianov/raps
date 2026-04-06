@@ -11,6 +11,9 @@
 export async function verifyHmac(body, signature, secret) {
   if (!signature || !secret) return false;
 
+  // Strip common prefixes (e.g. "sha256=", "sha1=") before comparing
+  const stripped = signature.replace(/^sha(?:1|256)=/, "");
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -23,7 +26,7 @@ export async function verifyHmac(body, signature, secret) {
   const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(body));
   const computed = bufToHex(sig);
 
-  return constantTimeEqual(computed, signature);
+  return constantTimeEqual(computed, stripped);
 }
 
 /** Convert ArrayBuffer to lowercase hex string. */

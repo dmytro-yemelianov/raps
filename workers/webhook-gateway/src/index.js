@@ -103,17 +103,21 @@ async function handleWebhook(request, env) {
  * Requires Bearer token matching RAPS_GATEWAY_API_KEY.
  */
 async function handleDrain(request, env, url) {
-  // Auth check
+  // Auth check — always require a configured key; if unset, deny all access
   const apiKey = env.RAPS_GATEWAY_API_KEY || "";
-  if (apiKey) {
-    const auth = request.headers.get("Authorization") || "";
-    const token = auth.replace(/^Bearer\s+/i, "");
-    if (token !== apiKey) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
-    }
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const auth = request.headers.get("Authorization") || "";
+  const token = auth.replace(/^Bearer\s+/i, "");
+  if (token !== apiKey) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const limit = url.searchParams.get("limit") || "100";

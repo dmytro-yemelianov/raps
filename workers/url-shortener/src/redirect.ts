@@ -16,7 +16,7 @@ export async function handleRedirect(c: Context<{ Bindings: Env }>): Promise<Res
   const raw = await c.env.KV.get(code)
   if (raw !== null) {
     const { url } = JSON.parse(raw) as { url: string; created_at: string }
-    return c.redirect(url, 301)
+    return c.redirect(url, 302)
   }
 
   const safe = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
