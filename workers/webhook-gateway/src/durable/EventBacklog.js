@@ -30,15 +30,17 @@ export class EventBacklog {
     const event = await request.json();
     const id = `evt:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
-    // Check current count
-    const keys = await this.state.storage.list({ prefix: "evt:" });
-    if (keys.size >= MAX_EVENTS) {
-      // Evict oldest
-      const oldest = [...keys.keys()].sort()[0];
-      await this.state.storage.delete(oldest);
-    }
+    await this.state.storage.transaction(async (txn) => {
+      // Check current count
+      const keys = await txn.list({ prefix: "evt:" });
+      if (keys.size >= MAX_EVENTS) {
+        // Evict oldest
+        const oldest = [...keys.keys()].sort()[0];
+        await txn.delete(oldest);
+      }
 
-    await this.state.storage.put(id, JSON.stringify(event));
+      await txn.put(id, JSON.stringify(event));
+    });
 
     return new Response(JSON.stringify({ id, stored: true }), {
       status: 201,
