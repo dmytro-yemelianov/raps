@@ -312,7 +312,9 @@ impl StateManager {
     async fn save_state(&self, state: &OperationState) -> Result<(), AdminError> {
         let path = self.operation_path(state.operation_id);
         let content = serde_json::to_string_pretty(state)?;
-        tokio::fs::write(&path, content).await?;
+        let tmp_path = path.with_extension("tmp");
+        tokio::fs::write(&tmp_path, &content).await?;
+        tokio::fs::rename(&tmp_path, &path).await?;
         Ok(())
     }
 }
