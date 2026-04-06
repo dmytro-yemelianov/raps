@@ -9,8 +9,7 @@
 //   GET  /api/urn          — decode APS URN
 //   GET  /urn              — URN decoder landing page
 //   GET  /api/status       — APS service health
-//   POST /api/shorten      — shorten a signed URL
-//   GET  /s/:id            — redirect to shortened URL
+//   GET  /s/:id            — redirect to url-shortener worker (go.rapscli.xyz)
 //   GET  /health           — health check
 //
 // Cron:
@@ -21,7 +20,6 @@ import { handleVersion } from "./version.js";
 import { handleBadge } from "./badge.js";
 import { handleUrn } from "./urn.js";
 import { handleStatus } from "./status.js";
-import { handleShorten, handleRedirect } from "./shorturl.js";
 import { refreshReleaseCache } from "./github.js";
 
 export default {
@@ -56,12 +54,9 @@ export default {
       return handleStatus(request, env);
     }
 
-    if (path === "/api/shorten" && request.method === "POST") {
-      return handleShorten(request, env);
-    }
-
     if (path.startsWith("/s/") && request.method === "GET") {
-      return handleRedirect(request, env);
+      const id = path.slice("/s/".length);
+      return Response.redirect(`https://go.rapscli.xyz/${id}`, 301);
     }
 
     return new Response("Not found", { status: 404 });
