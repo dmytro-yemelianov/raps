@@ -62,7 +62,9 @@ impl Config {
             .or_else(|_| {
                 profile_data
                     .as_ref()
-                    .and_then(|(_, profile)| profile.client_secret.clone())
+                    .and_then(|(profile_name, profile)| {
+                        resolve_client_secret(profile_name, profile.client_secret.clone())
+                    })
                     .ok_or(env::VarError::NotPresent)
             })
             .context(
@@ -123,7 +125,9 @@ impl Config {
             .or_else(|_| {
                 profile_data
                     .as_ref()
-                    .and_then(|(_, profile)| profile.client_secret.clone())
+                    .and_then(|(profile_name, profile)| {
+                        resolve_client_secret(profile_name, profile.client_secret.clone())
+                    })
                     .ok_or(env::VarError::NotPresent)
             })
             .unwrap_or_default();
@@ -329,6 +333,39 @@ pub fn find_project_profile() -> Option<String> {
         if !dir.pop() {
             return None;
         }
+    }
+}
+
+/// Sentinel written to profile JSON when client_secret is stored in the OS keychain.
+pub const CLIENT_SECRET_KEYCHAIN_SENTINEL: &str = "<stored-in-keychain>";
+
+/// Resolve `client_secret` from a profile, fetching from the OS keychain when
+/// the value is the keychain sentinel rather than returning the literal sentinel.
+///
+/// Returns `None` when no secret is stored (neither in the profile nor the keychain).
+pub fn resolve_client_secret(profile_name: &str, raw: Option<String>) -> Option<String> {
+    match raw {
+        Some(ref v) if v == CLIENT_SECRET_KEYCHAIN_SENTINEL => {
+            let key = format!("client_secret:{}", profile_name);
+            match keyring::Entry::new("raps", &key) {
+                Ok(entry) => match entry.get_password() {
+                    Ok(secret) => Some(secret),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            "Failed to load client_secret from keychain; \
+                             re-run: raps config set client_secret <value>"
+                        );
+                        None
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(error = %e, "Keychain not available for client_secret lookup");
+                    None
+                }
+            }
+        }
+        other => other,
     }
 }
 

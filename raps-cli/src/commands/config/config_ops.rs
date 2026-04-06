@@ -97,7 +97,22 @@ pub(super) async fn set_config(key: &str, value: &str, output_format: OutputForm
 
     match key {
         "client_id" => profile.client_id = Some(value.to_string()),
-        "client_secret" => profile.client_secret = Some(value.to_string()),
+        "client_secret" => {
+            // When keychain is enabled, store the real secret in the OS keychain
+            // and write a sentinel to the profile JSON so the secret is never
+            // persisted in plaintext on disk.
+            let use_keychain = profile.use_keychain.unwrap_or(true);
+            if use_keychain {
+                let entry = keyring::Entry::new("raps", &format!("client_secret:{}", profile_name))
+                    .map_err(|e| anyhow::anyhow!("Failed to access keychain: {}", e))?;
+                entry
+                    .set_password(value)
+                    .map_err(|e| anyhow::anyhow!("Failed to store client_secret in keychain: {}", e))?;
+                profile.client_secret = Some("<stored-in-keychain>".to_string());
+            } else {
+                profile.client_secret = Some(value.to_string());
+            }
+        }
         "base_url" => profile.base_url = Some(value.to_string()),
         "callback_url" => profile.callback_url = Some(value.to_string()),
         "da_nickname" => profile.da_nickname = Some(value.to_string()),
