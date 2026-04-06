@@ -319,7 +319,7 @@ impl JobConsumer {
     }
 
     /// Move a failed job to the dead-letter queue and acknowledge it on the source stream.
-    pub async fn nack_to_dlq(&self, job: &Job, error: &str) -> Result<()> {
+    pub async fn nack_to_dlq(&self, job: &Job, entry_id: &str, error: &str) -> Result<()> {
         let mut conn = self.pool.get().await.context("Redis pool exhausted")?;
 
         // Add to DLQ with error info
@@ -336,6 +336,16 @@ impl JobConsumer {
             .query_async::<String>(&mut *conn)
             .await
             .context("XADD to DLQ failed")?;
+
+        // Acknowledge on the source stream so the entry is removed from the PEL.
+        let source_stream = job.priority.stream_key();
+        redis::cmd("XACK")
+            .arg(source_stream)
+            .arg(CONSUMER_GROUP)
+            .arg(entry_id)
+            .query_async::<i64>(&mut *conn)
+            .await
+            .context("XACK on source stream after DLQ move")?;
 
         tracing::warn!(job_id = %job.id, error, "Job moved to DLQ");
         Ok(())

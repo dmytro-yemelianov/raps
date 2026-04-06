@@ -770,7 +770,7 @@ async fn worker_start(
                         Err(e) => {
                             tracing::error!(job_id = %job.id, error = %e, "Job failed");
                             if job.attempts >= job.max_attempts {
-                                let _ = consumer.nack_to_dlq(&job, &e.to_string()).await;
+                                let _ = consumer.nack_to_dlq(&job, &entry_id, &e.to_string()).await;
                             }
                         }
                     }
