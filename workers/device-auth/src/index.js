@@ -48,7 +48,7 @@ export default {
 
     // --- CLI polls for token ---
     if (path === "/device/token" && request.method === "GET") {
-      return handleToken(url, env);
+      return handleToken(url, env, request);
     }
 
     // --- CLI marks session consumed ---
@@ -78,7 +78,10 @@ function getDO(env) {
 
 function checkApiSecret(request, env) {
   const secret = env.RAPS_DEVICE_API_SECRET || "";
-  if (!secret) return true; // no secret configured = open
+  if (!secret) {
+    console.warn("RAPS_DEVICE_API_SECRET is not configured — rejecting request");
+    return false;
+  }
 
   const auth = request.headers.get("Authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "");
@@ -214,7 +217,11 @@ async function handleCallback(url, env) {
 }
 
 /** GET /device/token?session_id=X — CLI polls for auth state. */
-async function handleToken(url, env) {
+async function handleToken(url, env, request) {
+  if (!checkApiSecret(request, env)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const sessionId = url.searchParams.get("session_id") || "";
   if (!sessionId) {
     return json({ error: "Missing session_id" }, 400);
@@ -228,6 +235,10 @@ async function handleToken(url, env) {
 
 /** POST /device/consume — CLI marks session consumed. */
 async function handleConsume(request, env) {
+  if (!checkApiSecret(request, env)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   let body;
   try {
     body = await request.json();
