@@ -8,13 +8,17 @@ kv_namespaces = [
 ]
 
 routes = [
+  # Root domain (user-facing, stays permanently)
   { pattern = "rapscli.xyz/install", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/install.sh", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/install.ps1", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/health", zone_name = "rapscli.xyz" },
+  { pattern = "rapscli.xyz/s/*", zone_name = "rapscli.xyz" },
+  # Root domain (legacy, will be removed in cleanup)
   { pattern = "rapscli.xyz/api/*", zone_name = "rapscli.xyz" },
   { pattern = "rapscli.xyz/urn*", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/s/*", zone_name = "rapscli.xyz" },
-  { pattern = "rapscli.xyz/health", zone_name = "rapscli.xyz" }
+  # API subdomain (new canonical location)
+  { pattern = "api.rapscli.xyz/*", zone_name = "rapscli.xyz" },
 ]
 
 # Cron trigger: refresh release metadata every hour

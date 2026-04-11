@@ -1,16 +1,26 @@
 // RAPS CLI API Worker — Cloudflare Worker
 //
-// Routes:
+// rapscli.xyz routes (user-facing):
 //   GET  /install          — auto-detect OS, serve install script
 //   GET  /install.sh       — bash install script
 //   GET  /install.ps1      — PowerShell install script
+//   GET  /health           — health check
+//   GET  /s/:id            — redirect to url-shortener worker (go.rapscli.xyz)
+//
+// rapscli.xyz/api/* routes (legacy, will be removed):
 //   GET  /api/version      — latest release info
 //   GET  /api/badge/*      — SVG badges (version, downloads)
 //   GET  /api/urn          — decode APS URN
-//   GET  /urn              — URN decoder landing page
 //   GET  /api/status       — APS service health
-//   GET  /s/:id            — redirect to url-shortener worker (go.rapscli.xyz)
-//   GET  /health           — health check
+//
+// api.rapscli.xyz routes (new canonical):
+//   GET  /version          — latest release info
+//   GET  /badge/*          — SVG badges (version, downloads)
+//   GET  /urn              — decode APS URN
+//   GET  /status           — APS service health
+//
+// rapscli.xyz (legacy, will be removed):
+//   GET  /urn              — URN decoder landing page
 //
 // Cron:
 //   Every hour — refresh GitHub release cache
@@ -25,7 +35,12 @@ import { refreshReleaseCache } from "./github.js";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const path = url.pathname;
+    let path = url.pathname;
+
+    // On api.rapscli.xyz, the /api/ prefix is implicit — rewrite so handlers work unchanged
+    if (url.hostname === 'api.rapscli.xyz' && !path.startsWith('/api/') && !path.startsWith('/api')) {
+      path = '/api' + path;  // /version → /api/version, /badge/x → /api/badge/x, /urn → /api/urn
+    }
 
     if (path === "/health" && request.method === "GET") {
       return new Response(
