@@ -567,9 +567,9 @@ checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
 name = "clap_mangen"
-version = "0.2.31"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439ea63a92086df93893164221ad4f24142086d535b3a0957b9b9bea2dc86301"
+checksum = "d82842b45bf9f6a3be090dd860095ac30728042c08e0d6261ca7259b5d850f07"
 dependencies = [
  "clap",
  "roff",
@@ -3093,7 +3093,7 @@ checksum = "0c8d0fd677905edcbeedbf2edb6494d676f0e98d54d5cf9bda0b061cb8fb8aba"
 
 [[package]]
 name = "raps-acc"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3112,7 +3112,7 @@ dependencies = [
 
 [[package]]
 name = "raps-admin"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3135,7 +3135,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cli"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3207,7 +3207,7 @@ dependencies = [
 
 [[package]]
 name = "raps-cloud"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3242,7 +3242,7 @@ dependencies = [
 
 [[package]]
 name = "raps-da"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3262,7 +3262,7 @@ dependencies = [
 
 [[package]]
 name = "raps-derivative"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3286,7 +3286,7 @@ dependencies = [
 
 [[package]]
 name = "raps-dm"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3305,7 +3305,7 @@ dependencies = [
 
 [[package]]
 name = "raps-kernel"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3385,7 +3385,7 @@ dependencies = [
 
 [[package]]
 name = "raps-oss"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3411,7 +3411,7 @@ dependencies = [
 
 [[package]]
 name = "raps-reality"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "futures-util",
@@ -3429,7 +3429,7 @@ dependencies = [
 
 [[package]]
 name = "raps-webhooks"
-version = "5.6.3"
+version = "5.7.0"
 dependencies = [
  "anyhow",
  "insta",
@@ -3763,9 +3763,9 @@ dependencies = [
 
 [[package]]
 name = "roff"
-version = "0.2.2"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88f8660c1ff60292143c98d08fc6e2f654d722db50410e3f3797d40baaf9d8f3"
+checksum = "323c417e1d9665a65b263ec744ba09030cfb277e9daa0b018a4ab62e57bc8189"
 
 [[package]]
 name = "rsa"
