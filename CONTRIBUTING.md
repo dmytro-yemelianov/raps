@@ -1,6 +1,12 @@
-# Contributing to APS CLI
+# Contributing to RAPS
 
-Thank you for your interest in contributing to APS CLI! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to RAPS! This document provides guidelines and instructions for contributing.
+
+## Project Status
+
+RAPS is community-maintained as of March 2026. The original author reviews and merges PRs but is not actively developing new features. Contributions of all sizes are welcome.
+
+**Good first contributions:** bug fixes, new CLI subcommands, improved error messages, test coverage, documentation.
 
 ## Code of Conduct
 
@@ -34,7 +40,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 
 ### Prerequisites
 
-- Rust 1.70 or later ([rustup.rs](https://rustup.rs/))
+- Rust 1.88 or later ([rustup.rs](https://rustup.rs/))
 - APS account with application credentials from [APS Developer Portal](https://aps.autodesk.com/myapps)
 
 ### Building
@@ -208,11 +214,30 @@ Releases are managed by maintainers. To trigger a release:
 3. Push the tag: `git push origin v0.x.x`
 4. GitHub Actions will automatically build and publish releases
 
+## Architecture Overview
+
+RAPS is a Rust workspace with 10 crates:
+
+| Crate | Purpose |
+|-------|---------|
+| `raps-cli` | CLI binary, MCP server, TUI dashboard |
+| `raps-kernel` | Core auth, config, HTTP client, logging |
+| `raps-oss` | Object Storage Service |
+| `raps-derivative` | Model Derivative API |
+| `raps-dm` | Data Management (hubs, projects, folders) |
+| `raps-da` | Design Automation |
+| `raps-acc` | ACC/BIM 360 (issues, RFIs, assets) |
+| `raps-admin` | Account Admin (bulk user ops) |
+| `raps-webhooks` | Webhooks API |
+| `raps-reality` | Reality Capture |
+
+Adding a new command typically means: add a clap struct in `raps-cli`, implement the API call in the relevant service crate, and wire it into the CLI dispatch.
+
 ## Questions?
 
 - Open an issue for questions or discussions
 - Check existing issues and PRs before creating new ones
 - Be patient and respectful in all interactions
 
-Thank you for contributing! 🎉
+Thank you for contributing!
 

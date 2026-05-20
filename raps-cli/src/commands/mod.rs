@@ -38,6 +38,7 @@ pub mod project;
 pub mod reality;
 pub mod report;
 pub mod rfi;
+pub mod safeguard;
 pub mod schema;
 #[cfg(feature = "kubernetes")]
 pub mod serve;
@@ -76,6 +77,7 @@ pub use project::ProjectCommands;
 pub use reality::RealityCommands;
 pub use report::ReportCommands;
 pub use rfi::RfiCommands;
+pub use safeguard::SafeguardCommands;
 pub use skill::SkillCommands;
 pub use snapshot::SnapshotCommands;
 pub use template::TemplateCommands;

@@ -21,9 +21,13 @@ Third-Party Licenses
 --------------------
 
 This software includes dependencies licensed under various open-source licenses.
-See the Cargo.lock file for a complete list of dependencies and their versions.
 
-Notable dependencies:
+- Cargo.lock: machine-readable dependency graph (versions and checksums).
+- See the rapsody repository (https://github.com/dmytro-yemelianov/raps) for
+  the upstream THIRD_PARTY.md and THIRD_PARTY_LICENSES.txt bundles generated
+  by `cargo about`.
+
+Notable direct dependencies:
 
 - tokio (MIT) - Asynchronous runtime for Rust
 - reqwest (MIT/Apache-2.0) - HTTP client

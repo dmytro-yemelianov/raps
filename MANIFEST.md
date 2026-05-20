@@ -1,17 +1,17 @@
 # RAPS Manifest — Single Source of Truth
 
-Last updated: 2026-03-05
+Last updated: 2026-03-19
 
 ## Version
-- **Current version:** 5.1.0
+- **Current version:** 5.7.0
 - **Rust edition:** 2024
 - **Minimum Rust version:** 1.88+
 - **License:** Apache-2.0
 
 ## Counts
-- **Top-level command families:** 27
-- **Total operations (incl. subcommands):** 100+
-- **MCP tools:** 111
+- **Top-level command families:** 51
+- **Total operations (incl. subcommands):** 195+
+- **MCP tools:** 114
 - **Workspace crates:** 10
 - **APS service crates:** 8
 - **APS APIs covered:** 15+
@@ -36,8 +36,8 @@ Last updated: 2026-03-05
 - Total operations exceed 100 when subcommands are included.
 - Use `raps --help` and `raps <command> --help` for the live command surface.
 
-## Key Features (v5.0–v5.1)
-- 111 MCP tools via `raps mcp`
+## Key Features (v5.0–v5.7)
+- 114 MCP tools via `raps mcp`
 - Device code auth flow for headless environments (`raps auth login`)
 - Distributed orchestration: Redis-backed queue/cache, serverless dispatch, webhook gateway
 - TUI Dashboard (7 tabs, 33 views, opt-in `--features dashboard`)
@@ -45,9 +45,17 @@ Last updated: 2026-03-05
 - AEC GraphQL integration (faster hub/project queries, REST fallback)
 - Server-side object copy and batch copy/rename
 - Model Derivative metadata queries (4 commands)
-- Bulk admin: user add/remove/update across projects with dry-run
+- Bulk admin: user add/remove/update/create across projects with dry-run
 - Headless env detection for auth (auto device flow)
 - API health tracking with latency spinners
+- Company CRUD: create, get, search, update account companies
+- Account user lifecycle: create, get, update-account (email-based)
+- BIM 360 backward compatibility: HQ v1 API fallback across all admin endpoints
+- Export/clone permissions: bulk audit user project & folder permissions to CSV
+- Project archive with file export
+- Safeguard: rollback and backup script generation for 32 destructive operations
+- Graceful 2-legged auth fallback when 3-legged unavailable
+- Smart auth expiry handling with silent token refresh
 
 ## Author
 Dmytro Yemelianov (dmytroyemelianov@icloud.com)

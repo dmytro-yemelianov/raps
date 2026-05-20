@@ -55,8 +55,9 @@ use commands::{
     AccCommands, AdminCommands, ApiCommands, AuthCommands, BucketCommands, ConfigCommands,
     DaCommands, DemoCommands, FolderCommands, GenerateArgs, HubCommands, IssueCommands,
     ItemCommands, JobCommands, MarketplaceCommands, ObjectCommands, PipelineCommands,
-    PluginCommands, ProjectCommands, RealityCommands, ReportCommands, RfiCommands, SkillCommands,
-    SnapshotCommands, TemplateCommands, TranslateCommands, WebhookCommands, WorkflowCommands,
+    PluginCommands, ProjectCommands, RealityCommands, ReportCommands, RfiCommands,
+    SafeguardCommands, SkillCommands, SnapshotCommands, TemplateCommands, TranslateCommands,
+    WebhookCommands, WorkflowCommands,
 };
 
 use raps_acc::admin::AccountAdminClient;
@@ -372,6 +373,10 @@ enum Commands {
     #[command(subcommand)]
     Serve(commands::serve::ServeCommands),
 
+    /// Generate rollback and backup scripts for any raps operation
+    #[command(subcommand)]
+    Safeguard(SafeguardCommands),
+
     /// Record, compare, and list bucket object snapshots
     #[command(subcommand)]
     Snapshot(SnapshotCommands),
@@ -495,6 +500,7 @@ const KNOWN_SUBCOMMANDS: &[&str] = &[
     "man",
     "logs",
     "lint",
+    "safeguard",
     "snapshot",
     "skill",
 ];
@@ -1452,6 +1458,7 @@ fn command_name(cmd: &Commands) -> &'static str {
         Commands::Mcp { .. } => "mcp",
         #[cfg(feature = "kubernetes")]
         Commands::Serve(_) => "serve",
+        Commands::Safeguard(_) => "safeguard",
         Commands::Snapshot(_) => "snapshot",
         Commands::Doctor => "doctor",
         Commands::Cache(_) => "cache",
@@ -1725,6 +1732,10 @@ async fn execute_command(
         #[cfg(feature = "kubernetes")]
         Commands::Serve(cmd) => {
             cmd.execute().await?;
+        }
+
+        Commands::Safeguard(cmd) => {
+            cmd.execute(output_format).await?;
         }
 
         Commands::Snapshot(cmd) => {

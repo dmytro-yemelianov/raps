@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## Project Status — 2026-03-20
+
+**RAPS is now community-maintained.** Active development by the original author has been frozen at v5.7.0. The project is fully functional and feature-complete across 15+ Autodesk APIs with 195+ operations and 114 MCP tools.
+
+Community contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines. Bug fixes, new commands, and improvements will be reviewed and merged.
+
+## [5.7.0] - 2026-03-14
+
+### Added
+- **`raps safeguard`**: Generate executable rollback and backup shell scripts for 32 destructive APS operations. Covers buckets, objects, webhooks, projects, admin users, issues, RFIs, templates, folder permissions, pipelines, DA workitems, and reality capture. Scripts include `set -euo pipefail`, inline comments, timestamped filenames, and `chmod +x`.
+- **`raps admin company create/get/search/update`**: Full company CRUD for ACC accounts.
+- **`raps admin user create/get/update-account`**: Account-level user lifecycle management with email-based operations.
+- **`raps admin project get`**: Retrieve project details by ID.
+- **Graceful 2-legged auth fallback**: When 3-legged auth is unavailable, automatically falls back to 2-legged without error.
+- **Smart auth expiry handling**: Expired tokens auto-refresh silently instead of showing misleading "Already logged in" messages.
+
+### Fixed
+- Auth expiry detection improved — catches expired tokens before they cause 401 errors mid-operation.
+- User list display now resolves company names and shows added dates + status summary.
+- 5 bugs found during manual testing resolved.
+
+### Changed
+- `rustfmt` formatting applied across entire workspace.
+
+## [5.6.3] - 2026-03-13
+
+### Added
+- **BIM 360 HQ v1 fallback**: All admin API endpoints (user list, project list, company operations) automatically detect platform and fall back to BIM 360 HQ v1 APIs when ACC v2 endpoints return 404. Response formats, role names, and pagination normalized across both platforms.
+
+### Fixed
+- BIM 360 HQ v1 users response parsed correctly as plain array (not paginated object).
+
+## [5.6.2] - 2026-03-13
+
+### Fixed
+- ACC add-user HTTP 500 resolved; improved bulk user operation error handling.
+
+## [5.6.1] - 2026-03-13
+
+### Fixed
+- BIM 360 projects without Document Management module no longer cause errors during bulk user add.
+
+## [5.6.0] - 2026-03-13
+
+### Added
+- **`raps admin export-permissions`**: Bulk export user project memberships and folder-level permissions across an entire account to CSV.
+- **`raps admin clone-permissions`**: Copy one user's exact project roles and folder permissions to another user.
+- **`raps project archive --export`**: Enhanced project archive with automatic file export — downloads all files preserving folder structure before archiving.
+- **BIM 360 HQ v1 project creation**: Support for creating projects on legacy BIM 360 accounts.
+- **`--company` flag**: Company assignment support for admin user operations.
+- **`raps admin role list`**: List available roles for an account.
+- **`raps admin company list`**: List companies in an account.
+- **BIM 360 role resolution**: Smart role name resolution across ACC and BIM 360 platforms.
+
+### Fixed
+- Platform detection corrected for BIM 360 projects.
+- 429 rate-limit retry strategy improved for bulk operations.
+- CLI help snapshots updated for new commands.
+- Clippy `collapsible_if` warnings resolved.
+
 ## [5.3.3] - 2026-03-07
 
 ### Added
