@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "raps": {
+      "type": "streamable-http",
+      "url": "https://mcp.rapscli.xyz/mcp",
+      "headers": {
+        "Authorization": "Bearer <your-license-key>"
+      }
+    }
+  }
+}
