@@ -122,6 +122,9 @@ docs/_build/
 # Archive directory
 archive/
 
+# Demo runtime state (scripts/demo)
+scripts/demo/.demo-state
+
 # RAPS history
 .raps_history
 .worktrees/

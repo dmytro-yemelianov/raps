@@ -60,8 +60,12 @@ pub async fn watch_translation(
                     "\u{2713}".green().bold(),
                     progress_msg
                 ));
+                let url = raps_derivative::viewer_url(urn);
                 if output_format.supports_colors() {
                     println!("{} Translation succeeded", "\u{2713}".green().bold());
+                    println!("\n  {} {}", "Viewer:".bold().cyan(), url.underline());
+                } else {
+                    println!("{}", url);
                 }
                 return Ok(());
             }

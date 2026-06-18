@@ -217,6 +217,11 @@ pub(super) async fn upload_object(
                 "URN (for translation):".bold().yellow(),
                 output.urn
             );
+            println!(
+                "  {} raps translate start {} --watch",
+                "Next:".dimmed(),
+                output.urn.dimmed()
+            );
         }
         _ => {
             output_format.write(&output)?;
