@@ -1,0 +1,29 @@
+# RAPS demo sample model — a unit cube
+# Tiny text OBJ (safe to commit) used by scripts/demo/run.sh
+# Translates cleanly to SVF2 for the Autodesk Viewer.
+
+# Vertices
+v -1.0 -1.0  1.0
+v  1.0 -1.0  1.0
+v  1.0  1.0  1.0
+v -1.0  1.0  1.0
+v -1.0 -1.0 -1.0
+v  1.0 -1.0 -1.0
+v  1.0  1.0 -1.0
+v -1.0  1.0 -1.0
+
+# Normals
+vn  0.0  0.0  1.0
+vn  0.0  0.0 -1.0
+vn  0.0  1.0  0.0
+vn  0.0 -1.0  0.0
+vn  1.0  0.0  0.0
+vn -1.0  0.0  0.0
+
+# Faces
+f 1//1 2//1 3//1 4//1
+f 8//2 7//2 6//2 5//2
+f 4//3 3//3 7//3 8//3
+f 5//4 6//4 2//4 1//4
+f 2//5 6//5 7//5 3//5
+f 5//6 1//6 4//6 8//6

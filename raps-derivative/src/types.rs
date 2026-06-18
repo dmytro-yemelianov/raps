@@ -386,9 +386,41 @@ pub struct PropertyPagination {
     pub limit: usize,
 }
 
+/// Build a shareable Autodesk APS Viewer URL for a translated (SVF2/SVF) model.
+///
+/// Returns a link to the official APS Viewer reference application, which loads
+/// any URN the authenticated APS application has access to. The URN is passed
+/// in the URL fragment exactly as APS expects it (base64url, no padding).
+///
+/// Note: viewing requires a valid `viewables:read` token in the browser; the
+/// reference viewer prompts for APS login on first use. For OSS-hosted models
+/// the URN is `urn:adsk.objects:os.object:<bucket>/<key>` base64url-encoded —
+/// the same value returned by `object upload` and accepted by `translate`.
+pub fn viewer_url(urn: &str) -> String {
+    format!("https://aps.autodesk.com/viewer?urn={}", urn.trim())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_viewer_url_format() {
+        let urn = "dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6Yi9tLm9iag";
+        let url = viewer_url(urn);
+        assert_eq!(
+            url,
+            format!("https://aps.autodesk.com/viewer?urn={}", urn)
+        );
+        assert!(url.starts_with("https://"));
+        assert!(url.contains(urn));
+    }
+
+    #[test]
+    fn test_viewer_url_trims_whitespace() {
+        let url = viewer_url("  abc123  ");
+        assert_eq!(url, "https://aps.autodesk.com/viewer?urn=abc123");
+    }
 
     #[test]
     fn test_output_format_serialization() {

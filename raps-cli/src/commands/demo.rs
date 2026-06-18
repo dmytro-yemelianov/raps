@@ -499,6 +499,10 @@ f 5//6 1//6 4//6 8//6
     println!("  Bucket:  {}", bucket_key);
     println!("  URN:     {}", urn);
     println!("  Format:  {}", args.format);
+    println!(
+        "  Viewer:  {}",
+        raps_derivative::viewer_url(&urn).cyan().underline()
+    );
 
     // Cleanup
     if !args.keep_bucket {
