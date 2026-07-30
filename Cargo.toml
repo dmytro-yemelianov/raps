@@ -185,7 +185,7 @@ rstest = "0.25"
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
 
 # JWT authentication
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 
 # Encryption
 aes-gcm = "0.10"
