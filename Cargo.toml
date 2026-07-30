@@ -167,7 +167,7 @@ redis = { version = "1.0", features = ["tokio-comp", "streams", "aio"] }
 hostname = "0.4"
 
 # Prometheus metrics
-prometheus = { version = "0.13", default-features = false }
+prometheus = { version = "0.14", default-features = false }
 
 # Lightweight HTTP server (health + metrics endpoints)
 axum = "0.8"
