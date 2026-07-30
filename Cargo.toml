@@ -40,7 +40,7 @@ raps-admin = { path = "raps-admin", version = "5.7.0" }
 # CLI framework
 clap = { version = "4.5", features = ["derive"] }
 clap_complete = "4.5"
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 
 # Interactive prompts
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
